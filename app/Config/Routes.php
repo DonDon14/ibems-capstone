@@ -17,6 +17,7 @@ $routes->get('login', 'PageController::login');
 $routes->get('dashboard', 'PageController::dashboard', ['filter' => 'role:ADMIN,STORE_SYSTEM,ACCOUNTING_OFFICE']);
 
 $routes->get('store/pos', 'StoreController::pos', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
+$routes->get('store/products', 'StoreController::products', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
 
 $routes->get('user/dashboard', 'PageController::userDashboard', ['filter' => 'role:USER,ADMIN']);
 $routes->get('user/history', 'PageController::userHistory', ['filter' => 'role:USER,ADMIN']);

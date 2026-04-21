@@ -1,0 +1,66 @@
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+    background: #f5f7fb;
+    color: #1f2937;
+}
+
+a {
+    color: #1d4ed8;
+}
+
+.app-header {
+    background: #0f172a;
+    color: #ffffff;
+    padding: 14px 20px;
+}
+
+.app-header h2 {
+    margin: 0;
+    font-size: 1.25rem;
+}
+
+.app-nav {
+    background: #e5e7eb;
+    padding: 10px 20px;
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.app-nav a {
+    text-decoration: none;
+    color: #111827;
+    font-weight: 600;
+}
+
+.app-container {
+    padding: 20px;
+}
+
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #ffffff;
+}
+
+.table th,
+.table td {
+    border: 1px solid #d1d5db;
+    padding: 10px;
+    text-align: left;
+}
+
+.table th {
+    background: #f3f4f6;
+}
+
+button,
+select,
+input {
+    font: inherit;
+}
