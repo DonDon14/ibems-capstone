@@ -15,6 +15,7 @@ class StoreModel extends Model
     protected $allowedFields = [
         'store_name',
         'officer_id',
+        'logo_url',
         'is_active',
         'created_at',
     ];

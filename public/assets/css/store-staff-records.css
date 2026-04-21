@@ -1,0 +1,99 @@
+.staff-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.staff-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    gap: 12px;
+}
+
+.staff-head h3 {
+    margin: 0;
+    color: #003366;
+}
+
+.staff-head p {
+    margin: 4px 0 0;
+    color: #64748b;
+}
+
+.staff-store-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.staff-store-wrap label {
+    font-size: 0.82rem;
+    color: #64748b;
+    font-weight: 600;
+}
+
+#staff-store-select {
+    min-width: 220px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+
+.staff-card {
+    background: #fff;
+    border: 1px solid #dbe3ea;
+    border-radius: 12px;
+    padding: 14px;
+}
+
+.staff-card h4 {
+    margin: 0 0 12px;
+    color: #003366;
+}
+
+.staff-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: end;
+    margin-bottom: 10px;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.field label {
+    font-size: 0.82rem;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.field input {
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+
+.checkbox-field label {
+    color: #334155;
+    font-weight: 600;
+}
+
+.table-wrap {
+    overflow: auto;
+}
+
+.staff-result {
+    min-height: 20px;
+}
+
+@media (max-width: 900px) {
+    .staff-head {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}

@@ -42,7 +42,9 @@ class AuthController extends Controller
         session()->set([
             'user_id'   => $user['id'],
             'name'      => $user['name'],
+            'email'     => $user['email'],
             'role'      => $user['role'],
+            'profile_image_url' => $user['profile_image_url'] ?? null,
             'logged_in' => true
         ]);
 
@@ -61,10 +63,7 @@ class AuthController extends Controller
     {
         session()->destroy();
 
-        return $this->response->setJSON([
-            'status' => 'success',
-            'message' => 'Logged out'
-        ]);
+        return redirect()->to('/login');
     }
 
     public function me()

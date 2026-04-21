@@ -25,6 +25,11 @@ class StoreController extends BaseController
         return view('store/inventory');
     }
 
+    public function staffRecords()
+    {
+        return view('store/staff-records');
+    }
+
     public function products()
     {
         $storeId = (int) ($this->request->getGet('store_id') ?? 1);
@@ -359,9 +364,10 @@ class StoreController extends BaseController
         $productId = (int) ($request['product_id'] ?? 0);
         $qty = (int) ($request['qty'] ?? 0);
         $unitCost = (float) ($request['unit_cost'] ?? 0);
+        $sellPrice = (float) ($request['sell_price'] ?? 0);
         $reason = trim((string) ($request['reason'] ?? 'Stock in'));
 
-        if ($storeId <= 0 || $productId <= 0 || $qty <= 0 || $unitCost < 0) {
+        if ($storeId <= 0 || $productId <= 0 || $qty <= 0 || $unitCost < 0 || $sellPrice < 0) {
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
                 'message' => 'Invalid restock payload.',
@@ -386,10 +392,12 @@ class StoreController extends BaseController
         }
 
         $totalCost = $unitCost * $qty;
-        $expectedProfit = ((float) $product['price'] - $unitCost) * $qty;
+        $profitPerPiece = $sellPrice - $unitCost;
+        $expectedProfit = $profitPerPiece * $qty;
         $db = Database::connect();
         $db->transStart();
 
+        $productModel->update($productId, ['price' => $sellPrice]);
         $productModel->addStock($productId, $qty);
 
         $movementModel = new InventoryMovementModel();
@@ -418,6 +426,8 @@ class StoreController extends BaseController
                 'unit_cost' => $unitCost,
                 'total_cost' => $totalCost,
                 'expected_profit' => $expectedProfit,
+                'sell_price' => $sellPrice,
+                'profit_per_piece' => $profitPerPiece,
                 'reason' => $reason,
             ]),
             'created_at' => date('Y-m-d H:i:s'),
@@ -435,8 +445,312 @@ class StoreController extends BaseController
         return $this->response->setJSON([
             'status' => 'success',
             'movement_id' => $movementId,
+            'sell_price' => $sellPrice,
+            'profit_per_piece' => $profitPerPiece,
             'expected_profit' => $expectedProfit,
             'total_cost' => $totalCost,
+        ]);
+    }
+
+    public function adjustStock()
+    {
+        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $actorId = (int) session()->get('user_id');
+        $role = (string) session()->get('role');
+        $storeId = (int) ($request['store_id'] ?? 0);
+        $productId = (int) ($request['product_id'] ?? 0);
+        $actualQty = (int) ($request['actual_qty'] ?? -1);
+        $reason = trim((string) ($request['reason'] ?? 'Physical count adjustment'));
+
+        if ($storeId <= 0 || $productId <= 0 || $actualQty < 0) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Invalid stock adjustment payload.',
+            ]);
+        }
+
+        $storeModel = new StoreModel();
+        if (!$storeModel->canUserAccessStore($actorId, $role, $storeId)) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'You cannot adjust this store stock.',
+            ]);
+        }
+
+        $productModel = new ProductModel();
+        $product = $productModel->find($productId);
+        if (!$product || (int) $product['store_id'] !== $storeId) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Product does not belong to the selected store.',
+            ]);
+        }
+
+        $previousQty = (int) $product['stock_qty'];
+        $diffQty = $actualQty - $previousQty;
+
+        if ($diffQty === 0) {
+            return $this->response->setJSON([
+                'status' => 'success',
+                'product_id' => $productId,
+                'previous_qty' => $previousQty,
+                'actual_qty' => $actualQty,
+                'diff_qty' => 0,
+            ]);
+        }
+
+        $db = Database::connect();
+        $db->transStart();
+
+        $productModel->update($productId, [
+            'stock_qty' => $actualQty,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $movementModel = new InventoryMovementModel();
+        $movementId = $movementModel->insert([
+            'product_id' => $productId,
+            'store_id' => $storeId,
+            'type' => 'adjustment',
+            'qty' => $diffQty,
+            'reason' => $reason !== '' ? $reason : 'Physical count adjustment',
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $auditLogModel = new AuditLogModel();
+        $auditLogModel->insert([
+            'actor_id' => $actorId,
+            'action' => 'ADJUST_PRODUCT_STOCK',
+            'entity' => 'products',
+            'entity_id' => $productId,
+            'payload_json' => json_encode([
+                'store_id' => $storeId,
+                'product_id' => $productId,
+                'previous_qty' => $previousQty,
+                'actual_qty' => $actualQty,
+                'diff_qty' => $diffQty,
+                'reason' => $reason,
+                'movement_id' => $movementId,
+            ]),
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $db->transComplete();
+
+        if (!$db->transStatus()) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'status' => 'error',
+                'message' => 'Stock adjustment failed.',
+            ]);
+        }
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'product_id' => $productId,
+            'previous_qty' => $previousQty,
+            'actual_qty' => $actualQty,
+            'diff_qty' => $diffQty,
+        ]);
+    }
+
+    public function addProduct()
+    {
+        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $actorId = (int) session()->get('user_id');
+        $role = (string) session()->get('role');
+
+        $storeId = (int) ($request['store_id'] ?? 0);
+        $sku = trim((string) ($request['sku'] ?? ''));
+        $name = trim((string) ($request['name'] ?? ''));
+        $category = trim((string) ($request['category'] ?? ''));
+        $imageUrl = trim((string) ($request['image_url'] ?? ''));
+        $sellPrice = (float) ($request['sell_price'] ?? 0);
+        $initialStock = (int) ($request['initial_stock'] ?? 0);
+        $unitCost = (float) ($request['unit_cost'] ?? 0);
+        $reason = trim((string) ($request['reason'] ?? 'Initial stock'));
+
+        if ($storeId <= 0 || $sku === '' || $name === '' || $sellPrice < 0 || $initialStock < 0 || $unitCost < 0) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Invalid product payload.',
+            ]);
+        }
+
+        $storeModel = new StoreModel();
+        if (!$storeModel->canUserAccessStore($actorId, $role, $storeId)) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'You cannot add products to this store.',
+            ]);
+        }
+
+        $productModel = new ProductModel();
+        if ($productModel->getBySku($storeId, $sku)) {
+            return $this->response->setStatusCode(409)->setJSON([
+                'status' => 'error',
+                'message' => 'SKU already exists in this store.',
+            ]);
+        }
+
+        $db = Database::connect();
+        $db->transStart();
+
+        $productId = $productModel->insert([
+            'store_id' => $storeId,
+            'sku' => $sku,
+            'name' => $name,
+            'category' => $category !== '' ? $category : null,
+            'image_url' => $imageUrl !== '' ? $imageUrl : null,
+            'price' => $sellPrice,
+            'stock_qty' => $initialStock,
+            'is_active' => 1,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $movementId = null;
+        if ($initialStock > 0) {
+            $totalCost = $unitCost * $initialStock;
+            $profitPerPiece = $sellPrice - $unitCost;
+            $expectedProfit = $profitPerPiece * $initialStock;
+
+            $movementModel = new InventoryMovementModel();
+            $movementId = $movementModel->insert([
+                'product_id' => $productId,
+                'store_id' => $storeId,
+                'type' => 'restock',
+                'qty' => $initialStock,
+                'unit_cost' => $unitCost,
+                'total_cost' => $totalCost,
+                'expected_profit' => $expectedProfit,
+                'reason' => $reason !== '' ? $reason : 'Initial stock',
+                'created_at' => date('Y-m-d H:i:s'),
+            ]);
+        }
+
+        $auditLogModel = new AuditLogModel();
+        $auditLogModel->insert([
+            'actor_id' => $actorId,
+            'action' => 'CREATE_PRODUCT',
+            'entity' => 'products',
+            'entity_id' => $productId,
+            'payload_json' => json_encode([
+                'store_id' => $storeId,
+                'sku' => $sku,
+                'name' => $name,
+                'category' => $category,
+                'image_url' => $imageUrl,
+                'sell_price' => $sellPrice,
+                'initial_stock' => $initialStock,
+                'unit_cost' => $unitCost,
+                'movement_id' => $movementId,
+            ]),
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $db->transComplete();
+        if (!$db->transStatus()) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'status' => 'error',
+                'message' => 'Failed to create product.',
+            ]);
+        }
+
+        $created = $productModel->find($productId);
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'product' => $created,
+        ]);
+    }
+
+    public function staffTransactions()
+    {
+        $role = (string) session()->get('role');
+        $userId = (int) session()->get('user_id');
+        $storeModel = new StoreModel();
+        $stores = $storeModel->getAccessibleStores($userId, $role);
+
+        if ($stores === []) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'No accessible store found.',
+            ]);
+        }
+
+        $storeId = (int) ($this->request->getGet('store_id') ?? 0);
+        if ($storeId <= 0) {
+            $storeId = (int) $stores[0]['id'];
+        }
+
+        if (!$storeModel->canUserAccessStore($userId, $role, $storeId)) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'You cannot access this store.',
+            ]);
+        }
+
+        $q = trim((string) $this->request->getGet('q'));
+        $debtOnly = (int) ($this->request->getGet('debt_only') ?? 0) === 1;
+        $dateFrom = trim((string) $this->request->getGet('date_from'));
+        $dateTo = trim((string) $this->request->getGet('date_to'));
+        $limit = (int) ($this->request->getGet('limit') ?? 100);
+        $limit = max(1, min(200, $limit));
+
+        $db = Database::connect();
+        $query = $db->table('transactions t')
+            ->select('t.id, t.client_txn_id, t.created_at, t.payment_method, t.amount, u.id AS user_id, u.employee_id, u.name, u.email, u.user_type, b.current_debt')
+            ->join('users u', 'u.id = t.user_id', 'inner')
+            ->join('balances b', 'b.user_id = u.id', 'left')
+            ->where('t.store_id', $storeId)
+            ->whereIn('u.user_type', ['faculty', 'staff']);
+
+        if ($debtOnly) {
+            $query->where('t.payment_method', 'debt');
+        }
+
+        if ($dateFrom !== '') {
+            $query->where('t.created_at >=', $dateFrom . ' 00:00:00');
+        }
+
+        if ($dateTo !== '') {
+            $query->where('t.created_at <=', $dateTo . ' 23:59:59');
+        }
+
+        if ($q !== '') {
+            $query->groupStart()
+                ->like('u.name', $q)
+                ->orLike('u.email', $q)
+                ->orLike('u.employee_id', $q)
+                ->groupEnd();
+        }
+
+        $rows = $query->orderBy('t.id', 'DESC')
+            ->limit($limit)
+            ->get()
+            ->getResultArray();
+
+        $transactions = array_map(static function (array $row): array {
+            return [
+                'id' => (int) $row['id'],
+                'client_txn_id' => $row['client_txn_id'],
+                'created_at' => $row['created_at'],
+                'payment_method' => $row['payment_method'],
+                'amount' => (float) $row['amount'],
+                'staff' => [
+                    'id' => (int) $row['user_id'],
+                    'employee_id' => $row['employee_id'],
+                    'name' => $row['name'],
+                    'email' => $row['email'],
+                    'user_type' => $row['user_type'],
+                    'current_debt' => $row['current_debt'] !== null ? (float) $row['current_debt'] : 0.0,
+                ],
+            ];
+        }, $rows);
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'store_id' => $storeId,
+            'transactions' => $transactions,
         ]);
     }
 

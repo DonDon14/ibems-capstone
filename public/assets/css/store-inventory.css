@@ -10,6 +10,39 @@
     gap: 14px;
     align-items: end;
 }
+.inventory-top-actions {
+    display: flex;
+    gap: 10px;
+    align-items: end;
+}
+.add-menu-wrap {
+    position: relative;
+}
+.add-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    min-width: 170px;
+    background: #fff;
+    border: 1px solid #dbe3ea;
+    border-radius: 10px;
+    box-shadow: 0 8px 26px rgba(2, 6, 23, 0.15);
+    overflow: hidden;
+    z-index: 100;
+}
+.add-menu button {
+    width: 100%;
+    border: 0;
+    background: #fff;
+    color: #1f2937;
+    text-align: left;
+    padding: 10px 12px;
+    cursor: pointer;
+    font-size: 0.9rem;
+}
+.add-menu button:hover {
+    background: #f8fafc;
+}
 
 .inventory-top h3 {
     margin: 0;
@@ -42,7 +75,7 @@
 
 .inventory-grid {
     display: grid;
-    grid-template-columns: 1fr 1.35fr;
+    grid-template-columns: 1fr;
     gap: 12px;
 }
 
@@ -56,6 +89,70 @@
 .inventory-card h4 {
     margin: 0 0 12px;
     color: #003366;
+}
+.inventory-list-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+.inventory-list-head input {
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 8px 10px;
+    min-width: 260px;
+}
+.inventory-table-wrap {
+    overflow: auto;
+}
+.inventory-table-wrap .table td {
+    vertical-align: middle;
+}
+.prod-thumb {
+    width: 42px;
+    height: 42px;
+    border-radius: 8px;
+    border: 1px solid #dbe3ea;
+    object-fit: cover;
+    background: #f8fafc;
+}
+.prod-thumb-fallback {
+    width: 42px;
+    height: 42px;
+    border-radius: 8px;
+    border: 1px solid #dbe3ea;
+    background: #f8fafc;
+    display: grid;
+    place-items: center;
+    color: #64748b;
+    font-size: 0.78rem;
+    font-weight: 600;
+}
+.stock-input,
+.stock-reason {
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 6px 8px;
+}
+.stock-input {
+    width: 100px;
+}
+.stock-reason {
+    min-width: 180px;
+}
+.stock-adjust-btn {
+    border: 0;
+    border-radius: 8px;
+    background: #003366;
+    color: #fff;
+    padding: 8px 10px;
+    cursor: pointer;
+    font-size: 0.84rem;
+}
+.stock-adjust-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 .form-grid {
@@ -99,45 +196,70 @@
 
 .inventory-result {
     min-height: 20px;
-    margin-top: 8px;
+    margin-top: 4px;
 }
-
-.movement-filters {
+.inv-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    display: grid;
+    place-items: center;
+    padding: 18px;
+    z-index: 1200;
+}
+.inv-modal-card {
+    width: min(760px, 100%);
+    background: #fff;
+    border-radius: 12px;
+    border: 1px solid #dbe3ea;
+    padding: 14px;
+}
+.inv-modal-head {
     display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-    align-items: end;
+    align-items: center;
+    justify-content: space-between;
     margin-bottom: 10px;
 }
-
-.movement-table-wrap {
-    overflow: auto;
+.inv-modal-head h4 {
+    margin: 0;
+    color: #003366;
 }
-
-.history-action {
+.inv-modal-close {
     border: 0;
-    border-radius: 8px;
-    background: #003366;
-    color: #fff;
-    padding: 8px 10px;
+    background: #e2e8f0;
+    color: #0f172a;
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
     cursor: pointer;
-    font-size: 0.84rem;
+    font-weight: 700;
 }
-
-.history-action.alt {
-    background: #64748b;
-}
-
-@media (max-width: 1100px) {
-    .inventory-grid {
-        grid-template-columns: 1fr;
-    }
+.inv-modal-actions {
+    margin-top: 12px;
+    display: flex;
+    justify-content: flex-end;
 }
 
 @media (max-width: 900px) {
     .inventory-top {
         flex-direction: column;
         align-items: stretch;
+    }
+    .inventory-top-actions {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .add-menu {
+        left: 0;
+        right: auto;
+    }
+    .inventory-list-head {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    .inventory-list-head input {
+        min-width: 0;
+        width: 100%;
     }
 
     .form-grid {

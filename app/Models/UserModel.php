@@ -20,6 +20,7 @@ class UserModel extends Model
         'role',
         'user_type',
         'qr_token',
+        'profile_image_url',
         'base_salary',
         'is_active',
         'created_at',
