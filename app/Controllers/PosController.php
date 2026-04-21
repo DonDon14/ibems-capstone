@@ -53,8 +53,8 @@ class PosController extends ResourceController
             ];
         }
 
-        $userId        = $userId = session()->get('user_id');
-        $customerType  = $customerType  = $request['customer_type'] ?? 'walk_in';
+        $userId        = session()->get('user_id');
+        $customerType  = $request['customer_type'] ?? 'walk_in';
         $storeId       = $request['store_id'] ?? null;
         $items         = $request['items'] ?? [];
         $paymentMethod = $request['payment_method'] ?? null;
