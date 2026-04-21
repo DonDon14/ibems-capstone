@@ -45,7 +45,7 @@ $storeLogoUrl = (string) ($activeStore['logo_url'] ?? '');
             <a href="/store/pos" class="<?= $isActive('store/pos') ?>">POS</a>
             <a href="/store/inventory" class="<?= $isActive('store/inventory') ?>">Inventory</a>
             <a href="/store/history" class="<?= $isActive('store/history') ?>">History</a>
-            <a href="/store/staff-records" class="<?= $isActive('store/staff-records') ?>">Staff Records</a>
+            <a href="/store/staff-records" class="<?= $isActive('store/staff-records') ?>">Employee Records</a>
         </nav>
 
         <div class="app-sidebar-spacer"></div>

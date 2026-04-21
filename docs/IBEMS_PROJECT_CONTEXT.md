@@ -1,6 +1,6 @@
 # IBEMS Project Context
 
-Last updated: 2026-04-21
+Last updated: 2026-04-21 (Portal scope split locked)
 
 ## Project Overview
 
@@ -94,6 +94,90 @@ Working routes include:
 - `GET /user/dashboard`
 - `GET /user/history`
 
+Current store routes also include:
+
+- `GET /store/history`
+- `GET /store/inventory`
+- `GET /store/staff-records`
+- `GET /store/my-stores`
+- `GET /store/products`
+- `GET /store/debt-customers`
+- `GET /store/transactions`
+- `GET /store/staff-transactions`
+- `GET /store/transactions/{id}`
+- `POST /store/inventory/restock`
+- `POST /store/inventory/adjust-stock`
+- `POST /store/inventory/add-product`
+
+Accounting routes now include:
+
+- `GET /accounting/dashboard`
+- `GET /accounting/debts`
+- `GET /accounting/debts/data`
+- `POST /accounting/debts/deduct`
+- `POST /accounting/debts/credit-limit`
+
+## Portal Scope Split (Locked)
+
+This is now a strict architecture rule to avoid mixing responsibilities:
+
+### 1) Store Portal (`STORE_SYSTEM` / `ADMIN`)
+
+Purpose: per-store operations and per-store financial view only.
+
+Allowed:
+
+- POS sales
+- stock in and stock adjustment
+- product maintenance for assigned store
+- store transaction history
+- staff debt/transaction lookup for that store context
+- store-level margin/profit views (operational)
+
+Not allowed:
+
+- salary import
+- payroll deduction execution
+- global settlement runs across all stores
+- school-wide debt finalization controls
+
+### 2) School Accounting Department Portal (`ACCOUNTING_OFFICE` / `ADMIN`)
+
+Purpose: institution-level debt settlement and payroll-linked processing.
+
+Allowed:
+
+- global debt monitoring across stores
+- manual deduction processing per faculty/staff (phase 1)
+- credit limit updates
+- accounting audit reports
+
+Not allowed:
+
+- editing store inventory and product stock as daily store operations
+- operating store POS
+
+### Authority Rule
+
+- Store side can create debt transactions via POS.
+- Only School Accounting Department can settle/clear debt through salary deductions.
+
+## Route Boundary Plan (Do Not Mix)
+
+- Store operations must stay under `/store/*`.
+- School accounting operations must stay under `/accounting/*`.
+- User self-service stays under `/user/*`.
+- Admin management stays under `/admin/*`.
+
+If a feature is salary/payout/settlement related, it belongs to `/accounting/*`, not `/store/*`.
+
+## Admin Portal Notes (Current)
+
+- Admin store navigation is unified as one tab: `Stores & POS`.
+- `GET /admin/stores` is the main admin store hub (gallery + management).
+- Clicking a store opens `GET /admin/stores/{id}` for per-store inventory and transaction records.
+- Legacy `admin/store-ops` now redirects to `/admin/stores` for backward compatibility.
+
 ### UI Structure (Current)
 
 Views and layouts are now organized with shared assets:
@@ -115,27 +199,25 @@ Assets:
 
 ## Current Limitations
 
-- POS products are still hardcoded in UI
-- no dynamic product loading from DB yet
 - no QR scanning yet
-- accounting/admin/user modules are still starter-level UI
+- School Accounting portal is still minimal (needs salary-import + settlement workflow UI)
+- Admin/User portals are still starter-level UI
 
 ## Next Steps (In Order)
 
-1. Make POS dynamic
-- Create product listing API endpoint
-- Load products from DB in POS JS
-- Replace hardcoded product row
+1. School Accounting Department Portal (phase 1 manual controls)
+- debt search + monitoring
+- manual debt deduction
+- manual credit-limit updates
+- audit-log tracking for all accounting actions
 
-2. Improve Store POS UX
-- quantity controls (+/-)
-- remove line item
-- optional client-side stock safeguards before submit
+2. School Accounting Department Portal (phase 2 automation)
+- optional salary import workflow
+- optional payroll-linked settlement run
 
-3. Accounting Portal
-- debt monitoring
-- settlement workflow
-- reporting screens
+3. Store Financial Reporting (store-side)
+- realized profit report (separate from school accounting)
+- daily/weekly/monthly store summaries
 
 4. Admin Portal
 - user management
@@ -156,4 +238,4 @@ Assets:
 
 Use this prompt in a new chat:
 
-`Continue IBEMS project. POS backend, auth, role filters, and basic POS UI are done. Next step: make POS products dynamic from database.`
+`Continue IBEMS project with strict portal split: Store Portal handles per-store operations; School Accounting Portal handles salary import and debt settlement runs. Next priority is School Accounting Department workflow.`

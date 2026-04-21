@@ -1,0 +1,360 @@
+.admin-stores-shell {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.admin-stores-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: end;
+    gap: 10px;
+}
+
+.admin-stores-head h3 {
+    margin: 0;
+    color: #003366;
+}
+
+.admin-stores-head p {
+    margin: 4px 0 0;
+    color: #64748b;
+}
+
+.admin-stores-filters {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: end;
+    gap: 8px;
+    background: #fff;
+    border: 1px solid #dbe3ea;
+    border-radius: 12px;
+    padding: 12px;
+}
+
+.field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    min-width: 0;
+    position: relative;
+}
+
+.field label {
+    font-size: 0.82rem;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.field input,
+.field select {
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 8px 10px;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+}
+
+#store-search {
+    min-width: 280px;
+}
+
+.history-action {
+    border: 0;
+    border-radius: 8px;
+    background: #003366;
+    color: #fff;
+    padding: 8px 10px;
+    cursor: pointer;
+    font-size: 0.84rem;
+}
+
+.primary-btn {
+    border: 0;
+    border-radius: 8px;
+    background: #003366;
+    color: #fff;
+    padding: 8px 10px;
+    cursor: pointer;
+    font-size: 0.84rem;
+}
+
+.history-action.alt {
+    background: #64748b;
+}
+
+.stores-gallery {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    gap: 16px;
+}
+
+.store-card {
+    text-decoration: none;
+    color: inherit;
+    background: #fff;
+    border: 1px solid #dbe3ea;
+    border-radius: 12px;
+    padding: 18px;
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: start;
+    gap: 14px;
+    position: relative;
+}
+
+.store-card:hover {
+    border-color: #93c5fd;
+    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+}
+
+.store-card-logo {
+    width: 64px;
+    height: 64px;
+    border-radius: 14px;
+    overflow: hidden;
+    border: 1px solid #dbe3ea;
+    display: grid;
+    place-items: center;
+    background: #fff7d1;
+}
+
+.store-logo-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.store-logo-fallback {
+    width: 100%;
+    height: 100%;
+    display: grid;
+    place-items: center;
+    color: #003366;
+    font-weight: 800;
+}
+
+.store-card-meta strong {
+    display: block;
+    color: #003366;
+    font-size: 1.08rem;
+}
+
+.store-card-meta small {
+    color: #64748b;
+    font-size: 0.9rem;
+}
+
+.store-card-right {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+}
+
+.card-menu-btn {
+    width: 30px;
+    height: 30px;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: #64748b;
+    cursor: pointer;
+    line-height: 1;
+    font-weight: 700;
+    font-size: 1.1rem;
+}
+
+.card-menu-btn:hover {
+    background: transparent;
+    color: #0f172a;
+}
+
+.card-menu {
+    display: none;
+    min-width: 140px;
+    border: 1px solid #dbe3ea;
+    border-radius: 10px;
+    background: #fff;
+    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+    padding: 6px;
+    z-index: 4;
+}
+
+.card-menu.is-open {
+    display: grid;
+    gap: 4px;
+}
+
+.card-menu-item {
+    border: 0;
+    border-radius: 8px;
+    background: #fff;
+    color: #334155;
+    text-align: left;
+    padding: 8px 10px;
+    cursor: pointer;
+    font-size: 0.82rem;
+}
+
+.card-menu-item:hover {
+    background: #f1f5f9;
+}
+
+.card-menu-status {
+    font-weight: 700;
+}
+
+.card-menu-status.is-active {
+    color: #166534;
+}
+
+.card-menu-status.is-inactive {
+    color: #991b1b;
+}
+
+.store-card-empty {
+    background: #fff;
+    border: 1px dashed #cbd5e1;
+    border-radius: 12px;
+    padding: 16px;
+    color: #64748b;
+}
+
+.status-badge {
+    display: inline-block;
+    border-radius: 999px;
+    padding: 4px 9px;
+    font-size: 0.76rem;
+    font-weight: 700;
+}
+
+.status-badge.active {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.status-badge.inactive {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.stores-result {
+    min-height: 20px;
+}
+
+.admin-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.45);
+    display: grid;
+    place-items: center;
+    padding: 18px;
+    z-index: 1300;
+}
+
+.admin-modal-card {
+    width: min(860px, 100%);
+    background: #fff;
+    border: 1px solid #dbe3ea;
+    border-radius: 12px;
+    padding: 14px;
+}
+
+.admin-modal-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.admin-modal-head h4 {
+    margin: 0;
+    color: #003366;
+}
+
+.admin-modal-close {
+    border: 0;
+    background: #e2e8f0;
+    color: #0f172a;
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    align-items: start;
+}
+
+.officer-suggestions {
+    position: absolute;
+    top: calc(100% + 4px);
+    left: 0;
+    right: 0;
+    border: 1px solid #dbe3ea;
+    border-radius: 8px;
+    background: #fff;
+    padding: 6px;
+    display: grid;
+    gap: 4px;
+    max-height: 160px;
+    overflow: auto;
+    z-index: 20;
+}
+
+.officer-suggestion-item {
+    border: 0;
+    background: #fff;
+    border-radius: 6px;
+    text-align: left;
+    padding: 6px 8px;
+    cursor: pointer;
+    color: #334155;
+    font-size: 0.82rem;
+}
+
+.officer-suggestion-item:hover {
+    background: #f1f5f9;
+}
+
+.field-toggle-link {
+    align-self: flex-start;
+    border: 0;
+    background: transparent;
+    color: #003366;
+    font-size: 0.8rem;
+    padding: 0;
+    cursor: pointer;
+    text-decoration: underline;
+}
+
+.admin-modal-actions {
+    margin-top: 12px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+@media (max-width: 900px) {
+    #store-search {
+        min-width: 0;
+        width: 100%;
+    }
+
+    .admin-stores-head {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+}

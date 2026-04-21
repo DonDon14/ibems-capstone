@@ -9,7 +9,8 @@ function setStatus(message, type) {
 
 function targetPathByRole(role) {
     if (role === "STORE_SYSTEM") return "/store/pos";
-    if (role === "ADMIN" || role === "ACCOUNTING_OFFICE") return "/dashboard";
+    if (role === "ACCOUNTING_OFFICE") return "/accounting/debts";
+    if (role === "ADMIN") return "/admin/stores";
     if (role === "USER") return "/user/dashboard";
     return "/login";
 }

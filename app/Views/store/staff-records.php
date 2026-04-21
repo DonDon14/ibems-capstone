@@ -8,8 +8,8 @@
 <section class="staff-shell">
     <div class="staff-head">
         <div>
-            <h3>Staff Records</h3>
-            <p>Search staff debt records and staff transaction records.</p>
+            <h3>Employee Records</h3>
+            <p>Search employee debt records and employee transaction records.</p>
         </div>
         <div class="staff-store-wrap">
             <label for="staff-store-select">Store</label>
@@ -21,7 +21,7 @@
         <h4>Debt Records</h4>
         <div class="staff-filters">
             <div class="field">
-                <label for="debt-search">Search Staff</label>
+                <label for="debt-search">Search Employee</label>
                 <input id="debt-search" type="search" placeholder="Name, email, or employee ID">
             </div>
             <button id="debt-search-btn" class="primary-btn" type="button">Search</button>
@@ -34,25 +34,32 @@
                         <th>Employee ID</th>
                         <th>Name</th>
                         <th>Email</th>
+                        <th>Category</th>
                         <th>Current Debt</th>
                         <th>Credit Limit</th>
                         <th>Available Credit</th>
                     </tr>
                 </thead>
                 <tbody id="debt-body">
-                    <tr><td colspan="6">Loading debt records...</td></tr>
+                    <tr><td colspan="7">Loading debt records...</td></tr>
                 </tbody>
             </table>
         </div>
     </article>
 
-    <article class="staff-card">
-        <h4>Staff Transactions</h4>
-        <div class="staff-filters">
-            <div class="field">
-                <label for="txn-search">Search Staff</label>
-                <input id="txn-search" type="search" placeholder="Name, email, or employee ID">
-            </div>
+    <p id="staff-result" class="staff-result"></p>
+</section>
+
+<div id="staff-employee-modal" class="receipt-modal" style="display:none;">
+    <div class="receipt-card staff-employee-card">
+        <div class="receipt-head">
+            <h3>Employee Transactions</h3>
+            <button id="staff-employee-close" type="button" class="receipt-close">x</button>
+        </div>
+
+        <div id="staff-employee-summary" class="receipt-content-head"></div>
+
+        <div class="staff-filters staff-modal-filters">
             <div class="field">
                 <label for="txn-date-from">From</label>
                 <input id="txn-date-from" type="date">
@@ -64,7 +71,7 @@
             <div class="field checkbox-field">
                 <label><input id="txn-debt-only" type="checkbox"> Debt only</label>
             </div>
-            <button id="txn-search-btn" class="primary-btn" type="button">Search</button>
+            <button id="txn-search-btn" class="primary-btn" type="button">Apply</button>
         </div>
 
         <div class="table-wrap">
@@ -72,22 +79,33 @@
                 <thead>
                     <tr>
                         <th>Date</th>
-                        <th>Staff</th>
-                        <th>Employee ID</th>
                         <th>Payment</th>
                         <th>Amount</th>
                         <th>Current Debt</th>
                     </tr>
                 </thead>
                 <tbody id="txn-body">
-                    <tr><td colspan="6">Loading transactions...</td></tr>
+                    <tr><td colspan="4">Select an employee to load transactions.</td></tr>
                 </tbody>
             </table>
         </div>
-    </article>
+    </div>
+</div>
 
-    <p id="staff-result" class="staff-result"></p>
-</section>
+<div id="staff-receipt-modal" class="receipt-modal" style="display:none;">
+    <div class="receipt-card">
+        <div class="receipt-head">
+            <h3>Transaction Receipt</h3>
+            <button id="staff-receipt-close" type="button" class="receipt-close">x</button>
+        </div>
+
+        <div id="staff-receipt-content"></div>
+
+        <div class="receipt-actions">
+            <button id="staff-receipt-print" type="button" class="primary-btn">Print Receipt</button>
+        </div>
+    </div>
+</div>
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>

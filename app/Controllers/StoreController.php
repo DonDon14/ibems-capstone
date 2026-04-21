@@ -555,7 +555,10 @@ class StoreController extends BaseController
 
     public function addProduct()
     {
-        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $request = $this->request->getPost();
+        if ($request === []) {
+            $request = $this->request->getJSON(true) ?? [];
+        }
         $actorId = (int) session()->get('user_id');
         $role = (string) session()->get('role');
 
@@ -589,6 +592,15 @@ class StoreController extends BaseController
             return $this->response->setStatusCode(409)->setJSON([
                 'status' => 'error',
                 'message' => 'SKU already exists in this store.',
+            ]);
+        }
+
+        try {
+            $imageUrl = $this->resolveProductImageUrl($imageUrl, null);
+        } catch (\RuntimeException $e) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => $e->getMessage(),
             ]);
         }
 
@@ -663,6 +675,167 @@ class StoreController extends BaseController
         ]);
     }
 
+    public function updateProduct()
+    {
+        $request = $this->request->getPost();
+        if ($request === []) {
+            $request = $this->request->getJSON(true) ?? [];
+        }
+
+        $actorId = (int) session()->get('user_id');
+        $role = (string) session()->get('role');
+
+        $storeId = (int) ($request['store_id'] ?? 0);
+        $productId = (int) ($request['product_id'] ?? 0);
+        $sku = trim((string) ($request['sku'] ?? ''));
+        $name = trim((string) ($request['name'] ?? ''));
+        $category = trim((string) ($request['category'] ?? ''));
+        $sellPrice = (float) ($request['sell_price'] ?? 0);
+        $inputImageUrl = trim((string) ($request['image_url'] ?? ''));
+
+        if ($storeId <= 0 || $productId <= 0 || $sku === '' || $name === '' || $sellPrice < 0) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Invalid product update payload.',
+            ]);
+        }
+
+        $storeModel = new StoreModel();
+        if (!$storeModel->canUserAccessStore($actorId, $role, $storeId)) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'You cannot update products in this store.',
+            ]);
+        }
+
+        $productModel = new ProductModel();
+        $product = $productModel->find($productId);
+        if (!$product || (int) $product['store_id'] !== $storeId) {
+            return $this->response->setStatusCode(404)->setJSON([
+                'status' => 'error',
+                'message' => 'Product not found in selected store.',
+            ]);
+        }
+
+        $db = Database::connect();
+        $sameSku = $db->table('products')
+            ->where('store_id', $storeId)
+            ->where('sku', $sku)
+            ->where('id !=', $productId)
+            ->get()
+            ->getRowArray();
+        if ($sameSku) {
+            return $this->response->setStatusCode(409)->setJSON([
+                'status' => 'error',
+                'message' => 'SKU already exists in this store.',
+            ]);
+        }
+
+        try {
+            $resolvedImageUrl = $this->resolveProductImageUrl($inputImageUrl, $product['image_url'] ?? null);
+        } catch (\RuntimeException $e) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => $e->getMessage(),
+            ]);
+        }
+
+        $db->transStart();
+
+        $productModel->update($productId, [
+            'sku' => $sku,
+            'name' => $name,
+            'category' => $category !== '' ? $category : null,
+            'image_url' => $resolvedImageUrl !== '' ? $resolvedImageUrl : null,
+            'price' => $sellPrice,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $auditLogModel = new AuditLogModel();
+        $auditLogModel->insert([
+            'actor_id' => $actorId,
+            'action' => 'UPDATE_PRODUCT',
+            'entity' => 'products',
+            'entity_id' => $productId,
+            'payload_json' => json_encode([
+                'store_id' => $storeId,
+                'before' => [
+                    'sku' => $product['sku'],
+                    'name' => $product['name'],
+                    'category' => $product['category'],
+                    'image_url' => $product['image_url'],
+                    'price' => (float) $product['price'],
+                ],
+                'after' => [
+                    'sku' => $sku,
+                    'name' => $name,
+                    'category' => $category,
+                    'image_url' => $resolvedImageUrl,
+                    'price' => $sellPrice,
+                ],
+            ]),
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $db->transComplete();
+        if (!$db->transStatus()) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'status' => 'error',
+                'message' => 'Failed to update product.',
+            ]);
+        }
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'product' => $productModel->find($productId),
+        ]);
+    }
+
+    private function resolveProductImageUrl(string $inputUrl, ?string $currentUrl): ?string
+    {
+        $imageFile = $this->request->getFile('image_file');
+        $hasFile = $imageFile && $imageFile->getError() !== UPLOAD_ERR_NO_FILE;
+
+        if ($hasFile) {
+            if (!$imageFile->isValid()) {
+                throw new \RuntimeException('Invalid uploaded image file.');
+            }
+
+            $allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+            if (!in_array((string) $imageFile->getMimeType(), $allowedMimeTypes, true)) {
+                throw new \RuntimeException('Product image must be JPG, PNG, WEBP, or GIF.');
+            }
+
+            if ((int) $imageFile->getSize() > 2 * 1024 * 1024) {
+                throw new \RuntimeException('Product image size must be 2MB or less.');
+            }
+
+            $uploadDir = FCPATH . 'uploads/product-images';
+            if (!is_dir($uploadDir) && !mkdir($uploadDir, 0775, true) && !is_dir($uploadDir)) {
+                throw new \RuntimeException('Failed to prepare product image upload directory.');
+            }
+
+            $newName = $imageFile->getRandomName();
+            $imageFile->move($uploadDir, $newName);
+            $storedPath = '/uploads/product-images/' . $newName;
+
+            if ($currentUrl && strpos($currentUrl, '/uploads/product-images/') === 0) {
+                $oldFile = FCPATH . ltrim($currentUrl, '/');
+                if (is_file($oldFile)) {
+                    @unlink($oldFile);
+                }
+            }
+
+            return $storedPath;
+        }
+
+        if ($inputUrl !== '') {
+            return $inputUrl;
+        }
+
+        return $currentUrl;
+    }
+
     public function staffTransactions()
     {
         $role = (string) session()->get('role');
@@ -690,6 +863,7 @@ class StoreController extends BaseController
         }
 
         $q = trim((string) $this->request->getGet('q'));
+        $employeeUserId = (int) ($this->request->getGet('user_id') ?? 0);
         $debtOnly = (int) ($this->request->getGet('debt_only') ?? 0) === 1;
         $dateFrom = trim((string) $this->request->getGet('date_from'));
         $dateTo = trim((string) $this->request->getGet('date_to'));
@@ -722,6 +896,10 @@ class StoreController extends BaseController
                 ->orLike('u.email', $q)
                 ->orLike('u.employee_id', $q)
                 ->groupEnd();
+        }
+
+        if ($employeeUserId > 0) {
+            $query->where('u.id', $employeeUserId);
         }
 
         $rows = $query->orderBy('t.id', 'DESC')

@@ -1,5 +1,7 @@
 let srStores = [];
 let srStoreId = null;
+let srSelectedReceipt = null;
+let srSelectedEmployee = null;
 
 function srEscape(value) {
     return String(value ?? "")
@@ -12,6 +14,16 @@ function srEscape(value) {
 
 function srMoney(value) {
     return `PHP ${Number(value || 0).toFixed(2)}`;
+}
+
+function srDateTime(value) {
+    return new Date(value).toLocaleString();
+}
+
+function srCategory(value) {
+    const text = String(value || "");
+    if (!text) return "-";
+    return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
 }
 
 function srSetResult(message, type) {
@@ -47,15 +59,21 @@ async function srLoadStores() {
 function srRenderDebts(rows) {
     const body = document.getElementById("debt-body");
     if (!Array.isArray(rows) || rows.length === 0) {
-        body.innerHTML = '<tr><td colspan="6">No debt records found.</td></tr>';
+        body.innerHTML = '<tr><td colspan="7">No debt records found.</td></tr>';
         return;
     }
 
     body.innerHTML = rows.map((row) => `
-        <tr>
+        <tr class="sr-row-clickable"
+            data-debt-user-id="${Number(row.id || 0)}"
+            data-debt-name="${srEscape(row.name)}"
+            data-debt-employee="${srEscape(row.employee_id || "")}"
+            data-debt-email="${srEscape(row.email || "")}"
+            data-debt-category="${srEscape(row.user_type || "")}">
             <td>${srEscape(row.employee_id || "-")}</td>
             <td>${srEscape(row.name)}</td>
             <td>${srEscape(row.email)}</td>
+            <td>${srEscape(srCategory(row.user_type))}</td>
             <td>${srEscape(srMoney(row.current_debt))}</td>
             <td>${srEscape(srMoney(row.credit_limit))}</td>
             <td>${srEscape(srMoney(row.available_credit))}</td>
@@ -66,15 +84,13 @@ function srRenderDebts(rows) {
 function srRenderTransactions(rows) {
     const body = document.getElementById("txn-body");
     if (!Array.isArray(rows) || rows.length === 0) {
-        body.innerHTML = '<tr><td colspan="6">No staff transactions found.</td></tr>';
+        body.innerHTML = '<tr><td colspan="4">No employee transactions found.</td></tr>';
         return;
     }
 
     body.innerHTML = rows.map((row) => `
-        <tr>
+        <tr class="sr-row-clickable" data-txn-id="${row.id}">
             <td>${srEscape(new Date(row.created_at).toLocaleString())}</td>
-            <td>${srEscape(row.staff.name)}</td>
-            <td>${srEscape(row.staff.employee_id || "-")}</td>
             <td>${srEscape(String(row.payment_method || "").toUpperCase())}</td>
             <td>${srEscape(srMoney(row.amount))}</td>
             <td>${srEscape(srMoney(row.staff.current_debt))}</td>
@@ -98,17 +114,21 @@ async function srLoadDebtRecords() {
 }
 
 async function srLoadStaffTransactions() {
+    if (!srSelectedEmployee || !srSelectedEmployee.userId) {
+        srRenderTransactions([]);
+        return;
+    }
+
     const params = new URLSearchParams({
         store_id: String(srStoreId),
         limit: "120",
+        user_id: String(srSelectedEmployee.userId),
     });
 
-    const q = document.getElementById("txn-search").value.trim();
     const dateFrom = document.getElementById("txn-date-from").value || "";
     const dateTo = document.getElementById("txn-date-to").value || "";
     const debtOnly = document.getElementById("txn-debt-only").checked;
 
-    if (q) params.set("q", q);
     if (dateFrom) params.set("date_from", dateFrom);
     if (dateTo) params.set("date_to", dateTo);
     if (debtOnly) params.set("debt_only", "1");
@@ -116,11 +136,118 @@ async function srLoadStaffTransactions() {
     const response = await fetch(`/store/staff-transactions?${params.toString()}`);
     const data = await response.json();
     if (!data || data.status !== "success") {
-        srSetResult(data?.message || "Unable to load staff transactions.", "error");
+        srSetResult(data?.message || "Unable to load employee transactions.", "error");
         srRenderTransactions([]);
         return;
     }
     srRenderTransactions(data.transactions);
+}
+
+function srOpenEmployeeModal(employee) {
+    srSelectedEmployee = employee;
+    document.getElementById("staff-employee-summary").innerHTML = `
+        <div><strong>Employee:</strong> ${srEscape(employee.name)}</div>
+        <div><strong>Employee ID:</strong> ${srEscape(employee.employeeId || "-")} | <strong>Email:</strong> ${srEscape(employee.email || "-")} | <strong>Category:</strong> ${srEscape(srCategory(employee.userType))}</div>
+    `;
+    document.getElementById("staff-employee-modal").style.display = "grid";
+}
+
+function srCloseEmployeeModal() {
+    document.getElementById("staff-employee-modal").style.display = "none";
+    srSelectedEmployee = null;
+    document.getElementById("txn-date-from").value = "";
+    document.getElementById("txn-date-to").value = "";
+    document.getElementById("txn-debt-only").checked = false;
+    document.getElementById("txn-body").innerHTML = '<tr><td colspan="4">Select an employee to load transactions.</td></tr>';
+}
+
+function srBuildReceiptHtml(receipt) {
+    const rows = receipt.items
+        .map((item) => `
+            <tr>
+                <td>${srEscape(item.name)}</td>
+                <td>${item.qty}</td>
+                <td>${srMoney(item.unit_price)}</td>
+                <td>${srMoney(item.line_total)}</td>
+            </tr>
+        `)
+        .join("");
+
+    return `
+        <div class="receipt-content-head">
+            <div><strong>Transaction #:</strong> ${srEscape(receipt.client_txn_id)}</div>
+            <div><strong>Date:</strong> ${srEscape(srDateTime(receipt.created_at))}</div>
+            <div><strong>Store:</strong> ${srEscape(receipt.store_name)}</div>
+            <div><strong>Customer:</strong> ${srEscape(receipt.customer_name)}</div>
+            <div><strong>Payment:</strong> ${srEscape(String(receipt.payment_method).toUpperCase())}</div>
+        </div>
+        <table class="receipt-table">
+            <thead>
+                <tr>
+                    <th>Item</th>
+                    <th>Qty</th>
+                    <th>Price</th>
+                    <th>Line Total</th>
+                </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+        </table>
+        <div class="receipt-total">Total: ${srMoney(receipt.amount)}</div>
+    `;
+}
+
+async function srOpenReceipt(transactionId) {
+    const response = await fetch(`/store/transactions/${transactionId}`);
+    const data = await response.json();
+    if (!data || data.status !== "success" || !data.transaction) {
+        srSetResult(data?.message || "Unable to load receipt.", "error");
+        return;
+    }
+
+    srSelectedReceipt = data.transaction;
+    document.getElementById("staff-receipt-content").innerHTML = srBuildReceiptHtml(srSelectedReceipt);
+    document.getElementById("staff-receipt-modal").style.display = "grid";
+}
+
+function srCloseReceipt() {
+    document.getElementById("staff-receipt-modal").style.display = "none";
+}
+
+function srPrintReceipt() {
+    if (!srSelectedReceipt) return;
+
+    const printWindow = window.open("", "_blank", "width=800,height=900");
+    if (!printWindow) {
+        srSetResult("Popup blocked. Please allow popups.", "error");
+        return;
+    }
+
+    const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+            <title>Receipt ${srEscape(srSelectedReceipt.client_txn_id)}</title>
+            <style>
+                body { font-family: Arial, sans-serif; padding: 20px; color: #111; }
+                h2 { margin-top: 0; color: #003366; }
+                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                th, td { border: 1px solid #ddd; padding: 8px; font-size: 13px; }
+                th { background: #f4f4f4; text-align: left; }
+                .receipt-total { margin-top: 12px; text-align: right; font-weight: bold; font-size: 16px; }
+            </style>
+        </head>
+        <body>
+            <h2>USTP Store Receipt</h2>
+            ${srBuildReceiptHtml(srSelectedReceipt)}
+        </body>
+        </html>
+    `;
+
+    printWindow.document.open();
+    printWindow.document.write(html);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
 }
 
 document.getElementById("debt-search-btn").addEventListener("click", async () => {
@@ -135,14 +262,49 @@ document.getElementById("txn-search-btn").addEventListener("click", async () => 
 
 document.getElementById("staff-store-select").addEventListener("change", async (event) => {
     srStoreId = Number(event.target.value);
+    await srLoadDebtRecords();
+    if (srSelectedEmployee) {
+        await srLoadStaffTransactions();
+    }
+});
+
+document.getElementById("debt-body").addEventListener("click", async (event) => {
+    const row = event.target.closest("[data-debt-user-id]");
+    if (!row) return;
+
+    const userId = Number(row.getAttribute("data-debt-user-id") || 0);
+    if (!userId) return;
+
+    srOpenEmployeeModal({
+        userId,
+        name: row.getAttribute("data-debt-name") || "",
+        employeeId: row.getAttribute("data-debt-employee") || "",
+        email: row.getAttribute("data-debt-email") || "",
+        userType: row.getAttribute("data-debt-category") || "",
+    });
     await srLoadStaffTransactions();
+});
+
+document.getElementById("txn-body").addEventListener("click", async (event) => {
+    const row = event.target.closest("[data-txn-id]");
+    if (!row) return;
+    await srOpenReceipt(Number(row.getAttribute("data-txn-id")));
+});
+
+document.getElementById("staff-receipt-close").addEventListener("click", srCloseReceipt);
+document.getElementById("staff-receipt-print").addEventListener("click", srPrintReceipt);
+document.getElementById("staff-employee-close").addEventListener("click", srCloseEmployeeModal);
+document.getElementById("staff-employee-modal").addEventListener("click", (event) => {
+    if (event.target.id === "staff-employee-modal") srCloseEmployeeModal();
+});
+document.getElementById("staff-receipt-modal").addEventListener("click", (event) => {
+    if (event.target.id === "staff-receipt-modal") srCloseReceipt();
 });
 
 (async () => {
     try {
         await srLoadStores();
         await srLoadDebtRecords();
-        await srLoadStaffTransactions();
     } catch (error) {
         srSetResult(error.message || "Unable to load staff records.", "error");
     }

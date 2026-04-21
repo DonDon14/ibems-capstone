@@ -10,6 +10,7 @@ let debtCustomers = [];
 let selectedDebtCustomerId = null;
 let isSubmitting = false;
 let lastReceipt = null;
+let lastCardAddAt = 0;
 
 function escapeHtml(value) {
     return String(value ?? "")
@@ -62,7 +63,9 @@ function getStoreNameById(storeId) {
 function getDebtCustomerLabelById(customerId) {
     const customer = debtCustomers.find((c) => Number(c.id) === Number(customerId));
     if (!customer) return "N/A";
-    return `${customer.name} (${customer.user_type})`;
+    const category = String(customer.user_type || "");
+    const categoryLabel = category ? category.charAt(0).toUpperCase() + category.slice(1).toLowerCase() : "N/A";
+    return `${customer.name} (${categoryLabel})`;
 }
 
 function buildReceiptHtml(receipt) {
@@ -220,7 +223,6 @@ function renderProducts() {
             const stock = Number(product.stock_qty || 0);
             const inCart = getCartQty(product.id);
             const canAdd = inCart < stock;
-            const label = stock <= 0 ? "Out of stock" : "Add";
             const category = String(product.category || "General");
             const imageUrl = String(product.image_url || "").trim();
             const useImage = imageUrl !== "";
@@ -229,7 +231,7 @@ function renderProducts() {
                 : `<div class="product-visual placeholder">${escapeHtml(getInitials(product.name))}</div>`;
 
             return `
-                <article class="product-card">
+                <article class="product-card ${canAdd ? "" : "out-of-stock"}" data-product-card="${product.id}">
                     ${visualHtml}
                     <h5 class="product-name">${escapeHtml(product.name)}</h5>
                     <p class="product-meta">${escapeHtml(category)} | SKU: ${escapeHtml(product.sku)}</p>
@@ -238,16 +240,6 @@ function renderProducts() {
                             <div class="product-price">${formatMoney(product.price)}</div>
                             <div class="product-stock">Stock: ${stock} | In cart: ${inCart}</div>
                         </div>
-                        <button
-                            class="product-add"
-                            data-product-id="${product.id}"
-                            data-name="${escapeHtml(product.name)}"
-                            data-price="${Number(product.price)}"
-                            type="button"
-                            ${canAdd ? "" : "disabled"}
-                        >
-                            ${label}
-                        </button>
                     </div>
                 </article>
             `;
@@ -319,7 +311,9 @@ function renderDebtCustomerSelect() {
     const options = [
         '<option value="">Select customer</option>',
         ...debtCustomers.map((customer) => {
-            const label = `${escapeHtml(customer.name)} (${escapeHtml(customer.user_type)}) - ${escapeHtml(customer.employee_id || customer.email)} - ${escapeHtml(formatCredit(customer))}`;
+            const category = String(customer.user_type || "");
+            const categoryLabel = category ? category.charAt(0).toUpperCase() + category.slice(1).toLowerCase() : "N/A";
+            const label = `${escapeHtml(customer.name)} (${escapeHtml(categoryLabel)}) - ${escapeHtml(customer.employee_id || customer.email)} - ${escapeHtml(formatCredit(customer))}`;
             return `<option value="${customer.id}">${label}</option>`;
         }),
     ];
@@ -493,7 +487,7 @@ async function submitTransaction() {
     }
 
     if (paymentMethod === "debt" && !selectedDebtCustomerId) {
-        setResult("Select a faculty/staff customer for debt payment.", "error");
+        setResult("Select an employee (Faculty/Staff) for debt payment.", "error");
         return;
     }
 
@@ -563,14 +557,18 @@ async function submitTransaction() {
 }
 
 document.getElementById("product-grid").addEventListener("click", (event) => {
-    const button = event.target.closest(".product-add");
-    if (!button) return;
+    const card = event.target.closest("[data-product-card]");
+    if (!card) return;
 
-    addToCart(
-        Number(button.dataset.productId),
-        button.dataset.name || "",
-        Number(button.dataset.price)
-    );
+    const now = Date.now();
+    if (now - lastCardAddAt < 220) return;
+    lastCardAddAt = now;
+
+    const productId = Number(card.getAttribute("data-product-card") || 0);
+    const product = getProductById(productId);
+    if (!product) return;
+
+    addToCart(productId, product.name || "", Number(product.price || 0));
 });
 
 document.getElementById("cart-body").addEventListener("click", (event) => {

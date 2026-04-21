@@ -17,7 +17,7 @@
                 <select id="inventory-store-select"></select>
             </div>
             <div class="add-menu-wrap">
-                <button id="open-add-menu" class="primary-btn" type="button">+ Add</button>
+                <button id="open-add-menu" class="primary-btn inventory-add-btn" type="button"><span class="plus">+</span> Add New</button>
                 <div id="add-menu" class="add-menu" style="display:none;">
                     <button id="open-stockin-modal" type="button">Stock In</button>
                     <button id="open-product-modal" type="button">Product</button>
@@ -38,15 +38,13 @@
                         <th>Image</th>
                         <th>SKU</th>
                         <th>Product</th>
+                        <th>Category</th>
                         <th>Price</th>
                         <th>Current Stock</th>
-                        <th>Actual Stock</th>
-                        <th>Reason</th>
-                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody id="inventory-product-body">
-                    <tr><td colspan="8">Loading products...</td></tr>
+                    <tr><td colspan="6">Loading products...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -119,6 +117,17 @@
                 <input id="new-product-category" type="text" placeholder="e.g. Drinks, Snacks">
             </div>
             <div class="field">
+                <label for="new-product-image-source">Product Image Source</label>
+                <select id="new-product-image-source">
+                    <option value="upload">Upload File</option>
+                    <option value="url">Use Image URL</option>
+                </select>
+            </div>
+            <div class="field" id="new-product-image-upload-wrap">
+                <label for="new-product-image-file">Image Upload</label>
+                <input id="new-product-image-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+            </div>
+            <div class="field" id="new-product-image-url-wrap" style="display:none;">
                 <label for="new-product-image-url">Image URL</label>
                 <input id="new-product-image-url" type="url" placeholder="https://...">
             </div>
@@ -142,6 +151,94 @@
 
         <div class="inv-modal-actions">
             <button id="new-product-submit" class="primary-btn" type="button">Create Product</button>
+        </div>
+    </div>
+</div>
+
+<div id="inventory-product-action-modal" class="inv-modal" style="display:none;">
+    <div class="inv-modal-card">
+        <div class="inv-modal-head">
+            <h4>Product Actions</h4>
+            <button id="close-product-action-modal" type="button" class="inv-modal-close">x</button>
+        </div>
+
+        <div id="product-action-info" class="product-action-info"></div>
+
+        <div class="product-detail-view">
+            <div class="detail-item">
+                <span>SKU</span>
+                <strong id="product-view-sku">-</strong>
+            </div>
+            <div class="detail-item">
+                <span>Name</span>
+                <strong id="product-view-name">-</strong>
+            </div>
+            <div class="detail-item">
+                <span>Category</span>
+                <strong id="product-view-category">-</strong>
+            </div>
+            <div class="detail-item">
+                <span>Price</span>
+                <strong id="product-view-price">PHP 0.00</strong>
+            </div>
+            <div class="detail-item detail-item-wide">
+                <span>Image</span>
+                <strong id="product-view-image">Not set</strong>
+            </div>
+        </div>
+
+        <div id="product-edit-wrap" style="display:none;">
+            <div class="form-grid">
+                <div class="field">
+                    <label for="modal-product-sku">SKU</label>
+                    <input id="modal-product-sku" type="text" placeholder="SKU">
+                </div>
+                <div class="field">
+                    <label for="modal-product-name">Product Name</label>
+                    <input id="modal-product-name" type="text" placeholder="Product name">
+                </div>
+                <div class="field">
+                    <label for="modal-product-category">Category</label>
+                    <input id="modal-product-category" type="text" placeholder="Category">
+                </div>
+                <div class="field">
+                    <label for="modal-product-price">Sell Price</label>
+                    <input id="modal-product-price" type="number" min="0" step="0.01" value="0">
+                </div>
+                <div class="field">
+                    <label for="modal-product-image-source">Product Image Source</label>
+                    <select id="modal-product-image-source">
+                        <option value="upload">Upload File</option>
+                        <option value="url">Use Image URL</option>
+                    </select>
+                </div>
+                <div class="field" id="modal-product-image-upload-wrap">
+                    <label for="modal-product-image-file">Image Upload</label>
+                    <input id="modal-product-image-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+                </div>
+                <div class="field" id="modal-product-image-url-wrap" style="display:none;">
+                    <label for="modal-product-image-url">Image URL</label>
+                    <input id="modal-product-image-url" type="url" placeholder="https://...">
+                </div>
+            </div>
+        </div>
+
+        <div class="form-grid">
+            <div class="field">
+                <label for="modal-actual-stock">Actual Stock</label>
+                <input id="modal-actual-stock" type="number" min="0" step="1" value="0">
+            </div>
+            <div class="field">
+                <label for="modal-stock-reason">Reason</label>
+                <input id="modal-stock-reason" type="text" value="Physical count adjustment">
+            </div>
+        </div>
+
+        <div class="inv-modal-actions">
+            <button id="modal-start-edit-product" class="secondary-btn" type="button">Edit Product</button>
+            <button id="modal-cancel-edit-product" class="secondary-btn" type="button" style="display:none;">Cancel Edit</button>
+            <button id="modal-save-product" class="secondary-btn" type="button" style="display:none;">Save Details</button>
+            <button id="modal-save-adjustment" class="primary-btn" type="button">Save Adjustment</button>
         </div>
     </div>
 </div>

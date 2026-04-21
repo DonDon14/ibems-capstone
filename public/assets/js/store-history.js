@@ -55,7 +55,7 @@ function renderTransactions(transactions) {
     const body = document.getElementById("history-body");
 
     if (!Array.isArray(transactions) || transactions.length === 0) {
-        body.innerHTML = '<tr><td colspan="6">No transactions found.</td></tr>';
+        body.innerHTML = '<tr><td colspan="5">No transactions found.</td></tr>';
         renderSummary([]);
         return;
     }
@@ -63,13 +63,12 @@ function renderTransactions(transactions) {
     body.innerHTML = transactions
         .map(
             (txn) => `
-            <tr>
+            <tr class="history-row-clickable" data-txn-id="${txn.id}">
                 <td>${txn.id}</td>
                 <td>${hEscape(hDateTime(txn.created_at))}</td>
                 <td>${hEscape(txn.customer_name)}</td>
                 <td>${hEscape(String(txn.payment_method).toUpperCase())}</td>
                 <td>${hEscape(hMoney(txn.amount))}</td>
-                <td><button class="history-action" data-txn-id="${txn.id}" type="button">View Receipt</button></td>
             </tr>
         `
         )
@@ -93,7 +92,7 @@ async function loadStores() {
 
 async function loadTransactions() {
     const body = document.getElementById("history-body");
-    body.innerHTML = '<tr><td colspan="6">Loading transactions...</td></tr>';
+    body.innerHTML = '<tr><td colspan="5">Loading transactions...</td></tr>';
 
     const params = new URLSearchParams({
         store_id: String(historyActiveStoreId),
@@ -246,10 +245,9 @@ document.getElementById("history-clear-filters").addEventListener("click", async
 });
 
 document.getElementById("history-body").addEventListener("click", async (event) => {
-    const button = event.target.closest(".history-action");
-    if (!button) return;
-
-    await openReceipt(Number(button.dataset.txnId));
+    const row = event.target.closest("[data-txn-id]");
+    if (!row) return;
+    await openReceipt(Number(row.dataset.txnId));
 });
 
 document.getElementById("history-receipt-close").addEventListener("click", closeReceipt);

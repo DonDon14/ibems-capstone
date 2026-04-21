@@ -1,0 +1,79 @@
+<?= $this->extend('layouts/admin') ?>
+
+<?= $this->section('styles') ?>
+<link rel="stylesheet" href="<?= base_url('assets/css/admin-stores.css') ?>">
+<?= $this->endSection() ?>
+
+<?= $this->section('content') ?>
+<section class="admin-stores-shell">
+    <div class="admin-stores-head">
+        <div>
+            <h3>Store Management</h3>
+            <p>Create stores, assign officers, and manage store status.</p>
+        </div>
+        <button id="open-store-modal" class="primary-btn" type="button">+ Add Store</button>
+    </div>
+
+    <div class="admin-stores-filters">
+        <div class="field">
+            <label for="store-search">Search</label>
+            <input id="store-search" type="search" placeholder="Store name or officer">
+        </div>
+        <button id="store-search-btn" class="primary-btn" type="button">Search</button>
+        <button id="store-refresh-btn" class="history-action alt" type="button">Refresh</button>
+    </div>
+
+    <div id="stores-gallery" class="stores-gallery">
+        <div class="store-card-empty">Loading stores...</div>
+    </div>
+
+    <p id="stores-result" class="stores-result"></p>
+</section>
+
+<div id="store-modal" class="admin-modal" style="display:none;">
+    <div class="admin-modal-card">
+        <div class="admin-modal-head">
+            <h4 id="store-modal-title">Add Store</h4>
+            <button id="close-store-modal" type="button" class="admin-modal-close">x</button>
+        </div>
+
+        <div class="form-grid">
+            <div class="field">
+                <label for="store-name">Store Name</label>
+                <input id="store-name" type="text" placeholder="Store name">
+            </div>
+            <div class="field">
+                <label for="store-officer-search">Store Officer</label>
+                <input id="store-officer-search" type="search" placeholder="Type name, email, or employee ID">
+                <input id="store-officer-id" type="hidden">
+                <div id="store-officer-suggestions" class="officer-suggestions" style="display:none;"></div>
+            </div>
+            <div class="field" id="store-logo-upload-wrap">
+                <label for="store-logo-file">Store Logo</label>
+                <input id="store-logo-file" type="file" accept="image/*">
+                <button id="store-logo-toggle" class="field-toggle-link" type="button">Use URL instead</button>
+            </div>
+            <div class="field" id="store-logo-url-wrap" style="display:none;">
+                <label for="store-logo-url">Store Logo URL</label>
+                <input id="store-logo-url" type="url" placeholder="https://...">
+                <button id="store-logo-toggle-url" class="field-toggle-link" type="button">Use Upload instead</button>
+            </div>
+            <div class="field">
+                <label for="store-active">Status</label>
+                <select id="store-active">
+                    <option value="1">Active</option>
+                    <option value="0">Inactive</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="admin-modal-actions">
+            <button id="store-save-btn" class="primary-btn" type="button">Save</button>
+        </div>
+    </div>
+</div>
+<?= $this->endSection() ?>
+
+<?= $this->section('scripts') ?>
+<script src="<?= base_url('assets/js/admin-stores.js') ?>"></script>
+<?= $this->endSection() ?>

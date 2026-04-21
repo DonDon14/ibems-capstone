@@ -11,6 +11,13 @@
 <?php
 $name = (string) (session()->get('name') ?? 'Accounting Officer');
 $role = (string) (session()->get('role') ?? 'ACCOUNTING_OFFICE');
+$path = trim((string) service('uri')->getPath(), '/');
+if (strpos($path, 'index.php/') === 0) {
+    $path = substr($path, strlen('index.php/'));
+}
+$isActive = static function (string $prefix) use ($path): string {
+    return strpos($path, $prefix) === 0 ? 'is-active' : '';
+};
 $parts = preg_split('/\s+/', trim($name)) ?: [];
 $initials = '';
 foreach (array_slice($parts, 0, 2) as $part) {
@@ -28,8 +35,8 @@ if ($initials === '') {
         </div>
 
         <nav class="app-menu">
-            <a href="/dashboard" class="is-active">Dashboard</a>
-            <a href="/accounting/debts">Debt Monitoring</a>
+            <a href="/accounting/dashboard" class="<?= $isActive('accounting/dashboard') ?>">Dashboard</a>
+            <a href="/accounting/debts" class="<?= $isActive('accounting/debts') ?>">Debt Monitoring</a>
         </nav>
 
         <div class="app-sidebar-spacer"></div>

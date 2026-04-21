@@ -66,12 +66,11 @@
                     <th>Customer</th>
                     <th>Payment</th>
                     <th>Total</th>
-                    <th>Action</th>
                 </tr>
             </thead>
             <tbody id="history-body">
                 <tr>
-                    <td colspan="6">Loading transactions...</td>
+                    <td colspan="5">Loading transactions...</td>
                 </tr>
             </tbody>
         </table>
