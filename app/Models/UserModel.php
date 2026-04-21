@@ -49,4 +49,11 @@ class UserModel extends Model
                     ->where('is_active', 1)
                     ->first();
     }
+
+    public function getActiveUserById(int $userId): ?array
+    {
+        return $this->where('id', $userId)
+                    ->where('is_active', 1)
+                    ->first();
+    }
 }

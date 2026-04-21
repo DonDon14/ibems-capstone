@@ -1,66 +1,219 @@
+:root {
+    --ustp-blue: #003366;
+    --ustp-gold: #ffcc00;
+    --ustp-white: #ffffff;
+    --ustp-light-gray: #f4f4f4;
+    --text-main: #1f2937;
+    --text-soft: #64748b;
+    --border: #dbe3ea;
+}
+
 * {
     box-sizing: border-box;
 }
 
+html,
 body {
     margin: 0;
+    padding: 0;
+}
+
+body {
     font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
-    background: #f5f7fb;
-    color: #1f2937;
+    background: var(--ustp-light-gray);
+    color: var(--text-main);
 }
 
 a {
-    color: #1d4ed8;
+    color: inherit;
 }
 
-.app-header {
-    background: #0f172a;
-    color: #ffffff;
-    padding: 14px 20px;
+.app-shell {
+    min-height: 100vh;
+    position: relative;
 }
 
-.app-header h2 {
-    margin: 0;
-    font-size: 1.25rem;
-}
-
-.app-nav {
-    background: #e5e7eb;
-    padding: 10px 20px;
+.app-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 250px;
+    height: 100vh;
+    overflow-y: auto;
+    background: var(--ustp-blue);
+    color: var(--ustp-white);
     display: flex;
+    flex-direction: column;
+    padding: 18px 14px;
     gap: 14px;
-    flex-wrap: wrap;
 }
 
-.app-nav a {
+.app-brand {
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    border-radius: 12px;
+    padding: 12px;
+}
+
+.app-brand h1 {
+    margin: 0;
+    font-size: 1.05rem;
+    letter-spacing: 0.2px;
+}
+
+.app-brand p {
+    margin: 6px 0 0;
+    font-size: 0.8rem;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.app-menu {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.app-menu a {
     text-decoration: none;
-    color: #111827;
+    color: var(--ustp-white);
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 0.92rem;
     font-weight: 600;
+}
+
+.app-menu a:hover,
+.app-menu a.is-active {
+    background: var(--ustp-gold);
+    color: #2b2b2b;
+}
+
+.app-sidebar-spacer {
+    flex: 1;
+}
+
+.sidebar-logout a {
+    display: block;
+    text-decoration: none;
+    color: var(--ustp-white);
+    border: 1px solid rgba(255, 255, 255, 0.5);
+    border-radius: 8px;
+    text-align: center;
+    padding: 10px 12px;
+    font-weight: 600;
+}
+
+.sidebar-logout a:hover {
+    background: rgba(255, 255, 255, 0.14);
+}
+
+.app-main {
+    margin-left: 250px;
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    min-height: 100vh;
+}
+
+.app-topbar {
+    background: var(--ustp-white);
+    border-bottom: 1px solid var(--border);
+    padding: 12px 18px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+}
+
+.topbar-left h2 {
+    margin: 0;
+    color: var(--ustp-blue);
+    font-size: 1.2rem;
+}
+
+.topbar-left p {
+    margin: 2px 0 0;
+    color: var(--text-soft);
+    font-size: 0.82rem;
+}
+
+.topbar-profile {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.profile-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 999px;
+    background: var(--ustp-gold);
+    color: #1f2937;
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    border: 2px solid #e8b900;
+}
+
+.profile-meta {
+    line-height: 1.1;
+}
+
+.profile-name {
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.profile-role {
+    color: var(--text-soft);
+    font-size: 0.78rem;
 }
 
 .app-container {
     padding: 20px;
 }
 
+.app-footer {
+    background: var(--ustp-white);
+    border-top: 1px solid var(--border);
+    color: var(--text-soft);
+    padding: 10px 18px;
+    font-size: 0.82rem;
+}
+
 .table {
     width: 100%;
     border-collapse: collapse;
-    background: #ffffff;
+    background: var(--ustp-white);
 }
 
 .table th,
 .table td {
-    border: 1px solid #d1d5db;
+    border: 1px solid #d8dee7;
     padding: 10px;
     text-align: left;
 }
 
 .table th {
-    background: #f3f4f6;
+    background: #f7f9fc;
 }
 
 button,
 select,
 input {
     font: inherit;
+}
+
+@media (max-width: 980px) {
+    .app-sidebar {
+        position: static;
+        width: auto;
+        height: auto;
+        overflow: visible;
+        padding: 12px;
+    }
+
+    .app-main {
+        margin-left: 0;
+        min-height: auto;
+    }
 }

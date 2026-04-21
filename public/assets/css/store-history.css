@@ -1,0 +1,209 @@
+.history-shell {
+    background: #fff;
+    border: 1px solid #dbe3ea;
+    border-radius: 12px;
+    padding: 16px;
+}
+
+.history-toolbar {
+    display: flex;
+    justify-content: space-between;
+    gap: 16px;
+    align-items: end;
+    margin-bottom: 14px;
+}
+
+.history-toolbar h3 {
+    margin: 0;
+    color: #003366;
+}
+
+.history-toolbar p {
+    margin: 4px 0 0;
+    color: #64748b;
+}
+
+.history-store-switch {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.history-store-switch label {
+    font-size: 0.82rem;
+    color: #64748b;
+    font-weight: 600;
+}
+
+#history-store-select {
+    min-width: 220px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+
+.history-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    align-items: end;
+    margin-bottom: 14px;
+}
+
+.history-filter-field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.history-filter-field label {
+    font-size: 0.82rem;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.history-filter-field input,
+.history-filter-field select {
+    min-width: 180px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+
+.history-filter-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.history-table-wrap {
+    overflow: auto;
+}
+
+.history-summary {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+.history-summary-card {
+    background: #f8fafc;
+    border: 1px solid #dbe3ea;
+    border-radius: 10px;
+    padding: 10px 12px;
+    min-width: 180px;
+}
+
+.history-summary-card .label {
+    display: block;
+    font-size: 0.78rem;
+    color: #64748b;
+}
+
+.history-summary-card strong {
+    display: block;
+    margin-top: 4px;
+    color: #003366;
+}
+
+.history-result {
+    min-height: 20px;
+    margin: 10px 0 0;
+}
+
+.history-action {
+    border: 0;
+    border-radius: 8px;
+    background: #003366;
+    color: #fff;
+    padding: 6px 10px;
+    cursor: pointer;
+    font-size: 0.84rem;
+}
+
+.history-action.alt {
+    background: #64748b;
+}
+
+.receipt-modal {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    z-index: 1000;
+}
+
+.receipt-card {
+    width: 100%;
+    max-width: 560px;
+    background: #fff;
+    border-radius: 12px;
+    border: 1px solid #dbe3ea;
+    padding: 16px;
+}
+
+.receipt-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.receipt-head h3 {
+    margin: 0;
+    color: #003366;
+}
+
+.receipt-close {
+    border: 1px solid #cbd5e1;
+    background: #fff;
+    border-radius: 8px;
+    width: 32px;
+    height: 32px;
+    cursor: pointer;
+    font-size: 1.2rem;
+    line-height: 1;
+}
+
+.receipt-content-head {
+    margin-bottom: 10px;
+    color: #334155;
+    font-size: 0.9rem;
+}
+
+.receipt-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 10px;
+}
+
+.receipt-table th,
+.receipt-table td {
+    border: 1px solid #dbe3ea;
+    padding: 8px;
+    font-size: 0.85rem;
+}
+
+.receipt-table th {
+    background: #f8fafc;
+}
+
+.receipt-total {
+    text-align: right;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #0f172a;
+}
+
+.receipt-actions {
+    margin-top: 10px;
+}
+
+@media (max-width: 900px) {
+    .history-toolbar {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}

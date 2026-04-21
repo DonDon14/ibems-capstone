@@ -16,6 +16,8 @@ class ProductModel extends Model
         'store_id',
         'sku',
         'name',
+        'category',
+        'image_url',
         'price',
         'stock_qty',
         'is_active',
@@ -28,6 +30,8 @@ class ProductModel extends Model
     protected array $casts = [
         'id'        => 'integer',
         'store_id'  => 'integer',
+        'category'  => '?string',
+        'image_url' => '?string',
         'price'     => 'float',
         'stock_qty' => 'integer',
         'is_active' => 'boolean',

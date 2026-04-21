@@ -8,6 +8,8 @@ use App\Models\ProductModel;
 use App\Models\BalanceModel;
 use App\Models\InventoryMovementModel;
 use App\Models\AuditLogModel;
+use App\Models\StoreModel;
+use App\Models\UserModel;
 use CodeIgniter\RESTful\ResourceController;
 
 class PosController extends ResourceController
@@ -53,7 +55,9 @@ class PosController extends ResourceController
             ];
         }
 
-        $userId        = session()->get('user_id');
+        $actorId       = (int) session()->get('user_id');
+        $role          = (string) session()->get('role');
+        $customerUserId = isset($request['customer_user_id']) ? (int) $request['customer_user_id'] : null;
         $customerType  = $request['customer_type'] ?? 'walk_in';
         $storeId       = $request['store_id'] ?? null;
         $items         = $request['items'] ?? [];
@@ -65,12 +69,33 @@ class PosController extends ResourceController
         $itemModel      = new TransactionItemModel();
         $movementModel  = new InventoryMovementModel();
         $auditLogModel  = new AuditLogModel();
+        $storeModel     = new StoreModel();
+        $userModel      = new UserModel();
 
         if (!$customerType || !$storeId || !$paymentMethod || empty($items)) {
             return [
                 'status' => 'error',
                 'message' => 'Missing required transaction data.'
             ];
+        }
+
+        if (!$storeModel->canUserAccessStore($actorId, $role, (int) $storeId)) {
+            return [
+                'status' => 'error',
+                'message' => 'You cannot create transactions for this store.'
+            ];
+        }
+
+        if ($customerUserId) {
+            $customer = $userModel->getActiveUserById($customerUserId);
+            if (!$customer) {
+                return [
+                    'status' => 'error',
+                    'message' => 'Selected customer not found.'
+                ];
+            }
+
+            $customerType = $customer['user_type'] ?? 'walk_in';
         }
 
         $totalAmount = 0;
@@ -95,6 +120,13 @@ class PosController extends ResourceController
                 ];
             }
 
+            if ((int) $product['store_id'] !== (int) $storeId) {
+                return [
+                    'status' => 'error',
+                    'message' => 'Product does not belong to this store.'
+                ];
+            }
+
             if (!$productModel->hasEnoughStock($product['id'], $qty)) {
                 return [
                     'status' => 'error',
@@ -106,14 +138,21 @@ class PosController extends ResourceController
         }
 
         if ($paymentMethod === 'debt') {
-            if (!$userId) {
+            if (!$customerUserId) {
                 return [
                     'status' => 'error',
-                    'message' => 'Walk-in cannot use debt.'
+                    'message' => 'Please select a faculty/staff customer for debt transactions.'
                 ];
             }
 
-            if (!$balanceModel->canUseCredit($userId, $totalAmount)) {
+            if (!in_array($customerType, ['faculty', 'staff'], true)) {
+                return [
+                    'status' => 'error',
+                    'message' => 'Only faculty/staff can use debt payment.'
+                ];
+            }
+
+            if (!$balanceModel->canUseCredit($customerUserId, $totalAmount)) {
                 return [
                     'status' => 'error',
                     'message' => 'Insufficient credit.'
@@ -123,7 +162,7 @@ class PosController extends ResourceController
 
         $txnId = $txnModel->insert([
             'client_txn_id'   => uniqid(),
-            'user_id'         => $userId,
+            'user_id'         => $customerUserId,
             'customer_type'   => $customerType,
             'store_id'        => $storeId,
             'amount'          => $totalAmount,
@@ -159,11 +198,12 @@ class PosController extends ResourceController
         }
 
         $auditLogModel->insert([
-            'actor_id' => session()->get('user_id'),
+            'actor_id' => $actorId,
             'action'       => 'CREATE_TRANSACTION',
             'entity'       => 'transactions',
             'entity_id'    => $txnId,
             'payload_json' => json_encode([
+                'customer_user_id' => $customerUserId,
                 'customer_type'  => $customerType,
                 'store_id'       => $storeId,
                 'payment_method' => $paymentMethod,
@@ -174,7 +214,7 @@ class PosController extends ResourceController
         ]);
 
         if ($paymentMethod === 'debt') {
-            $balanceModel->addDebt($userId, $totalAmount);
+            $balanceModel->addDebt($customerUserId, $totalAmount);
         }
 
         $db->transComplete();

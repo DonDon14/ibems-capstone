@@ -41,4 +41,30 @@ class StoreModel extends Model
         return $this->where('officer_id', $officerId)
                     ->first();
     }
+
+    public function getAccessibleStores(int $userId, string $role): array
+    {
+        $builder = $this->where('is_active', 1);
+
+        if ($role === 'STORE_SYSTEM') {
+            $builder->where('officer_id', $userId);
+        } elseif ($role !== 'ADMIN') {
+            return [];
+        }
+
+        return $builder->orderBy('store_name', 'ASC')->findAll();
+    }
+
+    public function canUserAccessStore(int $userId, string $role, int $storeId): bool
+    {
+        $builder = $this->where('id', $storeId)->where('is_active', 1);
+
+        if ($role === 'STORE_SYSTEM') {
+            $builder->where('officer_id', $userId);
+        } elseif ($role !== 'ADMIN') {
+            return false;
+        }
+
+        return $builder->countAllResults() > 0;
+    }
 }
