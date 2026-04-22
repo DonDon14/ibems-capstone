@@ -59,12 +59,12 @@ async function srLoadStores() {
 function srRenderDebts(rows) {
     const body = document.getElementById("debt-body");
     if (!Array.isArray(rows) || rows.length === 0) {
-        body.innerHTML = '<tr><td colspan="7">No debt records found.</td></tr>';
+        body.innerHTML = '<tr><td colspan="8">No debt records found.</td></tr>';
         return;
     }
 
     body.innerHTML = rows.map((row) => `
-        <tr class="sr-row-clickable"
+        <tr class="sr-row-clickable table-row-clickable"
             data-debt-user-id="${Number(row.id || 0)}"
             data-debt-name="${srEscape(row.name)}"
             data-debt-employee="${srEscape(row.employee_id || "")}"
@@ -73,8 +73,14 @@ function srRenderDebts(rows) {
             <td>${srEscape(row.employee_id || "-")}</td>
             <td>${srEscape(row.name)}</td>
             <td>${srEscape(row.email)}</td>
-            <td>${srEscape(srCategory(row.user_type))}</td>
-            <td>${srEscape(srMoney(row.current_debt))}</td>
+            <td><span class="table-chip">${srEscape(srCategory(row.user_type))}</span></td>
+            <td><span class="table-status ${Number(row.is_active || 0) === 1 ? "is-active" : "is-inactive"}">${Number(row.is_active || 0) === 1 ? "Active" : "Inactive"}</span></td>
+            <td>
+                <div class="table-debt-wrap">
+                    <span>${srEscape(srMoney(row.current_debt))}</span>
+                    <div class="table-debt-bar"><i style="width:${Math.min(100, (Number(row.current_debt || 0) / Math.max(1, Number(row.credit_limit || 0))) * 100)}%"></i></div>
+                </div>
+            </td>
             <td>${srEscape(srMoney(row.credit_limit))}</td>
             <td>${srEscape(srMoney(row.available_credit))}</td>
         </tr>
@@ -89,7 +95,7 @@ function srRenderTransactions(rows) {
     }
 
     body.innerHTML = rows.map((row) => `
-        <tr class="sr-row-clickable" data-txn-id="${row.id}">
+        <tr class="sr-row-clickable table-row-clickable" data-txn-id="${row.id}">
             <td>${srEscape(new Date(row.created_at).toLocaleString())}</td>
             <td>${srEscape(String(row.payment_method || "").toUpperCase())}</td>
             <td>${srEscape(srMoney(row.amount))}</td>

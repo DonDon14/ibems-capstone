@@ -1,11 +1,12 @@
 let invStores = [];
 let invActiveStoreId = null;
 let invProducts = [];
-let invIsSubmitting = false;
+let invIsRestocking = false;
 let invIsCreatingProduct = false;
 let invIsUpdatingProduct = false;
 let invModalProductId = null;
 let invProductEditMode = false;
+let invModalPanel = "adjust";
 
 function invEscape(value) {
     return String(value ?? "")
@@ -36,19 +37,6 @@ function invRenderStoreSelect() {
     const multi = invStores.length > 1;
     select.disabled = !multi;
     wrap.style.display = multi ? "flex" : "none";
-}
-
-function invRenderProductSelect() {
-    const restockSelect = document.getElementById("restock-product");
-    const options = invProducts
-        .map((product) => `<option value="${product.id}">${invEscape(product.name)} (${invEscape(product.sku)})</option>`)
-        .join("");
-    restockSelect.innerHTML = options || '<option value="">No products</option>';
-}
-
-function invGetSelectedProduct() {
-    const productId = Number(document.getElementById("restock-product").value || 0);
-    return invProducts.find((product) => Number(product.id) === productId) || null;
 }
 
 function invRenderProductTable() {
@@ -112,7 +100,13 @@ function invOpenProductActionModal(productId) {
     document.getElementById("product-view-image").textContent = product.image_url || "Not set";
     document.getElementById("modal-actual-stock").value = Number(product.stock_qty || 0);
     document.getElementById("modal-stock-reason").value = "Physical count adjustment";
+    document.getElementById("modal-restock-qty").value = "1";
+    document.getElementById("modal-restock-unit-cost").value = "0";
+    document.getElementById("modal-restock-sell-price").value = Number(product.price || 0).toFixed(2);
+    document.getElementById("modal-restock-reason").value = "Stock in";
+    invUpdateModalRestockProjection();
     invSetProductEditMode(false);
+    invSetModalPanel("adjust");
     document.getElementById("inventory-product-action-modal").style.display = "grid";
 }
 
@@ -130,21 +124,32 @@ function invSetProductEditMode(enabled) {
     document.getElementById("modal-save-product").style.display = invProductEditMode ? "inline-flex" : "none";
 }
 
-function invUpdateProjection() {
-    const product = invGetSelectedProduct();
-    const qty = Number(document.getElementById("restock-qty").value || 0);
-    const unitCost = Number(document.getElementById("restock-unit-cost").value || 0);
-    const sellInput = Number(document.getElementById("restock-sell-price").value || 0);
+function invSetModalPanel(panel) {
+    invModalPanel = panel === "restock" ? "restock" : "adjust";
+    const isAdjust = invModalPanel === "adjust";
+    document.getElementById("modal-adjust-panel").style.display = isAdjust ? "block" : "none";
+    document.getElementById("modal-restock-panel").style.display = isAdjust ? "none" : "block";
+    document.getElementById("modal-panel-adjust-btn").classList.toggle("is-active", isAdjust);
+    document.getElementById("modal-panel-restock-btn").classList.toggle("is-active", !isAdjust);
+    document.getElementById("modal-save-adjustment").style.display = isAdjust ? "inline-flex" : "none";
+    document.getElementById("modal-restock-submit").style.display = isAdjust ? "none" : "inline-flex";
+}
+
+function invUpdateModalRestockProjection() {
+    const product = invGetProductById(invModalProductId);
+    const qty = Number(document.getElementById("modal-restock-qty").value || 0);
+    const unitCost = Number(document.getElementById("modal-restock-unit-cost").value || 0);
+    const sellInput = Number(document.getElementById("modal-restock-sell-price").value || 0);
     const sellPrice = sellInput > 0 ? sellInput : Number(product?.price || 0);
 
     const totalCost = qty * unitCost;
     const profitPerPiece = sellPrice - unitCost;
     const expectedProfit = qty * profitPerPiece;
 
-    document.getElementById("proj-price").textContent = invMoney(sellPrice);
-    document.getElementById("proj-profit-piece").textContent = invMoney(profitPerPiece);
-    document.getElementById("proj-cost").textContent = invMoney(totalCost);
-    document.getElementById("proj-profit").textContent = invMoney(expectedProfit);
+    document.getElementById("modal-proj-price").textContent = invMoney(sellPrice);
+    document.getElementById("modal-proj-profit-piece").textContent = invMoney(profitPerPiece);
+    document.getElementById("modal-proj-cost").textContent = invMoney(totalCost);
+    document.getElementById("modal-proj-profit").textContent = invMoney(expectedProfit);
 }
 
 async function invLoadStores() {
@@ -166,29 +171,23 @@ async function invLoadProducts() {
 
     if (!data || data.status !== "success") {
         invProducts = [];
-        invRenderProductSelect();
         invRenderProductTable();
-        invUpdateProjection();
         throw new Error(data?.message || "Unable to load products.");
     }
 
     invProducts = Array.isArray(data.products) ? data.products : [];
-    invRenderProductSelect();
     invRenderProductTable();
-    const product = invGetSelectedProduct();
-    document.getElementById("restock-sell-price").value = product ? Number(product.price || 0).toFixed(2) : "0";
-    invUpdateProjection();
 }
 
-async function invSubmitRestock() {
-    if (invIsSubmitting) return;
+async function invSubmitModalRestock() {
+    if (invIsRestocking) return;
 
-    const productId = Number(document.getElementById("restock-product").value || 0);
-    const qty = Number(document.getElementById("restock-qty").value || 0);
-    const unitCost = Number(document.getElementById("restock-unit-cost").value || 0);
-    const sellPrice = Number(document.getElementById("restock-sell-price").value || 0);
-    const reason = document.getElementById("restock-reason").value || "Stock in";
-    const button = document.getElementById("restock-submit");
+    const productId = Number(invModalProductId || 0);
+    const qty = Number(document.getElementById("modal-restock-qty").value || 0);
+    const unitCost = Number(document.getElementById("modal-restock-unit-cost").value || 0);
+    const sellPrice = Number(document.getElementById("modal-restock-sell-price").value || 0);
+    const reason = (document.getElementById("modal-restock-reason").value || "Stock in").trim();
+    const button = document.getElementById("modal-restock-submit");
 
     if (!invActiveStoreId || productId <= 0 || qty <= 0 || unitCost < 0 || sellPrice < 0) {
         invSetResult("Please complete a valid stock-in form.", "error");
@@ -205,7 +204,7 @@ async function invSubmitRestock() {
     };
 
     try {
-        invIsSubmitting = true;
+        invIsRestocking = true;
         button.disabled = true;
         button.textContent = "Submitting...";
 
@@ -225,13 +224,12 @@ async function invSubmitRestock() {
             `Stock-in successful. Total Cost: ${invMoney(data.total_cost)} | Profit/Piece: ${invMoney(data.profit_per_piece)} | Expected Profit: ${invMoney(data.expected_profit)}`,
             "ok"
         );
-
-        invCloseStockModal();
         await invLoadProducts();
+        invOpenProductActionModal(productId);
     } catch (error) {
         invSetResult("Stock-in request failed.", "error");
     } finally {
-        invIsSubmitting = false;
+        invIsRestocking = false;
         button.disabled = false;
         button.textContent = "Submit Stock In";
     }
@@ -430,26 +428,7 @@ async function invUpdateProduct(productId) {
     }
 }
 
-function invToggleAddMenu() {
-    const menu = document.getElementById("add-menu");
-    menu.style.display = menu.style.display === "none" ? "block" : "none";
-}
-
-function invCloseAddMenu() {
-    document.getElementById("add-menu").style.display = "none";
-}
-
-function invOpenStockModal() {
-    invCloseAddMenu();
-    document.getElementById("inventory-stockin-modal").style.display = "grid";
-}
-
-function invCloseStockModal() {
-    document.getElementById("inventory-stockin-modal").style.display = "none";
-}
-
 function invOpenProductModal() {
-    invCloseAddMenu();
     document.getElementById("inventory-product-modal").style.display = "grid";
 }
 
@@ -465,27 +444,15 @@ document.getElementById("inventory-store-select").addEventListener("change", asy
 
 document.getElementById("inventory-search").addEventListener("input", invRenderProductTable);
 
-document.getElementById("open-add-menu").addEventListener("click", invToggleAddMenu);
-document.getElementById("open-stockin-modal").addEventListener("click", invOpenStockModal);
-document.getElementById("open-product-modal").addEventListener("click", invOpenProductModal);
-document.getElementById("close-stockin-modal").addEventListener("click", invCloseStockModal);
+document.getElementById("open-product-modal-top").addEventListener("click", invOpenProductModal);
 document.getElementById("close-product-modal").addEventListener("click", invCloseProductModal);
 document.getElementById("close-product-action-modal").addEventListener("click", invCloseProductActionModal);
 document.getElementById("new-product-image-source").addEventListener("change", invToggleProductImageInput);
 document.getElementById("modal-product-image-source").addEventListener("change", invToggleModalProductImageInput);
 document.getElementById("modal-start-edit-product").addEventListener("click", () => invSetProductEditMode(true));
 document.getElementById("modal-cancel-edit-product").addEventListener("click", () => invSetProductEditMode(false));
-
-document.addEventListener("click", (event) => {
-    const wrap = event.target.closest(".add-menu-wrap");
-    if (!wrap) invCloseAddMenu();
-});
-
-document.getElementById("inventory-stockin-modal").addEventListener("click", (event) => {
-    if (event.target.id === "inventory-stockin-modal") {
-        invCloseStockModal();
-    }
-});
+document.getElementById("modal-panel-adjust-btn").addEventListener("click", () => invSetModalPanel("adjust"));
+document.getElementById("modal-panel-restock-btn").addEventListener("click", () => invSetModalPanel("restock"));
 
 document.getElementById("inventory-product-modal").addEventListener("click", (event) => {
     if (event.target.id === "inventory-product-modal") {
@@ -505,18 +472,10 @@ document.getElementById("inventory-product-body").addEventListener("click", (eve
     invOpenProductActionModal(row.getAttribute("data-product-row"));
 });
 
-document.getElementById("restock-product").addEventListener("change", () => {
-    const product = invGetSelectedProduct();
-    if (product) {
-        document.getElementById("restock-sell-price").value = Number(product.price || 0).toFixed(2);
-    }
-    invUpdateProjection();
-});
-
-document.getElementById("restock-qty").addEventListener("input", invUpdateProjection);
-document.getElementById("restock-unit-cost").addEventListener("input", invUpdateProjection);
-document.getElementById("restock-sell-price").addEventListener("input", invUpdateProjection);
-document.getElementById("restock-submit").addEventListener("click", invSubmitRestock);
+document.getElementById("modal-restock-qty").addEventListener("input", invUpdateModalRestockProjection);
+document.getElementById("modal-restock-unit-cost").addEventListener("input", invUpdateModalRestockProjection);
+document.getElementById("modal-restock-sell-price").addEventListener("input", invUpdateModalRestockProjection);
+document.getElementById("modal-restock-submit").addEventListener("click", invSubmitModalRestock);
 document.getElementById("new-product-submit").addEventListener("click", invCreateProduct);
 document.getElementById("modal-save-adjustment").addEventListener("click", async () => {
     if (!invModalProductId) return;

@@ -30,6 +30,253 @@ class StoreController extends BaseController
         return view('store/staff-records');
     }
 
+    public function reports()
+    {
+        return view('store/reports');
+    }
+
+    public function reportSummary()
+    {
+        $role = (string) session()->get('role');
+        $userId = (int) session()->get('user_id');
+        $storeModel = new StoreModel();
+        $stores = $storeModel->getAccessibleStores($userId, $role);
+
+        if ($stores === []) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'No accessible store found.',
+            ]);
+        }
+
+        $storeId = (int) ($this->request->getGet('store_id') ?? 0);
+        if ($storeId <= 0) {
+            $storeId = (int) $stores[0]['id'];
+        }
+
+        if (!$storeModel->canUserAccessStore($userId, $role, $storeId)) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'You cannot access this store.',
+            ]);
+        }
+
+        $period = strtolower(trim((string) ($this->request->getGet('period') ?? 'month')));
+        if (!in_array($period, ['today', 'week', 'month', 'custom'], true)) {
+            $period = 'month';
+        }
+
+        $dateFromInput = trim((string) $this->request->getGet('date_from'));
+        $dateToInput = trim((string) $this->request->getGet('date_to'));
+        $today = new \DateTimeImmutable('now');
+
+        switch ($period) {
+            case 'today':
+                $fromDate = $today->format('Y-m-d');
+                $toDate = $today->format('Y-m-d');
+                break;
+            case 'week':
+                $fromDate = $today->modify('monday this week')->format('Y-m-d');
+                $toDate = $today->modify('sunday this week')->format('Y-m-d');
+                break;
+            case 'custom':
+                if (
+                    !preg_match('/^\d{4}\-\d{2}\-\d{2}$/', $dateFromInput) ||
+                    !preg_match('/^\d{4}\-\d{2}\-\d{2}$/', $dateToInput)
+                ) {
+                    return $this->response->setStatusCode(400)->setJSON([
+                        'status' => 'error',
+                        'message' => 'Custom range requires date_from and date_to in YYYY-MM-DD format.',
+                    ]);
+                }
+                $fromDate = $dateFromInput;
+                $toDate = $dateToInput;
+                break;
+            case 'month':
+            default:
+                $fromDate = $today->modify('first day of this month')->format('Y-m-d');
+                $toDate = $today->modify('last day of this month')->format('Y-m-d');
+                break;
+        }
+
+        if ($fromDate > $toDate) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'date_from cannot be later than date_to.',
+            ]);
+        }
+
+        $fromTs = $fromDate . ' 00:00:00';
+        $toTs = $toDate . ' 23:59:59';
+
+        $storeName = 'Store';
+        foreach ($stores as $store) {
+            if ((int) ($store['id'] ?? 0) === $storeId) {
+                $storeName = (string) ($store['store_name'] ?? $storeName);
+                break;
+            }
+        }
+
+        $db = Database::connect();
+
+        $txnAgg = $db->table('transactions t')
+            ->select('COUNT(*) AS txn_count, COALESCE(SUM(t.amount), 0) AS total_sales')
+            ->where('t.store_id', $storeId)
+            ->where('t.created_at >=', $fromTs)
+            ->where('t.created_at <=', $toTs)
+            ->get()
+            ->getRowArray();
+
+        $itemsAgg = $db->table('transaction_items ti')
+            ->select('COALESCE(SUM(ti.qty), 0) AS items_sold')
+            ->join('transactions t', 't.id = ti.transaction_id', 'inner')
+            ->where('t.store_id', $storeId)
+            ->where('t.created_at >=', $fromTs)
+            ->where('t.created_at <=', $toTs)
+            ->get()
+            ->getRowArray();
+
+        $paymentRows = $db->table('transactions t')
+            ->select('t.payment_method, COUNT(*) AS txn_count, COALESCE(SUM(t.amount), 0) AS total_sales')
+            ->where('t.store_id', $storeId)
+            ->where('t.created_at >=', $fromTs)
+            ->where('t.created_at <=', $toTs)
+            ->groupBy('t.payment_method')
+            ->orderBy('total_sales', 'DESC')
+            ->get()
+            ->getResultArray();
+
+        $costRows = $db->table('inventory_movements im')
+            ->select('im.product_id, COALESCE(SUM(im.total_cost), 0) AS total_cost, COALESCE(SUM(im.qty), 0) AS total_qty')
+            ->where('im.store_id', $storeId)
+            ->where('im.type', 'restock')
+            ->where('im.qty >', 0)
+            ->where('im.created_at <=', $toTs)
+            ->groupBy('im.product_id')
+            ->get()
+            ->getResultArray();
+
+        $avgCostByProduct = [];
+        foreach ($costRows as $row) {
+            $qty = (float) ($row['total_qty'] ?? 0);
+            if ($qty <= 0) {
+                continue;
+            }
+            $avgCostByProduct[(int) $row['product_id']] = (float) $row['total_cost'] / $qty;
+        }
+
+        $productRows = $db->table('transaction_items ti')
+            ->select('ti.product_id, p.name AS product_name, p.sku, p.category, COALESCE(SUM(ti.qty), 0) AS qty_sold, COALESCE(SUM(ti.line_total), 0) AS revenue')
+            ->join('transactions t', 't.id = ti.transaction_id', 'inner')
+            ->join('products p', 'p.id = ti.product_id', 'left')
+            ->where('t.store_id', $storeId)
+            ->where('t.created_at >=', $fromTs)
+            ->where('t.created_at <=', $toTs)
+            ->groupBy('ti.product_id, p.name, p.sku, p.category')
+            ->orderBy('revenue', 'DESC')
+            ->limit(10)
+            ->get()
+            ->getResultArray();
+
+        $topProducts = [];
+        $estimatedCost = 0.0;
+        foreach ($productRows as $row) {
+            $productId = (int) ($row['product_id'] ?? 0);
+            $qtySold = (float) ($row['qty_sold'] ?? 0);
+            $revenue = (float) ($row['revenue'] ?? 0);
+            $avgCost = (float) ($avgCostByProduct[$productId] ?? 0);
+            $productCost = $qtySold * $avgCost;
+            $productProfit = $revenue - $productCost;
+            $estimatedCost += $productCost;
+
+            $topProducts[] = [
+                'product_id' => $productId,
+                'name' => $row['product_name'] ?: ('Product #' . $productId),
+                'sku' => $row['sku'] ?? null,
+                'category' => $row['category'] ?? null,
+                'qty_sold' => (int) $qtySold,
+                'revenue' => $revenue,
+                'estimated_cost' => $productCost,
+                'estimated_profit' => $productProfit,
+                'avg_unit_cost' => $avgCost,
+            ];
+        }
+
+        $trendRows = $db->table('transactions t')
+            ->select('DATE(t.created_at) AS sale_date, COUNT(*) AS txn_count, COALESCE(SUM(t.amount), 0) AS total_sales')
+            ->where('t.store_id', $storeId)
+            ->where('t.created_at >=', $fromTs)
+            ->where('t.created_at <=', $toTs)
+            ->groupBy('DATE(t.created_at)')
+            ->orderBy('sale_date', 'ASC')
+            ->get()
+            ->getResultArray();
+
+        $trend = array_map(static function (array $row): array {
+            return [
+                'date' => (string) ($row['sale_date'] ?? ''),
+                'transactions' => (int) ($row['txn_count'] ?? 0),
+                'sales' => (float) ($row['total_sales'] ?? 0),
+            ];
+        }, $trendRows);
+
+        $stockInAgg = $db->table('inventory_movements im')
+            ->select('COALESCE(SUM(im.qty), 0) AS stock_in_units, COALESCE(SUM(im.total_cost), 0) AS stock_in_cost, COALESCE(SUM(im.expected_profit), 0) AS projected_profit')
+            ->where('im.store_id', $storeId)
+            ->where('im.type', 'restock')
+            ->where('im.created_at >=', $fromTs)
+            ->where('im.created_at <=', $toTs)
+            ->get()
+            ->getRowArray();
+
+        $totalSales = (float) ($txnAgg['total_sales'] ?? 0);
+        $txnCount = (int) ($txnAgg['txn_count'] ?? 0);
+        $itemsSold = (int) ($itemsAgg['items_sold'] ?? 0);
+        $estimatedProfit = $totalSales - $estimatedCost;
+        $profitMarginPercent = $totalSales > 0 ? ($estimatedProfit / $totalSales) * 100 : 0.0;
+
+        $paymentBreakdown = array_map(static function (array $row): array {
+            return [
+                'payment_method' => (string) ($row['payment_method'] ?? 'unknown'),
+                'transactions' => (int) ($row['txn_count'] ?? 0),
+                'sales' => (float) ($row['total_sales'] ?? 0),
+            ];
+        }, $paymentRows);
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'store' => [
+                'id' => $storeId,
+                'name' => $storeName,
+            ],
+            'range' => [
+                'period' => $period,
+                'from' => $fromDate,
+                'to' => $toDate,
+            ],
+            'summary' => [
+                'transactions' => $txnCount,
+                'items_sold' => $itemsSold,
+                'total_sales' => $totalSales,
+                'estimated_cost' => $estimatedCost,
+                'estimated_profit' => $estimatedProfit,
+                'profit_margin_percent' => $profitMarginPercent,
+                'average_ticket' => $txnCount > 0 ? $totalSales / $txnCount : 0.0,
+            ],
+            'stock_in' => [
+                'units' => (int) ($stockInAgg['stock_in_units'] ?? 0),
+                'total_cost' => (float) ($stockInAgg['stock_in_cost'] ?? 0),
+                'projected_profit' => (float) ($stockInAgg['projected_profit'] ?? 0),
+            ],
+            'payment_breakdown' => $paymentBreakdown,
+            'top_products' => $topProducts,
+            'trend' => $trend,
+            'notes' => [
+                'profit_basis' => 'Estimated using weighted-average restock unit cost per product up to selected period end.',
+            ],
+        ]);
+    }
+
     public function products()
     {
         $storeId = (int) ($this->request->getGet('store_id') ?? 1);
@@ -88,7 +335,7 @@ class StoreController extends BaseController
         $db = Database::connect();
 
         $builder = $db->table('users u')
-            ->select('u.id, u.employee_id, u.name, u.email, u.user_type, b.credit_limit, b.current_debt')
+            ->select('u.id, u.employee_id, u.name, u.email, u.user_type, u.is_active, b.credit_limit, b.current_debt')
             ->join('balances b', 'b.user_id = u.id', 'inner')
             ->where('u.is_active', 1)
             ->whereIn('u.user_type', ['faculty', 'staff'])

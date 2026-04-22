@@ -57,8 +57,8 @@
         </div>
     </div>
 
-    <div class="history-table-wrap">
-        <table class="table">
+    <div class="history-table-wrap table-standard-wrap">
+        <table class="table table-standard">
             <thead>
                 <tr>
                     <th>#</th>

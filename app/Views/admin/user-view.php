@@ -7,12 +7,51 @@
 <?= $this->section('content') ?>
 <section class="admin-overview-shell">
     <div class="admin-overview-head">
-        <h3>Users Management</h3>
+        <h3>User Management</h3>
         <p>Manage portal users, roles, and account details.</p>
+    </div>
+
+    <div class="summary-grid">
+        <article class="summary-card">
+            <span>Total Users</span>
+            <strong id="uv-total-users">0</strong>
+        </article>
+        <article class="summary-card">
+            <span>Outstanding Debt</span>
+            <strong id="uv-total-debt">PHP 0.00</strong>
+        </article>
+        <article class="summary-card">
+            <span>Active Faculty</span>
+            <strong id="uv-active-faculty">0</strong>
+        </article>
+        <article class="summary-card">
+            <span>Store Officers</span>
+            <strong id="uv-store-officers">0</strong>
+        </article>
+    </div>
+
+    <div class="uv-chip-row">
+        <button class="uv-chip is-active" data-uv-quick="all" type="button">All Users</button>
+        <button class="uv-chip" data-uv-quick="active" type="button">Active</button>
+        <button class="uv-chip" data-uv-quick="debt" type="button">Debt</button>
+        <button class="uv-chip" data-uv-quick="store_system" type="button">Store System</button>
     </div>
 
     <div class="overview-filter">
         <input id="uv-search" type="search" placeholder="Search name, email, or employee ID">
+        <select id="uv-role-filter">
+            <option value="">Filter by Role</option>
+            <option value="ADMIN">Admin</option>
+            <option value="ACCOUNTING_OFFICE">Accounting Office</option>
+            <option value="STORE_SYSTEM">Store System</option>
+            <option value="USER">User</option>
+        </select>
+        <select id="uv-type-filter">
+            <option value="">Filter by Category</option>
+            <option value="faculty">Faculty</option>
+            <option value="staff">Staff</option>
+            <option value="student">Student</option>
+        </select>
         <button id="uv-search-btn" class="primary-btn" type="button">Search</button>
         <button id="uv-add-btn" class="primary-btn" type="button">+ Add User</button>
         <button id="uv-import-btn" class="primary-btn" type="button">Import CSV</button>

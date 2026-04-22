@@ -63,7 +63,7 @@ function renderTransactions(transactions) {
     body.innerHTML = transactions
         .map(
             (txn) => `
-            <tr class="history-row-clickable" data-txn-id="${txn.id}">
+            <tr class="history-row-clickable table-row-clickable" data-txn-id="${txn.id}">
                 <td>${txn.id}</td>
                 <td>${hEscape(hDateTime(txn.created_at))}</td>
                 <td>${hEscape(txn.customer_name)}</td>

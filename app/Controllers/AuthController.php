@@ -15,7 +15,7 @@ class AuthController extends Controller
         $password = $request['password'] ?? null;
 
         if (!$email || !$password) {
-            return $this->response->setJSON([
+            return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
                 'message' => 'Email and password required'
             ]);
@@ -26,16 +26,16 @@ class AuthController extends Controller
         $user = $userModel->getActiveUserByEmail($email);
 
         if (!$user) {
-            return $this->response->setJSON([
+            return $this->response->setStatusCode(401)->setJSON([
                 'status' => 'error',
-                'message' => 'User not found'
+                'message' => 'Invalid email or password'
             ]);
         }
 
         if (!password_verify($password, $user['password_hash'])) {
-            return $this->response->setJSON([
+            return $this->response->setStatusCode(401)->setJSON([
                 'status' => 'error',
-                'message' => 'Invalid password'
+                'message' => 'Invalid email or password'
             ]);
         }
 
@@ -69,7 +69,7 @@ class AuthController extends Controller
     public function me()
     {
         if (!session()->get('logged_in')) {
-            return $this->response->setJSON([
+            return $this->response->setStatusCode(401)->setJSON([
                 'status' => 'error',
                 'message' => 'Not authenticated'
             ]);

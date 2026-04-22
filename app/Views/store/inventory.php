@@ -16,13 +16,7 @@
                 <label for="inventory-store-select">Store</label>
                 <select id="inventory-store-select"></select>
             </div>
-            <div class="add-menu-wrap">
-                <button id="open-add-menu" class="primary-btn inventory-add-btn" type="button"><span class="plus">+</span> Add New</button>
-                <div id="add-menu" class="add-menu" style="display:none;">
-                    <button id="open-stockin-modal" type="button">Stock In</button>
-                    <button id="open-product-modal" type="button">Product</button>
-                </div>
-            </div>
+            <button id="open-product-modal-top" class="primary-btn inventory-add-btn" type="button"><span class="plus">+</span> Add New Product</button>
         </div>
     </div>
 
@@ -52,49 +46,6 @@
 
     <p id="inventory-result" class="inventory-result"></p>
 </section>
-
-<div id="inventory-stockin-modal" class="inv-modal" style="display:none;">
-    <div class="inv-modal-card">
-        <div class="inv-modal-head">
-            <h4>Add Inventory (Stock In)</h4>
-            <button id="close-stockin-modal" type="button" class="inv-modal-close">x</button>
-        </div>
-
-        <div class="form-grid">
-                <div class="field">
-                    <label for="restock-product">Product</label>
-                    <select id="restock-product"></select>
-                </div>
-                <div class="field">
-                    <label for="restock-qty">Quantity</label>
-                    <input id="restock-qty" type="number" min="1" step="1" value="1">
-                </div>
-                <div class="field">
-                    <label for="restock-unit-cost">Unit Cost</label>
-                    <input id="restock-unit-cost" type="number" min="0" step="0.01" value="0">
-                </div>
-                <div class="field">
-                    <label for="restock-sell-price">Sell Price (Per Piece)</label>
-                    <input id="restock-sell-price" type="number" min="0" step="0.01" value="0">
-                </div>
-                <div class="field">
-                    <label for="restock-reason">Reason</label>
-                    <input id="restock-reason" type="text" value="Stock in">
-                </div>
-        </div>
-
-        <div class="projection">
-            <div><span>Selling Price:</span> <strong id="proj-price">PHP 0.00</strong></div>
-            <div><span>Profit Per Piece:</span> <strong id="proj-profit-piece">PHP 0.00</strong></div>
-            <div><span>Total Cost:</span> <strong id="proj-cost">PHP 0.00</strong></div>
-            <div><span>Expected Profit:</span> <strong id="proj-profit">PHP 0.00</strong></div>
-        </div>
-
-        <div class="inv-modal-actions">
-            <button id="restock-submit" class="primary-btn" type="button">Submit Stock In</button>
-        </div>
-    </div>
-</div>
 
 <div id="inventory-product-modal" class="inv-modal" style="display:none;">
     <div class="inv-modal-card">
@@ -162,75 +113,112 @@
             <button id="close-product-action-modal" type="button" class="inv-modal-close">x</button>
         </div>
 
-        <div id="product-action-info" class="product-action-info"></div>
+        <div class="product-actions-body">
+            <div id="product-action-info" class="product-action-info"></div>
 
-        <div class="product-detail-view">
-            <div class="detail-item">
-                <span>SKU</span>
-                <strong id="product-view-sku">-</strong>
+            <div class="product-detail-view">
+                <div class="detail-item">
+                    <span>SKU</span>
+                    <strong id="product-view-sku">-</strong>
+                </div>
+                <div class="detail-item">
+                    <span>Name</span>
+                    <strong id="product-view-name">-</strong>
+                </div>
+                <div class="detail-item">
+                    <span>Category</span>
+                    <strong id="product-view-category">-</strong>
+                </div>
+                <div class="detail-item">
+                    <span>Price</span>
+                    <strong id="product-view-price">PHP 0.00</strong>
+                </div>
+                <div class="detail-item detail-item-wide">
+                    <span>Image</span>
+                    <strong id="product-view-image">Not set</strong>
+                </div>
             </div>
-            <div class="detail-item">
-                <span>Name</span>
-                <strong id="product-view-name">-</strong>
-            </div>
-            <div class="detail-item">
-                <span>Category</span>
-                <strong id="product-view-category">-</strong>
-            </div>
-            <div class="detail-item">
-                <span>Price</span>
-                <strong id="product-view-price">PHP 0.00</strong>
-            </div>
-            <div class="detail-item detail-item-wide">
-                <span>Image</span>
-                <strong id="product-view-image">Not set</strong>
-            </div>
-        </div>
 
-        <div id="product-edit-wrap" style="display:none;">
-            <div class="form-grid">
-                <div class="field">
-                    <label for="modal-product-sku">SKU</label>
-                    <input id="modal-product-sku" type="text" placeholder="SKU">
-                </div>
-                <div class="field">
-                    <label for="modal-product-name">Product Name</label>
-                    <input id="modal-product-name" type="text" placeholder="Product name">
-                </div>
-                <div class="field">
-                    <label for="modal-product-category">Category</label>
-                    <input id="modal-product-category" type="text" placeholder="Category">
-                </div>
-                <div class="field">
-                    <label for="modal-product-price">Sell Price</label>
-                    <input id="modal-product-price" type="number" min="0" step="0.01" value="0">
-                </div>
-                <div class="field">
-                    <label for="modal-product-image-source">Product Image Source</label>
-                    <select id="modal-product-image-source">
-                        <option value="upload">Upload File</option>
-                        <option value="url">Use Image URL</option>
-                    </select>
-                </div>
-                <div class="field" id="modal-product-image-upload-wrap">
-                    <label for="modal-product-image-file">Image Upload</label>
-                    <input id="modal-product-image-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
-                </div>
-                <div class="field" id="modal-product-image-url-wrap" style="display:none;">
-                    <label for="modal-product-image-url">Image URL</label>
-                    <input id="modal-product-image-url" type="url" placeholder="https://...">
+            <div id="product-edit-wrap" style="display:none;">
+                <div class="form-grid">
+                    <div class="field">
+                        <label for="modal-product-sku">SKU</label>
+                        <input id="modal-product-sku" type="text" placeholder="SKU">
+                    </div>
+                    <div class="field">
+                        <label for="modal-product-name">Product Name</label>
+                        <input id="modal-product-name" type="text" placeholder="Product name">
+                    </div>
+                    <div class="field">
+                        <label for="modal-product-category">Category</label>
+                        <input id="modal-product-category" type="text" placeholder="Category">
+                    </div>
+                    <div class="field">
+                        <label for="modal-product-price">Sell Price</label>
+                        <input id="modal-product-price" type="number" min="0" step="0.01" value="0">
+                    </div>
+                    <div class="field">
+                        <label for="modal-product-image-source">Product Image Source</label>
+                        <select id="modal-product-image-source">
+                            <option value="upload">Upload File</option>
+                            <option value="url">Use Image URL</option>
+                        </select>
+                    </div>
+                    <div class="field" id="modal-product-image-upload-wrap">
+                        <label for="modal-product-image-file">Image Upload</label>
+                        <input id="modal-product-image-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+                    </div>
+                    <div class="field" id="modal-product-image-url-wrap" style="display:none;">
+                        <label for="modal-product-image-url">Image URL</label>
+                        <input id="modal-product-image-url" type="url" placeholder="https://...">
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div class="form-grid">
-            <div class="field">
-                <label for="modal-actual-stock">Actual Stock</label>
-                <input id="modal-actual-stock" type="number" min="0" step="1" value="0">
+            <div class="modal-action-tabs">
+                <button id="modal-panel-adjust-btn" class="panel-tab is-active" type="button">Adjust Stock</button>
+                <button id="modal-panel-restock-btn" class="panel-tab" type="button">Stock In</button>
             </div>
-            <div class="field">
-                <label for="modal-stock-reason">Reason</label>
-                <input id="modal-stock-reason" type="text" value="Physical count adjustment">
+
+            <div id="modal-adjust-panel" class="action-panel">
+                <div class="form-grid">
+                    <div class="field">
+                        <label for="modal-actual-stock">Actual Stock</label>
+                        <input id="modal-actual-stock" type="number" min="0" step="1" value="0">
+                    </div>
+                    <div class="field">
+                        <label for="modal-stock-reason">Reason</label>
+                        <input id="modal-stock-reason" type="text" value="Physical count adjustment">
+                    </div>
+                </div>
+            </div>
+
+            <div id="modal-restock-panel" class="action-panel" style="display:none;">
+                <div class="form-grid">
+                    <div class="field">
+                        <label for="modal-restock-qty">Quantity</label>
+                        <input id="modal-restock-qty" type="number" min="1" step="1" value="1">
+                    </div>
+                    <div class="field">
+                        <label for="modal-restock-unit-cost">Unit Cost</label>
+                        <input id="modal-restock-unit-cost" type="number" min="0" step="0.01" value="0">
+                    </div>
+                    <div class="field">
+                        <label for="modal-restock-sell-price">Sell Price (Per Piece)</label>
+                        <input id="modal-restock-sell-price" type="number" min="0" step="0.01" value="0">
+                    </div>
+                    <div class="field">
+                        <label for="modal-restock-reason">Reason</label>
+                        <input id="modal-restock-reason" type="text" value="Stock in">
+                    </div>
+                </div>
+
+                <div class="projection">
+                    <div><span>Selling Price:</span> <strong id="modal-proj-price">PHP 0.00</strong></div>
+                    <div><span>Profit Per Piece:</span> <strong id="modal-proj-profit-piece">PHP 0.00</strong></div>
+                    <div><span>Total Cost:</span> <strong id="modal-proj-cost">PHP 0.00</strong></div>
+                    <div><span>Expected Profit:</span> <strong id="modal-proj-profit">PHP 0.00</strong></div>
+                </div>
             </div>
         </div>
 
@@ -238,6 +226,7 @@
             <button id="modal-start-edit-product" class="secondary-btn" type="button">Edit Product</button>
             <button id="modal-cancel-edit-product" class="secondary-btn" type="button" style="display:none;">Cancel Edit</button>
             <button id="modal-save-product" class="secondary-btn" type="button" style="display:none;">Save Details</button>
+            <button id="modal-restock-submit" class="secondary-btn" type="button" style="display:none;">Submit Stock In</button>
             <button id="modal-save-adjustment" class="primary-btn" type="button">Save Adjustment</button>
         </div>
     </div>

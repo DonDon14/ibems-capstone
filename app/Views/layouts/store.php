@@ -3,6 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token-name" content="<?= esc(config('Security')->tokenName) ?>">
+    <meta name="csrf-token-value" content="<?= esc(service('security')->getHash()) ?>">
+    <meta name="csrf-header-name" content="<?= esc(config('Security')->headerName) ?>">
+    <meta name="csrf-cookie-name" content="<?= esc(config('Security')->cookieName) ?>">
     <title>Store System</title>
     <link rel="stylesheet" href="<?= base_url('assets/css/app.css') ?>">
     <?= $this->renderSection('styles') ?>
@@ -44,6 +48,7 @@ $storeLogoUrl = (string) ($activeStore['logo_url'] ?? '');
         <nav class="app-menu">
             <a href="/store/pos" class="<?= $isActive('store/pos') ?>">POS</a>
             <a href="/store/inventory" class="<?= $isActive('store/inventory') ?>">Inventory</a>
+            <a href="/store/reports" class="<?= $isActive('store/reports') ?>">Reports</a>
             <a href="/store/history" class="<?= $isActive('store/history') ?>">History</a>
             <a href="/store/staff-records" class="<?= $isActive('store/staff-records') ?>">Employee Records</a>
         </nav>
@@ -91,6 +96,7 @@ $storeLogoUrl = (string) ($activeStore['logo_url'] ?? '');
     </div>
 </div>
 
+<script src="<?= base_url('assets/js/csrf.js') ?>"></script>
 <?= $this->renderSection('scripts') ?>
 </body>
 </html>

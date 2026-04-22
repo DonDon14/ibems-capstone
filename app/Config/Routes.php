@@ -38,9 +38,11 @@ $routes->post('admin/stores/toggle-status', 'AdminController::toggleStoreStatus'
 $routes->get('store/pos', 'StoreController::pos', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
 $routes->get('store/history', 'StoreController::history', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
 $routes->get('store/inventory', 'StoreController::inventory', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
+$routes->get('store/reports', 'StoreController::reports', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
 $routes->get('store/staff-records', 'StoreController::staffRecords', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
 $routes->get('store/my-stores', 'StoreController::myStores', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
 $routes->get('store/products', 'StoreController::products', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
+$routes->get('store/reports/summary', 'StoreController::reportSummary', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
 $routes->get('store/debt-customers', 'StoreController::debtCustomers', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
 $routes->get('store/transactions', 'StoreController::transactions', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
 $routes->get('store/staff-transactions', 'StoreController::staffTransactions', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
@@ -62,6 +64,10 @@ $routes->get('accounting/debts/data', 'AccountingController::debtsData', ['filte
 $routes->get('accounting/debts/profile', 'AccountingController::debtProfile', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
 $routes->get('accounting/debts/history', 'AccountingController::debtHistory', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
 $routes->get('accounting/debts/daily-summary', 'AccountingController::dailySummary', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
+$routes->get('accounting/settlement/preview', 'AccountingController::settlementPreview', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
+$routes->post('accounting/settlement/apply', 'AccountingController::applySettlementRun', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
+$routes->get('accounting/settlement/runs', 'AccountingController::settlementRuns', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
+$routes->get('accounting/settlement/runs/(:num)', 'AccountingController::settlementRunDetails/$1', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
 $routes->post('accounting/debts/import-csv', 'AccountingController::importCsv', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
 $routes->post('accounting/debts/deduct', 'AccountingController::deductDebt', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
 $routes->post('accounting/debts/deduct-full', 'AccountingController::deductFullDebt', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);

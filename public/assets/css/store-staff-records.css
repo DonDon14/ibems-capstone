@@ -91,10 +91,6 @@
     cursor: pointer;
 }
 
-.sr-row-clickable:hover {
-    background: #f8fafc;
-}
-
 .staff-result {
     min-height: 20px;
 }

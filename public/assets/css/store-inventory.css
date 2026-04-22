@@ -33,34 +33,6 @@
     font-size: 0.95rem;
     line-height: 1;
 }
-.add-menu-wrap {
-    position: relative;
-}
-.add-menu {
-    position: absolute;
-    top: calc(100% + 8px);
-    right: 0;
-    min-width: 170px;
-    background: #fff;
-    border: 1px solid #dbe3ea;
-    border-radius: 10px;
-    box-shadow: 0 8px 26px rgba(2, 6, 23, 0.15);
-    overflow: hidden;
-    z-index: 100;
-}
-.add-menu button {
-    width: 100%;
-    border: 0;
-    background: #fff;
-    color: #1f2937;
-    text-align: left;
-    padding: 10px 12px;
-    cursor: pointer;
-    font-size: 0.9rem;
-}
-.add-menu button:hover {
-    background: #f8fafc;
-}
 
 .inventory-top h3 {
     margin: 0;
@@ -226,6 +198,10 @@
     border-radius: 12px;
     border: 1px solid #dbe3ea;
     padding: 14px;
+    max-height: min(90vh, 860px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
 }
 .inv-modal-head {
     display: flex;
@@ -252,6 +228,10 @@
     display: flex;
     justify-content: flex-end;
     gap: 8px;
+}
+.product-actions-body {
+    overflow-y: auto;
+    padding-right: 4px;
 }
 .secondary-btn {
     border: 1px solid #003366;
@@ -302,6 +282,28 @@
 .detail-item-wide {
     grid-column: span 2;
 }
+.modal-action-tabs {
+    display: flex;
+    gap: 8px;
+    margin: 10px 0;
+}
+.panel-tab {
+    border: 1px solid #cbd5e1;
+    background: #f8fafc;
+    color: #334155;
+    border-radius: 999px;
+    padding: 6px 12px;
+    font-size: 0.84rem;
+    cursor: pointer;
+}
+.panel-tab.is-active {
+    border-color: #003366;
+    background: #003366;
+    color: #fff;
+}
+.action-panel {
+    margin-bottom: 4px;
+}
 
 @media (max-width: 900px) {
     .inventory-top {
@@ -311,10 +313,6 @@
     .inventory-top-actions {
         flex-direction: column;
         align-items: stretch;
-    }
-    .add-menu {
-        left: 0;
-        right: auto;
     }
     .inventory-list-head {
         flex-direction: column;

@@ -27,21 +27,22 @@
             <button id="debt-search-btn" class="primary-btn" type="button">Search</button>
         </div>
 
-        <div class="table-wrap">
-            <table class="table">
+        <div class="table-wrap table-standard-wrap">
+            <table class="table table-standard">
                 <thead>
                     <tr>
                         <th>Employee ID</th>
                         <th>Name</th>
                         <th>Email</th>
                         <th>Category</th>
+                        <th>Status</th>
                         <th>Current Debt</th>
                         <th>Credit Limit</th>
                         <th>Available Credit</th>
                     </tr>
                 </thead>
                 <tbody id="debt-body">
-                    <tr><td colspan="7">Loading debt records...</td></tr>
+                    <tr><td colspan="8">Loading debt records...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -74,8 +75,8 @@
             <button id="txn-search-btn" class="primary-btn" type="button">Apply</button>
         </div>
 
-        <div class="table-wrap">
-            <table class="table">
+        <div class="table-wrap table-standard-wrap">
+            <table class="table table-standard">
                 <thead>
                     <tr>
                         <th>Date</th>

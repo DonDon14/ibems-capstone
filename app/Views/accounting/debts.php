@@ -13,20 +13,6 @@
         </div>
     </div>
 
-    <div class="acct-filters">
-        <div class="field">
-            <label for="acct-search">Search</label>
-            <input id="acct-search" type="search" placeholder="Name, email, or employee ID">
-        </div>
-        <div class="field checkbox-field">
-            <label><input id="acct-debt-only" type="checkbox"> Debt only</label>
-        </div>
-        <button id="acct-search-btn" class="primary-btn" type="button">Search</button>
-        <button id="acct-refresh-btn" class="history-action alt" type="button">Refresh</button>
-        <button id="open-deduction-mode" class="primary-btn" type="button">Deduction Mode</button>
-        <button id="open-import-csv" class="primary-btn" type="button">Import HR CSV</button>
-    </div>
-
     <div class="acct-summary">
         <div class="summary-card">
             <span>Accounts</span>
@@ -46,21 +32,45 @@
         </div>
     </div>
 
-    <div class="acct-table-wrap">
-        <table class="table">
+    <div class="acct-filters acct-filters-redesign">
+        <div class="acct-filters-main">
+            <div class="field field-search">
+                <label for="acct-search">Search Employee</label>
+                <input id="acct-search" type="search" placeholder="Name, email, or employee ID">
+            </div>
+            <label class="toggle-check">
+                <input id="acct-debt-only" type="checkbox">
+                <span>Debt only</span>
+            </label>
+        </div>
+        <div class="acct-filters-actions">
+            <div class="action-group action-group-primary">
+                <button id="acct-refresh-btn" class="history-action alt" type="button">Refresh</button>
+            </div>
+            <div class="action-group action-group-tools">
+                <button id="open-settlement-run" class="history-action" type="button">Settlement Run</button>
+                <button id="open-deduction-mode" class="history-action" type="button">Deduction Mode</button>
+                <button id="open-import-csv" class="history-action" type="button">Import HR CSV</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="acct-table-wrap table-standard-wrap">
+        <table class="table table-standard">
             <thead>
                 <tr>
                     <th>Employee ID</th>
                     <th>Name</th>
                     <th>Email</th>
                     <th>Category</th>
+                    <th>Status</th>
                     <th>Current Debt</th>
                     <th>Credit Limit</th>
                     <th>Available</th>
                 </tr>
             </thead>
             <tbody id="acct-body">
-                <tr><td colspan="7">Loading records...</td></tr>
+                <tr><td colspan="8">Loading records...</td></tr>
             </tbody>
         </table>
     </div>
@@ -137,6 +147,97 @@
         <div class="mode-history">
             <h5>Recent History</h5>
             <div id="employee-modal-history" class="mode-history-list">Loading history...</div>
+        </div>
+    </div>
+</div>
+
+<div id="settlement-run-modal" class="acct-modal" style="display:none;">
+    <div class="acct-modal-card">
+        <div class="acct-modal-head">
+            <h4>Monthly Settlement Run</h4>
+            <button id="close-settlement-run" type="button" class="acct-modal-close">x</button>
+        </div>
+
+        <div class="settlement-controls">
+            <div class="field">
+                <label for="settlement-run-month">Run Month</label>
+                <input id="settlement-run-month" type="month">
+            </div>
+            <div class="field grow">
+                <label for="settlement-notes">Notes</label>
+                <input id="settlement-notes" type="text" placeholder="Optional note for this run">
+            </div>
+            <button id="settlement-preview-btn" class="primary-btn" type="button">Preview</button>
+            <button id="settlement-apply-btn" class="primary-btn" type="button" disabled>Apply Run</button>
+        </div>
+        <div id="settlement-existing-run" class="settlement-existing-run hidden">
+            <span id="settlement-existing-run-text"></span>
+            <button id="settlement-existing-run-view" type="button" class="history-action">View Existing Run</button>
+        </div>
+
+        <div class="acct-summary settlement-summary">
+            <div class="summary-card"><span>Candidates</span><strong id="settle-candidate-count">0</strong></div>
+            <div class="summary-card"><span>Processable</span><strong id="settle-processable-count">0</strong></div>
+            <div class="summary-card"><span>Total Debt Before</span><strong id="settle-total-before">PHP 0.00</strong></div>
+            <div class="summary-card"><span>Total Deducted</span><strong id="settle-total-deducted">PHP 0.00</strong></div>
+        </div>
+
+        <div class="acct-table-wrap table-standard-wrap">
+            <table class="table table-standard">
+                <thead>
+                    <tr>
+                        <th>Employee</th>
+                        <th>Category</th>
+                        <th>Monthly Salary</th>
+                        <th>Current Debt</th>
+                        <th>Deductible</th>
+                        <th>New Debt</th>
+                    </tr>
+                </thead>
+                <tbody id="settlement-preview-body">
+                    <tr><td colspan="6">Click Preview to load settlement candidates.</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="mode-history">
+            <h5>Recent Settlement Runs</h5>
+            <div id="settlement-runs-list" class="mode-history-list">Loading runs...</div>
+        </div>
+    </div>
+</div>
+
+<div id="settlement-run-details-modal" class="acct-modal" style="display:none;">
+    <div class="acct-modal-card">
+        <div class="acct-modal-head">
+            <h4>Settlement Run Details</h4>
+            <button id="close-settlement-run-details" type="button" class="acct-modal-close">x</button>
+        </div>
+
+        <div id="settlement-details-head" class="mode-profile-empty">Loading settlement run details...</div>
+
+        <div class="acct-summary settlement-summary">
+            <div class="summary-card"><span>Processed Accounts</span><strong id="settle-details-count">0</strong></div>
+            <div class="summary-card"><span>Total Deducted</span><strong id="settle-details-deducted">PHP 0.00</strong></div>
+            <div class="summary-card"><span>Total Debt After</span><strong id="settle-details-after">PHP 0.00</strong></div>
+        </div>
+
+        <div class="acct-table-wrap table-standard-wrap">
+            <table class="table table-standard">
+                <thead>
+                    <tr>
+                        <th>Employee</th>
+                        <th>Category</th>
+                        <th>Monthly Salary</th>
+                        <th>Previous Debt</th>
+                        <th>Deducted</th>
+                        <th>New Debt</th>
+                    </tr>
+                </thead>
+                <tbody id="settlement-details-body">
+                    <tr><td colspan="6">Loading details...</td></tr>
+                </tbody>
+            </table>
         </div>
     </div>
 </div>

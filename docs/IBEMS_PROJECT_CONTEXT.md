@@ -239,3 +239,19 @@ Assets:
 Use this prompt in a new chat:
 
 `Continue IBEMS project with strict portal split: Store Portal handles per-store operations; School Accounting Portal handles salary import and debt settlement runs. Next priority is School Accounting Department workflow.`
+
+## Session Checklist Status (2026-04-22)
+
+- [x] Settlement run idempotency lock
+  - Added DB-level uniqueness for `settlement_runs.run_month`
+  - Added duplicate-safe handling in settlement apply flow (`409` on duplicate month)
+- [x] Settlement run UX polish (optional)
+  - Disable/relabel apply action when selected month already has a completed run
+  - Offer quick link to open existing run details
+- [x] Store financial reporting (phase 1)
+  - Added `/store/reports` page with period filters (today/week/month/custom)
+  - Added `/store/reports/summary` API with:
+    - summary KPIs (sales, estimated cost/profit, margin, ticket)
+    - payment breakdown
+    - top products
+    - daily trend

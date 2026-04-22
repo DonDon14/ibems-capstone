@@ -46,7 +46,6 @@ class PosController extends ResourceController
     private function processTransaction(array $request)
     {
         $db = \Config\Database::connect();
-        $db->transStart();
 
         if (!session()->get('logged_in')) {
             return [
@@ -160,6 +159,9 @@ class PosController extends ResourceController
             }
         }
 
+        $db->transBegin();
+
+        try {
         $txnId = $txnModel->insert([
             'client_txn_id'   => uniqid(),
             'user_id'         => $customerUserId,
@@ -170,12 +172,15 @@ class PosController extends ResourceController
             'status'          => 'completed',
             'created_at'      => date('Y-m-d H:i:s'),
         ]);
+        if (!$txnId) {
+            throw new \RuntimeException('Failed to create transaction.');
+        }
 
         foreach ($items as $item) {
             $product = $productModel->find($item['product_id']);
             $qty = $item['qty'];
 
-            $itemModel->insert([
+            $itemInserted = $itemModel->insert([
                 'transaction_id' => $txnId,
                 'product_id'     => $product['id'],
                 'qty'            => $qty,
@@ -183,10 +188,16 @@ class PosController extends ResourceController
                 'line_total'     => $product['price'] * $qty,
                 'created_at'     => date('Y-m-d H:i:s'),
             ]);
+            if (!$itemInserted) {
+                throw new \RuntimeException('Failed to create transaction item.');
+            }
 
-            $productModel->deductStock($product['id'], $qty);
+            $deducted = $productModel->deductStock($product['id'], $qty);
+            if (!$deducted) {
+                throw new \RuntimeException('Failed to deduct product stock.');
+            }
 
-            $movementModel->insert([
+            $movementInserted = $movementModel->insert([
                 'product_id' => $product['id'],
                 'store_id'   => $storeId,
                 'type'       => 'sale',
@@ -195,9 +206,12 @@ class PosController extends ResourceController
                 'txn_id'     => $txnId,
                 'created_at' => date('Y-m-d H:i:s'),
             ]);
+            if (!$movementInserted) {
+                throw new \RuntimeException('Failed to create inventory movement.');
+            }
         }
 
-        $auditLogModel->insert([
+        $auditInserted = $auditLogModel->insert([
             'actor_id' => $actorId,
             'action'       => 'CREATE_TRANSACTION',
             'entity'       => 'transactions',
@@ -212,14 +226,23 @@ class PosController extends ResourceController
             ]),
             'created_at'   => date('Y-m-d H:i:s'),
         ]);
-
-        if ($paymentMethod === 'debt') {
-            $balanceModel->addDebt($customerUserId, $totalAmount);
+        if (!$auditInserted) {
+            throw new \RuntimeException('Failed to write audit log.');
         }
 
-        $db->transComplete();
+        if ($paymentMethod === 'debt') {
+            $debtAdded = $balanceModel->addDebt($customerUserId, $totalAmount);
+            if (!$debtAdded) {
+                throw new \RuntimeException('Failed to update debt balance.');
+            }
+        }
 
-        if ($db->transStatus() === false) {
+        if (!$db->transStatus()) {
+            throw new \RuntimeException('Transaction failed.');
+        }
+        $db->transCommit();
+        } catch (\Throwable $e) {
+            $db->transRollback();
             return [
                 'status' => 'error',
                 'message' => 'Transaction failed.'

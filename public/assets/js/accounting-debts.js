@@ -3,6 +3,8 @@ let modeFilteredRows = [];
 let modeSelectedUserId = null;
 let employeeModalUserId = null;
 let employeeModalProfile = null;
+let settlementPreview = null;
+let settlementRunsCache = [];
 
 function aEscape(value) {
     return String(value ?? "")
@@ -40,21 +42,180 @@ function renderSummary(rows) {
     document.getElementById("acct-total-debt").textContent = aMoney(totalDebt);
 }
 
+function renderSettlementSummary(summary) {
+    const safe = summary || {};
+    document.getElementById("settle-candidate-count").textContent = String(safe.candidate_count || 0);
+    document.getElementById("settle-processable-count").textContent = String(safe.processable_count || 0);
+    document.getElementById("settle-total-before").textContent = aMoney(safe.total_debt_before || 0);
+    document.getElementById("settle-total-deducted").textContent = aMoney(safe.total_deductible || 0);
+}
+
+function renderSettlementPreviewRows(rows) {
+    const body = document.getElementById("settlement-preview-body");
+    if (!Array.isArray(rows) || rows.length === 0) {
+        body.innerHTML = '<tr><td colspan="6">No settlement candidates.</td></tr>';
+        return;
+    }
+
+    body.innerHTML = rows.map((row) => `
+        <tr>
+            <td>${aEscape(row.name)}<br><small>${aEscape(row.employee_id || "-")}</small></td>
+            <td>${aEscape(aCategory(row.category))}</td>
+            <td>${aEscape(aMoney(row.monthly_salary || 0))}</td>
+            <td>${aEscape(aMoney(row.current_debt || 0))}</td>
+            <td>${aEscape(aMoney(row.deductible_amount || 0))}</td>
+            <td>${aEscape(aMoney(row.new_debt || 0))}</td>
+        </tr>
+    `).join("");
+}
+
+function renderSettlementRuns(rows) {
+    settlementRunsCache = Array.isArray(rows) ? rows : [];
+    const wrap = document.getElementById("settlement-runs-list");
+    if (settlementRunsCache.length === 0) {
+        wrap.innerHTML = "No previous settlement runs.";
+        syncSettlementApplyState();
+        return;
+    }
+
+    wrap.innerHTML = settlementRunsCache.map((row) => {
+        const notes = row.notes || {};
+        const deducted = Number(notes.total_deducted || 0);
+        return `
+            <button class="history-item run-item" type="button" data-settle-run="${row.id}">
+                <div class="h-top">
+                    <span>${aEscape(row.run_month)}</span>
+                    <span>${aEscape(aDateTime(row.run_at))}</span>
+                </div>
+                <div class="h-body">
+                    Processed: ${aEscape(String(row.total_accounts || 0))} accounts |
+                    Debt Before: ${aEscape(aMoney(row.total_debt_before || 0))} |
+                    Deducted: ${aEscape(aMoney(deducted))}
+                </div>
+            </button>
+        `;
+    }).join("");
+
+    syncSettlementApplyState();
+}
+
+function hasSettlementRunForMonth(runMonth) {
+    if (!runMonth) return false;
+    return settlementRunsCache.some((row) => String(row.run_month || "") === runMonth);
+}
+
+function getSettlementRunForMonth(runMonth) {
+    if (!runMonth) return null;
+    return settlementRunsCache.find((row) => String(row.run_month || "") === runMonth) || null;
+}
+
+function syncSettlementApplyState() {
+    const button = document.getElementById("settlement-apply-btn");
+    const runMonth = (document.getElementById("settlement-run-month").value || "").trim();
+    const runMonthLabel = runMonth || "-";
+    const hasProcessable = Number(settlementPreview?.summary?.processable_count || 0) > 0;
+    const existingRun = getSettlementRunForMonth(runMonth);
+    const alreadyApplied = !!existingRun;
+    const existingWrap = document.getElementById("settlement-existing-run");
+    const existingText = document.getElementById("settlement-existing-run-text");
+    const existingView = document.getElementById("settlement-existing-run-view");
+
+    button.disabled = !hasProcessable || alreadyApplied;
+    button.textContent = alreadyApplied ? "Already Applied" : "Apply Run";
+
+    if (alreadyApplied) {
+        existingWrap.classList.remove("hidden");
+        existingText.textContent = `Settlement for ${runMonthLabel} already applied.`;
+        existingView.dataset.settleRun = String(existingRun.id);
+    } else {
+        existingWrap.classList.add("hidden");
+        existingText.textContent = "";
+        delete existingView.dataset.settleRun;
+    }
+}
+
+async function openSettlementRunDetails(runId) {
+    const modal = document.getElementById("settlement-run-details-modal");
+    const head = document.getElementById("settlement-details-head");
+    const body = document.getElementById("settlement-details-body");
+    modal.style.display = "grid";
+    head.innerHTML = "Loading settlement run details...";
+    body.innerHTML = '<tr><td colspan="6">Loading details...</td></tr>';
+    document.getElementById("settle-details-count").textContent = "0";
+    document.getElementById("settle-details-deducted").textContent = aMoney(0);
+    document.getElementById("settle-details-after").textContent = aMoney(0);
+
+    try {
+        const response = await fetch(`/accounting/settlement/runs/${Number(runId)}`);
+        const data = await response.json();
+        if (!data || data.status !== "success") {
+            head.innerHTML = '<div class="mode-profile-empty">Failed to load run details.</div>';
+            body.innerHTML = '<tr><td colspan="6">No details available.</td></tr>';
+            return;
+        }
+
+        const run = data.run || {};
+        const summary = data.summary || {};
+        const notes = run.notes || {};
+
+        head.innerHTML = `
+            <div><strong>Run Month:</strong> ${aEscape(run.run_month || "-")}</div>
+            <div><strong>Run At:</strong> ${aEscape(aDateTime(run.run_at || new Date().toISOString()))}</div>
+            <div><strong>Run By:</strong> ${aEscape(run.run_by_name || "Unknown")}</div>
+            <div><strong>Notes:</strong> ${aEscape(notes.note || "-")}</div>
+        `;
+
+        document.getElementById("settle-details-count").textContent = String(summary.processed_accounts || 0);
+        document.getElementById("settle-details-deducted").textContent = aMoney(summary.total_deducted || 0);
+        document.getElementById("settle-details-after").textContent = aMoney(summary.total_debt_after || 0);
+
+        const rows = Array.isArray(data.items) ? data.items : [];
+        if (rows.length === 0) {
+            body.innerHTML = '<tr><td colspan="6">No settled accounts found for this run.</td></tr>';
+            return;
+        }
+
+        body.innerHTML = rows.map((row) => `
+            <tr>
+                <td>${aEscape(row.name || "-")}<br><small>${aEscape(row.employee_id || "-")}</small></td>
+                <td>${aEscape(aCategory(row.category))}</td>
+                <td>${aEscape(aMoney(row.monthly_salary || 0))}</td>
+                <td>${aEscape(aMoney(row.previous_debt || 0))}</td>
+                <td>${aEscape(aMoney(row.deducted_amount || 0))}</td>
+                <td>${aEscape(aMoney(row.new_debt || 0))}</td>
+            </tr>
+        `).join("");
+    } catch (error) {
+        head.innerHTML = '<div class="mode-profile-empty">Failed to load run details.</div>';
+        body.innerHTML = '<tr><td colspan="6">No details available.</td></tr>';
+    }
+}
+
+function closeSettlementRunDetails() {
+    document.getElementById("settlement-run-details-modal").style.display = "none";
+}
+
 function renderRows(rows) {
     const body = document.getElementById("acct-body");
     if (!Array.isArray(rows) || rows.length === 0) {
-        body.innerHTML = '<tr><td colspan="7">No records found.</td></tr>';
+        body.innerHTML = '<tr><td colspan="8">No records found.</td></tr>';
         renderSummary([]);
         return;
     }
 
     body.innerHTML = rows.map((row) => `
-        <tr data-row-user="${row.user_id}" class="acct-row-clickable">
+        <tr data-row-user="${row.user_id}" class="acct-row-clickable table-row-clickable">
             <td>${aEscape(row.employee_id || "-")}</td>
             <td>${aEscape(row.name)}</td>
             <td>${aEscape(row.email)}</td>
-            <td>${aEscape(aCategory(row.user_type))}</td>
-            <td>${aEscape(aMoney(row.current_debt))}</td>
+            <td><span class="table-chip acct-chip">${aEscape(aCategory(row.user_type))}</span></td>
+            <td><span class="table-status acct-status ${Number(row.is_active || 0) === 1 ? "is-active" : "is-inactive"}">${Number(row.is_active || 0) === 1 ? "Active" : "Inactive"}</span></td>
+            <td>
+                <div class="table-debt-wrap acct-debt-wrap">
+                    <span>${aEscape(aMoney(row.current_debt))}</span>
+                    <div class="table-debt-bar acct-debt-bar"><i style="width:${Math.min(100, (Number(row.current_debt || 0) / Math.max(1, Number(row.credit_limit || 0))) * 100)}%"></i></div>
+                </div>
+            </td>
             <td>${aEscape(aMoney(row.credit_limit))}</td>
             <td>${aEscape(aMoney(row.available_credit))}</td>
         </tr>
@@ -71,13 +232,33 @@ async function loadDailySummary() {
     document.getElementById("acct-today-amount").textContent = aMoney(data.deducted_amount || 0);
 }
 
-async function loadData() {
-    const search = (document.getElementById("acct-search").value || "").trim();
+function getMainFilteredRows() {
+    const keyword = (document.getElementById("acct-search").value || "").trim().toLowerCase();
     const debtOnly = document.getElementById("acct-debt-only").checked;
 
-    const params = new URLSearchParams({ limit: "300" });
-    if (search) params.set("q", search);
-    if (debtOnly) params.set("debt_only", "1");
+    return acctRows.filter((row) => {
+        if (debtOnly && Number(row.current_debt || 0) <= 0) {
+            return false;
+        }
+
+        if (!keyword) {
+            return true;
+        }
+
+        const category = String(row.user_type || "").toLowerCase();
+        const haystack = `${row.employee_id || ""} ${row.name || ""} ${row.email || ""} ${category}`.toLowerCase();
+        return haystack.includes(keyword);
+    });
+}
+
+function applyMainFiltersAndRender() {
+    const rows = getMainFilteredRows();
+    renderRows(rows);
+    setAcctResult("", "ok");
+}
+
+async function loadData() {
+    const params = new URLSearchParams({ limit: "500" });
 
     const response = await fetch(`/accounting/debts/data?${params.toString()}`);
     const data = await response.json();
@@ -90,10 +271,117 @@ async function loadData() {
     }
 
     acctRows = Array.isArray(data.data) ? data.data : [];
-    renderRows(acctRows);
+    applyMainFiltersAndRender();
     renderModeResults();
     await loadDailySummary();
     setAcctResult("", "ok");
+}
+
+async function loadSettlementRuns() {
+    const response = await fetch("/accounting/settlement/runs?limit=12");
+    const data = await response.json();
+    if (!data || data.status !== "success") {
+        renderSettlementRuns([]);
+        return;
+    }
+    renderSettlementRuns(Array.isArray(data.data) ? data.data : []);
+}
+
+function openSettlementModal() {
+    settlementPreview = null;
+    document.getElementById("settlement-run-modal").style.display = "grid";
+    document.getElementById("settlement-run-month").value = new Date().toISOString().slice(0, 7);
+    document.getElementById("settlement-notes").value = "";
+    renderSettlementSummary(null);
+    renderSettlementPreviewRows([]);
+    syncSettlementApplyState();
+    loadSettlementRuns().catch(() => {
+        renderSettlementRuns([]);
+    });
+}
+
+function closeSettlementModal() {
+    document.getElementById("settlement-run-modal").style.display = "none";
+    settlementPreview = null;
+}
+
+async function previewSettlementRun() {
+    const runMonth = (document.getElementById("settlement-run-month").value || "").trim();
+    if (!runMonth) {
+        setAcctResult("Please choose a run month.", "error");
+        return;
+    }
+
+    const response = await fetch(`/accounting/settlement/preview?run_month=${encodeURIComponent(runMonth)}`);
+    const data = await response.json();
+    if (!data || data.status !== "success") {
+        setAcctResult(data?.message || "Failed to preview settlement run.", "error");
+        settlementPreview = null;
+        document.getElementById("settlement-apply-btn").disabled = true;
+        renderSettlementSummary(null);
+        renderSettlementPreviewRows([]);
+        return;
+    }
+
+    settlementPreview = data;
+    renderSettlementSummary(data.summary || {});
+    renderSettlementPreviewRows(data.accounts || []);
+    syncSettlementApplyState();
+
+    if (hasSettlementRunForMonth(runMonth)) {
+        setAcctResult(`Settlement for ${runMonth} already exists. Open it from "Recent Settlement Runs".`, "error");
+        return;
+    }
+
+    setAcctResult("Settlement preview ready.", "ok");
+}
+
+async function applySettlementRun() {
+    if (!settlementPreview) {
+        setAcctResult("Please run preview first.", "error");
+        return;
+    }
+
+    const runMonth = (document.getElementById("settlement-run-month").value || "").trim();
+    const notes = (document.getElementById("settlement-notes").value || "").trim();
+
+    if (!window.confirm(`Apply settlement run for ${runMonth}?`)) {
+        return;
+    }
+
+    const button = document.getElementById("settlement-apply-btn");
+    button.disabled = true;
+    const oldText = button.textContent;
+    button.textContent = "Applying...";
+
+    try {
+        const response = await fetch("/accounting/settlement/apply", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                run_month: runMonth,
+                notes,
+            }),
+        });
+        const data = await response.json();
+        if (!data || data.status !== "success") {
+            setAcctResult(data?.message || "Failed to apply settlement run.", "error");
+            return;
+        }
+
+        setAcctResult(
+            `Settlement run applied (${data.run_month}). Processed: ${data.total_accounts}, Deducted: ${aMoney(data.total_deducted)}.`,
+            "ok"
+        );
+        await loadData();
+        await loadSettlementRuns();
+        closeSettlementModal();
+    } catch (error) {
+        setAcctResult("Settlement run request failed.", "error");
+    } finally {
+        button.textContent = oldText;
+        syncSettlementApplyState();
+    }
 }
 
 async function loadProfile(userId) {
@@ -357,12 +645,16 @@ async function submitImportCsv() {
     }
 }
 
-document.getElementById("acct-search-btn").addEventListener("click", async () => {
+document.getElementById("acct-refresh-btn").addEventListener("click", async () => {
     await loadData();
 });
 
-document.getElementById("acct-refresh-btn").addEventListener("click", async () => {
-    await loadData();
+document.getElementById("acct-search").addEventListener("input", () => {
+    applyMainFiltersAndRender();
+});
+
+document.getElementById("acct-debt-only").addEventListener("change", () => {
+    applyMainFiltersAndRender();
 });
 
 document.getElementById("acct-body").addEventListener("click", async (event) => {
@@ -373,16 +665,38 @@ document.getElementById("acct-body").addEventListener("click", async (event) => 
 });
 
 document.getElementById("open-deduction-mode").addEventListener("click", openMode);
+document.getElementById("open-settlement-run").addEventListener("click", openSettlementModal);
 document.getElementById("open-import-csv").addEventListener("click", openImportModal);
 document.getElementById("close-deduction-mode").addEventListener("click", closeMode);
+document.getElementById("close-settlement-run").addEventListener("click", closeSettlementModal);
 document.getElementById("close-import-csv").addEventListener("click", closeImportModal);
 document.getElementById("deduction-mode-modal").addEventListener("click", (event) => {
     if (event.target.id === "deduction-mode-modal") closeMode();
+});
+document.getElementById("settlement-run-modal").addEventListener("click", (event) => {
+    if (event.target.id === "settlement-run-modal") closeSettlementModal();
+});
+document.getElementById("settlement-run-month").addEventListener("change", syncSettlementApplyState);
+document.getElementById("settlement-run-details-modal").addEventListener("click", (event) => {
+    if (event.target.id === "settlement-run-details-modal") closeSettlementRunDetails();
 });
 document.getElementById("import-csv-modal").addEventListener("click", (event) => {
     if (event.target.id === "import-csv-modal") closeImportModal();
 });
 document.getElementById("import-csv-submit").addEventListener("click", submitImportCsv);
+document.getElementById("settlement-preview-btn").addEventListener("click", previewSettlementRun);
+document.getElementById("settlement-apply-btn").addEventListener("click", applySettlementRun);
+document.getElementById("close-settlement-run-details").addEventListener("click", closeSettlementRunDetails);
+document.getElementById("settlement-runs-list").addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-settle-run]");
+    if (!button) return;
+    await openSettlementRunDetails(button.getAttribute("data-settle-run"));
+});
+document.getElementById("settlement-existing-run-view").addEventListener("click", async (event) => {
+    const runId = event.currentTarget.dataset.settleRun;
+    if (!runId) return;
+    await openSettlementRunDetails(runId);
+});
 
 document.getElementById("mode-search").addEventListener("input", renderModeResults);
 document.getElementById("mode-debt-only").addEventListener("change", renderModeResults);

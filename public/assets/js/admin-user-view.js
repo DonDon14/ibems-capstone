@@ -1,5 +1,6 @@
 let uvRows = [];
 let uvEditingUserId = null;
+let uvQuickFilter = "all";
 
 function aMoney(value) {
     return `PHP ${Number(value || 0).toFixed(2)}`;
@@ -34,12 +35,86 @@ function setUvResult(message, type) {
     el.style.color = type === "error" ? "#b91c1c" : "#166534";
 }
 
+function getFilteredRows() {
+    const q = (document.getElementById("uv-search").value || "").trim().toLowerCase();
+    const roleFilter = (document.getElementById("uv-role-filter").value || "").trim().toUpperCase();
+    const typeFilter = (document.getElementById("uv-type-filter").value || "").trim().toLowerCase();
+
+    return uvRows.filter((row) => {
+        const matchesQuick =
+            uvQuickFilter === "all" ? true :
+            uvQuickFilter === "active" ? !!row.is_active :
+            uvQuickFilter === "debt" ? Number(row.current_debt || 0) > 0 :
+            uvQuickFilter === "store_system" ? String(row.role || "").toUpperCase() === "STORE_SYSTEM" :
+            true;
+
+        if (!matchesQuick) return false;
+
+        if (roleFilter && String(row.role || "").toUpperCase() !== roleFilter) {
+            return false;
+        }
+
+        if (typeFilter && String(row.user_type || "").toLowerCase() !== typeFilter) {
+            return false;
+        }
+
+        if (!q) return true;
+        const haystack = `${row.name || ""} ${row.email || ""} ${row.employee_id || ""}`.toLowerCase();
+        return haystack.includes(q);
+    });
+}
+
+function renderTopSummary(rows) {
+    const list = Array.isArray(rows) ? rows : [];
+    const totalUsers = list.length;
+    const totalDebt = list.reduce((sum, row) => sum + Number(row.current_debt || 0), 0);
+    const activeFaculty = list.filter((row) => !!row.is_active && String(row.user_type || "").toLowerCase() === "faculty").length;
+    const storeOfficers = list.filter((row) => String(row.role || "").toUpperCase() === "STORE_SYSTEM").length;
+
+    document.getElementById("uv-total-users").textContent = String(totalUsers);
+    document.getElementById("uv-total-debt").textContent = aMoney(totalDebt);
+    document.getElementById("uv-active-faculty").textContent = String(activeFaculty);
+    document.getElementById("uv-store-officers").textContent = String(storeOfficers);
+}
+
 function openModal(id) {
     document.getElementById(id).style.display = "grid";
 }
 
 function closeModal(id) {
     document.getElementById(id).style.display = "none";
+}
+
+function renderUserTable(rows) {
+    const body = document.getElementById("uv-body");
+    if (!Array.isArray(rows) || rows.length === 0) {
+        body.innerHTML = '<tr><td colspan="8">No users found.</td></tr>';
+        return;
+    }
+
+    body.innerHTML = rows.map((row) => `
+        <tr class="uv-row" data-user-id="${row.id}" style="cursor:pointer;">
+            <td>${aEscape(row.employee_id || "-")}</td>
+            <td>${aEscape(row.name)}</td>
+            <td>${aEscape(row.email)}</td>
+            <td>${aEscape(formatRoleLabel(row.role || "-"))}</td>
+            <td>${aEscape(formatTypeLabel(row.user_type))}</td>
+            <td><span class="uv-status ${row.is_active ? "is-active" : "is-inactive"}">${row.is_active ? "Active" : "Inactive"}</span></td>
+            <td>
+                <div class="uv-debt-wrap">
+                    <span>${aEscape(aMoney(row.current_debt))}</span>
+                    <div class="uv-debt-bar"><i style="width:${Math.min(100, (Number(row.current_debt || 0) / Math.max(1, Number(row.credit_limit || 0))) * 100)}%"></i></div>
+                </div>
+            </td>
+            <td>${aEscape(aMoney(row.credit_limit))}</td>
+        </tr>
+    `).join("");
+}
+
+function applyUserFiltersAndRender() {
+    const filtered = getFilteredRows();
+    renderTopSummary(filtered);
+    renderUserTable(filtered);
 }
 
 async function loadUserView() {
@@ -52,27 +127,12 @@ async function loadUserView() {
     const body = document.getElementById("uv-body");
     if (!data || data.status !== "success") {
         body.innerHTML = '<tr><td colspan="8">Unable to load users.</td></tr>';
+        renderTopSummary([]);
         return;
     }
 
     uvRows = Array.isArray(data.data) ? data.data : [];
-    if (uvRows.length === 0) {
-        body.innerHTML = '<tr><td colspan="8">No users found.</td></tr>';
-        return;
-    }
-
-    body.innerHTML = uvRows.map((row) => `
-        <tr class="uv-row" data-user-id="${row.id}" style="cursor:pointer;">
-            <td>${aEscape(row.employee_id || "-")}</td>
-            <td>${aEscape(row.name)}</td>
-            <td>${aEscape(row.email)}</td>
-            <td>${aEscape(formatRoleLabel(row.role || "-"))}</td>
-            <td>${aEscape(formatTypeLabel(row.user_type))}</td>
-            <td>${row.is_active ? "Active" : "Inactive"}</td>
-            <td>${aEscape(aMoney(row.current_debt))}</td>
-            <td>${aEscape(aMoney(row.credit_limit))}</td>
-        </tr>
-    `).join("");
+    applyUserFiltersAndRender();
 }
 
 async function openEditUser(userId) {
@@ -183,7 +243,25 @@ async function importUsersCsv() {
 document.getElementById("uv-search-btn").addEventListener("click", loadUserView);
 document.getElementById("uv-refresh-btn").addEventListener("click", () => {
     document.getElementById("uv-search").value = "";
+    document.getElementById("uv-role-filter").value = "";
+    document.getElementById("uv-type-filter").value = "";
+    uvQuickFilter = "all";
+    document.querySelectorAll("[data-uv-quick]").forEach((chip) => {
+        chip.classList.toggle("is-active", chip.getAttribute("data-uv-quick") === "all");
+    });
     loadUserView();
+});
+document.getElementById("uv-role-filter").addEventListener("change", applyUserFiltersAndRender);
+document.getElementById("uv-type-filter").addEventListener("change", applyUserFiltersAndRender);
+document.getElementById("uv-search").addEventListener("input", applyUserFiltersAndRender);
+document.querySelectorAll("[data-uv-quick]").forEach((chip) => {
+    chip.addEventListener("click", () => {
+        uvQuickFilter = chip.getAttribute("data-uv-quick") || "all";
+        document.querySelectorAll("[data-uv-quick]").forEach((item) => {
+            item.classList.toggle("is-active", item === chip);
+        });
+        applyUserFiltersAndRender();
+    });
 });
 
 document.getElementById("uv-add-btn").addEventListener("click", () => openModal("uv-add-modal"));

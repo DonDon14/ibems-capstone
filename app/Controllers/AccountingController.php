@@ -32,7 +32,7 @@ class AccountingController extends Controller
         $db = Database::connect();
 
         $query = $db->table('balances b')
-            ->select('u.id AS user_id, u.employee_id, u.name, u.email, u.user_type, b.credit_limit, b.current_debt, b.updated_at')
+            ->select('u.id AS user_id, u.employee_id, u.name, u.email, u.user_type, u.is_active, b.credit_limit, b.current_debt, b.updated_at')
             ->join('users u', 'u.id = b.user_id', 'inner')
             ->where('u.is_active', 1)
             ->whereIn('u.user_type', ['faculty', 'staff']);
@@ -195,6 +195,367 @@ class AccountingController extends Controller
             'date' => date('Y-m-d'),
             'deduction_count' => $count,
             'deducted_amount' => $amount,
+        ]);
+    }
+
+    public function settlementPreview()
+    {
+        $runMonth = trim((string) ($this->request->getGet('run_month') ?? date('Y-m')));
+        if (!preg_match('/^\d{4}\-(0[1-9]|1[0-2])$/', $runMonth)) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'run_month must be in YYYY-MM format.',
+            ]);
+        }
+
+        $db = Database::connect();
+        $rows = $db->table('balances b')
+            ->select('u.id AS user_id, u.employee_id, u.name, u.email, u.user_type, u.base_salary, b.current_debt')
+            ->join('users u', 'u.id = b.user_id', 'inner')
+            ->where('u.is_active', 1)
+            ->whereIn('u.user_type', ['faculty', 'staff'])
+            ->where('b.current_debt >', 0)
+            ->orderBy('b.current_debt', 'DESC')
+            ->get()
+            ->getResultArray();
+
+        $accounts = [];
+        $totalDebtBefore = 0.0;
+        $totalDeductible = 0.0;
+        $processableCount = 0;
+        $skippedCount = 0;
+
+        foreach ($rows as $row) {
+            $currentDebt = (float) ($row['current_debt'] ?? 0);
+            $monthlySalary = max(0, (float) ($row['base_salary'] ?? 0));
+            $deductible = min($currentDebt, $monthlySalary);
+            $newDebt = max(0, $currentDebt - $deductible);
+            $isProcessable = $deductible > 0;
+
+            $totalDebtBefore += $currentDebt;
+            $totalDeductible += $deductible;
+            if ($isProcessable) {
+                $processableCount++;
+            } else {
+                $skippedCount++;
+            }
+
+            $accounts[] = [
+                'user_id' => (int) $row['user_id'],
+                'employee_id' => $row['employee_id'],
+                'name' => $row['name'],
+                'email' => $row['email'],
+                'category' => $row['user_type'],
+                'monthly_salary' => $monthlySalary,
+                'current_debt' => $currentDebt,
+                'deductible_amount' => $deductible,
+                'new_debt' => $newDebt,
+                'processable' => $isProcessable,
+            ];
+        }
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'run_month' => $runMonth,
+            'summary' => [
+                'candidate_count' => count($accounts),
+                'processable_count' => $processableCount,
+                'skipped_count' => $skippedCount,
+                'total_debt_before' => $totalDebtBefore,
+                'total_deductible' => $totalDeductible,
+                'total_debt_after' => max(0, $totalDebtBefore - $totalDeductible),
+            ],
+            'accounts' => $accounts,
+        ]);
+    }
+
+    public function applySettlementRun()
+    {
+        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $runMonth = trim((string) ($request['run_month'] ?? date('Y-m')));
+        $notes = trim((string) ($request['notes'] ?? ''));
+        $actorId = (int) session()->get('user_id');
+
+        if (!preg_match('/^\d{4}\-(0[1-9]|1[0-2])$/', $runMonth)) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'run_month must be in YYYY-MM format.',
+            ]);
+        }
+
+        $db = Database::connect();
+
+        $existingRun = $db->table('settlement_runs')
+            ->select('id')
+            ->where('run_month', $runMonth)
+            ->get()
+            ->getRowArray();
+        if ($existingRun) {
+            return $this->response->setStatusCode(409)->setJSON([
+                'status' => 'error',
+                'message' => "Settlement run for {$runMonth} already exists.",
+            ]);
+        }
+
+        $rows = $db->table('balances b')
+            ->select('u.id AS user_id, u.base_salary, b.current_debt')
+            ->join('users u', 'u.id = b.user_id', 'inner')
+            ->where('u.is_active', 1)
+            ->whereIn('u.user_type', ['faculty', 'staff'])
+            ->where('b.current_debt >', 0)
+            ->get()
+            ->getResultArray();
+
+        $processRows = [];
+        $totalDebtBefore = 0.0;
+        $totalDeducted = 0.0;
+        foreach ($rows as $row) {
+            $currentDebt = (float) ($row['current_debt'] ?? 0);
+            $monthlySalary = max(0, (float) ($row['base_salary'] ?? 0));
+            $deductible = min($currentDebt, $monthlySalary);
+            if ($deductible <= 0) {
+                continue;
+            }
+
+            $processRows[] = [
+                'user_id' => (int) $row['user_id'],
+                'previous_debt' => $currentDebt,
+                'deducted_amount' => $deductible,
+                'new_debt' => max(0, $currentDebt - $deductible),
+                'monthly_salary' => $monthlySalary,
+            ];
+            $totalDebtBefore += $currentDebt;
+            $totalDeducted += $deductible;
+        }
+
+        if ($processRows === []) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'No processable debt accounts found for settlement.',
+            ]);
+        }
+
+        $auditLogModel = new AuditLogModel();
+        $balanceModel = new BalanceModel();
+
+        $db->transStart();
+
+        $runInserted = $db->table('settlement_runs')->insert([
+            'run_month' => $runMonth,
+            'run_by' => $actorId,
+            'run_at' => date('Y-m-d H:i:s'),
+            'total_accounts' => count($processRows),
+            'total_debt_before' => $totalDebtBefore,
+            'notes' => json_encode([
+                'note' => $notes,
+                'total_deducted' => $totalDeducted,
+                'total_debt_after' => max(0, $totalDebtBefore - $totalDeducted),
+            ]),
+        ]);
+
+        if (!$runInserted) {
+            $error = $db->error();
+            $db->transRollback();
+
+            if ((int) ($error['code'] ?? 0) === 1062) {
+                return $this->response->setStatusCode(409)->setJSON([
+                    'status' => 'error',
+                    'message' => "Settlement run for {$runMonth} already exists.",
+                ]);
+            }
+
+            return $this->response->setStatusCode(500)->setJSON([
+                'status' => 'error',
+                'message' => 'Failed to create settlement run.',
+            ]);
+        }
+
+        $runId = (int) $db->insertID();
+
+        foreach ($processRows as $entry) {
+            $balanceModel->update($entry['user_id'], [
+                'current_debt' => $entry['new_debt'],
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+
+            $auditLogModel->insert([
+                'actor_id' => $actorId,
+                'action' => 'ACCOUNTING_SETTLEMENT_DEDUCT',
+                'entity' => 'balances',
+                'entity_id' => $entry['user_id'],
+                'payload_json' => json_encode([
+                    'run_id' => $runId,
+                    'run_month' => $runMonth,
+                    'previous_debt' => $entry['previous_debt'],
+                    'deducted_amount' => $entry['deducted_amount'],
+                    'new_debt' => $entry['new_debt'],
+                    'monthly_salary' => $entry['monthly_salary'],
+                ]),
+                'created_at' => date('Y-m-d H:i:s'),
+            ]);
+        }
+
+        $auditLogModel->insert([
+            'actor_id' => $actorId,
+            'action' => 'ACCOUNTING_RUN_SETTLEMENT',
+            'entity' => 'settlement_runs',
+            'entity_id' => $runId,
+            'payload_json' => json_encode([
+                'run_month' => $runMonth,
+                'total_accounts' => count($processRows),
+                'total_debt_before' => $totalDebtBefore,
+                'total_deducted' => $totalDeducted,
+                'total_debt_after' => max(0, $totalDebtBefore - $totalDeducted),
+                'notes' => $notes,
+            ]),
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $db->transComplete();
+        if (!$db->transStatus()) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'status' => 'error',
+                'message' => 'Settlement run failed.',
+            ]);
+        }
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'run_id' => $runId,
+            'run_month' => $runMonth,
+            'total_accounts' => count($processRows),
+            'total_debt_before' => $totalDebtBefore,
+            'total_deducted' => $totalDeducted,
+            'total_debt_after' => max(0, $totalDebtBefore - $totalDeducted),
+        ]);
+    }
+
+    public function settlementRuns()
+    {
+        $limit = (int) ($this->request->getGet('limit') ?? 20);
+        $limit = max(1, min(100, $limit));
+        $db = Database::connect();
+
+        $rows = $db->table('settlement_runs sr')
+            ->select('sr.id, sr.run_month, sr.run_at, sr.total_accounts, sr.total_debt_before, sr.notes, u.name AS run_by_name')
+            ->join('users u', 'u.id = sr.run_by', 'left')
+            ->orderBy('sr.id', 'DESC')
+            ->limit($limit)
+            ->get()
+            ->getResultArray();
+
+        $runs = array_map(static function (array $row): array {
+            $notes = [];
+            if (!empty($row['notes'])) {
+                $decoded = json_decode((string) $row['notes'], true);
+                if (is_array($decoded)) {
+                    $notes = $decoded;
+                }
+            }
+
+            return [
+                'id' => (int) $row['id'],
+                'run_month' => $row['run_month'],
+                'run_at' => $row['run_at'],
+                'run_by_name' => $row['run_by_name'] ?: 'Unknown',
+                'total_accounts' => (int) ($row['total_accounts'] ?? 0),
+                'total_debt_before' => (float) ($row['total_debt_before'] ?? 0),
+                'notes' => $notes,
+            ];
+        }, $rows);
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'data' => $runs,
+        ]);
+    }
+
+    public function settlementRunDetails(int $runId)
+    {
+        if ($runId <= 0) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Invalid run id.',
+            ]);
+        }
+
+        $db = Database::connect();
+        $run = $db->table('settlement_runs sr')
+            ->select('sr.id, sr.run_month, sr.run_at, sr.total_accounts, sr.total_debt_before, sr.notes, u.name AS run_by_name')
+            ->join('users u', 'u.id = sr.run_by', 'left')
+            ->where('sr.id', $runId)
+            ->get()
+            ->getRowArray();
+
+        if (!$run) {
+            return $this->response->setStatusCode(404)->setJSON([
+                'status' => 'error',
+                'message' => 'Settlement run not found.',
+            ]);
+        }
+
+        $auditRows = $db->table('audit_logs al')
+            ->select('al.id, al.created_at, al.entity_id, al.payload_json, u.employee_id, u.name, u.email, u.user_type')
+            ->join('users u', 'u.id = al.entity_id', 'left')
+            ->where('al.action', 'ACCOUNTING_SETTLEMENT_DEDUCT')
+            ->like('al.payload_json', '"run_id":' . $runId)
+            ->orderBy('al.id', 'ASC')
+            ->get()
+            ->getResultArray();
+
+        $items = [];
+        $totalDeducted = 0.0;
+        $totalDebtAfter = 0.0;
+        foreach ($auditRows as $row) {
+            $payload = json_decode((string) ($row['payload_json'] ?? ''), true);
+            if (!is_array($payload) || (int) ($payload['run_id'] ?? 0) !== $runId) {
+                continue;
+            }
+
+            $deducted = (float) ($payload['deducted_amount'] ?? 0);
+            $newDebt = (float) ($payload['new_debt'] ?? 0);
+            $totalDeducted += $deducted;
+            $totalDebtAfter += $newDebt;
+
+            $items[] = [
+                'user_id' => (int) ($row['entity_id'] ?? 0),
+                'employee_id' => $row['employee_id'] ?? null,
+                'name' => $row['name'] ?? null,
+                'email' => $row['email'] ?? null,
+                'category' => $row['user_type'] ?? null,
+                'deducted_amount' => $deducted,
+                'previous_debt' => (float) ($payload['previous_debt'] ?? 0),
+                'new_debt' => $newDebt,
+                'monthly_salary' => (float) ($payload['monthly_salary'] ?? 0),
+                'created_at' => $row['created_at'],
+            ];
+        }
+
+        $notes = [];
+        if (!empty($run['notes'])) {
+            $decoded = json_decode((string) $run['notes'], true);
+            if (is_array($decoded)) {
+                $notes = $decoded;
+            }
+        }
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'run' => [
+                'id' => (int) $run['id'],
+                'run_month' => $run['run_month'],
+                'run_at' => $run['run_at'],
+                'run_by_name' => $run['run_by_name'] ?: 'Unknown',
+                'total_accounts' => (int) ($run['total_accounts'] ?? 0),
+                'total_debt_before' => (float) ($run['total_debt_before'] ?? 0),
+                'notes' => $notes,
+            ],
+            'summary' => [
+                'processed_accounts' => count($items),
+                'total_deducted' => $totalDeducted,
+                'total_debt_after' => $totalDebtAfter,
+            ],
+            'items' => $items,
         ]);
     }
 
