@@ -18,9 +18,9 @@
         <div class="summary-card"><span>Today Deducted</span><strong id="ad-today-deducted">PHP 0.00</strong></div>
     </div>
 
-    <div class="overview-table-wrap">
+    <div class="overview-table-wrap table-standard-wrap">
         <h4>Top Debt Accounts</h4>
-        <table class="table">
+        <table class="table table-standard">
             <thead>
                 <tr>
                     <th>Employee ID</th>

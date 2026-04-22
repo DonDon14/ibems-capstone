@@ -146,6 +146,10 @@
     gap: 10px;
 }
 
+.form-grid > .field {
+    min-width: 0;
+}
+
 .field {
     display: flex;
     flex-direction: column;
@@ -163,6 +167,100 @@
     border: 1px solid #d1d5db;
     border-radius: 8px;
     padding: 8px 10px;
+    width: 100%;
+    min-width: 0;
+}
+
+.field-wide {
+    grid-column: span 2;
+}
+
+.create-product-layout {
+    overflow-y: auto;
+    display: grid;
+    grid-template-columns: 1.25fr 0.85fr;
+    gap: 14px 18px;
+}
+
+.create-product-section {
+    border: 0;
+    padding: 0;
+    background: transparent;
+}
+
+.create-product-section h5 {
+    margin: 0 0 10px;
+    color: #0f172a;
+    font-size: 1.04rem;
+    font-weight: 800;
+}
+
+.image-grid .image-preview-box {
+    border: 1px solid #dbe3ea;
+    border-radius: 12px;
+    background: #fff;
+    padding: 10px;
+    min-height: 120px;
+    display: grid;
+    place-items: center;
+    color: #64748b;
+    font-size: 0.84rem;
+}
+
+#new-product-image-preview {
+    max-width: 100%;
+    max-height: 140px;
+    object-fit: contain;
+    border-radius: 8px;
+}
+
+.readonly-field label {
+    color: #64748b;
+}
+
+.readonly-value {
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    background: #eef2f7;
+    color: #334155;
+    padding: 8px 10px;
+    font-weight: 700;
+}
+
+.field.field-number input,
+.field.field-number .readonly-value {
+    max-width: 240px;
+}
+
+.section-product-info {
+    grid-column: 1;
+}
+
+.section-media {
+    grid-column: 2;
+}
+
+.section-pricing,
+.section-inventory,
+.section-actions {
+    grid-column: 1 / -1;
+}
+
+.field-help {
+    color: #64748b;
+    font-size: 0.78rem;
+    margin-top: 2px;
+}
+
+#new-product-image-upload-wrap input[type="file"] {
+    padding: 7px 8px;
+    background: #fff;
+    width: 100%;
+}
+
+.inv-modal-card {
+    width: min(980px, 100%);
+    overflow-x: hidden;
 }
 
 .projection {
@@ -325,6 +423,28 @@
 
     .form-grid {
         grid-template-columns: 1fr;
+    }
+
+    .create-product-layout {
+        grid-template-columns: 1fr;
+        gap: 12px;
+    }
+
+    .section-product-info,
+    .section-media,
+    .section-pricing,
+    .section-inventory,
+    .section-actions {
+        grid-column: 1;
+    }
+
+    .field-wide {
+        grid-column: auto;
+    }
+
+    .field.field-number input,
+    .field.field-number .readonly-value {
+        max-width: none;
     }
     .product-detail-view {
         grid-template-columns: 1fr;

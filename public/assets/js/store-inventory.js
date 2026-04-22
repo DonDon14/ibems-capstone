@@ -7,6 +7,14 @@ let invIsUpdatingProduct = false;
 let invModalProductId = null;
 let invProductEditMode = false;
 let invModalPanel = "adjust";
+let invCreatePreviewObjectUrl = null;
+let invCategories = [];
+let invCreateSnapshot = null;
+
+function invGetElementValue(id, fallback = "") {
+    const el = document.getElementById(id);
+    return el ? String(el.value ?? "") : fallback;
+}
 
 function invEscape(value) {
     return String(value ?? "")
@@ -27,16 +35,37 @@ function invSetResult(message, type) {
     el.style.color = type === "error" ? "#b91c1c" : "#166534";
 }
 
-function invRenderStoreSelect() {
-    const select = document.getElementById("inventory-store-select");
-    const wrap = document.querySelector(".inventory-store-wrap");
-    select.innerHTML = invStores
-        .map((store) => `<option value="${store.id}">${invEscape(store.store_name)}</option>`)
-        .join("");
-    select.value = String(invActiveStoreId);
-    const multi = invStores.length > 1;
-    select.disabled = !multi;
-    wrap.style.display = multi ? "flex" : "none";
+function invEnsureCategoryOption(selectEl, categoryName) {
+    if (!selectEl) return;
+    const name = String(categoryName || "").trim();
+    if (!name) return;
+    const exists = Array.from(selectEl.options).some((opt) => String(opt.value) === name);
+    if (!exists) {
+        const option = document.createElement("option");
+        option.value = name;
+        option.textContent = name;
+        selectEl.appendChild(option);
+    }
+}
+
+function invRenderCategorySelects() {
+    const createSelect = document.getElementById("new-product-category");
+    const editSelect = document.getElementById("modal-product-category");
+    const names = invCategories.length > 0
+        ? invCategories.map((row) => String(row.name || "").trim()).filter((name) => name !== "")
+        : ["General"];
+
+    [createSelect, editSelect].forEach((selectEl) => {
+        if (!selectEl) return;
+        const currentValue = String(selectEl.value || "");
+        selectEl.innerHTML = names.map((name) => `<option value="${invEscape(name)}">${invEscape(name)}</option>`).join("");
+        if (currentValue !== "") {
+            invEnsureCategoryOption(selectEl, currentValue);
+            selectEl.value = currentValue;
+        } else {
+            selectEl.value = "General";
+        }
+    });
 }
 
 function invRenderProductTable() {
@@ -45,12 +74,12 @@ function invRenderProductTable() {
 
     const rows = invProducts.filter((product) => {
         if (!search) return true;
-        const haystack = `${product.name || ""} ${product.sku || ""}`.toLowerCase();
+        const haystack = `${product.name || ""} ${product.variant_label || ""} ${product.sku || ""} ${product.barcode || ""}`.toLowerCase();
         return haystack.includes(search);
     });
 
     if (rows.length === 0) {
-        body.innerHTML = '<tr><td colspan="6">No products found.</td></tr>';
+        body.innerHTML = '<tr><td colspan="7">No products found.</td></tr>';
         return;
     }
 
@@ -64,6 +93,7 @@ function invRenderProductTable() {
                 <td>${thumb}</td>
                 <td>${invEscape(product.sku || "-")}</td>
                 <td>${invEscape(product.name)}</td>
+                <td>${invEscape(product.variant_label || "-")}</td>
                 <td>${invEscape(product.category || "-")}</td>
                 <td>${invEscape(invMoney(product.price))}</td>
                 <td>${Number(product.stock_qty || 0)}</td>
@@ -81,21 +111,27 @@ function invOpenProductActionModal(productId) {
     if (!product) return;
 
     invModalProductId = Number(product.id);
+    const displayName = product.variant_label ? `${product.name} (${product.variant_label})` : product.name;
     document.getElementById("product-action-info").innerHTML = `
-        <div><strong>${invEscape(product.name)}</strong> (${invEscape(product.sku || "-")})</div>
+        <div><strong>${invEscape(displayName)}</strong> (${invEscape(product.sku || "-")})</div>
         <div>Current Stock: <strong>${Number(product.stock_qty || 0)}</strong> | Price: <strong>${invEscape(invMoney(product.price))}</strong></div>
     `;
     document.getElementById("modal-product-sku").value = product.sku || "";
     document.getElementById("modal-product-name").value = product.name || "";
+    document.getElementById("modal-product-variant-label").value = product.variant_label || "";
+    invEnsureCategoryOption(document.getElementById("modal-product-category"), product.category || "General");
     document.getElementById("modal-product-category").value = product.category || "";
     document.getElementById("modal-product-price").value = Number(product.price || 0).toFixed(2);
+    document.getElementById("modal-product-barcode").value = product.barcode || "";
     document.getElementById("modal-product-image-url").value = product.image_url || "";
     document.getElementById("modal-product-image-file").value = "";
     document.getElementById("modal-product-image-source").value = product.image_url ? "url" : "upload";
     invToggleModalProductImageInput();
     document.getElementById("product-view-sku").textContent = product.sku || "-";
     document.getElementById("product-view-name").textContent = product.name || "-";
+    document.getElementById("product-view-variant").textContent = product.variant_label || "-";
     document.getElementById("product-view-category").textContent = product.category || "-";
+    document.getElementById("product-view-barcode").textContent = product.barcode || "-";
     document.getElementById("product-view-price").textContent = invMoney(product.price);
     document.getElementById("product-view-image").textContent = product.image_url || "Not set";
     document.getElementById("modal-actual-stock").value = Number(product.stock_qty || 0);
@@ -162,7 +198,6 @@ async function invLoadStores() {
 
     invStores = data.stores;
     invActiveStoreId = Number(data.default_store_id || invStores[0].id);
-    invRenderStoreSelect();
 }
 
 async function invLoadProducts() {
@@ -177,6 +212,18 @@ async function invLoadProducts() {
 
     invProducts = Array.isArray(data.products) ? data.products : [];
     invRenderProductTable();
+}
+
+async function invLoadCategories() {
+    const response = await fetch(`/store/categories?store_id=${invActiveStoreId}`);
+    const data = await response.json();
+
+    if (!data || data.status !== "success") {
+        throw new Error(data?.message || "Unable to load categories.");
+    }
+
+    invCategories = Array.isArray(data.categories) ? data.categories : [];
+    invRenderCategorySelects();
 }
 
 async function invSubmitModalRestock() {
@@ -239,6 +286,7 @@ function invToggleProductImageInput() {
     const source = document.getElementById("new-product-image-source").value;
     document.getElementById("new-product-image-upload-wrap").style.display = source === "upload" ? "flex" : "none";
     document.getElementById("new-product-image-url-wrap").style.display = source === "url" ? "flex" : "none";
+    invUpdateCreateProductImagePreview();
 }
 
 function invToggleModalProductImageInput() {
@@ -247,19 +295,105 @@ function invToggleModalProductImageInput() {
     document.getElementById("modal-product-image-url-wrap").style.display = source === "url" ? "flex" : "none";
 }
 
+function invUpdateCreateProductProjection() {
+    const initialStock = Number(document.getElementById("new-product-initial-stock").value || 0);
+    const unitCost = Number(document.getElementById("new-product-unit-cost").value || 0);
+    const sellPrice = Number(document.getElementById("new-product-sell-price").value || 0);
+
+    const markup = unitCost > 0 ? ((sellPrice - unitCost) / unitCost) * 100 : 0;
+    const stockValue = Math.max(0, initialStock) * Math.max(0, unitCost);
+
+    document.getElementById("new-product-markup").textContent = `Markup: ${markup.toFixed(2)}%`;
+    document.getElementById("new-product-stock-value").textContent = `Value: ${invMoney(stockValue)}`;
+}
+
+function invUpdateCreateProductImagePreview() {
+    const source = (document.getElementById("new-product-image-source").value || "upload").trim();
+    const imageUrl = (document.getElementById("new-product-image-url").value || "").trim();
+    const imageFile = document.getElementById("new-product-image-file").files[0] || null;
+    const preview = document.getElementById("new-product-image-preview");
+    const empty = document.getElementById("new-product-image-preview-empty");
+
+    if (invCreatePreviewObjectUrl) {
+        URL.revokeObjectURL(invCreatePreviewObjectUrl);
+        invCreatePreviewObjectUrl = null;
+    }
+
+    let resolved = "";
+    if (source === "upload" && imageFile) {
+        invCreatePreviewObjectUrl = URL.createObjectURL(imageFile);
+        resolved = invCreatePreviewObjectUrl;
+    } else if (source === "url" && imageUrl !== "") {
+        resolved = imageUrl;
+    }
+
+    if (resolved !== "") {
+        preview.src = resolved;
+        preview.style.display = "block";
+        empty.style.display = "none";
+    } else {
+        preview.removeAttribute("src");
+        preview.style.display = "none";
+        empty.style.display = "block";
+    }
+}
+
+function invCaptureCreateFormState() {
+    const fileInput = document.getElementById("new-product-image-file");
+    const imageFile = fileInput && fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+
+    return {
+        sku: invGetElementValue("new-product-sku").trim(),
+        name: invGetElementValue("new-product-name").trim(),
+        variantLabel: invGetElementValue("new-product-variant-label").trim(),
+        category: invGetElementValue("new-product-category", "General").trim(),
+        supplier: invGetElementValue("new-product-supplier").trim(),
+        barcode: invGetElementValue("new-product-barcode").trim(),
+        imageSource: invGetElementValue("new-product-image-source", "upload").trim(),
+        imageUrl: invGetElementValue("new-product-image-url").trim(),
+        sellPrice: invGetElementValue("new-product-sell-price", "0").trim(),
+        initialStock: invGetElementValue("new-product-initial-stock", "0").trim(),
+        unitCost: invGetElementValue("new-product-unit-cost", "0").trim(),
+        location: invGetElementValue("new-product-location").trim(),
+        lowStock: invGetElementValue("new-product-low-stock", "0").trim(),
+        reason: invGetElementValue("new-product-reason", "Initial stock").trim(),
+        imageFileName: imageFile ? imageFile.name : "",
+        imageFileSize: imageFile ? Number(imageFile.size || 0) : 0,
+    };
+}
+
+function invIsCreateFormDirty() {
+    if (!invCreateSnapshot) return false;
+    const current = invCaptureCreateFormState();
+    return JSON.stringify(current) !== JSON.stringify(invCreateSnapshot);
+}
+
+function invRequestCloseProductModal() {
+    if (invIsCreatingProduct) return;
+
+    if (invIsCreateFormDirty()) {
+        const confirmed = window.confirm("Discard unsaved product changes?");
+        if (!confirmed) return;
+    }
+
+    invCloseProductModal();
+}
+
 async function invCreateProduct() {
     if (invIsCreatingProduct) return;
 
     const sku = (document.getElementById("new-product-sku").value || "").trim();
     const name = (document.getElementById("new-product-name").value || "").trim();
-    const category = (document.getElementById("new-product-category").value || "").trim();
+    const variantLabel = (document.getElementById("new-product-variant-label").value || "").trim();
+    const category = (document.getElementById("new-product-category").value || "General").trim() || "General";
+    const barcode = (document.getElementById("new-product-barcode").value || "").trim();
     const imageSource = (document.getElementById("new-product-image-source").value || "upload").trim();
     const imageUrl = (document.getElementById("new-product-image-url").value || "").trim();
     const imageFile = document.getElementById("new-product-image-file").files[0] || null;
     const sellPrice = Number(document.getElementById("new-product-sell-price").value || 0);
     const initialStock = Number(document.getElementById("new-product-initial-stock").value || 0);
     const unitCost = Number(document.getElementById("new-product-unit-cost").value || 0);
-    const reason = (document.getElementById("new-product-reason").value || "Initial stock").trim();
+    const reason = (invGetElementValue("new-product-reason", "Initial stock") || "Initial stock").trim();
     const button = document.getElementById("new-product-submit");
 
     if (!invActiveStoreId || !sku || !name || sellPrice < 0 || initialStock < 0 || unitCost < 0) {
@@ -284,7 +418,9 @@ async function invCreateProduct() {
         formData.append("store_id", String(invActiveStoreId));
         formData.append("sku", sku);
         formData.append("name", name);
+        formData.append("variant_label", variantLabel);
         formData.append("category", category);
+        formData.append("barcode", barcode);
         formData.append("sell_price", String(sellPrice));
         formData.append("initial_stock", String(initialStock));
         formData.append("unit_cost", String(unitCost));
@@ -308,6 +444,7 @@ async function invCreateProduct() {
 
         invSetResult(`Product created: ${data.product?.name || name}`, "ok");
         invCloseProductModal();
+        await invLoadCategories();
         await invLoadProducts();
     } catch (error) {
         invSetResult("Product creation request failed.", "error");
@@ -369,7 +506,9 @@ async function invUpdateProduct(productId) {
 
     const sku = (document.getElementById("modal-product-sku").value || "").trim();
     const name = (document.getElementById("modal-product-name").value || "").trim();
-    const category = (document.getElementById("modal-product-category").value || "").trim();
+    const variantLabel = (document.getElementById("modal-product-variant-label").value || "").trim();
+    const category = (document.getElementById("modal-product-category").value || "General").trim() || "General";
+    const barcode = (document.getElementById("modal-product-barcode").value || "").trim();
     const sellPrice = Number(document.getElementById("modal-product-price").value || 0);
     const imageSource = (document.getElementById("modal-product-image-source").value || "upload").trim();
     const imageUrl = (document.getElementById("modal-product-image-url").value || "").trim();
@@ -395,7 +534,9 @@ async function invUpdateProduct(productId) {
         formData.append("product_id", String(productId));
         formData.append("sku", sku);
         formData.append("name", name);
+        formData.append("variant_label", variantLabel);
         formData.append("category", category);
+        formData.append("barcode", barcode);
         formData.append("sell_price", String(sellPrice));
         if (imageSource === "url" && imageUrl !== "") {
             formData.append("image_url", imageUrl);
@@ -414,6 +555,7 @@ async function invUpdateProduct(productId) {
         }
 
         invSetResult(`Product updated: ${data.product?.name || name}`, "ok");
+        await invLoadCategories();
         await invLoadProducts();
         const refreshed = invGetProductById(productId);
         if (refreshed) {
@@ -428,26 +570,51 @@ async function invUpdateProduct(productId) {
     }
 }
 
-function invOpenProductModal() {
+async function invOpenProductModal() {
+    await invLoadCategories();
+    document.getElementById("new-product-sku").value = "";
+    document.getElementById("new-product-name").value = "";
+    document.getElementById("new-product-variant-label").value = "";
+    document.getElementById("new-product-category").value = "General";
+    document.getElementById("new-product-supplier").value = "";
+    document.getElementById("new-product-barcode").value = "";
+    document.getElementById("new-product-image-source").value = "upload";
+    document.getElementById("new-product-image-file").value = "";
+    document.getElementById("new-product-image-url").value = "";
+    document.getElementById("new-product-sell-price").value = "0";
+    document.getElementById("new-product-initial-stock").value = "0";
+    document.getElementById("new-product-unit-cost").value = "0";
+    document.getElementById("new-product-location").value = "";
+    document.getElementById("new-product-low-stock").value = "0";
+    invToggleProductImageInput();
+    invUpdateCreateProductProjection();
     document.getElementById("inventory-product-modal").style.display = "grid";
+    invCreateSnapshot = invCaptureCreateFormState();
 }
 
 function invCloseProductModal() {
+    if (invCreatePreviewObjectUrl) {
+        URL.revokeObjectURL(invCreatePreviewObjectUrl);
+        invCreatePreviewObjectUrl = null;
+    }
     document.getElementById("inventory-product-modal").style.display = "none";
+    invCreateSnapshot = null;
 }
-
-document.getElementById("inventory-store-select").addEventListener("change", async (event) => {
-    invActiveStoreId = Number(event.target.value);
-    invSetResult("", "ok");
-    await invLoadProducts();
-});
 
 document.getElementById("inventory-search").addEventListener("input", invRenderProductTable);
 
-document.getElementById("open-product-modal-top").addEventListener("click", invOpenProductModal);
-document.getElementById("close-product-modal").addEventListener("click", invCloseProductModal);
+document.getElementById("open-product-modal-top").addEventListener("click", () => {
+    invOpenProductModal().catch((error) => invSetResult(error.message || "Unable to open product modal.", "error"));
+});
+document.getElementById("close-product-modal").addEventListener("click", invRequestCloseProductModal);
+document.getElementById("new-product-cancel").addEventListener("click", invRequestCloseProductModal);
 document.getElementById("close-product-action-modal").addEventListener("click", invCloseProductActionModal);
 document.getElementById("new-product-image-source").addEventListener("change", invToggleProductImageInput);
+document.getElementById("new-product-image-file").addEventListener("change", invUpdateCreateProductImagePreview);
+document.getElementById("new-product-image-url").addEventListener("input", invUpdateCreateProductImagePreview);
+document.getElementById("new-product-unit-cost").addEventListener("input", invUpdateCreateProductProjection);
+document.getElementById("new-product-sell-price").addEventListener("input", invUpdateCreateProductProjection);
+document.getElementById("new-product-initial-stock").addEventListener("input", invUpdateCreateProductProjection);
 document.getElementById("modal-product-image-source").addEventListener("change", invToggleModalProductImageInput);
 document.getElementById("modal-start-edit-product").addEventListener("click", () => invSetProductEditMode(true));
 document.getElementById("modal-cancel-edit-product").addEventListener("click", () => invSetProductEditMode(false));
@@ -456,8 +623,16 @@ document.getElementById("modal-panel-restock-btn").addEventListener("click", () 
 
 document.getElementById("inventory-product-modal").addEventListener("click", (event) => {
     if (event.target.id === "inventory-product-modal") {
-        invCloseProductModal();
+        invRequestCloseProductModal();
     }
+});
+
+document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    const modal = document.getElementById("inventory-product-modal");
+    if (!modal || modal.style.display !== "grid") return;
+    event.preventDefault();
+    invRequestCloseProductModal();
 });
 
 document.getElementById("inventory-product-action-modal").addEventListener("click", (event) => {
@@ -489,8 +664,10 @@ document.getElementById("modal-save-product").addEventListener("click", async ()
 (async () => {
     try {
         await invLoadStores();
+        await invLoadCategories();
         await invLoadProducts();
         invToggleProductImageInput();
+        invUpdateCreateProductProjection();
     } catch (error) {
         invSetResult(error.message || "Unable to initialize inventory page.", "error");
     }

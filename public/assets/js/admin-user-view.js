@@ -1,5 +1,6 @@
 let uvRows = [];
 let uvEditingUserId = null;
+let uvViewingUserId = null;
 let uvQuickFilter = "all";
 
 function aMoney(value) {
@@ -29,6 +30,27 @@ function formatTypeLabel(type) {
     return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
 }
 
+function normalizeRoles(roles, fallbackRole) {
+    if (Array.isArray(roles) && roles.length) {
+        return [...new Set(roles.map((role) => String(role || "").toUpperCase()).filter(Boolean))];
+    }
+    const fallback = String(fallbackRole || "").toUpperCase();
+    return fallback ? [fallback] : ["USER"];
+}
+
+function setRoleChecks(prefix, roles, fallbackRole) {
+    const normalized = normalizeRoles(roles, fallbackRole);
+    document.querySelectorAll(`input[name="${prefix}-roles"]`).forEach((input) => {
+        input.checked = normalized.includes(String(input.value || "").toUpperCase());
+    });
+}
+
+function getRoleChecks(prefix) {
+    return Array.from(document.querySelectorAll(`input[name="${prefix}-roles"]:checked`))
+        .map((input) => String(input.value || "").toUpperCase())
+        .filter(Boolean);
+}
+
 function setUvResult(message, type) {
     const el = document.getElementById("uv-result");
     el.textContent = message || "";
@@ -41,25 +63,20 @@ function getFilteredRows() {
     const typeFilter = (document.getElementById("uv-type-filter").value || "").trim().toLowerCase();
 
     return uvRows.filter((row) => {
+        const roleList = normalizeRoles(row.roles, row.role);
         const matchesQuick =
             uvQuickFilter === "all" ? true :
             uvQuickFilter === "active" ? !!row.is_active :
             uvQuickFilter === "debt" ? Number(row.current_debt || 0) > 0 :
-            uvQuickFilter === "store_system" ? String(row.role || "").toUpperCase() === "STORE_SYSTEM" :
+            uvQuickFilter === "store_system" ? roleList.includes("STORE_SYSTEM") :
             true;
 
         if (!matchesQuick) return false;
-
-        if (roleFilter && String(row.role || "").toUpperCase() !== roleFilter) {
-            return false;
-        }
-
-        if (typeFilter && String(row.user_type || "").toLowerCase() !== typeFilter) {
-            return false;
-        }
+        if (roleFilter && !roleList.includes(roleFilter)) return false;
+        if (typeFilter && String(row.user_type || "").toLowerCase() !== typeFilter) return false;
 
         if (!q) return true;
-        const haystack = `${row.name || ""} ${row.email || ""} ${row.employee_id || ""}`.toLowerCase();
+        const haystack = `${row.name || ""} ${row.email || ""} ${row.employee_id || ""} ${roleList.join(" ")}`.toLowerCase();
         return haystack.includes(q);
     });
 }
@@ -69,7 +86,7 @@ function renderTopSummary(rows) {
     const totalUsers = list.length;
     const totalDebt = list.reduce((sum, row) => sum + Number(row.current_debt || 0), 0);
     const activeFaculty = list.filter((row) => !!row.is_active && String(row.user_type || "").toLowerCase() === "faculty").length;
-    const storeOfficers = list.filter((row) => String(row.role || "").toUpperCase() === "STORE_SYSTEM").length;
+    const storeOfficers = list.filter((row) => normalizeRoles(row.roles, row.role).includes("STORE_SYSTEM")).length;
 
     document.getElementById("uv-total-users").textContent = String(totalUsers);
     document.getElementById("uv-total-debt").textContent = aMoney(totalDebt);
@@ -92,12 +109,14 @@ function renderUserTable(rows) {
         return;
     }
 
-    body.innerHTML = rows.map((row) => `
+    body.innerHTML = rows.map((row) => {
+        const roles = normalizeRoles(row.roles, row.role);
+        return `
         <tr class="uv-row" data-user-id="${row.id}" style="cursor:pointer;">
             <td>${aEscape(row.employee_id || "-")}</td>
             <td>${aEscape(row.name)}</td>
             <td>${aEscape(row.email)}</td>
-            <td>${aEscape(formatRoleLabel(row.role || "-"))}</td>
+            <td>${roles.map((role) => `<span class="uv-tag">${aEscape(formatRoleLabel(role))}</span>`).join(" ")}</td>
             <td>${aEscape(formatTypeLabel(row.user_type))}</td>
             <td><span class="uv-status ${row.is_active ? "is-active" : "is-inactive"}">${row.is_active ? "Active" : "Inactive"}</span></td>
             <td>
@@ -108,7 +127,8 @@ function renderUserTable(rows) {
             </td>
             <td>${aEscape(aMoney(row.credit_limit))}</td>
         </tr>
-    `).join("");
+    `;
+    }).join("");
 }
 
 function applyUserFiltersAndRender() {
@@ -148,7 +168,7 @@ async function openEditUser(userId) {
     document.getElementById("uv-e-employee-id").value = row.employee_id || "";
     document.getElementById("uv-e-name").value = row.name || "";
     document.getElementById("uv-e-email").value = row.email || "";
-    document.getElementById("uv-e-role").value = row.role || "USER";
+    setRoleChecks("uv-e", row.roles, row.role);
     document.getElementById("uv-e-type").value = row.user_type || "staff";
     document.getElementById("uv-e-salary").value = Number(row.base_salary || 0);
     document.getElementById("uv-e-credit-limit").value = Number(row.credit_limit || 0);
@@ -156,14 +176,44 @@ async function openEditUser(userId) {
     openModal("uv-edit-modal");
 }
 
+async function openViewUser(userId) {
+    const response = await fetch(`/admin/user-view/${userId}`);
+    const data = await response.json();
+    if (!data || data.status !== "success") {
+        setUvResult(data?.message || "Unable to load user detail.", "error");
+        return;
+    }
+
+    const row = data.data;
+    uvViewingUserId = Number(row.id);
+    document.getElementById("uv-v-employee-id").value = row.employee_id || "-";
+    document.getElementById("uv-v-name").value = row.name || "-";
+    document.getElementById("uv-v-email").value = row.email || "-";
+    document.getElementById("uv-v-roles").value = normalizeRoles(row.roles, row.role).map(formatRoleLabel).join(", ");
+    document.getElementById("uv-v-type").value = formatTypeLabel(row.user_type);
+    document.getElementById("uv-v-status").value = row.is_active ? "Active" : "Inactive";
+    document.getElementById("uv-v-salary").value = aMoney(row.base_salary || 0);
+    document.getElementById("uv-v-credit-limit").value = aMoney(row.credit_limit || 0);
+    document.getElementById("uv-v-current-debt").value = aMoney(row.current_debt || 0);
+    document.getElementById("uv-v-created-at").value = row.created_at || "-";
+    openModal("uv-view-modal");
+}
+
 async function saveEditedUser() {
     if (!uvEditingUserId) return;
+
+    const roles = getRoleChecks("uv-e");
+    if (!roles.length) {
+        setUvResult("Select at least one role.", "error");
+        return;
+    }
+
     const payload = {
         user_id: uvEditingUserId,
         employee_id: (document.getElementById("uv-e-employee-id").value || "").trim(),
         name: (document.getElementById("uv-e-name").value || "").trim(),
         email: (document.getElementById("uv-e-email").value || "").trim(),
-        role: document.getElementById("uv-e-role").value,
+        roles,
         user_type: document.getElementById("uv-e-type").value,
         base_salary: Number(document.getElementById("uv-e-salary").value || 0),
         credit_limit: Number(document.getElementById("uv-e-credit-limit").value || 0),
@@ -187,12 +237,18 @@ async function saveEditedUser() {
 }
 
 async function createUser() {
+    const roles = getRoleChecks("uv-a");
+    if (!roles.length) {
+        setUvResult("Select at least one role.", "error");
+        return;
+    }
+
     const payload = {
         employee_id: (document.getElementById("uv-a-employee-id").value || "").trim(),
         name: (document.getElementById("uv-a-name").value || "").trim(),
         email: (document.getElementById("uv-a-email").value || "").trim(),
         password: (document.getElementById("uv-a-password").value || "").trim(),
-        role: document.getElementById("uv-a-role").value,
+        roles,
         user_type: document.getElementById("uv-a-type").value,
         base_salary: Number(document.getElementById("uv-a-salary").value || 0),
         credit_limit: Number(document.getElementById("uv-a-credit-limit").value || 0),
@@ -264,24 +320,33 @@ document.querySelectorAll("[data-uv-quick]").forEach((chip) => {
     });
 });
 
-document.getElementById("uv-add-btn").addEventListener("click", () => openModal("uv-add-modal"));
+document.getElementById("uv-add-btn").addEventListener("click", () => {
+    setRoleChecks("uv-a", ["USER"]);
+    openModal("uv-add-modal");
+});
 document.getElementById("uv-import-btn").addEventListener("click", () => openModal("uv-import-modal"));
 document.getElementById("uv-add-close").addEventListener("click", () => closeModal("uv-add-modal"));
 document.getElementById("uv-edit-close").addEventListener("click", () => closeModal("uv-edit-modal"));
 document.getElementById("uv-import-close").addEventListener("click", () => closeModal("uv-import-modal"));
+document.getElementById("uv-view-close").addEventListener("click", () => closeModal("uv-view-modal"));
 document.getElementById("uv-add-save").addEventListener("click", createUser);
 document.getElementById("uv-edit-save").addEventListener("click", saveEditedUser);
 document.getElementById("uv-import-submit").addEventListener("click", importUsersCsv);
+document.getElementById("uv-view-edit").addEventListener("click", async () => {
+    if (!uvViewingUserId) return;
+    closeModal("uv-view-modal");
+    await openEditUser(uvViewingUserId);
+});
 
 document.getElementById("uv-body").addEventListener("click", (event) => {
     const row = event.target.closest(".uv-row");
     if (!row) return;
     const userId = Number(row.getAttribute("data-user-id") || 0);
     if (!userId) return;
-    openEditUser(userId);
+    openViewUser(userId);
 });
 
-["uv-add-modal", "uv-edit-modal", "uv-import-modal"].forEach((id) => {
+["uv-add-modal", "uv-edit-modal", "uv-import-modal", "uv-view-modal"].forEach((id) => {
     document.getElementById(id).addEventListener("click", (event) => {
         if (event.target.id === id) closeModal(id);
     });

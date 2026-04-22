@@ -149,6 +149,19 @@
     background: #fef3c7;
 }
 
+.uv-tag {
+    display: inline-flex;
+    align-items: center;
+    border: 1px solid #dbe3ea;
+    border-radius: 999px;
+    padding: 2px 8px;
+    margin: 0 4px 4px 0;
+    font-size: 0.75rem;
+    font-weight: 700;
+    color: #003366;
+    background: #f8fbff;
+}
+
 .uv-debt-wrap {
     display: grid;
     gap: 4px;
@@ -232,6 +245,25 @@
     border: 1px solid #d1d5db;
     border-radius: 8px;
     padding: 8px 10px;
+}
+
+.role-check-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 10px;
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 8px 10px;
+    background: #fff;
+}
+
+.role-check-grid label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: #334155;
+    font-size: 0.84rem;
+    font-weight: 600;
 }
 
 .admin-modal-actions {

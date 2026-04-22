@@ -1,6 +1,7 @@
 let reportsStores = [];
 let reportsActiveStoreId = null;
 let reportsPeriod = "today";
+let reportsSummaryData = null;
 
 function rMoney(value) {
     return `PHP ${Number(value || 0).toFixed(2)}`;
@@ -27,18 +28,6 @@ function rSetPeriod(nextPeriod) {
         chip.classList.toggle("is-active", chip.dataset.period === reportsPeriod);
     });
     document.getElementById("reports-custom-range").classList.toggle("hidden", reportsPeriod !== "custom");
-}
-
-function rRenderStoreSelect() {
-    const select = document.getElementById("reports-store-select");
-    const wrap = document.querySelector(".reports-store-wrap");
-    select.innerHTML = reportsStores
-        .map((store) => `<option value="${store.id}">${rEscape(store.store_name)}</option>`)
-        .join("");
-    select.value = String(reportsActiveStoreId);
-    const multi = reportsStores.length > 1;
-    select.disabled = !multi;
-    wrap.style.display = multi ? "flex" : "none";
 }
 
 function rRenderSummary(data) {
@@ -72,6 +61,138 @@ function rRenderPaymentRows(rows) {
             <td>${rEscape(rMoney(row.sales || 0))}</td>
         </tr>
     `).join("");
+}
+
+function rRenderPaymentRecords(rows, data) {
+    const safeRows = Array.isArray(rows) ? rows : [];
+    const index = {};
+    safeRows.forEach((row) => {
+        const key = String(row.payment_method || "").toLowerCase();
+        index[key] = {
+            sales: Number(row.sales || 0),
+            transactions: Number(row.transactions || 0),
+        };
+    });
+
+    const cash = index.cash || { sales: 0, transactions: 0 };
+    const gcash = index.gcash || { sales: 0, transactions: 0 };
+    const debt = index.debt || { sales: 0, transactions: 0 };
+
+    const excluded = new Set(["cash", "gcash", "debt"]);
+    let othersSales = 0;
+    let othersTxn = 0;
+    safeRows.forEach((row) => {
+        const key = String(row.payment_method || "").toLowerCase();
+        if (excluded.has(key)) return;
+        othersSales += Number(row.sales || 0);
+        othersTxn += Number(row.transactions || 0);
+    });
+
+    const totalRevenue = Number(data?.summary?.total_sales || 0);
+    const cashDrawer = data?.cash_drawer || {};
+    const openingBalance = Number(cashDrawer.opening_balance || 0);
+    const expectedCashOnHand = Number(cashDrawer.expected_cash_on_hand || 0);
+    const expectedEcashOnHand = Number(cashDrawer.expected_ecash_on_hand || 0);
+    const openingDate = String(cashDrawer.opening_business_date || "--");
+
+    document.getElementById("pay-cash").textContent = rMoney(cash.sales);
+    document.getElementById("pay-cash-meta").textContent = `${cash.transactions} transactions`;
+    document.getElementById("pay-gcash").textContent = rMoney(gcash.sales);
+    document.getElementById("pay-gcash-meta").textContent = `${gcash.transactions} transactions`;
+    document.getElementById("pay-others").textContent = rMoney(othersSales);
+    document.getElementById("pay-others-meta").textContent = `${othersTxn} transactions`;
+    document.getElementById("pay-debt").textContent = rMoney(debt.sales);
+    document.getElementById("pay-debt-meta").textContent = `${debt.transactions} transactions`;
+
+    document.getElementById("cash-opening").textContent = rMoney(openingBalance);
+    document.getElementById("cash-date").textContent = `Initial date: ${openingDate}`;
+    document.getElementById("cash-on-hand").textContent = rMoney(expectedCashOnHand);
+    document.getElementById("ecash-on-hand").textContent = rMoney(expectedEcashOnHand);
+    document.getElementById("pay-total-revenue").textContent = rMoney(totalRevenue);
+}
+
+function rRenderCashMovements(rows) {
+    const body = document.getElementById("cash-movements-body");
+    if (!Array.isArray(rows) || rows.length === 0) {
+        body.innerHTML = '<tr><td colspan="5">No cash movement records for this range.</td></tr>';
+        return;
+    }
+
+    body.innerHTML = rows.map((row) => {
+        const channel = String(row.channel || "cash").toUpperCase();
+        const movementType = String(row.movement_type || "cash_in").toLowerCase() === "cash_out" ? "Cash Out" : "Cash In";
+        return `
+            <tr>
+                <td>${rEscape(row.business_date || "-")}</td>
+                <td>${rEscape(channel)}</td>
+                <td>${rEscape(movementType)}</td>
+                <td>${rEscape(rMoney(row.amount || 0))}</td>
+                <td>${rEscape(row.reason || "-")}</td>
+            </tr>
+        `;
+    }).join("");
+}
+
+async function rCreateCashMovement() {
+    if (!reportsActiveStoreId) return;
+
+    const channel = String(document.getElementById("cash-channel").value || "cash").trim().toLowerCase();
+    const movementType = String(document.getElementById("cash-movement-type").value || "cash_in").trim().toLowerCase();
+    const amount = Number(document.getElementById("cash-movement-amount").value || 0);
+    const reason = String(document.getElementById("cash-movement-reason").value || "").trim();
+    const saveBtn = document.getElementById("cash-movement-save");
+    const businessDate = reportsSummaryData?.cash_drawer?.business_date || new Date().toISOString().slice(0, 10);
+
+    if (!(channel === "cash" || channel === "ecash")) {
+        rSetResult("Channel must be cash or ecash.", "error");
+        return;
+    }
+
+    if (!(movementType === "cash_in" || movementType === "cash_out")) {
+        rSetResult("Type must be cash_in or cash_out.", "error");
+        return;
+    }
+
+    if (amount <= 0) {
+        rSetResult("Amount must be greater than 0.", "error");
+        return;
+    }
+
+    if (reason === "") {
+        rSetResult("Reason is required.", "error");
+        return;
+    }
+
+    saveBtn.disabled = true;
+    saveBtn.textContent = "Saving...";
+    try {
+        const response = await fetch("/store/cash-movements/create", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                store_id: reportsActiveStoreId,
+                business_date: businessDate,
+                channel,
+                movement_type: movementType,
+                amount,
+                reason,
+            }),
+        });
+        const data = await response.json();
+        if (!data || data.status !== "success") {
+            throw new Error(data?.message || "Failed to save cash movement.");
+        }
+
+        document.getElementById("cash-movement-amount").value = "";
+        document.getElementById("cash-movement-reason").value = "";
+        rSetResult("Cash movement saved.", "ok");
+        await rLoadSummary();
+    } catch (error) {
+        rSetResult(error.message || "Failed to save cash movement.", "error");
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.textContent = "Save Entry";
+    }
 }
 
 function rRenderProductRows(rows) {
@@ -116,7 +237,6 @@ async function rLoadStores() {
 
     reportsStores = data.stores;
     reportsActiveStoreId = Number(data.default_store_id || reportsStores[0].id);
-    rRenderStoreSelect();
 }
 
 async function rLoadSummary() {
@@ -142,23 +262,23 @@ async function rLoadSummary() {
     const data = await response.json();
     if (!data || data.status !== "success") {
         rSetResult(data?.message || "Unable to load report summary.", "error");
+        reportsSummaryData = null;
         rRenderPaymentRows([]);
+        rRenderCashMovements([]);
         rRenderProductRows([]);
         rRenderTrendRows([]);
         return;
     }
 
+    reportsSummaryData = data;
     rRenderSummary(data);
     rRenderPaymentRows(data.payment_breakdown || []);
+    rRenderPaymentRecords(data.payment_breakdown || [], data);
+    rRenderCashMovements(data.cash_movements || []);
     rRenderProductRows(data.top_products || []);
     rRenderTrendRows(data.trend || []);
     rSetResult("", "ok");
 }
-
-document.getElementById("reports-store-select").addEventListener("change", async (event) => {
-    reportsActiveStoreId = Number(event.target.value || 0);
-    await rLoadSummary();
-});
 
 document.querySelectorAll(".period-chip").forEach((chip) => {
     chip.addEventListener("click", async () => {
@@ -177,6 +297,10 @@ document.getElementById("reports-date-from").addEventListener("change", async ()
 
 document.getElementById("reports-date-to").addEventListener("change", async () => {
     if (reportsPeriod === "custom") await rLoadSummary();
+});
+
+document.getElementById("cash-movement-save").addEventListener("click", async () => {
+    await rCreateCashMovement();
 });
 
 (async () => {

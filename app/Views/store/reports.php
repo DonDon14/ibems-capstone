@@ -12,10 +12,6 @@
             <p>Track sales, estimated cost, and profit by period.</p>
         </div>
         <div class="reports-controls">
-            <div class="reports-store-wrap">
-                <label for="reports-store-select">Store</label>
-                <select id="reports-store-select"></select>
-            </div>
             <div class="reports-period-chips">
                 <button type="button" class="period-chip is-active" data-period="today">Today</button>
                 <button type="button" class="period-chip" data-period="week">Week</button>
@@ -40,6 +36,98 @@
         <article class="summary-card"><span>Average Ticket</span><strong id="sum-ticket">PHP 0.00</strong></article>
         <article class="summary-card"><span>Stock-in Cost</span><strong id="sum-stockin-cost">PHP 0.00</strong></article>
     </div>
+
+    <article class="reports-card">
+        <h4>Payment Records</h4>
+        <div class="payment-records-grid">
+            <article class="summary-card payment-record">
+                <span>Cash Sales</span>
+                <strong id="pay-cash">PHP 0.00</strong>
+                <small id="pay-cash-meta">0 transactions</small>
+            </article>
+            <article class="summary-card payment-record">
+                <span>GCash Sales</span>
+                <strong id="pay-gcash">PHP 0.00</strong>
+                <small id="pay-gcash-meta">0 transactions</small>
+            </article>
+            <article class="summary-card payment-record">
+                <span>Other Payments</span>
+                <strong id="pay-others">PHP 0.00</strong>
+                <small id="pay-others-meta">0 transactions</small>
+            </article>
+            <article class="summary-card payment-record">
+                <span>Debt Payments</span>
+                <strong id="pay-debt">PHP 0.00</strong>
+                <small id="pay-debt-meta">0 transactions</small>
+            </article>
+            <article class="summary-card payment-record">
+                <span>Initial Opening Balance</span>
+                <strong id="cash-opening">PHP 0.00</strong>
+                <small id="cash-date">Initial date: --</small>
+            </article>
+            <article class="summary-card payment-record">
+                <span>Expected Cash on Hand</span>
+                <strong id="cash-on-hand">PHP 0.00</strong>
+                <small id="cash-on-hand-meta">Opening + cash sales</small>
+            </article>
+            <article class="summary-card payment-record">
+                <span>Expected E-Cash on Hand</span>
+                <strong id="ecash-on-hand">PHP 0.00</strong>
+                <small id="ecash-on-hand-meta">E-cash sales + cash in/out</small>
+            </article>
+            <article class="summary-card payment-record payment-record--highlight">
+                <span>Total Revenue</span>
+                <strong id="pay-total-revenue">PHP 0.00</strong>
+                <small id="pay-total-meta">All payment methods combined</small>
+            </article>
+        </div>
+    </article>
+
+    <article class="reports-card">
+        <h4>Cash Control (Per Store)</h4>
+        <div class="cash-control-form">
+            <div class="field">
+                <label for="cash-channel">Channel</label>
+                <select id="cash-channel">
+                    <option value="cash">Cash</option>
+                    <option value="ecash">E-Cash</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="cash-movement-type">Type</label>
+                <select id="cash-movement-type">
+                    <option value="cash_in">Cash In</option>
+                    <option value="cash_out">Cash Out</option>
+                </select>
+            </div>
+            <div class="field">
+                <label for="cash-movement-amount">Amount</label>
+                <input id="cash-movement-amount" type="number" min="0.01" step="0.01" placeholder="0.00">
+            </div>
+            <div class="field field-reason">
+                <label for="cash-movement-reason">Reason</label>
+                <input id="cash-movement-reason" type="text" maxlength="255" placeholder="e.g. Petty cash top-up">
+            </div>
+            <button id="cash-movement-save" class="primary-btn" type="button">Save Entry</button>
+        </div>
+
+        <div class="table-wrap table-standard-wrap">
+            <table class="table table-standard">
+                <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Channel</th>
+                    <th>Type</th>
+                    <th>Amount</th>
+                    <th>Reason</th>
+                </tr>
+                </thead>
+                <tbody id="cash-movements-body">
+                <tr><td colspan="5">Loading...</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </article>
 
     <div class="reports-panels">
         <article class="reports-card">

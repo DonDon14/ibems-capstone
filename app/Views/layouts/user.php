@@ -9,12 +9,14 @@
     <meta name="csrf-cookie-name" content="<?= esc(config('Security')->cookieName) ?>">
     <title>User Portal</title>
     <link rel="stylesheet" href="<?= base_url('assets/css/app.css') ?>">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <?= $this->renderSection('styles') ?>
 </head>
 <body>
 <?php
 $name = (string) (session()->get('name') ?? 'User');
 $role = (string) (session()->get('role') ?? 'USER');
+$ustpLogoUrl = base_url('assets/images/ustp_claveria_logo.jpg');
 $path = trim((string) service('uri')->getPath(), '/');
 if (strpos($path, 'index.php/') === 0) {
     $path = substr($path, strlen('index.php/'));
@@ -33,28 +35,38 @@ if ($initials === '') {
 ?>
 <div class="app-shell">
     <aside class="app-sidebar">
-        <div class="app-brand">
-            <h1>IBEMS</h1>
-            <p>User Portal</p>
+        <div class="app-sidebar-header">
+            <div class="app-brand">
+                <img src="<?= esc($ustpLogoUrl) ?>" alt="USTP Logo" class="app-brand-logo">
+                <div class="app-brand-text">
+                    <h1>IBEMS</h1>
+                    <p>User Portal</p>
+                </div>
+            </div>
+            <button id="sidebar-toggle" type="button" class="secondary-btn sidebar-toggle sidebar-toggle-in-sidebar" aria-label="Toggle Sidebar">
+                <i class="bi bi-layout-sidebar"></i>
+            </button>
         </div>
 
         <nav class="app-menu">
-            <a href="/user/dashboard" class="<?= $isActive('user/dashboard') ?>">Dashboard</a>
-            <a href="/user/history" class="<?= $isActive('user/history') ?>">History</a>
+            <a href="/user/dashboard" class="<?= $isActive('user/dashboard') ?>"><i class="bi bi-speedometer2"></i><span>Dashboard</span></a>
+            <a href="/user/history" class="<?= $isActive('user/history') ?>"><i class="bi bi-clock-history"></i><span>History</span></a>
         </nav>
 
         <div class="app-sidebar-spacer"></div>
 
         <div class="sidebar-logout">
-            <a href="/auth/logout">Logout</a>
+            <a href="/auth/logout"><i class="bi bi-box-arrow-right"></i><span>Logout</span></a>
         </div>
     </aside>
 
     <div class="app-main">
         <header class="app-topbar">
             <div class="topbar-left">
-                <h2>User Portal</h2>
-                <p>Account and Purchase Overview</p>
+                <div class="topbar-title">
+                    <h2>User Portal</h2>
+                    <p>Account and Purchase Overview</p>
+                </div>
             </div>
 
             <div class="topbar-profile">
@@ -77,6 +89,7 @@ if ($initials === '') {
 </div>
 
 <script src="<?= base_url('assets/js/csrf.js') ?>"></script>
+<script src="<?= base_url('assets/js/app-layout.js') ?>"></script>
 <?= $this->renderSection('scripts') ?>
 </body>
 </html>

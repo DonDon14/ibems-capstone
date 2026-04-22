@@ -9,6 +9,7 @@
     <meta name="csrf-cookie-name" content="<?= esc(config('Security')->cookieName) ?>">
     <title>Store System</title>
     <link rel="stylesheet" href="<?= base_url('assets/css/app.css') ?>">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <?= $this->renderSection('styles') ?>
 </head>
 <body>
@@ -16,6 +17,7 @@
 $name = (string) (session()->get('name') ?? 'Store User');
 $email = (string) (session()->get('email') ?? '');
 $role = (string) (session()->get('role') ?? 'STORE_SYSTEM');
+$ustpLogoUrl = base_url('assets/images/ustp_claveria_logo.jpg');
 $profileImageUrl = (string) (session()->get('profile_image_url') ?? '');
 $path = trim((string) service('uri')->getPath(), '/');
 if (strpos($path, 'index.php/') === 0) {
@@ -40,31 +42,42 @@ $storeLogoUrl = (string) ($activeStore['logo_url'] ?? '');
 ?>
 <div class="app-shell">
     <aside class="app-sidebar">
-        <div class="app-brand">
-            <h1>IBEMS</h1>
-            <p><?= esc($storeName) ?></p>
+        <div class="app-sidebar-header">
+            <div class="app-brand">
+                <img src="<?= esc($ustpLogoUrl) ?>" alt="USTP Logo" class="app-brand-logo">
+                <div class="app-brand-text">
+                    <h1>IBEMS</h1>
+                    <p><?= esc($storeName) ?></p>
+                </div>
+            </div>
+            <button id="sidebar-toggle" type="button" class="secondary-btn sidebar-toggle sidebar-toggle-in-sidebar" aria-label="Toggle Sidebar">
+                <i class="bi bi-layout-sidebar"></i>
+            </button>
         </div>
 
         <nav class="app-menu">
-            <a href="/store/pos" class="<?= $isActive('store/pos') ?>">POS</a>
-            <a href="/store/inventory" class="<?= $isActive('store/inventory') ?>">Inventory</a>
-            <a href="/store/reports" class="<?= $isActive('store/reports') ?>">Reports</a>
-            <a href="/store/history" class="<?= $isActive('store/history') ?>">History</a>
-            <a href="/store/staff-records" class="<?= $isActive('store/staff-records') ?>">Employee Records</a>
+            <a href="/store/pos" class="<?= $isActive('store/pos') ?>"><i class="bi bi-cart3"></i><span>POS</span></a>
+            <a href="/store/inventory" class="<?= $isActive('store/inventory') ?>"><i class="bi bi-box-seam"></i><span>Inventory</span></a>
+            <a href="/store/reports" class="<?= $isActive('store/reports') ?>"><i class="bi bi-bar-chart-line"></i><span>Reports</span></a>
+            <a href="/store/history" class="<?= $isActive('store/history') ?>"><i class="bi bi-clock-history"></i><span>History</span></a>
+            <a href="/store/staff-records" class="<?= $isActive('store/staff-records') ?>"><i class="bi bi-person-vcard"></i><span>Employee Records</span></a>
+            <a href="/store/settings" class="<?= $isActive('store/settings') ?>"><i class="bi bi-gear"></i><span>Settings</span></a>
         </nav>
 
         <div class="app-sidebar-spacer"></div>
 
         <div class="sidebar-logout">
-            <a href="/auth/logout">Logout</a>
+            <a href="/auth/logout"><i class="bi bi-box-arrow-right"></i><span>Logout</span></a>
         </div>
     </aside>
 
     <div class="app-main">
         <header class="app-topbar">
             <div class="topbar-left">
-                <h2><?= esc($storeName) ?></h2>
-                <p>School Store Operations</p>
+                <div class="topbar-title">
+                    <h2><?= esc($storeName) ?></h2>
+                    <p>School Store Operations</p>
+                </div>
             </div>
 
             <div class="topbar-profile">
@@ -97,6 +110,7 @@ $storeLogoUrl = (string) ($activeStore['logo_url'] ?? '');
 </div>
 
 <script src="<?= base_url('assets/js/csrf.js') ?>"></script>
+<script src="<?= base_url('assets/js/app-layout.js') ?>"></script>
 <?= $this->renderSection('scripts') ?>
 </body>
 </html>

@@ -6,6 +6,7 @@ use App\Models\AuditLogModel;
 use App\Models\BalanceModel;
 use App\Models\StoreModel;
 use App\Models\UserModel;
+use App\Models\UserRoleModel;
 use CodeIgniter\Controller;
 use Config\Database;
 
@@ -113,15 +114,18 @@ class AdminController extends Controller
         }
 
         $rows = $query->orderBy('u.name', 'ASC')->limit(200)->get()->getResultArray();
+        $rolesMap = $this->buildRolesMap($rows);
         return $this->response->setJSON([
             'status' => 'success',
-            'data' => array_map(static function (array $row): array {
+            'data' => array_map(static function (array $row) use ($rolesMap): array {
+                $userId = (int) $row['id'];
                 return [
-                    'id' => (int) $row['id'],
+                    'id' => $userId,
                     'employee_id' => $row['employee_id'],
                     'name' => $row['name'],
                     'email' => $row['email'],
                     'role' => $row['role'],
+                    'roles' => $rolesMap[$userId] ?? [strtoupper((string) ($row['role'] ?? 'USER'))],
                     'user_type' => $row['user_type'],
                     'is_active' => (bool) $row['is_active'],
                     'current_debt' => (float) ($row['current_debt'] ?? 0),
@@ -163,6 +167,7 @@ class AdminController extends Controller
                 'name' => $row['name'],
                 'email' => $row['email'],
                 'role' => $row['role'],
+                'roles' => $this->resolveUserRoles((int) $row['id'], (string) ($row['role'] ?? 'USER')),
                 'user_type' => $row['user_type'],
                 'base_salary' => (float) ($row['base_salary'] ?? 0),
                 'is_active' => (bool) $row['is_active'],
@@ -183,6 +188,7 @@ class AdminController extends Controller
         $email = strtolower(trim((string) ($request['email'] ?? '')));
         $role = strtoupper(trim((string) ($request['role'] ?? 'USER')));
         $userType = strtolower(trim((string) ($request['user_type'] ?? 'staff')));
+        $roles = $this->extractRolesFromRequest($request);
         $baseSalary = (float) ($request['base_salary'] ?? 0);
         $creditLimit = (float) ($request['credit_limit'] ?? 0);
         $isActive = (int) ($request['is_active'] ?? 1) === 1 ? 1 : 0;
@@ -204,6 +210,17 @@ class AdminController extends Controller
 
         $allowedRoles = ['USER', 'STORE_SYSTEM', 'ACCOUNTING_OFFICE', 'ADMIN'];
         $allowedTypes = ['faculty', 'staff', 'student'];
+        if (empty($roles)) {
+            $roles = [$role];
+        }
+        foreach ($roles as $selectedRole) {
+            if (!in_array($selectedRole, $allowedRoles, true)) {
+                return $this->response->setStatusCode(400)->setJSON([
+                    'status' => 'error',
+                    'message' => 'Invalid role.',
+                ]);
+            }
+        }
         if (!in_array($role, $allowedRoles, true)) {
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
@@ -235,6 +252,7 @@ class AdminController extends Controller
             ]);
         }
 
+        $primaryRole = $this->pickPrimaryRole($roles);
         $passwordHash = $password !== '' ? password_hash($password, PASSWORD_BCRYPT) : password_hash('123456', PASSWORD_BCRYPT);
 
         $db->transStart();
@@ -244,7 +262,7 @@ class AdminController extends Controller
             'name' => $name,
             'email' => $email,
             'password_hash' => $passwordHash,
-            'role' => $role,
+            'role' => $primaryRole,
             'user_type' => $userType,
             'qr_token' => bin2hex(random_bytes(16)),
             'base_salary' => max(0, $baseSalary),
@@ -253,6 +271,8 @@ class AdminController extends Controller
         ]);
 
         if ($userId) {
+            $this->syncUserRoles((int) $userId, $roles);
+
             $balanceModel->insert([
                 'user_id' => (int) $userId,
                 'credit_limit' => max(0, $creditLimit),
@@ -268,7 +288,8 @@ class AdminController extends Controller
             'entity_id' => (int) $userId,
             'payload_json' => json_encode([
                 'email' => $email,
-                'role' => $role,
+                'role' => $primaryRole,
+                'roles' => $roles,
                 'user_type' => $userType,
             ]),
             'created_at' => date('Y-m-d H:i:s'),
@@ -299,6 +320,7 @@ class AdminController extends Controller
         $email = strtolower(trim((string) ($request['email'] ?? '')));
         $role = strtoupper(trim((string) ($request['role'] ?? 'USER')));
         $userType = strtolower(trim((string) ($request['user_type'] ?? 'staff')));
+        $roles = $this->extractRolesFromRequest($request);
         $baseSalary = (float) ($request['base_salary'] ?? 0);
         $creditLimit = (float) ($request['credit_limit'] ?? 0);
         $isActive = (int) ($request['is_active'] ?? 1) === 1 ? 1 : 0;
@@ -318,6 +340,17 @@ class AdminController extends Controller
 
         $allowedRoles = ['USER', 'STORE_SYSTEM', 'ACCOUNTING_OFFICE', 'ADMIN'];
         $allowedTypes = ['faculty', 'staff', 'student'];
+        if (empty($roles)) {
+            $roles = [$role];
+        }
+        foreach ($roles as $selectedRole) {
+            if (!in_array($selectedRole, $allowedRoles, true)) {
+                return $this->response->setStatusCode(400)->setJSON([
+                    'status' => 'error',
+                    'message' => 'Invalid role or user type.',
+                ]);
+            }
+        }
         if (!in_array($role, $allowedRoles, true) || !in_array($userType, $allowedTypes, true)) {
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
@@ -355,17 +388,19 @@ class AdminController extends Controller
             }
         }
 
+        $primaryRole = $this->pickPrimaryRole($roles);
         $db->transStart();
 
         $userModel->update($userId, [
             'employee_id' => $employeeId !== '' ? $employeeId : null,
             'name' => $name,
             'email' => $email,
-            'role' => $role,
+            'role' => $primaryRole,
             'user_type' => $userType,
             'base_salary' => max(0, $baseSalary),
             'is_active' => $isActive,
         ]);
+        $this->syncUserRoles($userId, $roles);
 
         $balance = $balanceModel->find($userId);
         if ($balance) {
@@ -389,7 +424,8 @@ class AdminController extends Controller
             'entity_id' => $userId,
             'payload_json' => json_encode([
                 'email' => $email,
-                'role' => $role,
+                'role' => $primaryRole,
+                'roles' => $roles,
                 'user_type' => $userType,
                 'is_active' => $isActive,
             ]),
@@ -448,7 +484,6 @@ class AdminController extends Controller
 
         $allowedRoles = ['USER', 'STORE_SYSTEM', 'ACCOUNTING_OFFICE', 'ADMIN'];
         $allowedTypes = ['faculty', 'staff', 'student'];
-
         $total = 0;
         $created = 0;
         $updated = 0;
@@ -465,16 +500,24 @@ class AdminController extends Controller
             $name = $row['name'] ?? '';
             $email = strtolower($row['email'] ?? '');
             $role = strtoupper($row['role'] ?? '');
+            $roles = $this->parseRoleList($role);
             $userType = strtolower($row['user_type'] ?? '');
             $employeeId = $row['employee_id'] ?? '';
             $baseSalary = isset($row['base_salary']) ? (float) $row['base_salary'] : 0;
             $creditLimit = isset($row['credit_limit']) ? (float) $row['credit_limit'] : 0;
             $isActive = isset($row['is_active']) ? ((int) $row['is_active'] === 1 ? 1 : 0) : 1;
 
-            if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || !in_array($role, $allowedRoles, true) || !in_array($userType, $allowedTypes, true)) {
+            if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || empty($roles) || !in_array($userType, $allowedTypes, true)) {
                 $invalid++;
                 continue;
             }
+            foreach ($roles as $selectedRole) {
+                if (!in_array($selectedRole, $allowedRoles, true)) {
+                    $invalid++;
+                    continue 2;
+                }
+            }
+            $primaryRole = $this->pickPrimaryRole($roles);
 
             $existing = $db->table('users')->where('email', $email)->get()->getRowArray();
             if (!$existing && $employeeId !== '') {
@@ -486,7 +529,7 @@ class AdminController extends Controller
                     'employee_id' => $employeeId !== '' ? $employeeId : $existing['employee_id'],
                     'name' => $name,
                     'email' => $email,
-                    'role' => $role,
+                    'role' => $primaryRole,
                     'user_type' => $userType,
                     'base_salary' => max(0, $baseSalary),
                     'is_active' => $isActive,
@@ -499,7 +542,7 @@ class AdminController extends Controller
                     'name' => $name,
                     'email' => $email,
                     'password_hash' => password_hash('123456', PASSWORD_BCRYPT),
-                    'role' => $role,
+                    'role' => $primaryRole,
                     'user_type' => $userType,
                     'qr_token' => bin2hex(random_bytes(16)),
                     'base_salary' => max(0, $baseSalary),
@@ -512,6 +555,7 @@ class AdminController extends Controller
                 }
                 $created++;
             }
+            $this->syncUserRoles($userId, $roles);
 
             $balance = $balanceModel->find($userId);
             if ($balance) {
@@ -774,8 +818,8 @@ class AdminController extends Controller
             'created_at' => date('Y-m-d H:i:s'),
         ]);
 
-        if ($storeId && $officer['role'] !== 'STORE_SYSTEM') {
-            $userModel->update($officerId, ['role' => 'STORE_SYSTEM']);
+        if ($storeId) {
+            $this->addRoleToUser($officerId, 'STORE_SYSTEM', $userModel);
         }
 
         $auditLogModel->insert([
@@ -869,17 +913,12 @@ class AdminController extends Controller
             'logo_url' => $logoUrl !== '' ? $logoUrl : null,
         ]);
 
-        if ($officer['role'] !== 'STORE_SYSTEM') {
-            $userModel->update($officerId, ['role' => 'STORE_SYSTEM']);
-        }
+        $this->addRoleToUser($officerId, 'STORE_SYSTEM', $userModel);
 
         if ($previousOfficerId > 0 && $previousOfficerId !== $officerId) {
             $assignedCount = $db->table('stores')->where('officer_id', $previousOfficerId)->countAllResults();
             if ($assignedCount === 0) {
-                $previousOfficer = $userModel->find($previousOfficerId);
-                if ($previousOfficer && $previousOfficer['role'] === 'STORE_SYSTEM') {
-                    $userModel->update($previousOfficerId, ['role' => 'USER']);
-                }
+                $this->removeRoleFromUser($previousOfficerId, 'STORE_SYSTEM', $userModel);
             }
         }
 
@@ -1027,5 +1066,181 @@ class AdminController extends Controller
         }
 
         return $this->request->getPost();
+    }
+
+    private function extractRolesFromRequest(array $request): array
+    {
+        $rawRoles = $request['roles'] ?? null;
+        if (is_string($rawRoles)) {
+            return $this->parseRoleList($rawRoles);
+        }
+
+        if (is_array($rawRoles)) {
+            $roles = [];
+            foreach ($rawRoles as $role) {
+                $value = strtoupper(trim((string) $role));
+                if ($value !== '') {
+                    $roles[] = $value;
+                }
+            }
+            return array_values(array_unique($roles));
+        }
+
+        $fallbackRole = strtoupper(trim((string) ($request['role'] ?? '')));
+        return $fallbackRole !== '' ? [$fallbackRole] : [];
+    }
+
+    private function parseRoleList(string $value): array
+    {
+        $parts = preg_split('/[\s,|;]+/', strtoupper(trim($value))) ?: [];
+        $roles = [];
+        foreach ($parts as $part) {
+            $role = trim((string) $part);
+            if ($role !== '') {
+                $roles[] = $role;
+            }
+        }
+        return array_values(array_unique($roles));
+    }
+
+    private function pickPrimaryRole(array $roles): string
+    {
+        $priority = ['ADMIN', 'ACCOUNTING_OFFICE', 'STORE_SYSTEM', 'USER'];
+        foreach ($priority as $preferred) {
+            if (in_array($preferred, $roles, true)) {
+                return $preferred;
+            }
+        }
+        return $roles[0] ?? 'USER';
+    }
+
+    private function syncUserRoles(int $userId, array $roles): void
+    {
+        $roles = array_values(array_unique(array_map(static fn($role): string => strtoupper(trim((string) $role)), $roles)));
+        $roles = array_values(array_filter($roles, static fn($role): bool => $role !== ''));
+        if (empty($roles)) {
+            $roles = ['USER'];
+        }
+
+        $userRoleModel = new UserRoleModel();
+        $existingRows = $userRoleModel->where('user_id', $userId)->findAll();
+        $existingRoles = [];
+        foreach ($existingRows as $row) {
+            $existingRoles[] = strtoupper((string) ($row['role'] ?? ''));
+        }
+
+        $toDelete = array_diff($existingRoles, $roles);
+        $toInsert = array_diff($roles, $existingRoles);
+
+        if (!empty($toDelete)) {
+            $userRoleModel->where('user_id', $userId)->whereIn('role', array_values($toDelete))->delete();
+        }
+
+        $now = date('Y-m-d H:i:s');
+        foreach ($toInsert as $role) {
+            $userRoleModel->insert([
+                'user_id' => $userId,
+                'role' => $role,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
+    }
+
+    private function resolveUserRoles(int $userId, string $fallbackRole): array
+    {
+        $roles = (new UserRoleModel())->getRolesByUserId($userId);
+        if (!empty($roles)) {
+            return $roles;
+        }
+
+        $fallback = strtoupper(trim($fallbackRole));
+        return $fallback !== '' ? [$fallback] : ['USER'];
+    }
+
+    private function buildRolesMap(array $rows): array
+    {
+        $userIds = [];
+        foreach ($rows as $row) {
+            $id = (int) ($row['id'] ?? 0);
+            if ($id > 0) {
+                $userIds[] = $id;
+            }
+        }
+        $userIds = array_values(array_unique($userIds));
+        if (empty($userIds)) {
+            return [];
+        }
+
+        $roleRows = (new UserRoleModel())
+            ->whereIn('user_id', $userIds)
+            ->orderBy('role', 'ASC')
+            ->findAll();
+
+        $map = [];
+        foreach ($roleRows as $row) {
+            $userId = (int) ($row['user_id'] ?? 0);
+            $role = strtoupper(trim((string) ($row['role'] ?? '')));
+            if ($userId <= 0 || $role === '') {
+                continue;
+            }
+            if (!isset($map[$userId])) {
+                $map[$userId] = [];
+            }
+            if (!in_array($role, $map[$userId], true)) {
+                $map[$userId][] = $role;
+            }
+        }
+
+        return $map;
+    }
+
+    private function addRoleToUser(int $userId, string $role, UserModel $userModel): void
+    {
+        $user = $userModel->find($userId);
+        if (!$user) {
+            return;
+        }
+
+        $role = strtoupper(trim($role));
+        if ($role === '') {
+            return;
+        }
+
+        $roles = $this->resolveUserRoles($userId, (string) ($user['role'] ?? 'USER'));
+        if (!in_array($role, $roles, true)) {
+            $roles[] = $role;
+        }
+
+        $this->syncUserRoles($userId, $roles);
+        $primaryRole = $this->pickPrimaryRole($roles);
+        if (strtoupper((string) ($user['role'] ?? '')) !== $primaryRole) {
+            $userModel->update($userId, ['role' => $primaryRole]);
+        }
+    }
+
+    private function removeRoleFromUser(int $userId, string $role, UserModel $userModel): void
+    {
+        $user = $userModel->find($userId);
+        if (!$user) {
+            return;
+        }
+
+        $role = strtoupper(trim($role));
+        if ($role === '') {
+            return;
+        }
+
+        $roles = $this->resolveUserRoles($userId, (string) ($user['role'] ?? 'USER'));
+        $roles = array_values(array_filter($roles, static fn(string $selectedRole): bool => $selectedRole !== $role));
+        if (empty($roles)) {
+            $roles = ['USER'];
+        }
+
+        $this->syncUserRoles($userId, $roles);
+        $primaryRole = $this->pickPrimaryRole($roles);
+        if (strtoupper((string) ($user['role'] ?? '')) !== $primaryRole) {
+            $userModel->update($userId, ['role' => $primaryRole]);
+        }
     }
 }

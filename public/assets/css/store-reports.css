@@ -127,6 +127,65 @@
     color: #003366;
 }
 
+.payment-records-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.payment-record small {
+    display: block;
+    margin-top: 3px;
+    color: #64748b;
+    font-size: 0.76rem;
+}
+
+.payment-record--highlight {
+    background: #003366;
+    border-color: #003366;
+}
+
+.payment-record--highlight span,
+.payment-record--highlight small,
+.payment-record--highlight strong {
+    color: #fff;
+}
+
+.cash-control-form {
+    display: grid;
+    grid-template-columns: 140px 140px 140px 1fr auto;
+    gap: 8px;
+    align-items: end;
+    margin-bottom: 12px;
+}
+
+.cash-control-form .field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.cash-control-form label {
+    font-size: 0.78rem;
+    color: #64748b;
+    font-weight: 600;
+}
+
+.cash-control-form select,
+.cash-control-form input {
+    border: 1px solid #d1d5db;
+    border-radius: 8px;
+    padding: 8px 10px;
+    background: #fff;
+}
+
+.cash-control-form .primary-btn {
+    margin: 0;
+    width: auto;
+    min-width: 120px;
+    padding: 9px 14px;
+}
+
 .table-wrap {
     overflow: auto;
 }
@@ -146,6 +205,18 @@
     .reports-summary-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+
+    .payment-records-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .cash-control-form {
+        grid-template-columns: 1fr 1fr 1fr;
+    }
+
+    .cash-control-form .field-reason {
+        grid-column: span 2;
+    }
 }
 
 @media (max-width: 900px) {
@@ -164,5 +235,21 @@
 
     .reports-panels {
         grid-template-columns: 1fr;
+    }
+
+    .payment-records-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .cash-control-form {
+        grid-template-columns: 1fr;
+    }
+
+    .cash-control-form .field-reason {
+        grid-column: auto;
+    }
+
+    .cash-control-form .primary-btn {
+        width: 100%;
     }
 }

@@ -4,6 +4,10 @@ namespace App\Controllers;
 
 use App\Models\ProductModel;
 use App\Models\StoreModel;
+use App\Models\StoreCategoryModel;
+use App\Models\StorePaymentMethodModel;
+use App\Models\StoreOpeningBalanceModel;
+use App\Models\StoreCashMovementModel;
 use App\Models\InventoryMovementModel;
 use App\Models\AuditLogModel;
 use Config\Database;
@@ -33,6 +37,18 @@ class StoreController extends BaseController
     public function reports()
     {
         return view('store/reports');
+    }
+
+    public function receiptPage(int $transactionId)
+    {
+        return view('store/receipt', [
+            'transaction_id' => $transactionId,
+        ]);
+    }
+
+    public function settings()
+    {
+        return view('store/settings');
     }
 
     public function reportSummary()
@@ -243,6 +259,123 @@ class StoreController extends BaseController
             ];
         }, $paymentRows);
 
+        $openingModel = new StoreOpeningBalanceModel();
+        $cashMovementModel = new StoreCashMovementModel();
+        $todayDate = $today->format('Y-m-d');
+        $initialOpening = $openingModel->getInitialByStore($storeId);
+        $openingBalance = (float) ($initialOpening['opening_balance'] ?? 0);
+        $openingBusinessDate = (string) ($initialOpening['business_date'] ?? $todayDate);
+        $openingFromTs = $openingBusinessDate . ' 00:00:00';
+        $cashSalesPeriod = 0.0;
+        $eCashSalesPeriod = 0.0;
+        foreach ($paymentBreakdown as $row) {
+            $method = strtolower((string) ($row['payment_method'] ?? ''));
+            $sales = (float) ($row['sales'] ?? 0);
+            if ($method === 'cash') {
+                $cashSalesPeriod += $sales;
+                continue;
+            }
+            if ($method === 'debt') {
+                continue;
+            }
+            $eCashSalesPeriod += $sales;
+        }
+
+        $asOfToTs = $toDate . ' 23:59:59';
+        $asOfPaymentRows = $db->table('transactions t')
+            ->select('t.payment_method, COALESCE(SUM(t.amount), 0) AS total_sales')
+            ->where('t.store_id', $storeId)
+            ->where('t.created_at >=', $openingFromTs)
+            ->where('t.created_at <=', $asOfToTs)
+            ->groupBy('t.payment_method')
+            ->get()
+            ->getResultArray();
+
+        $cashSalesAsOf = 0.0;
+        $eCashSalesAsOf = 0.0;
+        foreach ($asOfPaymentRows as $row) {
+            $method = strtolower((string) ($row['payment_method'] ?? ''));
+            $sales = (float) ($row['total_sales'] ?? 0);
+            if ($method === 'cash') {
+                $cashSalesAsOf += $sales;
+                continue;
+            }
+            if ($method === 'debt') {
+                continue;
+            }
+            $eCashSalesAsOf += $sales;
+        }
+
+        $movementAggRows = $db->table('store_cash_movements scm')
+            ->select('scm.channel, scm.movement_type, COALESCE(SUM(scm.amount), 0) AS total_amount')
+            ->where('scm.store_id', $storeId)
+            ->where('scm.business_date >=', $fromDate)
+            ->where('scm.business_date <=', $toDate)
+            ->groupBy('scm.channel, scm.movement_type')
+            ->get()
+            ->getResultArray();
+
+        $periodCashIn = 0.0;
+        $periodCashOut = 0.0;
+        $periodEcashIn = 0.0;
+        $periodEcashOut = 0.0;
+        foreach ($movementAggRows as $row) {
+            $channel = strtolower((string) ($row['channel'] ?? 'cash'));
+            $type = strtolower((string) ($row['movement_type'] ?? 'cash_in'));
+            $amount = (float) ($row['total_amount'] ?? 0);
+            if ($channel === 'ecash') {
+                if ($type === 'cash_out') {
+                    $periodEcashOut += $amount;
+                } else {
+                    $periodEcashIn += $amount;
+                }
+            } else {
+                if ($type === 'cash_out') {
+                    $periodCashOut += $amount;
+                } else {
+                    $periodCashIn += $amount;
+                }
+            }
+        }
+
+        $asOfMovementAggRows = $db->table('store_cash_movements scm')
+            ->select('scm.channel, scm.movement_type, COALESCE(SUM(scm.amount), 0) AS total_amount')
+            ->where('scm.store_id', $storeId)
+            ->where('scm.business_date >=', $openingBusinessDate)
+            ->where('scm.business_date <=', $toDate)
+            ->groupBy('scm.channel, scm.movement_type')
+            ->get()
+            ->getResultArray();
+
+        $asOfCashIn = 0.0;
+        $asOfCashOut = 0.0;
+        $asOfEcashIn = 0.0;
+        $asOfEcashOut = 0.0;
+        foreach ($asOfMovementAggRows as $row) {
+            $channel = strtolower((string) ($row['channel'] ?? 'cash'));
+            $type = strtolower((string) ($row['movement_type'] ?? 'cash_in'));
+            $amount = (float) ($row['total_amount'] ?? 0);
+            if ($channel === 'ecash') {
+                if ($type === 'cash_out') {
+                    $asOfEcashOut += $amount;
+                } else {
+                    $asOfEcashIn += $amount;
+                }
+            } else {
+                if ($type === 'cash_out') {
+                    $asOfCashOut += $amount;
+                } else {
+                    $asOfCashIn += $amount;
+                }
+            }
+        }
+
+        $cashOnHandAsOf = $openingBalance + $cashSalesAsOf + $asOfCashIn - $asOfCashOut;
+        $ecashOnHandAsOf = $eCashSalesAsOf + $asOfEcashIn - $asOfEcashOut;
+        $combinedOnHandAsOf = $cashOnHandAsOf + $ecashOnHandAsOf;
+
+        $cashMovements = $cashMovementModel->getByStoreAndRange($storeId, $fromDate, $toDate, 200);
+
         return $this->response->setJSON([
             'status' => 'success',
             'store' => [
@@ -269,10 +402,378 @@ class StoreController extends BaseController
                 'projected_profit' => (float) ($stockInAgg['projected_profit'] ?? 0),
             ],
             'payment_breakdown' => $paymentBreakdown,
+            'cash_drawer' => [
+                'business_date' => $toDate,
+                'opening_business_date' => $openingBusinessDate,
+                'opening_balance' => $openingBalance,
+                'cash_sales' => $cashSalesAsOf,
+                'ecash_sales' => $eCashSalesAsOf,
+                'cash_in' => $asOfCashIn,
+                'cash_out' => $asOfCashOut,
+                'ecash_in' => $asOfEcashIn,
+                'ecash_out' => $asOfEcashOut,
+                'expected_cash_on_hand' => $cashOnHandAsOf,
+                'expected_ecash_on_hand' => $ecashOnHandAsOf,
+                'expected_total_on_hand' => $combinedOnHandAsOf,
+            ],
+            'cash_movement_summary' => [
+                'cash_in' => $periodCashIn,
+                'cash_out' => $periodCashOut,
+                'ecash_in' => $periodEcashIn,
+                'ecash_out' => $periodEcashOut,
+                'cash_sales' => $cashSalesPeriod,
+                'ecash_sales' => $eCashSalesPeriod,
+            ],
+            'cash_movements' => array_map(static function (array $row): array {
+                return [
+                    'id' => (int) ($row['id'] ?? 0),
+                    'business_date' => (string) ($row['business_date'] ?? ''),
+                    'channel' => (string) ($row['channel'] ?? 'cash'),
+                    'movement_type' => (string) ($row['movement_type'] ?? 'cash_in'),
+                    'amount' => (float) ($row['amount'] ?? 0),
+                    'reason' => (string) ($row['reason'] ?? ''),
+                    'created_at' => (string) ($row['created_at'] ?? ''),
+                ];
+            }, $cashMovements),
+            'cash_channels' => [
+                'cash' => [
+                    'sales' => $cashSalesAsOf,
+                    'on_hand' => $cashOnHandAsOf,
+                ],
+                'ecash' => [
+                    'sales' => $eCashSalesAsOf,
+                    'on_hand' => $ecashOnHandAsOf,
+                ],
+                'combined' => [
+                    'on_hand' => $combinedOnHandAsOf,
+                ],
+            ],
             'top_products' => $topProducts,
             'trend' => $trend,
             'notes' => [
                 'profit_basis' => 'Estimated using weighted-average restock unit cost per product up to selected period end.',
+            ],
+        ]);
+    }
+
+    public function openingBalanceStatus()
+    {
+        $storeId = (int) ($this->request->getGet('store_id') ?? 0);
+        $store = $this->resolveAccessibleStore($storeId);
+        if (!$store) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'You cannot access this store.',
+            ]);
+        }
+
+        $model = new StoreOpeningBalanceModel();
+        $row = $model->getInitialByStore((int) $store['id']);
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'store_id' => (int) $store['id'],
+            'business_date' => (string) ($row['business_date'] ?? date('Y-m-d')),
+            'is_opened' => (bool) $row,
+            'opening' => $row ? [
+                'id' => (int) $row['id'],
+                'opening_balance' => (float) $row['opening_balance'],
+                'note' => (string) ($row['note'] ?? ''),
+                'opened_by' => $row['opened_by'] !== null ? (int) $row['opened_by'] : null,
+                'opened_at' => (string) ($row['opened_at'] ?? ''),
+            ] : null,
+        ]);
+    }
+
+    public function setOpeningBalance()
+    {
+        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $storeId = (int) ($request['store_id'] ?? 0);
+        $openingBalance = (float) ($request['opening_balance'] ?? 0);
+        $note = trim((string) ($request['note'] ?? ''));
+
+        if ($openingBalance < 0) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Opening balance must be 0 or greater.',
+            ]);
+        }
+
+        $store = $this->resolveAccessibleStore($storeId);
+        if (!$store) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'You cannot access this store.',
+            ]);
+        }
+
+        $openedBy = (int) session()->get('user_id');
+        $model = new StoreOpeningBalanceModel();
+        $existing = $model->getInitialByStore((int) $store['id']);
+        if ($existing) {
+            return $this->response->setStatusCode(409)->setJSON([
+                'status' => 'error',
+                'message' => 'Initial opening balance is already set. Use cash in/out for adjustments.',
+            ]);
+        }
+
+        $row = $model->createInitialOpening((int) $store['id'], $openingBalance, $openedBy, $note);
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'opening' => [
+                'id' => (int) ($row['id'] ?? 0),
+                'business_date' => (string) ($row['business_date'] ?? date('Y-m-d')),
+                'opening_balance' => (float) ($row['opening_balance'] ?? $openingBalance),
+                'note' => (string) ($row['note'] ?? ''),
+                'opened_by' => $row['opened_by'] !== null ? (int) $row['opened_by'] : $openedBy,
+                'opened_at' => (string) ($row['opened_at'] ?? ''),
+            ],
+        ]);
+    }
+
+    public function resetOpeningBalance()
+    {
+        $role = (string) session()->get('role');
+        if ($role !== 'ADMIN') {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'Only admin can reset initial opening balance.',
+            ]);
+        }
+
+        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $storeId = (int) ($request['store_id'] ?? 0);
+        $openingBalance = (float) ($request['opening_balance'] ?? 0);
+        $note = trim((string) ($request['note'] ?? ''));
+
+        if ($openingBalance < 0) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Initial opening balance must be 0 or greater.',
+            ]);
+        }
+
+        $store = $this->resolveAccessibleStore($storeId);
+        if (!$store) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'You cannot access this store.',
+            ]);
+        }
+
+        $model = new StoreOpeningBalanceModel();
+        $existing = $model->getInitialByStore((int) $store['id']);
+        if (!$existing) {
+            return $this->response->setStatusCode(404)->setJSON([
+                'status' => 'error',
+                'message' => 'No initial opening balance found. Set it first.',
+            ]);
+        }
+
+        $actorId = (int) session()->get('user_id');
+        $now = date('Y-m-d H:i:s');
+
+        $model->update((int) $existing['id'], [
+            'opening_balance' => $openingBalance,
+            'note' => $note !== '' ? $note : null,
+            'opened_by' => $actorId > 0 ? $actorId : null,
+            'opened_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $updated = $model->find((int) $existing['id']) ?? $existing;
+
+        $auditLogModel = new AuditLogModel();
+        $auditLogModel->insert([
+            'actor_id' => $actorId > 0 ? $actorId : null,
+            'action' => 'RESET_INITIAL_OPENING_BALANCE',
+            'entity' => 'store_opening_balances',
+            'entity_id' => (int) $existing['id'],
+            'payload_json' => json_encode([
+                'store_id' => (int) $store['id'],
+                'before' => [
+                    'opening_balance' => (float) ($existing['opening_balance'] ?? 0),
+                    'note' => (string) ($existing['note'] ?? ''),
+                    'opened_by' => $existing['opened_by'] !== null ? (int) $existing['opened_by'] : null,
+                    'opened_at' => (string) ($existing['opened_at'] ?? ''),
+                ],
+                'after' => [
+                    'opening_balance' => (float) ($updated['opening_balance'] ?? $openingBalance),
+                    'note' => (string) ($updated['note'] ?? ''),
+                    'opened_by' => $updated['opened_by'] !== null ? (int) $updated['opened_by'] : null,
+                    'opened_at' => (string) ($updated['opened_at'] ?? $now),
+                ],
+            ]),
+            'created_at' => $now,
+        ]);
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'opening' => [
+                'id' => (int) ($updated['id'] ?? $existing['id']),
+                'business_date' => (string) ($updated['business_date'] ?? $existing['business_date']),
+                'opening_balance' => (float) ($updated['opening_balance'] ?? $openingBalance),
+                'note' => (string) ($updated['note'] ?? ''),
+                'opened_by' => $updated['opened_by'] !== null ? (int) $updated['opened_by'] : ($actorId > 0 ? $actorId : null),
+                'opened_at' => (string) ($updated['opened_at'] ?? $now),
+            ],
+        ]);
+    }
+
+    public function cashMovements()
+    {
+        $storeId = (int) ($this->request->getGet('store_id') ?? 0);
+        $store = $this->resolveAccessibleStore($storeId);
+        if (!$store) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'You cannot access this store.',
+            ]);
+        }
+
+        $fromDate = trim((string) $this->request->getGet('date_from'));
+        $toDate = trim((string) $this->request->getGet('date_to'));
+        $todayDate = date('Y-m-d');
+        if (!preg_match('/^\d{4}\-\d{2}\-\d{2}$/', $fromDate)) {
+            $fromDate = $todayDate;
+        }
+        if (!preg_match('/^\d{4}\-\d{2}\-\d{2}$/', $toDate)) {
+            $toDate = $todayDate;
+        }
+        if ($fromDate > $toDate) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'date_from cannot be later than date_to.',
+            ]);
+        }
+
+        $limit = (int) ($this->request->getGet('limit') ?? 200);
+        $model = new StoreCashMovementModel();
+        $rows = $model->getByStoreAndRange((int) $store['id'], $fromDate, $toDate, $limit);
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'store_id' => (int) $store['id'],
+            'range' => [
+                'from' => $fromDate,
+                'to' => $toDate,
+            ],
+            'movements' => array_map(static function (array $row): array {
+                return [
+                    'id' => (int) ($row['id'] ?? 0),
+                    'business_date' => (string) ($row['business_date'] ?? ''),
+                    'channel' => (string) ($row['channel'] ?? 'cash'),
+                    'movement_type' => (string) ($row['movement_type'] ?? 'cash_in'),
+                    'amount' => (float) ($row['amount'] ?? 0),
+                    'reason' => (string) ($row['reason'] ?? ''),
+                    'created_at' => (string) ($row['created_at'] ?? ''),
+                ];
+            }, $rows),
+        ]);
+    }
+
+    public function createCashMovement()
+    {
+        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $storeId = (int) ($request['store_id'] ?? 0);
+        $amount = (float) ($request['amount'] ?? 0);
+        $reason = trim((string) ($request['reason'] ?? ''));
+        $channel = strtolower(trim((string) ($request['channel'] ?? 'cash')));
+        $movementType = strtolower(trim((string) ($request['movement_type'] ?? 'cash_in')));
+        $businessDate = trim((string) ($request['business_date'] ?? date('Y-m-d')));
+
+        if (!in_array($channel, ['cash', 'ecash'], true)) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Invalid channel. Use cash or ecash.',
+            ]);
+        }
+
+        if (!in_array($movementType, ['cash_in', 'cash_out'], true)) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Invalid movement type. Use cash_in or cash_out.',
+            ]);
+        }
+
+        if (!preg_match('/^\d{4}\-\d{2}\-\d{2}$/', $businessDate)) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'business_date must be YYYY-MM-DD.',
+            ]);
+        }
+
+        if ($amount <= 0) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Amount must be greater than 0.',
+            ]);
+        }
+
+        if ($reason === '') {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Reason is required.',
+            ]);
+        }
+
+        $store = $this->resolveAccessibleStore($storeId);
+        if (!$store) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'You cannot access this store.',
+            ]);
+        }
+
+        $actorId = (int) session()->get('user_id');
+        $model = new StoreCashMovementModel();
+        $movementId = $model->insert([
+            'store_id' => (int) $store['id'],
+            'business_date' => $businessDate,
+            'channel' => $channel,
+            'movement_type' => $movementType,
+            'amount' => $amount,
+            'reason' => $reason,
+            'created_by' => $actorId > 0 ? $actorId : null,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        if (!$movementId) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'status' => 'error',
+                'message' => 'Failed to save cash movement.',
+            ]);
+        }
+
+        $auditLogModel = new AuditLogModel();
+        $auditLogModel->insert([
+            'actor_id' => $actorId > 0 ? $actorId : null,
+            'action' => 'CREATE_CASH_MOVEMENT',
+            'entity' => 'store_cash_movements',
+            'entity_id' => $movementId,
+            'payload_json' => json_encode([
+                'store_id' => (int) $store['id'],
+                'business_date' => $businessDate,
+                'channel' => $channel,
+                'movement_type' => $movementType,
+                'amount' => $amount,
+                'reason' => $reason,
+            ]),
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'movement' => [
+                'id' => (int) $movementId,
+                'store_id' => (int) $store['id'],
+                'business_date' => $businessDate,
+                'channel' => $channel,
+                'movement_type' => $movementType,
+                'amount' => $amount,
+                'reason' => $reason,
             ],
         ]);
     }
@@ -325,6 +826,403 @@ class StoreController extends BaseController
             'status' => 'success',
             'stores' => $stores,
             'default_store_id' => $stores[0]['id'] ?? null,
+        ]);
+    }
+
+    public function categories()
+    {
+        $storeId = (int) ($this->request->getGet('store_id') ?? 0);
+        $store = $this->resolveAccessibleStore($storeId);
+        if (!$store) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'You cannot access this store.',
+            ]);
+        }
+
+        $categoryModel = new StoreCategoryModel();
+        $categories = $categoryModel->getActiveByStore((int) $store['id']);
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'store_id' => (int) $store['id'],
+            'categories' => array_map(static function (array $row): array {
+                return [
+                    'id' => (int) $row['id'],
+                    'name' => (string) $row['name'],
+                    'sort_order' => (int) ($row['sort_order'] ?? 0),
+                ];
+            }, $categories),
+        ]);
+    }
+
+    public function createCategory()
+    {
+        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $storeId = (int) ($request['store_id'] ?? 0);
+        $name = trim((string) ($request['name'] ?? ''));
+
+        if ($name === '') {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Category name is required.',
+            ]);
+        }
+
+        $store = $this->resolveAccessibleStore($storeId);
+        if (!$store) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'You cannot access this store.',
+            ]);
+        }
+
+        $categoryModel = new StoreCategoryModel();
+        $categoryId = $categoryModel->ensureCategory((int) $store['id'], $name);
+        $created = $categoryModel->find($categoryId);
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'category' => [
+                'id' => (int) $created['id'],
+                'name' => (string) $created['name'],
+                'sort_order' => (int) ($created['sort_order'] ?? 0),
+            ],
+        ]);
+    }
+
+    public function updateCategory()
+    {
+        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $storeId = (int) ($request['store_id'] ?? 0);
+        $categoryId = (int) ($request['category_id'] ?? 0);
+        $name = trim((string) ($request['name'] ?? ''));
+
+        if ($categoryId <= 0 || $name === '') {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Invalid category update payload.',
+            ]);
+        }
+
+        $store = $this->resolveAccessibleStore($storeId);
+        if (!$store) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'You cannot access this store.',
+            ]);
+        }
+
+        $categoryModel = new StoreCategoryModel();
+        $category = $categoryModel->find($categoryId);
+        if (!$category || (int) $category['store_id'] !== (int) $store['id']) {
+            return $this->response->setStatusCode(404)->setJSON([
+                'status' => 'error',
+                'message' => 'Category not found.',
+            ]);
+        }
+
+        $duplicate = $categoryModel->where('store_id', (int) $store['id'])
+            ->where('name', $name)
+            ->where('id !=', $categoryId)
+            ->first();
+        if ($duplicate) {
+            return $this->response->setStatusCode(409)->setJSON([
+                'status' => 'error',
+                'message' => 'Category name already exists.',
+            ]);
+        }
+
+        $db = Database::connect();
+        $db->transStart();
+
+        $categoryModel->update($categoryId, [
+            'name' => $name,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $db->table('products')
+            ->where('store_id', (int) $store['id'])
+            ->where('category', (string) $category['name'])
+            ->update([
+                'category' => $name,
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+
+        $db->transComplete();
+        if (!$db->transStatus()) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'status' => 'error',
+                'message' => 'Failed to update category.',
+            ]);
+        }
+
+        return $this->response->setJSON([
+            'status' => 'success',
+        ]);
+    }
+
+    public function deleteCategory()
+    {
+        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $storeId = (int) ($request['store_id'] ?? 0);
+        $categoryId = (int) ($request['category_id'] ?? 0);
+
+        if ($categoryId <= 0) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Category id is required.',
+            ]);
+        }
+
+        $store = $this->resolveAccessibleStore($storeId);
+        if (!$store) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'You cannot access this store.',
+            ]);
+        }
+
+        $categoryModel = new StoreCategoryModel();
+        $category = $categoryModel->find($categoryId);
+        if (!$category || (int) $category['store_id'] !== (int) $store['id']) {
+            return $this->response->setStatusCode(404)->setJSON([
+                'status' => 'error',
+                'message' => 'Category not found.',
+            ]);
+        }
+
+        if (strtolower((string) $category['name']) === 'general') {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'General category cannot be deleted.',
+            ]);
+        }
+
+        $db = Database::connect();
+        $db->transStart();
+
+        $db->table('products')
+            ->where('store_id', (int) $store['id'])
+            ->where('category', (string) $category['name'])
+            ->update([
+                'category' => 'General',
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+
+        $categoryModel->delete($categoryId);
+
+        $db->transComplete();
+        if (!$db->transStatus()) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'status' => 'error',
+                'message' => 'Failed to delete category.',
+            ]);
+        }
+
+        return $this->response->setJSON([
+            'status' => 'success',
+        ]);
+    }
+
+    public function paymentMethods()
+    {
+        $storeId = (int) ($this->request->getGet('store_id') ?? 0);
+        $store = $this->resolveAccessibleStore($storeId);
+        if (!$store) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'You cannot access this store.',
+            ]);
+        }
+
+        $model = new StorePaymentMethodModel();
+        $model->ensureDefaults((int) $store['id']);
+        $methods = $model->getActiveByStore((int) $store['id']);
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'store_id' => (int) $store['id'],
+            'methods' => array_map(static function (array $row): array {
+                return [
+                    'id' => (int) $row['id'],
+                    'code' => (string) $row['code'],
+                    'label' => (string) $row['label'],
+                    'icon_class' => (string) ($row['icon_class'] ?? ''),
+                    'sort_order' => (int) ($row['sort_order'] ?? 0),
+                    'is_system_reserved' => (int) ($row['is_system_reserved'] ?? 0) === 1,
+                ];
+            }, $methods),
+        ]);
+    }
+
+    public function createPaymentMethod()
+    {
+        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $storeId = (int) ($request['store_id'] ?? 0);
+        $label = trim((string) ($request['label'] ?? ''));
+        $iconClass = trim((string) ($request['icon_class'] ?? ''));
+
+        if ($label === '') {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Payment method label is required.',
+            ]);
+        }
+
+        $store = $this->resolveAccessibleStore($storeId);
+        if (!$store) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'You cannot access this store.',
+            ]);
+        }
+
+        $model = new StorePaymentMethodModel();
+        $model->ensureDefaults((int) $store['id']);
+
+        $code = $model->normalizeCode((string) ($request['code'] ?? $label));
+        if ($code === '' || $code === 'debt') {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Invalid payment method code.',
+            ]);
+        }
+
+        $existing = $model->where('store_id', (int) $store['id'])
+            ->where('code', $code)
+            ->first();
+
+        if ($existing) {
+            if ((int) ($existing['is_system_reserved'] ?? 0) === 1) {
+                return $this->response->setStatusCode(400)->setJSON([
+                    'status' => 'error',
+                    'message' => 'System payment method cannot be recreated.',
+                ]);
+            }
+
+            $model->update((int) $existing['id'], [
+                'label' => $label,
+                'icon_class' => $iconClass !== '' ? $iconClass : null,
+                'is_active' => 1,
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+        } else {
+            $maxSort = $model->where('store_id', (int) $store['id'])->selectMax('sort_order')->first();
+            $nextSort = (int) ($maxSort['sort_order'] ?? 0) + 10;
+
+            $model->insert([
+                'store_id' => (int) $store['id'],
+                'code' => $code,
+                'label' => $label,
+                'icon_class' => $iconClass !== '' ? $iconClass : null,
+                'sort_order' => $nextSort,
+                'is_active' => 1,
+                'is_system_reserved' => 0,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
+        }
+
+        return $this->response->setJSON([
+            'status' => 'success',
+        ]);
+    }
+
+    public function updatePaymentMethod()
+    {
+        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $storeId = (int) ($request['store_id'] ?? 0);
+        $methodId = (int) ($request['method_id'] ?? 0);
+        $label = trim((string) ($request['label'] ?? ''));
+        $iconClass = trim((string) ($request['icon_class'] ?? ''));
+
+        if ($methodId <= 0 || $label === '') {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Invalid payment method update payload.',
+            ]);
+        }
+
+        $store = $this->resolveAccessibleStore($storeId);
+        if (!$store) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'You cannot access this store.',
+            ]);
+        }
+
+        $model = new StorePaymentMethodModel();
+        $method = $model->find($methodId);
+        if (!$method || (int) $method['store_id'] !== (int) $store['id']) {
+            return $this->response->setStatusCode(404)->setJSON([
+                'status' => 'error',
+                'message' => 'Payment method not found.',
+            ]);
+        }
+
+        if ((string) $method['code'] === 'debt') {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Debt payment method is protected.',
+            ]);
+        }
+
+        $model->update($methodId, [
+            'label' => $label,
+            'icon_class' => $iconClass !== '' ? $iconClass : null,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        return $this->response->setJSON([
+            'status' => 'success',
+        ]);
+    }
+
+    public function deletePaymentMethod()
+    {
+        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $storeId = (int) ($request['store_id'] ?? 0);
+        $methodId = (int) ($request['method_id'] ?? 0);
+
+        if ($methodId <= 0) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Payment method id is required.',
+            ]);
+        }
+
+        $store = $this->resolveAccessibleStore($storeId);
+        if (!$store) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'You cannot access this store.',
+            ]);
+        }
+
+        $model = new StorePaymentMethodModel();
+        $method = $model->find($methodId);
+        if (!$method || (int) $method['store_id'] !== (int) $store['id']) {
+            return $this->response->setStatusCode(404)->setJSON([
+                'status' => 'error',
+                'message' => 'Payment method not found.',
+            ]);
+        }
+
+        if ((int) ($method['is_system_reserved'] ?? 0) === 1 || (string) $method['code'] === 'debt') {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'This payment method is protected.',
+            ]);
+        }
+
+        $model->update($methodId, [
+            'is_active' => 0,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        return $this->response->setJSON([
+            'status' => 'success',
         ]);
     }
 
@@ -812,7 +1710,9 @@ class StoreController extends BaseController
         $storeId = (int) ($request['store_id'] ?? 0);
         $sku = trim((string) ($request['sku'] ?? ''));
         $name = trim((string) ($request['name'] ?? ''));
+        $variantLabel = trim((string) ($request['variant_label'] ?? ''));
         $category = trim((string) ($request['category'] ?? ''));
+        $barcode = trim((string) ($request['barcode'] ?? ''));
         $imageUrl = trim((string) ($request['image_url'] ?? ''));
         $sellPrice = (float) ($request['sell_price'] ?? 0);
         $initialStock = (int) ($request['initial_stock'] ?? 0);
@@ -835,11 +1735,30 @@ class StoreController extends BaseController
         }
 
         $productModel = new ProductModel();
+        $categoryModel = new StoreCategoryModel();
         if ($productModel->getBySku($storeId, $sku)) {
             return $this->response->setStatusCode(409)->setJSON([
                 'status' => 'error',
                 'message' => 'SKU already exists in this store.',
             ]);
+        }
+
+        $category = $category !== '' ? $category : 'General';
+        $categoryModel->ensureCategory($storeId, $category);
+
+        if ($barcode !== '') {
+            $db = Database::connect();
+            $sameBarcode = $db->table('products')
+                ->where('store_id', $storeId)
+                ->where('barcode', $barcode)
+                ->get()
+                ->getRowArray();
+            if ($sameBarcode) {
+                return $this->response->setStatusCode(409)->setJSON([
+                    'status' => 'error',
+                    'message' => 'Barcode already exists in this store.',
+                ]);
+            }
         }
 
         try {
@@ -858,8 +1777,10 @@ class StoreController extends BaseController
             'store_id' => $storeId,
             'sku' => $sku,
             'name' => $name,
-            'category' => $category !== '' ? $category : null,
+            'variant_label' => $variantLabel !== '' ? $variantLabel : null,
+            'category' => $category,
             'image_url' => $imageUrl !== '' ? $imageUrl : null,
+            'barcode' => $barcode !== '' ? $barcode : null,
             'price' => $sellPrice,
             'stock_qty' => $initialStock,
             'is_active' => 1,
@@ -896,8 +1817,10 @@ class StoreController extends BaseController
                 'store_id' => $storeId,
                 'sku' => $sku,
                 'name' => $name,
+                'variant_label' => $variantLabel !== '' ? $variantLabel : null,
                 'category' => $category,
                 'image_url' => $imageUrl,
+                'barcode' => $barcode !== '' ? $barcode : null,
                 'sell_price' => $sellPrice,
                 'initial_stock' => $initialStock,
                 'unit_cost' => $unitCost,
@@ -936,7 +1859,9 @@ class StoreController extends BaseController
         $productId = (int) ($request['product_id'] ?? 0);
         $sku = trim((string) ($request['sku'] ?? ''));
         $name = trim((string) ($request['name'] ?? ''));
+        $variantLabel = trim((string) ($request['variant_label'] ?? ''));
         $category = trim((string) ($request['category'] ?? ''));
+        $barcode = trim((string) ($request['barcode'] ?? ''));
         $sellPrice = (float) ($request['sell_price'] ?? 0);
         $inputImageUrl = trim((string) ($request['image_url'] ?? ''));
 
@@ -956,6 +1881,7 @@ class StoreController extends BaseController
         }
 
         $productModel = new ProductModel();
+        $categoryModel = new StoreCategoryModel();
         $product = $productModel->find($productId);
         if (!$product || (int) $product['store_id'] !== $storeId) {
             return $this->response->setStatusCode(404)->setJSON([
@@ -978,6 +1904,21 @@ class StoreController extends BaseController
             ]);
         }
 
+        if ($barcode !== '') {
+            $sameBarcode = $db->table('products')
+                ->where('store_id', $storeId)
+                ->where('barcode', $barcode)
+                ->where('id !=', $productId)
+                ->get()
+                ->getRowArray();
+            if ($sameBarcode) {
+                return $this->response->setStatusCode(409)->setJSON([
+                    'status' => 'error',
+                    'message' => 'Barcode already exists in this store.',
+                ]);
+            }
+        }
+
         try {
             $resolvedImageUrl = $this->resolveProductImageUrl($inputImageUrl, $product['image_url'] ?? null);
         } catch (\RuntimeException $e) {
@@ -987,13 +1928,18 @@ class StoreController extends BaseController
             ]);
         }
 
+        $category = $category !== '' ? $category : 'General';
+        $categoryModel->ensureCategory($storeId, $category);
+
         $db->transStart();
 
         $productModel->update($productId, [
             'sku' => $sku,
             'name' => $name,
-            'category' => $category !== '' ? $category : null,
+            'variant_label' => $variantLabel !== '' ? $variantLabel : null,
+            'category' => $category,
             'image_url' => $resolvedImageUrl !== '' ? $resolvedImageUrl : null,
+            'barcode' => $barcode !== '' ? $barcode : null,
             'price' => $sellPrice,
             'updated_at' => date('Y-m-d H:i:s'),
         ]);
@@ -1009,15 +1955,19 @@ class StoreController extends BaseController
                 'before' => [
                     'sku' => $product['sku'],
                     'name' => $product['name'],
+                    'variant_label' => $product['variant_label'] ?? null,
                     'category' => $product['category'],
                     'image_url' => $product['image_url'],
+                    'barcode' => $product['barcode'] ?? null,
                     'price' => (float) $product['price'],
                 ],
                 'after' => [
                     'sku' => $sku,
                     'name' => $name,
+                    'variant_label' => $variantLabel !== '' ? $variantLabel : null,
                     'category' => $category,
                     'image_url' => $resolvedImageUrl,
+                    'barcode' => $barcode !== '' ? $barcode : null,
                     'price' => $sellPrice,
                 ],
             ]),
@@ -1036,6 +1986,37 @@ class StoreController extends BaseController
             'status' => 'success',
             'product' => $productModel->find($productId),
         ]);
+    }
+
+    private function resolveAccessibleStore(int $requestedStoreId = 0): ?array
+    {
+        $userId = (int) session()->get('user_id');
+        $role = (string) session()->get('role');
+        $storeModel = new StoreModel();
+        $stores = $storeModel->getAccessibleStores($userId, $role);
+        if ($stores === []) {
+            return null;
+        }
+
+        $storeId = $requestedStoreId > 0 ? $requestedStoreId : (int) ($stores[0]['id'] ?? 0);
+        if ($storeId <= 0) {
+            return null;
+        }
+
+        if (!$storeModel->canUserAccessStore($userId, $role, $storeId)) {
+            return null;
+        }
+
+        foreach ($stores as $store) {
+            if ((int) ($store['id'] ?? 0) === $storeId) {
+                return $store;
+            }
+        }
+
+        return [
+            'id' => $storeId,
+            'store_name' => 'Store',
+        ];
     }
 
     private function resolveProductImageUrl(string $inputUrl, ?string $currentUrl): ?string

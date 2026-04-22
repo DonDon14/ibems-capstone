@@ -2,6 +2,7 @@
 
 <?= $this->section('styles') ?>
 <link rel="stylesheet" href="<?= base_url('assets/css/store-history.css') ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -10,11 +11,6 @@
         <div>
             <h3>Store Transaction History</h3>
             <p>View past transactions and reprint receipts.</p>
-        </div>
-
-        <div class="history-store-switch">
-            <label for="history-store-select">Store</label>
-            <select id="history-store-select"></select>
         </div>
     </div>
 
@@ -96,5 +92,6 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
+<script src="<?= base_url('assets/js/receipt-standard.js') ?>"></script>
 <script src="<?= base_url('assets/js/store-history.js') ?>"></script>
 <?= $this->endSection() ?>

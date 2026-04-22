@@ -9,12 +9,14 @@
     <meta name="csrf-cookie-name" content="<?= esc(config('Security')->cookieName) ?>">
     <title>Admin Portal</title>
     <link rel="stylesheet" href="<?= base_url('assets/css/app.css') ?>">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <?= $this->renderSection('styles') ?>
 </head>
 <body>
 <?php
 $name = (string) (session()->get('name') ?? 'Administrator');
 $role = (string) (session()->get('role') ?? 'ADMIN');
+$ustpLogoUrl = base_url('assets/images/ustp_claveria_logo.jpg');
 $path = trim((string) service('uri')->getPath(), '/');
 if (strpos($path, 'index.php/') === 0) {
     $path = substr($path, strlen('index.php/'));
@@ -33,30 +35,40 @@ if ($initials === '') {
 ?>
 <div class="app-shell">
     <aside class="app-sidebar">
-        <div class="app-brand">
-            <h1>IBEMS</h1>
-            <p>Admin Portal</p>
+        <div class="app-sidebar-header">
+            <div class="app-brand">
+                <img src="<?= esc($ustpLogoUrl) ?>" alt="USTP Logo" class="app-brand-logo">
+                <div class="app-brand-text">
+                    <h1>IBEMS</h1>
+                    <p>Admin Portal</p>
+                </div>
+            </div>
+            <button id="sidebar-toggle" type="button" class="secondary-btn sidebar-toggle sidebar-toggle-in-sidebar" aria-label="Toggle Sidebar">
+                <i class="bi bi-layout-sidebar"></i>
+            </button>
         </div>
 
         <nav class="app-menu">
-            <a href="/admin/dashboard" class="<?= $isActive('admin/dashboard') ?>">Dashboard</a>
-            <a href="/admin/stores" class="<?= $isActive('admin/stores') ?>">Stores & POS</a>
-            <a href="/admin/accounting-debts" class="<?= $isActive('admin/accounting-debts') ?>">Accounting Debts</a>
-            <a href="/admin/user-view" class="<?= $isActive('admin/user-view') ?>">User Management</a>
+            <a href="/admin/dashboard" class="<?= $isActive('admin/dashboard') ?>"><i class="bi bi-speedometer2"></i><span>Dashboard</span></a>
+            <a href="/admin/stores" class="<?= $isActive('admin/stores') ?>"><i class="bi bi-shop-window"></i><span>Stores & POS</span></a>
+            <a href="/admin/accounting-debts" class="<?= $isActive('admin/accounting-debts') ?>"><i class="bi bi-cash-coin"></i><span>Accounting Debts</span></a>
+            <a href="/admin/user-view" class="<?= $isActive('admin/user-view') ?>"><i class="bi bi-people"></i><span>User Management</span></a>
         </nav>
 
         <div class="app-sidebar-spacer"></div>
 
         <div class="sidebar-logout">
-            <a href="/auth/logout">Logout</a>
+            <a href="/auth/logout"><i class="bi bi-box-arrow-right"></i><span>Logout</span></a>
         </div>
     </aside>
 
     <div class="app-main">
         <header class="app-topbar">
             <div class="topbar-left">
-                <h2>Admin Portal</h2>
-                <p>School-wide Operations Oversight</p>
+                <div class="topbar-title">
+                    <h2>Admin Portal</h2>
+                    <p>School-wide Operations Oversight</p>
+                </div>
             </div>
 
             <div class="topbar-profile">
@@ -79,6 +91,7 @@ if ($initials === '') {
 </div>
 
 <script src="<?= base_url('assets/js/csrf.js') ?>"></script>
+<script src="<?= base_url('assets/js/app-layout.js') ?>"></script>
 <?= $this->renderSection('scripts') ?>
 </body>
 </html>

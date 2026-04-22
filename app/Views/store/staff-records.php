@@ -11,10 +11,6 @@
             <h3>Employee Records</h3>
             <p>Search employee debt records and employee transaction records.</p>
         </div>
-        <div class="staff-store-wrap">
-            <label for="staff-store-select">Store</label>
-            <select id="staff-store-select"></select>
-        </div>
     </div>
 
     <article class="staff-card">
@@ -22,7 +18,12 @@
         <div class="staff-filters">
             <div class="field">
                 <label for="debt-search">Search Employee</label>
-                <input id="debt-search" type="search" placeholder="Name, email, or employee ID">
+                <div class="staff-search-wrap">
+                    <input id="debt-search" type="search" placeholder="Name, email, or employee ID">
+                    <button id="debt-search-scan-btn" type="button" class="staff-scan-btn" title="Scan employee QR/ID">
+                        <i class="bi bi-qr-code-scan"></i>
+                    </button>
+                </div>
             </div>
             <button id="debt-search-btn" class="primary-btn" type="button">Search</button>
         </div>
@@ -107,8 +108,25 @@
         </div>
     </div>
 </div>
+
+<div id="staff-scanner-modal" class="receipt-modal" style="display:none;">
+    <div class="receipt-card scanner-card">
+        <div class="receipt-head">
+            <h3><i class="bi bi-person-badge"></i> Employee QR Scanner</h3>
+            <button id="staff-scanner-close" type="button" class="receipt-close">x</button>
+        </div>
+        <div class="scanner-body">
+            <div id="staff-scanner-reader"></div>
+            <p id="staff-scanner-status" class="scanner-status">Ready to scan.</p>
+            <div class="scanner-actions">
+                <button id="staff-scanner-stop" type="button" class="scan-btn"><i class="bi bi-stop-fill"></i> Stop</button>
+            </div>
+        </div>
+    </div>
+</div>
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="<?= base_url('assets/js/store-staff-records.js') ?>"></script>
 <?= $this->endSection() ?>

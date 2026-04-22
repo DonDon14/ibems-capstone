@@ -43,6 +43,7 @@ class InitialSeeder extends Seeder
             'store_id'   => 1,
             'sku'        => 'SKU001',
             'name'       => 'Coffee',
+            'category'   => 'General',
             'price'      => 50,
             'stock_qty'  => 100,
             'is_active'  => 1,

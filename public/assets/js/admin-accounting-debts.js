@@ -11,6 +11,13 @@ function aEscape(value) {
         .replace(/'/g, "&#39;");
 }
 
+function debtPercent(currentDebt, creditLimit) {
+    const current = Number(currentDebt || 0);
+    const limit = Number(creditLimit || 0);
+    if (limit <= 0) return 0;
+    return Math.max(0, Math.min(100, (current / limit) * 100));
+}
+
 async function loadAdminDebtOverview() {
     const response = await fetch("/admin/accounting-debts/data");
     const data = await response.json();
@@ -34,7 +41,12 @@ async function loadAdminDebtOverview() {
             <td>${aEscape(row.employee_id || "-")}</td>
             <td>${aEscape(row.name)}</td>
             <td>${aEscape(row.email)}</td>
-            <td>${aEscape(aMoney(row.current_debt))}</td>
+            <td>
+                <div class="table-debt-wrap">
+                    <span>${aEscape(aMoney(row.current_debt))}</span>
+                    <div class="table-debt-bar"><i style="width:${debtPercent(row.current_debt, row.credit_limit)}%"></i></div>
+                </div>
+            </td>
             <td>${aEscape(aMoney(row.credit_limit))}</td>
         </tr>
     `).join("");

@@ -57,4 +57,26 @@ class UserModel extends Model
                     ->where('is_active', 1)
                     ->first();
     }
+
+    public function getEffectiveRoles(array $user): array
+    {
+        $userId = (int) ($user['id'] ?? 0);
+        $roles = [];
+
+        if ($userId > 0) {
+            $userRoleModel = new UserRoleModel();
+            $roles = $userRoleModel->getRolesByUserId($userId);
+        }
+
+        $legacyRole = strtoupper(trim((string) ($user['role'] ?? '')));
+        if ($legacyRole !== '' && !in_array($legacyRole, $roles, true)) {
+            $roles[] = $legacyRole;
+        }
+
+        if ($roles === []) {
+            $roles[] = 'USER';
+        }
+
+        return array_values(array_unique($roles));
+    }
 }

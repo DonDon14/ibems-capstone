@@ -40,17 +40,6 @@ function renderSummary(transactions) {
     totalEl.textContent = hMoney(total);
 }
 
-function renderStoreSelect() {
-    const select = document.getElementById("history-store-select");
-    const wrap = document.querySelector(".history-store-switch");
-    select.innerHTML = historyStores
-        .map((store) => `<option value="${store.id}">${hEscape(store.store_name)}</option>`)
-        .join("");
-    select.value = String(historyActiveStoreId);
-    select.disabled = historyStores.length <= 1;
-    wrap.style.display = historyStores.length <= 1 ? "none" : "flex";
-}
-
 function renderTransactions(transactions) {
     const body = document.getElementById("history-body");
 
@@ -87,7 +76,6 @@ async function loadStores() {
 
     historyStores = data.stores;
     historyActiveStoreId = Number(data.default_store_id || historyStores[0].id);
-    renderStoreSelect();
 }
 
 async function loadTransactions() {
@@ -122,43 +110,6 @@ async function loadTransactions() {
     setHistoryResult("", "ok");
 }
 
-function buildReceiptHtml(receipt) {
-    const rows = receipt.items
-        .map(
-            (item) => `
-            <tr>
-                <td>${hEscape(item.name)}</td>
-                <td>${item.qty}</td>
-                <td>${hMoney(item.unit_price)}</td>
-                <td>${hMoney(item.line_total)}</td>
-            </tr>
-        `
-        )
-        .join("");
-
-    return `
-        <div class="receipt-content-head">
-            <div><strong>Transaction #:</strong> ${hEscape(receipt.client_txn_id)}</div>
-            <div><strong>Date:</strong> ${hEscape(hDateTime(receipt.created_at))}</div>
-            <div><strong>Store:</strong> ${hEscape(receipt.store_name)}</div>
-            <div><strong>Customer:</strong> ${hEscape(receipt.customer_name)}</div>
-            <div><strong>Payment:</strong> ${hEscape(String(receipt.payment_method).toUpperCase())}</div>
-        </div>
-        <table class="receipt-table">
-            <thead>
-                <tr>
-                    <th>Item</th>
-                    <th>Qty</th>
-                    <th>Price</th>
-                    <th>Line Total</th>
-                </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-        </table>
-        <div class="receipt-total">Total: ${hMoney(receipt.amount)}</div>
-    `;
-}
-
 async function openReceipt(transactionId) {
     const response = await fetch(`/store/transactions/${transactionId}`);
     const data = await response.json();
@@ -168,10 +119,22 @@ async function openReceipt(transactionId) {
         return;
     }
 
-    selectedReceipt = data.transaction;
+    const tx = data.transaction;
+    selectedReceipt = {
+        transactionId: tx.id,
+        clientTxnId: tx.client_txn_id,
+        createdAt: tx.created_at,
+        storeName: tx.store_name,
+        customerName: tx.customer_name,
+        paymentMethod: tx.payment_method,
+        totalAmount: tx.amount,
+        items: tx.items,
+        lookupUrl: `${window.location.origin}/store/receipt/${encodeURIComponent(String(tx.id))}`,
+    };
     const modal = document.getElementById("history-receipt-modal");
-    const content = document.getElementById("history-receipt-content");
-    content.innerHTML = buildReceiptHtml(selectedReceipt);
+    if (window.IbemsReceipt) {
+        window.IbemsReceipt.renderReceipt("history-receipt-content", selectedReceipt);
+    }
     modal.style.display = "grid";
 }
 
@@ -180,49 +143,11 @@ function closeReceipt() {
 }
 
 function printReceipt() {
-    if (!selectedReceipt) {
-        return;
-    }
-
-    const printWindow = window.open("", "_blank", "width=800,height=900");
-    if (!printWindow) {
+    if (!selectedReceipt) return;
+    if (!window.IbemsReceipt || !window.IbemsReceipt.printReceipt(selectedReceipt)) {
         setHistoryResult("Popup blocked. Please allow popups.", "error");
-        return;
     }
-
-    const html = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Receipt ${hEscape(selectedReceipt.client_txn_id)}</title>
-            <style>
-                body { font-family: Arial, sans-serif; padding: 20px; color: #111; }
-                h2 { margin-top: 0; color: #003366; }
-                .meta { margin-bottom: 12px; font-size: 14px; }
-                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-                th, td { border: 1px solid #ddd; padding: 8px; font-size: 13px; }
-                th { background: #f4f4f4; text-align: left; }
-                .total { margin-top: 12px; text-align: right; font-weight: bold; font-size: 16px; }
-            </style>
-        </head>
-        <body>
-            <h2>USTP Store Receipt</h2>
-            ${buildReceiptHtml(selectedReceipt)}
-        </body>
-        </html>
-    `;
-
-    printWindow.document.open();
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
 }
-
-document.getElementById("history-store-select").addEventListener("change", async (event) => {
-    historyActiveStoreId = Number(event.target.value);
-    await loadTransactions();
-});
 
 document.getElementById("history-apply-filters").addEventListener("click", async () => {
     historyFilters.dateFrom = document.getElementById("history-date-from").value || "";

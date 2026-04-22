@@ -12,10 +12,7 @@
             <p>View all products, adjust real stock counts, and add new stock.</p>
         </div>
         <div class="inventory-top-actions">
-            <div class="inventory-store-wrap">
-                <label for="inventory-store-select">Store</label>
-                <select id="inventory-store-select"></select>
-            </div>
+            <a href="/store/settings" class="secondary-btn" style="text-decoration:none;">Manage Categories</a>
             <button id="open-product-modal-top" class="primary-btn inventory-add-btn" type="button"><span class="plus">+</span> Add New Product</button>
         </div>
     </div>
@@ -32,13 +29,14 @@
                         <th>Image</th>
                         <th>SKU</th>
                         <th>Product</th>
+                        <th>Variant</th>
                         <th>Category</th>
                         <th>Price</th>
                         <th>Current Stock</th>
                     </tr>
                 </thead>
                 <tbody id="inventory-product-body">
-                    <tr><td colspan="6">Loading products...</td></tr>
+                    <tr><td colspan="7">Loading products...</td></tr>
                 </tbody>
             </table>
         </div>
@@ -54,53 +52,107 @@
             <button id="close-product-modal" type="button" class="inv-modal-close">x</button>
         </div>
 
-        <div class="form-grid">
-            <div class="field">
-                <label for="new-product-sku">SKU</label>
-                <input id="new-product-sku" type="text" placeholder="e.g. SNACK-001">
+        <div class="create-product-layout">
+            <div class="create-product-section section-product-info">
+                <h5>Product Information</h5>
+                <div class="form-grid">
+                    <div class="field">
+                        <label for="new-product-sku">SKU</label>
+                        <input id="new-product-sku" type="text" placeholder="e.g. SNACK-001">
+                    </div>
+                    <div class="field">
+                        <label for="new-product-name">Product Name</label>
+                        <input id="new-product-name" type="text" placeholder="Product name">
+                    </div>
+                    <div class="field">
+                        <label for="new-product-variant-label">Variant/Size (optional)</label>
+                        <input id="new-product-variant-label" type="text" placeholder="e.g. 1.5L, 750ml, Can">
+                    </div>
+                    <div class="field">
+                        <label for="new-product-category">Category</label>
+                        <select id="new-product-category"></select>
+                    </div>
+                    <div class="field">
+                        <label for="new-product-supplier">Supplier (optional)</label>
+                        <input id="new-product-supplier" type="text" placeholder="Search...">
+                    </div>
+                    <div class="field field-wide">
+                        <label for="new-product-barcode">Barcode (optional)</label>
+                        <input id="new-product-barcode" type="text" placeholder="Scan or barcode or entry">
+                    </div>
+                </div>
             </div>
-            <div class="field">
-                <label for="new-product-name">Product Name</label>
-                <input id="new-product-name" type="text" placeholder="Product name">
+
+            <div class="create-product-section section-media">
+                <h5>Image & Media</h5>
+                <div class="form-grid image-grid">
+                    <div class="field">
+                        <label for="new-product-image-source">Product Image Source</label>
+                        <select id="new-product-image-source">
+                            <option value="upload">Upload File</option>
+                            <option value="url">Use Image URL</option>
+                        </select>
+                    </div>
+                    <div class="field" id="new-product-image-upload-wrap">
+                        <label for="new-product-image-file">Image Upload</label>
+                        <input id="new-product-image-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+                    </div>
+                    <div class="field" id="new-product-image-url-wrap" style="display:none;">
+                        <label for="new-product-image-url">Image URL</label>
+                        <input id="new-product-image-url" type="url" placeholder="https://...">
+                    </div>
+                    <div class="image-preview-box field-wide">
+                        <img id="new-product-image-preview" alt="Preview" style="display:none;">
+                        <span id="new-product-image-preview-empty">No image preview</span>
+                    </div>
+                </div>
             </div>
-            <div class="field">
-                <label for="new-product-category">Category</label>
-                <input id="new-product-category" type="text" placeholder="e.g. Drinks, Snacks">
+
+            <div class="create-product-section section-pricing">
+                <h5>Pricing & Cost</h5>
+                <div class="form-grid">
+                    <div class="field field-number">
+                        <label for="new-product-unit-cost">Unit Cost</label>
+                        <input id="new-product-unit-cost" type="number" min="0" step="0.01" value="0">
+                    </div>
+                    <div class="field field-number">
+                        <label for="new-product-sell-price">Sell Price</label>
+                        <input id="new-product-sell-price" type="number" min="0" step="0.01" value="0">
+                    </div>
+                    <div class="field readonly-field field-number">
+                        <label>Initial Markup</label>
+                        <div id="new-product-markup" class="readonly-value">Markup: 0.00%</div>
+                    </div>
+                    <div class="field readonly-field field-number">
+                        <label>Total Stock Value</label>
+                        <div id="new-product-stock-value" class="readonly-value">Value: PHP 0.00</div>
+                    </div>
+                </div>
             </div>
-            <div class="field">
-                <label for="new-product-image-source">Product Image Source</label>
-                <select id="new-product-image-source">
-                    <option value="upload">Upload File</option>
-                    <option value="url">Use Image URL</option>
-                </select>
+
+            <div class="create-product-section section-inventory">
+                <h5>Inventory & Stock</h5>
+                <div class="form-grid">
+                    <div class="field field-number">
+                        <label for="new-product-initial-stock">Initial Stock</label>
+                        <input id="new-product-initial-stock" type="number" min="0" step="1" value="0">
+                    </div>
+                    <div class="field">
+                        <label for="new-product-location">Location/Bin (optional)</label>
+                        <input id="new-product-location" type="text" placeholder="e.g. Aisle 3, Bin 12">
+                    </div>
+                    <div class="field field-number">
+                        <label for="new-product-low-stock">Low Stock Threshold (optional)</label>
+                        <input id="new-product-low-stock" type="number" min="0" step="1" value="0">
+                        <small class="field-help">Threshold to trigger low stock alerts.</small>
+                    </div>
+                </div>
             </div>
-            <div class="field" id="new-product-image-upload-wrap">
-                <label for="new-product-image-file">Image Upload</label>
-                <input id="new-product-image-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
-            </div>
-            <div class="field" id="new-product-image-url-wrap" style="display:none;">
-                <label for="new-product-image-url">Image URL</label>
-                <input id="new-product-image-url" type="url" placeholder="https://...">
-            </div>
-            <div class="field">
-                <label for="new-product-sell-price">Sell Price</label>
-                <input id="new-product-sell-price" type="number" min="0" step="0.01" value="0">
-            </div>
-            <div class="field">
-                <label for="new-product-initial-stock">Initial Stock</label>
-                <input id="new-product-initial-stock" type="number" min="0" step="1" value="0">
-            </div>
-            <div class="field">
-                <label for="new-product-unit-cost">Unit Cost (if initial stock > 0)</label>
-                <input id="new-product-unit-cost" type="number" min="0" step="0.01" value="0">
-            </div>
-            <div class="field">
-                <label for="new-product-reason">Reason</label>
-                <input id="new-product-reason" type="text" value="Initial stock">
-            </div>
+
         </div>
 
         <div class="inv-modal-actions">
+            <button id="new-product-cancel" class="secondary-btn" type="button">Cancel</button>
             <button id="new-product-submit" class="primary-btn" type="button">Create Product</button>
         </div>
     </div>
@@ -126,8 +178,16 @@
                     <strong id="product-view-name">-</strong>
                 </div>
                 <div class="detail-item">
+                    <span>Variant</span>
+                    <strong id="product-view-variant">-</strong>
+                </div>
+                <div class="detail-item">
                     <span>Category</span>
                     <strong id="product-view-category">-</strong>
+                </div>
+                <div class="detail-item">
+                    <span>Barcode</span>
+                    <strong id="product-view-barcode">-</strong>
                 </div>
                 <div class="detail-item">
                     <span>Price</span>
@@ -150,8 +210,12 @@
                         <input id="modal-product-name" type="text" placeholder="Product name">
                     </div>
                     <div class="field">
+                        <label for="modal-product-variant-label">Variant/Size (optional)</label>
+                        <input id="modal-product-variant-label" type="text" placeholder="e.g. 1.5L, 750ml, Can">
+                    </div>
+                    <div class="field">
                         <label for="modal-product-category">Category</label>
-                        <input id="modal-product-category" type="text" placeholder="Category">
+                        <select id="modal-product-category"></select>
                     </div>
                     <div class="field">
                         <label for="modal-product-price">Sell Price</label>
@@ -163,6 +227,10 @@
                             <option value="upload">Upload File</option>
                             <option value="url">Use Image URL</option>
                         </select>
+                    </div>
+                    <div class="field">
+                        <label for="modal-product-barcode">Barcode (optional)</label>
+                        <input id="modal-product-barcode" type="text" placeholder="Barcode">
                     </div>
                     <div class="field" id="modal-product-image-upload-wrap">
                         <label for="modal-product-image-file">Image Upload</label>

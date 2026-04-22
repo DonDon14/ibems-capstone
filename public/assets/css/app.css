@@ -41,61 +41,112 @@ a {
     top: 0;
     left: 0;
     bottom: 0;
-    width: 250px;
+    width: 260px;
     height: 100vh;
     overflow-y: auto;
-    background:
-        linear-gradient(180deg, #003b77 0%, #003366 45%, #00284f 100%);
+    background: linear-gradient(180deg, #0b1322 0%, #0f1b33 100%);
     color: var(--ustp-white);
     display: flex;
     flex-direction: column;
-    padding: 18px 14px;
-    gap: 14px;
+    padding: 14px 10px;
+    gap: 10px;
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    transition: width 0.18s ease, padding 0.18s ease;
+}
+
+.app-sidebar-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 44px;
 }
 
 .app-brand {
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    border: 1px solid rgba(255, 255, 255, 0.14);
     border-radius: 12px;
-    padding: 12px 12px 13px;
-    background: rgba(255, 255, 255, 0.04);
-    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    flex: 1;
+}
+
+.app-brand-logo {
+    width: 44px;
+    height: 44px;
+    border-radius: 10px;
+    object-fit: cover;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    background: rgba(255, 255, 255, 0.12);
+    display: block;
+    margin: 0;
+}
+
+.app-brand-text {
+    min-width: 0;
 }
 
 .app-brand h1 {
     margin: 0;
-    font-size: 1.2rem;
+    font-size: 1.12rem;
     letter-spacing: 0.2px;
 }
 
 .app-brand p {
-    margin: 6px 0 0;
-    font-size: 0.8rem;
-    color: rgba(255, 255, 255, 0.85);
+    margin: 3px 0 0;
+    font-size: 0.78rem;
+    color: rgba(255, 255, 255, 0.76);
 }
 
 .app-menu {
     display: flex;
     flex-direction: column;
-    gap: 6px;
+    gap: 3px;
 }
 
 .app-menu a {
+    display: flex;
+    align-items: center;
+    gap: 10px;
     text-decoration: none;
-    color: var(--ustp-white);
+    color: #d8e3f2;
     padding: 10px 12px;
     border-radius: 10px;
-    font-size: 0.95rem;
+    font-size: 0.94rem;
     font-weight: 600;
     border: 1px solid transparent;
-    transition: all 0.15s ease;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
+    position: relative;
+}
+
+.app-menu a i {
+    font-size: 1.02rem;
+    width: 18px;
+    text-align: center;
+    flex: 0 0 18px;
+    color: inherit;
+}
+
+.app-menu a span {
+    min-width: 0;
 }
 
 .app-menu a:hover,
+.app-menu a:focus-visible {
+    background: rgba(255, 255, 255, 0.08);
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.14);
+}
+
 .app-menu a.is-active {
-    background: var(--ustp-gold);
-    color: #2b2b2b;
-    border-color: rgba(255, 255, 255, 0.35);
-    box-shadow: 0 7px 14px rgba(0, 0, 0, 0.15);
+    background: rgba(255, 204, 0, 0.18);
+    color: #ffde59;
+    border-color: rgba(255, 204, 0, 0.38);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .app-sidebar-spacer {
@@ -103,25 +154,101 @@ a {
 }
 
 .sidebar-logout a {
-    display: block;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
     text-decoration: none;
-    color: var(--ustp-white);
-    border: 1px solid rgba(255, 255, 255, 0.5);
+    color: #d8e3f2;
+    border: 1px solid rgba(255, 255, 255, 0.2);
     border-radius: 10px;
     text-align: center;
     padding: 10px 12px;
     font-weight: 600;
+    background: rgba(255, 255, 255, 0.02);
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.sidebar-logout a i {
+    font-size: 1rem;
 }
 
 .sidebar-logout a:hover {
-    background: rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.32);
+    color: #ffffff;
+}
+
+.app-shell.sidebar-collapsed .app-sidebar {
+    width: 82px;
+    padding-left: 10px;
+    padding-right: 10px;
+}
+
+.app-shell.sidebar-collapsed .app-main {
+    margin-left: 82px;
+}
+
+.app-shell.sidebar-collapsed .app-sidebar-header {
+    justify-content: center;
+    min-height: 38px;
+}
+
+.app-shell.sidebar-collapsed .app-brand {
+    display: none;
+}
+
+.app-shell.sidebar-collapsed .app-brand-text,
+.app-shell.sidebar-collapsed .app-menu a span,
+.app-shell.sidebar-collapsed .sidebar-logout a span {
+    display: none;
+}
+
+.app-shell.sidebar-collapsed .app-menu a::after,
+.app-shell.sidebar-collapsed .sidebar-logout a::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: calc(100% + 10px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: #0f172a;
+    color: #fff;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    padding: 6px 9px;
+    font-size: 0.76rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    z-index: 50;
+    transition: opacity 0.12s ease;
+}
+
+.app-shell.sidebar-collapsed .app-menu a:hover::after,
+.app-shell.sidebar-collapsed .sidebar-logout a:hover::after {
+    opacity: 1;
+}
+
+.app-shell.sidebar-collapsed .app-menu a,
+.app-shell.sidebar-collapsed .sidebar-logout a {
+    justify-content: center;
+    margin-left: auto;
+    margin-right: auto;
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    padding: 0;
+    border-radius: 12px;
 }
 
 .app-main {
-    margin-left: 250px;
+    margin-left: 260px;
     display: grid;
     grid-template-rows: auto 1fr auto;
     min-height: 100vh;
+    height: 100vh;
+    overflow: hidden;
+    transition: margin-left 0.18s ease;
 }
 
 .app-topbar {
@@ -132,6 +259,16 @@ a {
     justify-content: space-between;
     align-items: center;
     gap: 14px;
+}
+
+.topbar-left {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.topbar-title {
+    min-width: 0;
 }
 
 .topbar-left h2 {
@@ -145,6 +282,53 @@ a {
     margin: 4px 0 0;
     color: var(--text-soft);
     font-size: 0.82rem;
+}
+
+.sidebar-toggle {
+    width: 36px;
+    height: 36px;
+    min-height: 36px;
+    padding: 0;
+    border-radius: 10px;
+}
+
+.sidebar-toggle-in-sidebar {
+    align-self: auto;
+    margin: 0;
+    width: 32px;
+    height: 32px;
+    min-height: 32px;
+    border-radius: 9px;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transition: opacity 0.14s ease, visibility 0.14s ease, transform 0.14s ease, background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+
+.app-shell.sidebar-collapsed .sidebar-toggle-in-sidebar {
+    align-self: center;
+    margin: 0 auto 10px;
+}
+
+.app-sidebar:hover .sidebar-toggle-in-sidebar,
+.app-sidebar:focus-within .sidebar-toggle-in-sidebar {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: auto;
+}
+
+.sidebar-toggle-in-sidebar:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+.sidebar-toggle-in-sidebar:disabled {
+    opacity: 0.45;
+    cursor: default;
+    transform: none;
+}
+
+.sidebar-toggle i {
+    font-size: 1rem;
 }
 
 .topbar-profile {
@@ -212,6 +396,8 @@ a {
 
 .app-container {
     padding: 22px;
+    min-height: 0;
+    overflow-y: auto;
 }
 
 .app-footer {
@@ -350,18 +536,115 @@ textarea:focus {
     box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.14);
 }
 
-.primary-btn {
-    border: 0;
+/* Unified button system (backward compatible with existing classes) */
+.btn,
+.primary-btn,
+.secondary-btn,
+.danger-btn,
+.ghost-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
     border-radius: 10px;
-    background: linear-gradient(180deg, #0f4884 0%, #003366 100%);
-    color: #fff;
+    border: 1px solid transparent;
     font-weight: 700;
     letter-spacing: 0.1px;
+    font-size: 0.92rem;
+    line-height: 1;
+    min-height: 38px;
+    padding: 0 14px;
+    cursor: pointer;
+    text-decoration: none;
+    white-space: nowrap;
+    transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.12s ease, box-shadow 0.15s ease;
+}
+
+.btn:disabled,
+.primary-btn:disabled,
+.secondary-btn:disabled,
+.danger-btn:disabled,
+.ghost-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    box-shadow: none;
+    transform: none;
+}
+
+.btn:hover:not(:disabled),
+.primary-btn:hover:not(:disabled),
+.secondary-btn:hover:not(:disabled),
+.danger-btn:hover:not(:disabled),
+.ghost-btn:hover:not(:disabled) {
+    transform: translateY(-1px);
+}
+
+.btn-primary,
+.primary-btn {
+    border-color: #0b4b87;
+    background: linear-gradient(180deg, #0f5a9f 0%, #003366 100%);
+    color: #fff;
     box-shadow: 0 8px 18px rgba(0, 51, 102, 0.24);
 }
 
-.primary-btn:hover {
-    filter: brightness(1.05);
+.btn-primary:hover:not(:disabled),
+.primary-btn:hover:not(:disabled) {
+    filter: brightness(1.04);
+}
+
+.btn-secondary,
+.secondary-btn {
+    border-color: #c1cedf;
+    background: #fff;
+    color: #0f2745;
+    box-shadow: 0 6px 14px rgba(15, 39, 69, 0.08);
+}
+
+.btn-secondary:hover:not(:disabled),
+.secondary-btn:hover:not(:disabled) {
+    border-color: #9db2cb;
+    background: #f7fbff;
+}
+
+/* Sidebar-native toggle button (must come after generic button rules) */
+.secondary-btn.sidebar-toggle-in-sidebar {
+    border-color: rgba(255, 255, 255, 0.24);
+    background: rgba(255, 255, 255, 0.06);
+    color: #d8e3f2;
+    box-shadow: none;
+    backdrop-filter: blur(2px);
+}
+
+.secondary-btn.sidebar-toggle-in-sidebar:hover:not(:disabled) {
+    border-color: rgba(255, 255, 255, 0.38);
+    background: rgba(255, 255, 255, 0.13);
+    color: #ffffff;
+}
+
+.btn-danger,
+.danger-btn {
+    border-color: #dc2626;
+    background: #ef4444;
+    color: #fff;
+    box-shadow: 0 8px 16px rgba(220, 38, 38, 0.22);
+}
+
+.btn-danger:hover:not(:disabled),
+.danger-btn:hover:not(:disabled) {
+    background: #dc2626;
+}
+
+.btn-ghost,
+.ghost-btn {
+    border-color: transparent;
+    background: transparent;
+    color: #0f2745;
+}
+
+.btn-sm {
+    min-height: 32px;
+    padding: 0 11px;
+    font-size: 0.84rem;
 }
 
 .dashboard-shell {
@@ -400,6 +683,25 @@ textarea:focus {
     font-size: 0.8rem;
 }
 
+.dash-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.dash-card-head i {
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    display: grid;
+    place-items: center;
+    font-size: 0.92rem;
+    color: #003366;
+    background: #edf4ff;
+    border: 1px solid #cfe0f3;
+}
+
 .dash-card strong {
     display: block;
     margin-top: 4px;
@@ -423,6 +725,14 @@ textarea:focus {
 .dash-panel h4 {
     margin: 0;
     color: #003366;
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+}
+
+.dash-panel h4 i {
+    font-size: 1rem;
+    color: #1d4d80;
 }
 
 .dash-panel p {
@@ -438,6 +748,9 @@ textarea:focus {
 }
 
 .quick-links a {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
     text-decoration: none;
     color: #0f2745;
     background: #f5f9ff;
@@ -445,6 +758,11 @@ textarea:focus {
     border-radius: 10px;
     padding: 10px;
     font-weight: 600;
+}
+
+.quick-links a i {
+    color: #1f4f82;
+    font-size: 0.94rem;
 }
 
 /* Unified modal standard (applies across admin/accounting/store modals) */
@@ -539,6 +857,10 @@ body .app-modal .app-modal-actions {
 }
 
 @media (max-width: 980px) {
+    .sidebar-toggle-in-sidebar {
+        display: none;
+    }
+
     .app-sidebar {
         position: static;
         width: auto;
@@ -550,6 +872,13 @@ body .app-modal .app-modal-actions {
     .app-main {
         margin-left: 0;
         min-height: auto;
+        height: auto;
+        overflow: visible;
+    }
+
+    .app-container {
+        min-height: auto;
+        overflow: visible;
     }
 
     .dashboard-grid,

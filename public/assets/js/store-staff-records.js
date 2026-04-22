@@ -2,6 +2,10 @@ let srStores = [];
 let srStoreId = null;
 let srSelectedReceipt = null;
 let srSelectedEmployee = null;
+let srScannerEngine = null;
+let srScannerRunning = false;
+let srScannerLastDetected = "";
+let srScannerLastDetectedAt = 0;
 
 function srEscape(value) {
     return String(value ?? "")
@@ -32,17 +36,154 @@ function srSetResult(message, type) {
     el.style.color = type === "error" ? "#b91c1c" : "#166534";
 }
 
-function srRenderStoreSelect() {
-    const select = document.getElementById("staff-store-select");
-    const wrap = document.querySelector(".staff-store-wrap");
+function srSetScannerStatus(message, isError = false) {
+    const el = document.getElementById("staff-scanner-status");
+    if (!el) return;
+    el.textContent = message || "";
+    el.style.color = isError ? "#b91c1c" : "#475569";
+}
 
-    select.innerHTML = srStores
-        .map((store) => `<option value="${store.id}">${srEscape(store.store_name)}</option>`)
-        .join("");
-    select.value = String(srStoreId);
-    const multi = srStores.length > 1;
-    select.disabled = !multi;
-    wrap.style.display = multi ? "flex" : "none";
+function srSetScannerUiState(running) {
+    const scanBtn = document.getElementById("debt-search-scan-btn");
+    const stopBtn = document.getElementById("staff-scanner-stop");
+    if (scanBtn) scanBtn.disabled = !!running;
+    if (stopBtn) stopBtn.disabled = !running;
+}
+
+function srExtractScanCode(rawValue) {
+    const raw = String(rawValue || "").trim();
+    if (!raw) return "";
+
+    try {
+        const parsed = JSON.parse(raw);
+        if (parsed && typeof parsed === "object") {
+            const candidate = parsed.employee_id || parsed.employeeId || parsed.email || parsed.id || parsed.value || "";
+            if (candidate) return String(candidate).trim();
+        }
+    } catch (error) {
+        // Not JSON, continue with other parse modes.
+    }
+
+    if (/^https?:\/\//i.test(raw)) {
+        try {
+            const url = new URL(raw);
+            const fromQuery =
+                url.searchParams.get("employee_id") ||
+                url.searchParams.get("employeeId") ||
+                url.searchParams.get("email") ||
+                url.searchParams.get("id") ||
+                url.searchParams.get("q") ||
+                url.searchParams.get("value") ||
+                "";
+            if (fromQuery) return String(fromQuery).trim();
+
+            const chunks = url.pathname.split("/").filter(Boolean);
+            const last = chunks[chunks.length - 1] || "";
+            if (last) return String(last).trim();
+        } catch (error) {
+            // Invalid URL, fallback to raw.
+        }
+    }
+
+    return raw;
+}
+
+async function srOpenScannerModal() {
+    document.getElementById("staff-scanner-modal").style.display = "grid";
+    srSetScannerUiState(srScannerRunning);
+    srSetScannerStatus("Starting scanner...");
+    await srStartScanner();
+}
+
+async function srCloseScannerModal() {
+    await srStopScanner();
+    document.getElementById("staff-scanner-modal").style.display = "none";
+}
+
+async function srStartScanner() {
+    if (srScannerRunning) return;
+
+    if (typeof window.Html5Qrcode === "undefined") {
+        srSetScannerStatus("Scanner library not loaded. Check internet/CDN access.", true);
+        srSetScannerUiState(false);
+        return;
+    }
+
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        srSetScannerStatus("Camera API not available in this browser.", true);
+        srSetScannerUiState(false);
+        return;
+    }
+
+    const readerId = "staff-scanner-reader";
+    const readerEl = document.getElementById(readerId);
+    readerEl.innerHTML = "";
+    srScannerEngine = new window.Html5Qrcode(readerId);
+
+    try {
+        await srScannerEngine.start(
+            { facingMode: "environment" },
+            {
+                fps: 10,
+                qrbox: { width: 260, height: 180 },
+                aspectRatio: 1.7777778,
+            },
+            async (decodedText) => {
+                const raw = String(decodedText || "").trim();
+                if (!raw) return;
+
+                const now = Date.now();
+                if (raw === srScannerLastDetected && now - srScannerLastDetectedAt <= 1200) return;
+                srScannerLastDetected = raw;
+                srScannerLastDetectedAt = now;
+
+                const resolved = srExtractScanCode(raw);
+                if (!resolved) return;
+
+                srSetScannerStatus(`Detected: ${resolved}`);
+                document.getElementById("debt-search").value = resolved;
+                await srLoadDebtRecords();
+                await srCloseScannerModal();
+                document.getElementById("debt-search").focus();
+                srSetResult(`Scanned and searched: ${resolved}`, "ok");
+            },
+            () => {}
+        );
+    } catch (error) {
+        srScannerEngine = null;
+        srScannerRunning = false;
+        srSetScannerStatus("Failed to start camera scanner.", true);
+        srSetScannerUiState(false);
+        return;
+    }
+
+    srScannerRunning = true;
+    srSetScannerUiState(true);
+    srSetScannerStatus("Scanning... Point camera to employee QR/ID.");
+}
+
+async function srStopScanner() {
+    if (!srScannerRunning || !srScannerEngine) {
+        srScannerRunning = false;
+        srSetScannerUiState(false);
+        return;
+    }
+
+    try {
+        await srScannerEngine.stop();
+    } catch (error) {
+        // Ignore stop errors for already-stopped sessions.
+    }
+
+    try {
+        await srScannerEngine.clear();
+    } catch (error) {
+        // Ignore clear errors.
+    }
+
+    srScannerEngine = null;
+    srScannerRunning = false;
+    srSetScannerUiState(false);
 }
 
 async function srLoadStores() {
@@ -53,7 +194,6 @@ async function srLoadStores() {
     }
     srStores = data.stores;
     srStoreId = Number(data.default_store_id || data.stores[0].id);
-    srRenderStoreSelect();
 }
 
 function srRenderDebts(rows) {
@@ -261,17 +401,35 @@ document.getElementById("debt-search-btn").addEventListener("click", async () =>
     await srLoadDebtRecords();
 });
 
+document.getElementById("debt-search").addEventListener("keydown", async (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    srSetResult("", "ok");
+    await srLoadDebtRecords();
+});
+
+document.getElementById("debt-search-scan-btn").addEventListener("click", () => {
+    srOpenScannerModal().catch(() => srSetScannerStatus("Unable to open scanner.", true));
+});
+
+document.getElementById("staff-scanner-close").addEventListener("click", async () => {
+    await srCloseScannerModal();
+});
+
+document.getElementById("staff-scanner-stop").addEventListener("click", async () => {
+    await srStopScanner();
+    srSetScannerStatus("Scanner stopped.");
+});
+
+document.getElementById("staff-scanner-modal").addEventListener("click", async (event) => {
+    if (event.target.id === "staff-scanner-modal") {
+        await srCloseScannerModal();
+    }
+});
+
 document.getElementById("txn-search-btn").addEventListener("click", async () => {
     srSetResult("", "ok");
     await srLoadStaffTransactions();
-});
-
-document.getElementById("staff-store-select").addEventListener("change", async (event) => {
-    srStoreId = Number(event.target.value);
-    await srLoadDebtRecords();
-    if (srSelectedEmployee) {
-        await srLoadStaffTransactions();
-    }
 });
 
 document.getElementById("debt-body").addEventListener("click", async (event) => {
@@ -305,6 +463,10 @@ document.getElementById("staff-employee-modal").addEventListener("click", (event
 });
 document.getElementById("staff-receipt-modal").addEventListener("click", (event) => {
     if (event.target.id === "staff-receipt-modal") srCloseReceipt();
+});
+
+window.addEventListener("beforeunload", () => {
+    srStopScanner();
 });
 
 (async () => {

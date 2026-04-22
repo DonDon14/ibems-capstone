@@ -91,13 +91,14 @@
             <div class="field"><label for="uv-e-employee-id">Employee ID</label><input id="uv-e-employee-id" type="text"></div>
             <div class="field"><label for="uv-e-name">Name</label><input id="uv-e-name" type="text"></div>
             <div class="field"><label for="uv-e-email">Email</label><input id="uv-e-email" type="email"></div>
-            <div class="field"><label for="uv-e-role">Role</label>
-                <select id="uv-e-role">
-                    <option value="USER">User</option>
-                    <option value="STORE_SYSTEM">Store System</option>
-                    <option value="ACCOUNTING_OFFICE">Accounting Office</option>
-                    <option value="ADMIN">Admin</option>
-                </select>
+            <div class="field">
+                <label>Roles</label>
+                <div class="role-check-grid">
+                    <label><input type="checkbox" name="uv-e-roles" value="USER"> User</label>
+                    <label><input type="checkbox" name="uv-e-roles" value="STORE_SYSTEM"> Store System</label>
+                    <label><input type="checkbox" name="uv-e-roles" value="ACCOUNTING_OFFICE"> Accounting Office</label>
+                    <label><input type="checkbox" name="uv-e-roles" value="ADMIN"> Admin</label>
+                </div>
             </div>
             <div class="field"><label for="uv-e-type">Category</label>
                 <select id="uv-e-type">
@@ -121,6 +122,30 @@
     </div>
 </div>
 
+<div id="uv-view-modal" class="admin-modal" style="display:none;">
+    <div class="admin-modal-card">
+        <div class="admin-modal-head">
+            <h4>Employee Details</h4>
+            <button id="uv-view-close" type="button" class="admin-modal-close">x</button>
+        </div>
+        <div class="form-grid">
+            <div class="field"><label>Employee ID</label><input id="uv-v-employee-id" type="text" readonly></div>
+            <div class="field"><label>Name</label><input id="uv-v-name" type="text" readonly></div>
+            <div class="field"><label>Email</label><input id="uv-v-email" type="text" readonly></div>
+            <div class="field"><label>Roles</label><input id="uv-v-roles" type="text" readonly></div>
+            <div class="field"><label>Category</label><input id="uv-v-type" type="text" readonly></div>
+            <div class="field"><label>Status</label><input id="uv-v-status" type="text" readonly></div>
+            <div class="field"><label>Base Salary</label><input id="uv-v-salary" type="text" readonly></div>
+            <div class="field"><label>Credit Limit</label><input id="uv-v-credit-limit" type="text" readonly></div>
+            <div class="field"><label>Current Debt</label><input id="uv-v-current-debt" type="text" readonly></div>
+            <div class="field"><label>Created At</label><input id="uv-v-created-at" type="text" readonly></div>
+        </div>
+        <div class="admin-modal-actions">
+            <button id="uv-view-edit" class="primary-btn" type="button">Edit User</button>
+        </div>
+    </div>
+</div>
+
 <div id="uv-add-modal" class="admin-modal" style="display:none;">
     <div class="admin-modal-card">
         <div class="admin-modal-head">
@@ -132,13 +157,14 @@
             <div class="field"><label for="uv-a-name">Name</label><input id="uv-a-name" type="text"></div>
             <div class="field"><label for="uv-a-email">Email</label><input id="uv-a-email" type="email"></div>
             <div class="field"><label for="uv-a-password">Password (optional)</label><input id="uv-a-password" type="password" placeholder="defaults to 123456"></div>
-            <div class="field"><label for="uv-a-role">Role</label>
-                <select id="uv-a-role">
-                    <option value="USER">User</option>
-                    <option value="STORE_SYSTEM">Store System</option>
-                    <option value="ACCOUNTING_OFFICE">Accounting Office</option>
-                    <option value="ADMIN">Admin</option>
-                </select>
+            <div class="field">
+                <label>Roles</label>
+                <div class="role-check-grid">
+                    <label><input type="checkbox" name="uv-a-roles" value="USER" checked> User</label>
+                    <label><input type="checkbox" name="uv-a-roles" value="STORE_SYSTEM"> Store System</label>
+                    <label><input type="checkbox" name="uv-a-roles" value="ACCOUNTING_OFFICE"> Accounting Office</label>
+                    <label><input type="checkbox" name="uv-a-roles" value="ADMIN"> Admin</label>
+                </div>
             </div>
             <div class="field"><label for="uv-a-type">Category</label>
                 <select id="uv-a-type">

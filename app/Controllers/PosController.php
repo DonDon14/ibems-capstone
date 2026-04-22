@@ -9,6 +9,9 @@ use App\Models\BalanceModel;
 use App\Models\InventoryMovementModel;
 use App\Models\AuditLogModel;
 use App\Models\StoreModel;
+use App\Models\StorePaymentMethodModel;
+use App\Models\StoreOpeningBalanceModel;
+use App\Models\DebtCashbookEntryModel;
 use App\Models\UserModel;
 use CodeIgniter\RESTful\ResourceController;
 
@@ -69,7 +72,11 @@ class PosController extends ResourceController
         $movementModel  = new InventoryMovementModel();
         $auditLogModel  = new AuditLogModel();
         $storeModel     = new StoreModel();
+        $paymentMethodModel = new StorePaymentMethodModel();
+        $openingBalanceModel = new StoreOpeningBalanceModel();
+        $cashbookModel = new DebtCashbookEntryModel();
         $userModel      = new UserModel();
+        $debtBalanceBefore = null;
 
         if (!$customerType || !$storeId || !$paymentMethod || empty($items)) {
             return [
@@ -82,6 +89,23 @@ class PosController extends ResourceController
             return [
                 'status' => 'error',
                 'message' => 'You cannot create transactions for this store.'
+            ];
+        }
+
+        $opening = $openingBalanceModel->getInitialByStore((int) $storeId);
+        if (!$opening) {
+            return [
+                'status' => 'error',
+                'message' => 'Initial opening balance is not set. Please set it first.'
+            ];
+        }
+
+        $paymentMethodModel->ensureDefaults((int) $storeId);
+        $paymentMethod = strtolower(trim((string) $paymentMethod));
+        if ($paymentMethod === '' || !$paymentMethodModel->isAllowedForStore((int) $storeId, $paymentMethod)) {
+            return [
+                'status' => 'error',
+                'message' => 'Invalid or disabled payment method.'
             ];
         }
 
@@ -157,6 +181,7 @@ class PosController extends ResourceController
                     'message' => 'Insufficient credit.'
                 ];
             }
+            $debtBalanceBefore = $balanceModel->getBalanceByUserId($customerUserId);
         }
 
         $db->transBegin();
@@ -235,6 +260,34 @@ class PosController extends ResourceController
             if (!$debtAdded) {
                 throw new \RuntimeException('Failed to update debt balance.');
             }
+
+            $debtBalanceAfter = $balanceModel->getBalanceByUserId($customerUserId);
+            $creditLimit = (float) ($debtBalanceAfter['credit_limit'] ?? $debtBalanceBefore['credit_limit'] ?? 0);
+            $debtBefore = (float) ($debtBalanceBefore['current_debt'] ?? 0);
+            $debtAfter = (float) ($debtBalanceAfter['current_debt'] ?? ($debtBefore + $totalAmount));
+            $availableAfter = max(0, $creditLimit - $debtAfter);
+
+            $cashbookModel->insert([
+                'user_id' => $customerUserId,
+                'entry_type' => 'debt_purchase',
+                'direction' => 'debit',
+                'amount' => $totalAmount,
+                'debt_before' => $debtBefore,
+                'debt_after' => $debtAfter,
+                'credit_limit_snapshot' => $creditLimit,
+                'available_credit_snapshot' => $availableAfter,
+                'reference_type' => 'transaction',
+                'reference_id' => $txnId,
+                'actor_id' => $actorId > 0 ? $actorId : null,
+                'remarks' => 'POS debt purchase',
+                'meta_json' => json_encode([
+                    'store_id' => (int) $storeId,
+                    'payment_method' => 'debt',
+                    'transaction_id' => (int) $txnId,
+                ]),
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
+            ]);
         }
 
         if (!$db->transStatus()) {

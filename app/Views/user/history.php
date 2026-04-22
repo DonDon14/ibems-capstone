@@ -40,6 +40,31 @@
             </tbody>
         </table>
     </div>
+
+    <div class="user-head">
+        <h3>Debt Cashbook</h3>
+        <p>Track debt purchases, salary/manual deductions, and running debt balance.</p>
+    </div>
+
+    <div class="user-table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Date</th>
+                    <th>Entry</th>
+                    <th>Direction</th>
+                    <th>Amount</th>
+                    <th>Debt Before</th>
+                    <th>Debt After</th>
+                    <th>Available Credit</th>
+                    <th>Remarks</th>
+                </tr>
+            </thead>
+            <tbody id="uh-cashbook-body">
+                <tr><td colspan="8">Loading cashbook...</td></tr>
+            </tbody>
+        </table>
+    </div>
 </section>
 <?= $this->endSection() ?>
 

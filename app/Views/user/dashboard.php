@@ -15,6 +15,8 @@
         <div class="summary-card"><span>Credit Limit</span><strong id="u-credit-limit">PHP 0.00</strong></div>
         <div class="summary-card"><span>Current Debt</span><strong id="u-current-debt">PHP 0.00</strong></div>
         <div class="summary-card"><span>Available Credit</span><strong id="u-available-credit">PHP 0.00</strong></div>
+        <div class="summary-card"><span>Debt Purchases Total</span><strong id="u-debt-added-total">PHP 0.00</strong></div>
+        <div class="summary-card"><span>Debt Deductions Total</span><strong id="u-debt-deducted-total">PHP 0.00</strong></div>
         <div class="summary-card"><span>Total Purchases</span><strong id="u-total-spent">PHP 0.00</strong></div>
         <div class="summary-card"><span>Total Transactions</span><strong id="u-txn-count">0</strong></div>
     </div>

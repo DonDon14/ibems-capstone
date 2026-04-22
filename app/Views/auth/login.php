@@ -11,7 +11,15 @@
     <link rel="stylesheet" href="<?= base_url('assets/css/auth-login.css') ?>">
 </head>
 <body>
+<?php $ustpLogoUrl = base_url('assets/images/ustp_claveria_logo.jpg'); ?>
     <main class="login-card">
+        <div class="login-brand">
+            <img src="<?= esc($ustpLogoUrl) ?>" alt="USTP Logo" class="login-brand-logo">
+            <div class="login-brand-text">
+                <strong>USTP IBEMS</strong>
+                <span>Integrated Business Enterprise Management System</span>
+            </div>
+        </div>
         <h1>IBEMS Login</h1>
         <p>Sign in to continue to the system.</p>
 

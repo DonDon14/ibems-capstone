@@ -7,11 +7,45 @@ use App\Models\BalanceModel;
 use App\Models\SalaryImportBatchModel;
 use App\Models\SalaryImportRowModel;
 use App\Models\UserModel;
+use App\Models\DebtCashbookEntryModel;
 use CodeIgniter\Controller;
 use Config\Database;
 
 class AccountingController extends Controller
 {
+    private function addDebtCashbookEntry(
+        int $userId,
+        string $entryType,
+        float $amount,
+        float $debtBefore,
+        float $debtAfter,
+        float $creditLimit,
+        ?int $actorId = null,
+        ?string $remarks = null,
+        ?string $referenceType = null,
+        ?int $referenceId = null,
+        array $meta = []
+    ): void {
+        $cashbookModel = new DebtCashbookEntryModel();
+        $cashbookModel->insert([
+            'user_id' => $userId,
+            'entry_type' => $entryType,
+            'direction' => $debtAfter >= $debtBefore ? 'debit' : 'credit',
+            'amount' => abs($amount),
+            'debt_before' => $debtBefore,
+            'debt_after' => $debtAfter,
+            'credit_limit_snapshot' => $creditLimit,
+            'available_credit_snapshot' => max(0, $creditLimit - $debtAfter),
+            'reference_type' => $referenceType,
+            'reference_id' => $referenceId,
+            'actor_id' => $actorId,
+            'remarks' => $remarks,
+            'meta_json' => $meta !== [] ? json_encode($meta) : null,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+    }
+
     public function dashboard()
     {
         return view('accounting/dashboard');
@@ -378,6 +412,9 @@ class AccountingController extends Controller
                 'updated_at' => date('Y-m-d H:i:s'),
             ]);
 
+            $updatedBalance = $balanceModel->getBalanceByUserId((int) $entry['user_id']);
+            $creditLimit = (float) ($updatedBalance['credit_limit'] ?? 0);
+
             $auditLogModel->insert([
                 'actor_id' => $actorId,
                 'action' => 'ACCOUNTING_SETTLEMENT_DEDUCT',
@@ -393,6 +430,23 @@ class AccountingController extends Controller
                 ]),
                 'created_at' => date('Y-m-d H:i:s'),
             ]);
+
+            $this->addDebtCashbookEntry(
+                (int) $entry['user_id'],
+                'salary_deduction',
+                (float) $entry['deducted_amount'],
+                (float) $entry['previous_debt'],
+                (float) $entry['new_debt'],
+                $creditLimit,
+                $actorId > 0 ? $actorId : null,
+                'Salary settlement deduction',
+                'settlement_run',
+                $runId,
+                [
+                    'run_month' => $runMonth,
+                    'monthly_salary' => (float) $entry['monthly_salary'],
+                ]
+            );
         }
 
         $auditLogModel->insert([
@@ -850,6 +904,8 @@ class AccountingController extends Controller
         }
 
         $currentDebt = (float) $balance['current_debt'];
+        $creditLimit = (float) $balance['credit_limit'];
+        $creditLimit = (float) $balance['credit_limit'];
         if ($currentDebt <= 0) {
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
@@ -887,6 +943,20 @@ class AccountingController extends Controller
             ]),
             'created_at' => date('Y-m-d H:i:s'),
         ]);
+
+        $this->addDebtCashbookEntry(
+            $userId,
+            'manual_deduction',
+            $amount,
+            $currentDebt,
+            $newDebt,
+            $creditLimit,
+            $actorId > 0 ? $actorId : null,
+            $reason,
+            'audit_log',
+            null,
+            ['source' => 'accounting_manual_deduction']
+        );
 
         $db->transComplete();
 
@@ -961,6 +1031,20 @@ class AccountingController extends Controller
             ]),
             'created_at' => date('Y-m-d H:i:s'),
         ]);
+
+        $this->addDebtCashbookEntry(
+            $userId,
+            'full_deduction',
+            $currentDebt,
+            $currentDebt,
+            0.0,
+            $creditLimit,
+            $actorId > 0 ? $actorId : null,
+            $reason,
+            'audit_log',
+            null,
+            ['source' => 'accounting_full_deduction']
+        );
 
         $db->transComplete();
 

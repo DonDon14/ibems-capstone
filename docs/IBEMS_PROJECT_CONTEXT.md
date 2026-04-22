@@ -1,6 +1,6 @@
 # IBEMS Project Context
 
-Last updated: 2026-04-21 (Portal scope split locked)
+Last updated: 2026-04-22 (Portal scope split + multi-role login)
 
 ## Project Overview
 
@@ -25,6 +25,7 @@ Core tables are in place:
 - settlement_runs
 - notifications
 - audit_logs
+- user_roles
 
 ### Models
 
@@ -63,6 +64,10 @@ Flow includes:
   - `session()->get('user_id')`
   - `session()->get('role')`
   - `session()->get('logged_in')`
+  - `session()->get('available_roles')`
+- multi-role login flow:
+  - one effective role -> auto-select + redirect
+  - multiple effective roles -> redirect to role picker first
 
 ### Role Access
 
@@ -80,6 +85,12 @@ Roles in use:
 - ACCOUNTING_OFFICE
 - USER
 
+Multi-role behavior:
+
+- one account can have multiple roles via `user_roles`
+- active role is selected per session after login
+- `RoleFilter` blocks protected pages until role is selected
+
 ### Routes (Current)
 
 Working routes include:
@@ -87,6 +98,8 @@ Working routes include:
 - `POST /auth/login`
 - `GET /auth/logout`
 - `GET /auth/me`
+- `GET /auth/select-role`
+- `POST /auth/select-role`
 - `GET /login`
 - `GET /dashboard`
 - `POST /pos/transactions`
