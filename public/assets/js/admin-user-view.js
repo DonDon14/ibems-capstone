@@ -106,10 +106,22 @@ function closeModal(id) {
     modal.classList.add("is-hidden");
 }
 
+function setQuickChipState(chip, active) {
+    if (!chip) return;
+    chip.classList.toggle("is-active", !!active);
+    chip.classList.toggle("bg-blue-600", !!active);
+    chip.classList.toggle("text-white", !!active);
+    chip.classList.toggle("border-blue-700", !!active);
+    chip.classList.toggle("shadow-sm", !!active);
+    chip.classList.toggle("bg-white", !active);
+    chip.classList.toggle("text-slate-700", !active);
+    chip.classList.toggle("border-slate-200", !active);
+}
+
 function renderUserTable(rows) {
     const body = document.getElementById("uv-body");
     if (!Array.isArray(rows) || rows.length === 0) {
-        body.innerHTML = '<div class="uv-empty">No users found.</div>';
+        body.innerHTML = '<div class="uv-empty rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">No users found.</div>';
         return;
     }
 
@@ -126,26 +138,26 @@ function renderUserTable(rows) {
             .map((part) => part.charAt(0).toUpperCase())
             .join("") || "U";
         return `
-        <article class="uv-record-row" data-user-id="${row.id}">
-            <div class="uv-person">
-                <div class="uv-avatar">${aEscape(initials)}</div>
-                <div class="uv-person-meta">
-                    <div class="uv-name-line">
-                        <strong>${aEscape(row.name || "-")}</strong>
-                        <span class="uv-tag">${aEscape(formatRoleLabel(mainRole))}</span>
-                        <span class="uv-status ${row.is_active ? "is-active" : "is-inactive"}">${statusText}</span>
+        <article class="uv-record-row flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:shadow-sm" data-user-id="${row.id}">
+            <div class="uv-person flex min-w-0 items-center gap-3">
+                <div class="uv-avatar inline-flex h-11 w-11 flex-none items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-sm font-bold text-blue-700">${aEscape(initials)}</div>
+                <div class="uv-person-meta min-w-0">
+                    <div class="uv-name-line flex flex-wrap items-center gap-2">
+                        <strong class="text-base font-bold text-slate-900">${aEscape(row.name || "-")}</strong>
+                        <span class="uv-tag inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">${aEscape(formatRoleLabel(mainRole))}</span>
+                        <span class="uv-status inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${row.is_active ? "is-active bg-emerald-100 text-emerald-700" : "is-inactive bg-amber-100 text-amber-700"}">${statusText}</span>
                     </div>
-                    <div class="uv-subline">${aEscape(row.employee_id || "-")} | ${aEscape(formatTypeLabel(row.user_type))} | ${aEscape(row.email || "-")}</div>
+                    <div class="uv-subline truncate text-sm text-slate-500">${aEscape(row.employee_id || "-")} | ${aEscape(formatTypeLabel(row.user_type))} | ${aEscape(row.email || "-")}</div>
                 </div>
             </div>
-            <div class="uv-finance">
-                <div class="uv-fin-kv">
-                    <span>Debt</span>
-                    <strong class="${debt > 0 ? "uv-money-debt" : ""}">${aEscape(aMoney(debt))}</strong>
+            <div class="uv-finance flex flex-wrap items-center justify-end gap-4">
+                <div class="uv-fin-kv grid gap-0.5">
+                    <span class="text-xs text-slate-500">Debt</span>
+                    <strong class="text-sm font-semibold ${debt > 0 ? "uv-money-debt text-rose-600" : "text-slate-900"}">${aEscape(aMoney(debt))}</strong>
                 </div>
-                <div class="uv-fin-kv">
-                    <span>Credit Limit</span>
-                    <strong>${aEscape(aMoney(creditLimit))}</strong>
+                <div class="uv-fin-kv grid gap-0.5">
+                    <span class="text-xs text-slate-500">Credit Limit</span>
+                    <strong class="text-sm font-semibold text-slate-900">${aEscape(aMoney(creditLimit))}</strong>
                 </div>
                 <button class="secondary-btn btn-sm" type="button" data-edit-user="${row.id}">
                     <i class="bi bi-pencil"></i> Edit
@@ -372,7 +384,7 @@ document.getElementById("uv-refresh-btn").addEventListener("click", () => {
     document.getElementById("uv-type-filter").value = "";
     uvQuickFilter = "all";
     document.querySelectorAll("[data-uv-quick]").forEach((chip) => {
-        chip.classList.toggle("is-active", chip.getAttribute("data-uv-quick") === "all");
+        setQuickChipState(chip, chip.getAttribute("data-uv-quick") === "all");
     });
     loadUserView();
 });
@@ -383,10 +395,14 @@ document.querySelectorAll("[data-uv-quick]").forEach((chip) => {
     chip.addEventListener("click", () => {
         uvQuickFilter = chip.getAttribute("data-uv-quick") || "all";
         document.querySelectorAll("[data-uv-quick]").forEach((item) => {
-            item.classList.toggle("is-active", item === chip);
+            setQuickChipState(item, item === chip);
         });
         applyUserFiltersAndRender();
     });
+});
+
+document.querySelectorAll("[data-uv-quick]").forEach((chip) => {
+    setQuickChipState(chip, chip.classList.contains("is-active"));
 });
 
 document.getElementById("uv-add-btn").addEventListener("click", () => {

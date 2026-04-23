@@ -82,12 +82,12 @@ function renderSettlementRuns(rows) {
         const notes = row.notes || {};
         const deducted = Number(notes.total_deducted || 0);
         return `
-            <button class="history-item run-item" type="button" data-settle-run="${row.id}">
-                <div class="h-top">
+            <button class="history-item run-item w-full rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:bg-slate-50" type="button" data-settle-run="${row.id}">
+                <div class="h-top flex items-center justify-between gap-2 text-xs text-slate-500">
                     <span>${aEscape(row.run_month)}</span>
                     <span>${aEscape(aDateTime(row.run_at))}</span>
                 </div>
-                <div class="h-body">
+                <div class="h-body mt-1 text-sm text-slate-700">
                     Processed: ${aEscape(String(row.total_accounts || 0))} accounts |
                     Debt Before: ${aEscape(aMoney(row.total_debt_before || 0))} |
                     Deducted: ${aEscape(aMoney(deducted))}
@@ -199,7 +199,7 @@ function renderRows(rows) {
     const body = document.getElementById("acct-body");
     const countText = document.getElementById("acct-count-text");
     if (!Array.isArray(rows) || rows.length === 0) {
-        body.innerHTML = '<div class="acct-empty">No records found.</div>';
+        body.innerHTML = '<div class="acct-empty rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">No records found.</div>';
         if (countText) countText.textContent = "Showing 0 records";
         renderSummary([]);
         return;
@@ -208,31 +208,31 @@ function renderRows(rows) {
     if (countText) countText.textContent = `Showing ${rows.length} records`;
 
     body.innerHTML = rows.map((row) => `
-        <article data-row-user="${row.user_id}" class="acct-record-row acct-row-clickable">
-            <div class="acct-person">
-                <div class="acct-avatar">${aEscape(String(row.name || "U").split(" ").filter(Boolean).slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join("") || "U")}</div>
-                <div class="acct-person-meta">
-                    <div class="acct-name-line">
-                        <strong>${aEscape(row.name)}</strong>
+        <article data-row-user="${row.user_id}" class="acct-record-row acct-row-clickable flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:bg-slate-50">
+            <div class="acct-person flex min-w-0 items-center gap-3">
+                <div class="acct-avatar inline-flex h-11 w-11 flex-none items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-sm font-bold text-blue-700">${aEscape(String(row.name || "U").split(" ").filter(Boolean).slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join("") || "U")}</div>
+                <div class="acct-person-meta min-w-0">
+                    <div class="acct-name-line flex flex-wrap items-center gap-2">
+                        <strong class="text-base font-bold text-slate-900">${aEscape(row.name)}</strong>
                         <span class="table-chip acct-chip">${aEscape(aCategory(row.user_type))}</span>
                         <span class="table-status acct-status ${Number(row.is_active || 0) === 1 ? "is-active" : "is-inactive"}">${Number(row.is_active || 0) === 1 ? "Active" : "Inactive"}</span>
                     </div>
-                    <div class="acct-subline">${aEscape(row.employee_id || "-")} | ${aEscape(row.email)}</div>
+                    <div class="acct-subline truncate text-sm text-slate-500">${aEscape(row.employee_id || "-")} | ${aEscape(row.email)}</div>
                 </div>
             </div>
-            <div class="acct-finance">
-                <div class="acct-fin-kv">
-                    <span>Current Debt</span>
-                    <strong class="${Number(row.current_debt || 0) > 0 ? "acct-money-debt" : ""}">${aEscape(aMoney(row.current_debt))}</strong>
+            <div class="acct-finance flex flex-wrap items-center justify-end gap-4">
+                <div class="acct-fin-kv grid gap-0.5">
+                    <span class="text-xs text-slate-500">Current Debt</span>
+                    <strong class="text-sm font-semibold ${Number(row.current_debt || 0) > 0 ? "acct-money-debt text-rose-600" : "text-slate-900"}">${aEscape(aMoney(row.current_debt))}</strong>
                     <div class="table-debt-bar acct-debt-bar"><i style="width:${Math.min(100, (Number(row.current_debt || 0) / Math.max(1, Number(row.credit_limit || 0))) * 100)}%"></i></div>
                 </div>
-                <div class="acct-fin-kv">
-                    <span>Credit Limit</span>
-                    <strong>${aEscape(aMoney(row.credit_limit))}</strong>
+                <div class="acct-fin-kv grid gap-0.5">
+                    <span class="text-xs text-slate-500">Credit Limit</span>
+                    <strong class="text-sm font-semibold text-slate-900">${aEscape(aMoney(row.credit_limit))}</strong>
                 </div>
-                <div class="acct-fin-kv">
-                    <span>Available</span>
-                    <strong>${aEscape(aMoney(row.available_credit))}</strong>
+                <div class="acct-fin-kv grid gap-0.5">
+                    <span class="text-xs text-slate-500">Available</span>
+                    <strong class="text-sm font-semibold text-slate-900">${aEscape(aMoney(row.available_credit))}</strong>
                 </div>
             </div>
         </article>
@@ -417,17 +417,17 @@ async function loadHistory(userId) {
 
 function buildProfileHtml(p) {
     return `
-        <div class="mode-profile-card">
-            <h5>Selected Person</h5>
-            <div class="mode-profile-grid">
-                <div class="kv"><span>Name</span><strong>${aEscape(p.name)}</strong></div>
-                <div class="kv"><span>Employee ID</span><strong>${aEscape(p.employee_id || "-")}</strong></div>
-                <div class="kv"><span>Email</span><strong>${aEscape(p.email)}</strong></div>
-                <div class="kv"><span>Category</span><strong>${aEscape(aCategory(p.user_type))}</strong></div>
-                <div class="kv"><span>Current Debt</span><strong>${aEscape(aMoney(p.current_debt))}</strong></div>
-                <div class="kv"><span>Credit Limit</span><strong>${aEscape(aMoney(p.credit_limit))}</strong></div>
-                <div class="kv"><span>Available Credit</span><strong>${aEscape(aMoney(p.available_credit))}</strong></div>
-                <div class="kv"><span>Updated At</span><strong>${aEscape(aDateTime(p.updated_at))}</strong></div>
+        <div class="mode-profile-card rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <h5 class="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Selected Person</h5>
+            <div class="mode-profile-grid grid gap-2 md:grid-cols-2">
+                <div class="kv rounded-lg border border-slate-200 bg-white p-2.5"><span class="block text-xs text-slate-500">Name</span><strong class="text-sm text-slate-900">${aEscape(p.name)}</strong></div>
+                <div class="kv rounded-lg border border-slate-200 bg-white p-2.5"><span class="block text-xs text-slate-500">Employee ID</span><strong class="text-sm text-slate-900">${aEscape(p.employee_id || "-")}</strong></div>
+                <div class="kv rounded-lg border border-slate-200 bg-white p-2.5"><span class="block text-xs text-slate-500">Email</span><strong class="text-sm text-slate-900">${aEscape(p.email)}</strong></div>
+                <div class="kv rounded-lg border border-slate-200 bg-white p-2.5"><span class="block text-xs text-slate-500">Category</span><strong class="text-sm text-slate-900">${aEscape(aCategory(p.user_type))}</strong></div>
+                <div class="kv rounded-lg border border-slate-200 bg-white p-2.5"><span class="block text-xs text-slate-500">Current Debt</span><strong class="text-sm text-slate-900">${aEscape(aMoney(p.current_debt))}</strong></div>
+                <div class="kv rounded-lg border border-slate-200 bg-white p-2.5"><span class="block text-xs text-slate-500">Credit Limit</span><strong class="text-sm text-slate-900">${aEscape(aMoney(p.credit_limit))}</strong></div>
+                <div class="kv rounded-lg border border-slate-200 bg-white p-2.5"><span class="block text-xs text-slate-500">Available Credit</span><strong class="text-sm text-slate-900">${aEscape(aMoney(p.available_credit))}</strong></div>
+                <div class="kv rounded-lg border border-slate-200 bg-white p-2.5"><span class="block text-xs text-slate-500">Updated At</span><strong class="text-sm text-slate-900">${aEscape(aDateTime(p.updated_at))}</strong></div>
             </div>
         </div>
     `;
@@ -448,12 +448,12 @@ function buildHistoryHtml(rows) {
         }
 
         return `
-            <div class="history-item">
-                <div class="h-top">
+            <div class="history-item rounded-xl border border-slate-200 bg-white p-3">
+                <div class="h-top flex items-center justify-between gap-2 text-xs text-slate-500">
                     <span>${aEscape(aDateTime(row.created_at))}</span>
                     <span>${aEscape(row.actor_name)}</span>
                 </div>
-                <div class="h-body">${aEscape(detail)}</div>
+                <div class="h-body mt-1 text-sm text-slate-700">${aEscape(detail)}</div>
             </div>
         `;
     }).join("");
@@ -489,14 +489,14 @@ function renderModeResults() {
     });
 
     if (modeFilteredRows.length === 0) {
-        wrap.innerHTML = '<div class="mode-profile-empty">No matching records.</div>';
+        wrap.innerHTML = '<div class="mode-profile-empty rounded-lg border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">No matching records.</div>';
         return;
     }
 
     wrap.innerHTML = modeFilteredRows.map((row) => `
-        <button class="mode-item ${modeSelectedUserId === Number(row.user_id) ? "is-active" : ""}" type="button" data-mode-user="${row.user_id}">
-            <span class="name">${aEscape(row.name)}</span>
-            <span class="meta">${aEscape(row.employee_id || "-")} | Debt: ${aEscape(aMoney(row.current_debt))}</span>
+        <button class="mode-item w-full rounded-xl border p-3 text-left transition ${modeSelectedUserId === Number(row.user_id) ? "is-active border-blue-300 bg-blue-50" : "border-slate-200 bg-white hover:bg-slate-50"}" type="button" data-mode-user="${row.user_id}">
+            <span class="name block text-sm font-semibold text-slate-900">${aEscape(row.name)}</span>
+            <span class="meta mt-0.5 block text-xs text-slate-500">${aEscape(row.employee_id || "-")} | Debt: ${aEscape(aMoney(row.current_debt))}</span>
         </button>
     `).join("");
 }
@@ -644,7 +644,7 @@ async function submitImportCsv() {
         const invalidPreview = Array.isArray(data.invalid_preview) ? data.invalid_preview : [];
         if (invalidPreview.length > 0) {
             invalidEl.innerHTML = invalidPreview.map((row) => `
-                <div class="invalid-item">
+                <div class="invalid-item rounded-xl border border-slate-200 bg-white p-3">
                     <strong>Line ${row.line}</strong><br>
                     ${aEscape(row.name || "-")} (${aEscape(row.email || "-")})<br>
                     <span>${aEscape(row.error || "Invalid row")}</span>

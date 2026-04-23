@@ -200,7 +200,7 @@ function srRenderDebts(rows) {
     const body = document.getElementById("debt-body");
     const countText = document.getElementById("staff-count-text");
     if (!Array.isArray(rows) || rows.length === 0) {
-        body.innerHTML = '<div class="staff-empty">No debt records found.</div>';
+        body.innerHTML = '<div class="staff-empty rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">No debt records found.</div>';
         if (countText) countText.textContent = "Showing 0 records";
         return;
     }
@@ -208,36 +208,36 @@ function srRenderDebts(rows) {
     if (countText) countText.textContent = `Showing ${rows.length} records`;
 
     body.innerHTML = rows.map((row) => `
-        <article class="staff-record-row sr-row-clickable"
+        <article class="staff-record-row sr-row-clickable flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:shadow-sm"
             data-debt-user-id="${Number(row.id || 0)}"
             data-debt-name="${srEscape(row.name)}"
             data-debt-employee="${srEscape(row.employee_id || "")}"
             data-debt-email="${srEscape(row.email || "")}"
             data-debt-category="${srEscape(row.user_type || "")}">
-            <div class="staff-person">
-                <div class="staff-avatar">${srEscape(String(row.name || "U").split(" ").filter(Boolean).slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join("") || "U")}</div>
-                <div class="staff-person-meta">
-                    <div class="staff-name-line">
-                        <strong>${srEscape(row.name)}</strong>
+            <div class="staff-person flex min-w-0 items-center gap-3">
+                <div class="staff-avatar inline-flex h-11 w-11 flex-none items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-sm font-bold text-blue-700">${srEscape(String(row.name || "U").split(" ").filter(Boolean).slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join("") || "U")}</div>
+                <div class="staff-person-meta min-w-0">
+                    <div class="staff-name-line flex flex-wrap items-center gap-2">
+                        <strong class="text-base font-bold text-slate-900">${srEscape(row.name)}</strong>
                         <span class="table-chip">${srEscape(srCategory(row.user_type))}</span>
                         <span class="table-status ${Number(row.is_active || 0) === 1 ? "is-active" : "is-inactive"}">${Number(row.is_active || 0) === 1 ? "Active" : "Inactive"}</span>
                     </div>
-                    <div class="staff-subline">${srEscape(row.employee_id || "-")} | ${srEscape(row.email)}</div>
+                    <div class="staff-subline truncate text-sm text-slate-500">${srEscape(row.employee_id || "-")} | ${srEscape(row.email)}</div>
                 </div>
             </div>
-            <div class="staff-finance">
-                <div class="staff-fin-kv">
-                    <span>Current Debt</span>
-                    <strong class="${Number(row.current_debt || 0) > 0 ? "staff-money-debt" : ""}">${srEscape(srMoney(row.current_debt))}</strong>
+            <div class="staff-finance flex flex-wrap items-center justify-end gap-4">
+                <div class="staff-fin-kv grid gap-0.5">
+                    <span class="text-xs text-slate-500">Current Debt</span>
+                    <strong class="text-sm font-semibold ${Number(row.current_debt || 0) > 0 ? "staff-money-debt text-rose-600" : "text-slate-900"}">${srEscape(srMoney(row.current_debt))}</strong>
                     <div class="table-debt-bar"><i style="width:${Math.min(100, (Number(row.current_debt || 0) / Math.max(1, Number(row.credit_limit || 0))) * 100)}%"></i></div>
                 </div>
-                <div class="staff-fin-kv">
-                    <span>Credit Limit</span>
-                    <strong>${srEscape(srMoney(row.credit_limit))}</strong>
+                <div class="staff-fin-kv grid gap-0.5">
+                    <span class="text-xs text-slate-500">Credit Limit</span>
+                    <strong class="text-sm font-semibold text-slate-900">${srEscape(srMoney(row.credit_limit))}</strong>
                 </div>
-                <div class="staff-fin-kv">
-                    <span>Available Credit</span>
-                    <strong>${srEscape(srMoney(row.available_credit))}</strong>
+                <div class="staff-fin-kv grid gap-0.5">
+                    <span class="text-xs text-slate-500">Available Credit</span>
+                    <strong class="text-sm font-semibold text-slate-900">${srEscape(srMoney(row.available_credit))}</strong>
                 </div>
             </div>
         </article>
@@ -247,16 +247,16 @@ function srRenderDebts(rows) {
 function srRenderTransactions(rows) {
     const body = document.getElementById("txn-body");
     if (!Array.isArray(rows) || rows.length === 0) {
-        body.innerHTML = '<tr><td colspan="4">No employee transactions found.</td></tr>';
+        body.innerHTML = '<tr><td class="px-3 py-4 text-sm text-slate-500" colspan="4">No employee transactions found.</td></tr>';
         return;
     }
 
     body.innerHTML = rows.map((row) => `
         <tr class="sr-row-clickable table-row-clickable" data-txn-id="${row.id}">
-            <td>${srEscape(new Date(row.created_at).toLocaleString())}</td>
-            <td>${srEscape(String(row.payment_method || "").toUpperCase())}</td>
-            <td>${srEscape(srMoney(row.amount))}</td>
-            <td>${srEscape(srMoney(row.staff.current_debt))}</td>
+            <td class="border border-slate-200 px-3 py-2 text-sm text-slate-700">${srEscape(new Date(row.created_at).toLocaleString())}</td>
+            <td class="border border-slate-200 px-3 py-2 text-sm text-slate-700">${srEscape(String(row.payment_method || "").toUpperCase())}</td>
+            <td class="border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-900">${srEscape(srMoney(row.amount))}</td>
+            <td class="border border-slate-200 px-3 py-2 text-sm text-slate-700">${srEscape(srMoney(row.staff.current_debt))}</td>
         </tr>
     `).join("");
 }
@@ -321,41 +321,41 @@ function srCloseEmployeeModal() {
     document.getElementById("txn-date-from").value = "";
     document.getElementById("txn-date-to").value = "";
     document.getElementById("txn-debt-only").checked = false;
-    document.getElementById("txn-body").innerHTML = '<tr><td colspan="4">Select an employee to load transactions.</td></tr>';
+    document.getElementById("txn-body").innerHTML = '<tr><td class="px-3 py-4 text-sm text-slate-500" colspan="4">Select an employee to load transactions.</td></tr>';
 }
 
 function srBuildReceiptHtml(receipt) {
     const rows = receipt.items
         .map((item) => `
             <tr>
-                <td>${srEscape(item.name)}</td>
-                <td>${item.qty}</td>
-                <td>${srMoney(item.unit_price)}</td>
-                <td>${srMoney(item.line_total)}</td>
+                <td class="border border-slate-200 px-3 py-2 text-sm text-slate-700">${srEscape(item.name)}</td>
+                <td class="border border-slate-200 px-3 py-2 text-sm text-slate-700">${item.qty}</td>
+                <td class="border border-slate-200 px-3 py-2 text-sm text-slate-700">${srMoney(item.unit_price)}</td>
+                <td class="border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-900">${srMoney(item.line_total)}</td>
             </tr>
         `)
         .join("");
 
     return `
-        <div class="receipt-content-head">
+        <div class="receipt-content-head mb-3 space-y-1 text-sm text-slate-700">
             <div><strong>Transaction #:</strong> ${srEscape(receipt.client_txn_id)}</div>
             <div><strong>Date:</strong> ${srEscape(srDateTime(receipt.created_at))}</div>
             <div><strong>Store:</strong> ${srEscape(receipt.store_name)}</div>
             <div><strong>Customer:</strong> ${srEscape(receipt.customer_name)}</div>
             <div><strong>Payment:</strong> ${srEscape(String(receipt.payment_method).toUpperCase())}</div>
         </div>
-        <table class="receipt-table">
+        <table class="receipt-table mb-3 w-full border-collapse overflow-hidden rounded-xl border border-slate-200">
             <thead>
                 <tr>
-                    <th>Item</th>
-                    <th>Qty</th>
-                    <th>Price</th>
-                    <th>Line Total</th>
+                    <th class="border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Item</th>
+                    <th class="border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Qty</th>
+                    <th class="border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Price</th>
+                    <th class="border border-slate-200 bg-slate-50 px-3 py-2 text-left text-xs font-semibold uppercase tracking-wide text-slate-600">Line Total</th>
                 </tr>
             </thead>
             <tbody>${rows}</tbody>
         </table>
-        <div class="receipt-total">Total: ${srMoney(receipt.amount)}</div>
+        <div class="receipt-total text-right text-lg font-bold text-slate-900">Total: ${srMoney(receipt.amount)}</div>
     `;
 }
 
