@@ -51,7 +51,7 @@ function renderRoles(roles) {
     }
 
     optionsEl.innerHTML = safeRoles.map((role) => `
-        <button type="button" class="history-action" data-role="${role}" style="margin-right:8px;margin-bottom:8px;">
+        <button type="button" class="auth-role-btn" data-role="${role}">
             ${roleLabel(role)}
         </button>
     `).join("");
@@ -88,4 +88,3 @@ async function init() {
 }
 
 init();
-

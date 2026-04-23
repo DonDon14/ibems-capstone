@@ -24,7 +24,7 @@
                 <thead>
                     <tr>
                         <th>Category</th>
-                        <th style="width: 220px;">Actions</th>
+                        <th class="w-actions-220">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="category-body">
@@ -51,7 +51,7 @@
                         <th>Code</th>
                         <th>Label</th>
                         <th>Icon</th>
-                        <th style="width: 220px;">Actions</th>
+                        <th class="w-actions-220">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="payment-method-body">

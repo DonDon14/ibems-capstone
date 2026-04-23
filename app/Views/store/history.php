@@ -43,14 +43,8 @@
     </div>
 
     <div class="history-summary">
-        <div class="history-summary-card">
-            <span class="label">Transactions</span>
-            <strong id="history-summary-count">0</strong>
-        </div>
-        <div class="history-summary-card">
-            <span class="label">Total Sales</span>
-            <strong id="history-summary-total">PHP 0.00</strong>
-        </div>
+        <?= view('components/stat_card', ['title' => 'Transactions', 'value' => '0', 'valueId' => 'history-summary-count', 'icon' => 'bi bi-receipt', 'tone' => 'users', 'class' => 'history-summary-card']) ?>
+        <?= view('components/stat_card', ['title' => 'Total Sales', 'value' => 'PHP 0.00', 'valueId' => 'history-summary-total', 'icon' => 'bi bi-graph-up-arrow', 'tone' => 'sales', 'class' => 'history-summary-card']) ?>
     </div>
 
     <div class="history-table-wrap table-standard-wrap">
@@ -75,11 +69,11 @@
     <p id="history-result" class="history-result"></p>
 </section>
 
-<div id="history-receipt-modal" class="receipt-modal" style="display:none;">
+<div id="history-receipt-modal" class="receipt-modal is-hidden">
     <div class="receipt-card">
         <div class="receipt-head">
             <h3>Transaction Receipt</h3>
-            <button id="history-receipt-close" type="button" class="receipt-close">×</button>
+            <button id="history-receipt-close" type="button" class="receipt-close">&times;</button>
         </div>
 
         <div id="history-receipt-content"></div>
@@ -95,3 +89,4 @@
 <script src="<?= base_url('assets/js/receipt-standard.js') ?>"></script>
 <script src="<?= base_url('assets/js/store-history.js') ?>"></script>
 <?= $this->endSection() ?>
+

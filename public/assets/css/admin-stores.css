@@ -1,7 +1,7 @@
 .admin-stores-shell {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 16px;
 }
 
 .admin-stores-head {
@@ -13,23 +13,26 @@
 
 .admin-stores-head h3 {
     margin: 0;
-    color: #003366;
+    color: #082f63;
+    font-size: 1.56rem;
 }
 
 .admin-stores-head p {
-    margin: 4px 0 0;
-    color: #64748b;
+    margin: 6px 0 0;
+    color: #5e738b;
+    font-size: 0.95rem;
 }
 
 .admin-stores-filters {
     display: flex;
     flex-wrap: wrap;
     align-items: end;
-    gap: 8px;
-    background: #fff;
-    border: 1px solid #dbe3ea;
-    border-radius: 12px;
+    gap: 10px;
+    background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+    border: 1px solid #d8e2ee;
+    border-radius: 14px;
     padding: 12px;
+    box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
 }
 
 .field {
@@ -48,9 +51,9 @@
 
 .field input,
 .field select {
-    border: 1px solid #d1d5db;
-    border-radius: 8px;
-    padding: 8px 10px;
+    border: 1px solid #c7d5e4;
+    border-radius: 10px;
+    padding: 9px 12px;
     width: 100%;
     min-width: 0;
     max-width: 100%;
@@ -61,27 +64,33 @@
 }
 
 .history-action {
-    border: 0;
-    border-radius: 8px;
-    background: #003366;
+    border: 1px solid #0b4b87;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #0f5a9f 0%, #003366 100%);
     color: #fff;
-    padding: 8px 10px;
+    padding: 8px 12px;
     cursor: pointer;
     font-size: 0.84rem;
+    font-weight: 700;
+    box-shadow: 0 10px 20px rgba(0, 51, 102, 0.22);
 }
 
 .primary-btn {
-    border: 0;
-    border-radius: 8px;
-    background: #003366;
+    border: 1px solid #0b4b87;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #0f5a9f 0%, #003366 100%);
     color: #fff;
-    padding: 8px 10px;
+    padding: 8px 12px;
     cursor: pointer;
     font-size: 0.84rem;
+    font-weight: 700;
+    box-shadow: 0 10px 20px rgba(0, 51, 102, 0.22);
 }
 
 .history-action.alt {
-    background: #64748b;
+    border-color: #4b5a70;
+    background: linear-gradient(180deg, #64748b 0%, #475569 100%);
+    box-shadow: 0 10px 18px rgba(71, 85, 105, 0.2);
 }
 
 .stores-gallery {
@@ -93,9 +102,9 @@
 .store-card {
     text-decoration: none;
     color: inherit;
-    background: #fff;
-    border: 1px solid #dbe3ea;
-    border-radius: 12px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    border: 1px solid #d8e2ee;
+    border-radius: 14px;
     padding: 18px;
     display: grid;
     grid-template-columns: auto 1fr;
@@ -105,8 +114,9 @@
 }
 
 .store-card:hover {
-    border-color: #93c5fd;
-    box-shadow: 0 6px 16px rgba(15, 23, 42, 0.08);
+    border-color: #a5c6e8;
+    box-shadow: 0 16px 30px rgba(15, 23, 42, 0.11);
+    transform: translateY(-1px);
 }
 
 .store-card-logo {
@@ -177,10 +187,10 @@
 .card-menu {
     display: none;
     min-width: 140px;
-    border: 1px solid #dbe3ea;
-    border-radius: 10px;
-    background: #fff;
-    box-shadow: 0 8px 20px rgba(15, 23, 42, 0.12);
+    border: 1px solid #d8e2ee;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #ffffff 0%, #f7fbff 100%);
+    box-shadow: 0 14px 26px rgba(15, 23, 42, 0.17);
     padding: 6px;
     z-index: 4;
 }
@@ -250,7 +260,7 @@
 .admin-modal {
     position: fixed;
     inset: 0;
-    background: rgba(15, 23, 42, 0.45);
+    background: rgba(8, 14, 26, 0.54);
     display: grid;
     place-items: center;
     padding: 18px;
@@ -259,10 +269,11 @@
 
 .admin-modal-card {
     width: min(860px, 100%);
-    background: #fff;
-    border: 1px solid #dbe3ea;
-    border-radius: 12px;
-    padding: 14px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    border: 1px solid #d6e2ef;
+    border-radius: 14px;
+    padding: 16px;
+    box-shadow: 0 24px 48px rgba(15, 23, 42, 0.3);
 }
 
 .admin-modal-head {
@@ -278,12 +289,12 @@
 }
 
 .admin-modal-close {
-    border: 0;
-    background: #e2e8f0;
+    border: 1px solid #d2dbe6;
+    background: #f1f5f9;
     color: #0f172a;
-    width: 28px;
-    height: 28px;
-    border-radius: 999px;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
     cursor: pointer;
     font-weight: 700;
 }

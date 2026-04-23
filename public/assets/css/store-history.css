@@ -88,30 +88,14 @@
 }
 
 .history-summary {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
-    flex-wrap: wrap;
     margin-bottom: 12px;
 }
 
 .history-summary-card {
-    background: #f8fafc;
-    border: 1px solid #dbe3ea;
-    border-radius: 10px;
-    padding: 10px 12px;
-    min-width: 180px;
-}
-
-.history-summary-card .label {
-    display: block;
-    font-size: 0.78rem;
-    color: #64748b;
-}
-
-.history-summary-card strong {
-    display: block;
-    margin-top: 4px;
-    color: #003366;
+    min-width: 0;
 }
 
 .history-result {
@@ -213,5 +197,8 @@
     .history-toolbar {
         flex-direction: column;
         align-items: stretch;
+    }
+    .history-summary {
+        grid-template-columns: 1fr;
     }
 }

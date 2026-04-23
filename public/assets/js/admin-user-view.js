@@ -95,44 +95,74 @@ function renderTopSummary(rows) {
 }
 
 function openModal(id) {
-    document.getElementById(id).style.display = "grid";
+    const modal = document.getElementById(id);
+    if (!modal) return;
+    modal.classList.remove("is-hidden");
 }
 
 function closeModal(id) {
-    document.getElementById(id).style.display = "none";
+    const modal = document.getElementById(id);
+    if (!modal) return;
+    modal.classList.add("is-hidden");
 }
 
 function renderUserTable(rows) {
     const body = document.getElementById("uv-body");
     if (!Array.isArray(rows) || rows.length === 0) {
-        body.innerHTML = '<tr><td colspan="8">No users found.</td></tr>';
+        body.innerHTML = '<div class="uv-empty">No users found.</div>';
         return;
     }
 
     body.innerHTML = rows.map((row) => {
         const roles = normalizeRoles(row.roles, row.role);
+        const mainRole = roles[0] || "USER";
+        const statusText = row.is_active ? "Active" : "Inactive";
+        const debt = Number(row.current_debt || 0);
+        const creditLimit = Number(row.credit_limit || 0);
+        const initials = String(row.name || "U")
+            .split(" ")
+            .filter(Boolean)
+            .slice(0, 2)
+            .map((part) => part.charAt(0).toUpperCase())
+            .join("") || "U";
         return `
-        <tr class="uv-row" data-user-id="${row.id}" style="cursor:pointer;">
-            <td>${aEscape(row.employee_id || "-")}</td>
-            <td>${aEscape(row.name)}</td>
-            <td>${aEscape(row.email)}</td>
-            <td>${roles.map((role) => `<span class="uv-tag">${aEscape(formatRoleLabel(role))}</span>`).join(" ")}</td>
-            <td>${aEscape(formatTypeLabel(row.user_type))}</td>
-            <td><span class="uv-status ${row.is_active ? "is-active" : "is-inactive"}">${row.is_active ? "Active" : "Inactive"}</span></td>
-            <td>
-                <div class="uv-debt-wrap">
-                    <span>${aEscape(aMoney(row.current_debt))}</span>
-                    <div class="uv-debt-bar"><i style="width:${Math.min(100, (Number(row.current_debt || 0) / Math.max(1, Number(row.credit_limit || 0))) * 100)}%"></i></div>
+        <article class="uv-record-row" data-user-id="${row.id}">
+            <div class="uv-person">
+                <div class="uv-avatar">${aEscape(initials)}</div>
+                <div class="uv-person-meta">
+                    <div class="uv-name-line">
+                        <strong>${aEscape(row.name || "-")}</strong>
+                        <span class="uv-tag">${aEscape(formatRoleLabel(mainRole))}</span>
+                        <span class="uv-status ${row.is_active ? "is-active" : "is-inactive"}">${statusText}</span>
+                    </div>
+                    <div class="uv-subline">${aEscape(row.employee_id || "-")} | ${aEscape(formatTypeLabel(row.user_type))} | ${aEscape(row.email || "-")}</div>
                 </div>
-            </td>
-            <td>${aEscape(aMoney(row.credit_limit))}</td>
-        </tr>
+            </div>
+            <div class="uv-finance">
+                <div class="uv-fin-kv">
+                    <span>Debt</span>
+                    <strong class="${debt > 0 ? "uv-money-debt" : ""}">${aEscape(aMoney(debt))}</strong>
+                </div>
+                <div class="uv-fin-kv">
+                    <span>Credit Limit</span>
+                    <strong>${aEscape(aMoney(creditLimit))}</strong>
+                </div>
+                <button class="secondary-btn btn-sm" type="button" data-edit-user="${row.id}">
+                    <i class="bi bi-pencil"></i> Edit
+                </button>
+                <button class="ghost-btn btn-sm uv-open-btn" type="button" data-view-user="${row.id}" aria-label="Open record">
+                    <i class="bi bi-chevron-down"></i>
+                </button>
+            </div>
+        </article>
     `;
     }).join("");
 }
 
 function applyUserFiltersAndRender() {
     const filtered = getFilteredRows();
+    const countText = document.getElementById("uv-count-text");
+    if (countText) countText.textContent = `Showing ${filtered.length} of ${uvRows.length} records`;
     renderTopSummary(filtered);
     renderUserTable(filtered);
 }
@@ -146,7 +176,9 @@ async function loadUserView() {
     const data = await response.json();
     const body = document.getElementById("uv-body");
     if (!data || data.status !== "success") {
-        body.innerHTML = '<tr><td colspan="8">Unable to load users.</td></tr>';
+        body.innerHTML = '<div class="uv-empty">Unable to load users.</div>';
+        const countText = document.getElementById("uv-count-text");
+        if (countText) countText.textContent = "Showing 0 of 0 records";
         renderTopSummary([]);
         return;
     }
@@ -296,6 +328,43 @@ async function importUsersCsv() {
     await loadUserView();
 }
 
+function exportFilteredRowsToCsv() {
+    const rows = getFilteredRows();
+    if (!rows.length) {
+        setUvResult("No records to export.", "error");
+        return;
+    }
+
+    const headers = ["employee_id", "name", "email", "roles", "category", "status", "current_debt", "credit_limit"];
+    const lines = [headers.join(",")];
+
+    rows.forEach((row) => {
+        const roles = normalizeRoles(row.roles, row.role).join("|");
+        const fields = [
+            row.employee_id || "",
+            row.name || "",
+            row.email || "",
+            roles,
+            row.user_type || "",
+            row.is_active ? "Active" : "Inactive",
+            Number(row.current_debt || 0).toFixed(2),
+            Number(row.credit_limit || 0).toFixed(2),
+        ].map((field) => `"${String(field).replace(/"/g, '""')}"`);
+        lines.push(fields.join(","));
+    });
+
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `employee-records-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    setUvResult("Export completed.", "ok");
+}
+
 document.getElementById("uv-search-btn").addEventListener("click", loadUserView);
 document.getElementById("uv-refresh-btn").addEventListener("click", () => {
     document.getElementById("uv-search").value = "";
@@ -325,6 +394,7 @@ document.getElementById("uv-add-btn").addEventListener("click", () => {
     openModal("uv-add-modal");
 });
 document.getElementById("uv-import-btn").addEventListener("click", () => openModal("uv-import-modal"));
+document.getElementById("uv-export-btn").addEventListener("click", exportFilteredRowsToCsv);
 document.getElementById("uv-add-close").addEventListener("click", () => closeModal("uv-add-modal"));
 document.getElementById("uv-edit-close").addEventListener("click", () => closeModal("uv-edit-modal"));
 document.getElementById("uv-import-close").addEventListener("click", () => closeModal("uv-import-modal"));
@@ -339,11 +409,26 @@ document.getElementById("uv-view-edit").addEventListener("click", async () => {
 });
 
 document.getElementById("uv-body").addEventListener("click", (event) => {
-    const row = event.target.closest(".uv-row");
+    const editBtn = event.target.closest("[data-edit-user]");
+    if (editBtn) {
+        event.stopPropagation();
+        const userId = Number(editBtn.getAttribute("data-edit-user") || 0);
+        if (userId) openEditUser(userId);
+        return;
+    }
+
+    const viewBtn = event.target.closest("[data-view-user]");
+    if (viewBtn) {
+        event.stopPropagation();
+        const userId = Number(viewBtn.getAttribute("data-view-user") || 0);
+        if (userId) openViewUser(userId);
+        return;
+    }
+
+    const row = event.target.closest(".uv-record-row");
     if (!row) return;
     const userId = Number(row.getAttribute("data-user-id") || 0);
-    if (!userId) return;
-    openViewUser(userId);
+    if (userId) openViewUser(userId);
 });
 
 ["uv-add-modal", "uv-edit-modal", "uv-import-modal", "uv-view-modal"].forEach((id) => {

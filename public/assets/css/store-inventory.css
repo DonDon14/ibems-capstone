@@ -1,7 +1,7 @@
 .inventory-shell {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 16px;
 }
 
 .inventory-top {
@@ -36,12 +36,14 @@
 
 .inventory-top h3 {
     margin: 0;
-    color: #003366;
+    color: #082f63;
+    font-size: 1.56rem;
 }
 
 .inventory-top p {
-    margin: 4px 0 0;
-    color: #64748b;
+    margin: 6px 0 0;
+    color: #5e738b;
+    font-size: 0.95rem;
 }
 
 .inventory-store-wrap {
@@ -70,15 +72,18 @@
 }
 
 .inventory-card {
-    background: #fff;
-    border: 1px solid #dbe3ea;
-    border-radius: 12px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 250, 255, 0.94));
+    border: 1px solid #d8e2ee;
+    border-radius: 14px;
     padding: 14px;
+    box-shadow: 0 12px 26px rgba(15, 23, 42, 0.08);
 }
 
 .inventory-card h4 {
     margin: 0 0 12px;
-    color: #003366;
+    color: #0b3f73;
+    font-size: 1.14rem;
 }
 .inventory-list-head {
     display: flex;
@@ -88,10 +93,11 @@
     margin-bottom: 10px;
 }
 .inventory-list-head input {
-    border: 1px solid #d1d5db;
-    border-radius: 8px;
-    padding: 8px 10px;
+    border: 1px solid #c7d5e4;
+    border-radius: 10px;
+    padding: 9px 12px;
     min-width: 260px;
+    background: #fff;
 }
 .inventory-table-wrap {
     overflow: auto;
@@ -104,7 +110,7 @@
     transition: background-color 0.15s ease;
 }
 .inventory-table-wrap .table tbody tr.product-row:hover {
-    background: #f8fafc;
+    background: #f5f9ff;
 }
 .prod-thumb {
     width: 42px;
@@ -127,13 +133,15 @@
     font-weight: 600;
 }
 .stock-adjust-btn {
-    border: 0;
-    border-radius: 8px;
-    background: #003366;
+    border: 1px solid #0b4b87;
+    border-radius: 10px;
+    background: linear-gradient(180deg, #0f5a9f 0%, #003366 100%);
     color: #fff;
-    padding: 8px 10px;
+    padding: 8px 12px;
     cursor: pointer;
     font-size: 0.84rem;
+    font-weight: 700;
+    box-shadow: 0 10px 20px rgba(0, 51, 102, 0.22);
 }
 .stock-adjust-btn:disabled {
     opacity: 0.6;
@@ -164,11 +172,12 @@
 
 .field input,
 .field select {
-    border: 1px solid #d1d5db;
-    border-radius: 8px;
-    padding: 8px 10px;
+    border: 1px solid #c7d5e4;
+    border-radius: 10px;
+    padding: 9px 12px;
     width: 100%;
     min-width: 0;
+    background: #fff;
 }
 
 .field-wide {
@@ -190,15 +199,15 @@
 
 .create-product-section h5 {
     margin: 0 0 10px;
-    color: #0f172a;
-    font-size: 1.04rem;
+    color: #0f2b49;
+    font-size: 1.05rem;
     font-weight: 800;
 }
 
 .image-grid .image-preview-box {
-    border: 1px solid #dbe3ea;
+    border: 1px solid #d8e2ee;
     border-radius: 12px;
-    background: #fff;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
     padding: 10px;
     min-height: 120px;
     display: grid;
@@ -219,9 +228,9 @@
 }
 
 .readonly-value {
-    border: 1px solid #d1d5db;
-    border-radius: 8px;
-    background: #eef2f7;
+    border: 1px solid #cbd9ea;
+    border-radius: 10px;
+    background: #edf3fb;
     color: #334155;
     padding: 8px 10px;
     font-weight: 700;
@@ -284,22 +293,23 @@
 .inv-modal {
     position: fixed;
     inset: 0;
-    background: rgba(15, 23, 42, 0.45);
+    background: rgba(8, 14, 26, 0.54);
     display: grid;
     place-items: center;
     padding: 18px;
     z-index: 1200;
 }
 .inv-modal-card {
-    width: min(760px, 100%);
-    background: #fff;
-    border-radius: 12px;
-    border: 1px solid #dbe3ea;
-    padding: 14px;
+    width: min(900px, 100%);
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    border-radius: 14px;
+    border: 1px solid #d6e2ef;
+    padding: 16px;
     max-height: min(90vh, 860px);
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    box-shadow: 0 24px 48px rgba(15, 23, 42, 0.3);
 }
 .inv-modal-head {
     display: flex;
@@ -309,15 +319,15 @@
 }
 .inv-modal-head h4 {
     margin: 0;
-    color: #003366;
+    color: #0b3f73;
 }
 .inv-modal-close {
-    border: 0;
-    background: #e2e8f0;
+    border: 1px solid #d2dbe6;
+    background: #f1f5f9;
     color: #0f172a;
-    width: 28px;
-    height: 28px;
-    border-radius: 999px;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
     cursor: pointer;
     font-weight: 700;
 }
@@ -332,14 +342,14 @@
     padding-right: 4px;
 }
 .secondary-btn {
-    border: 1px solid #003366;
-    border-radius: 8px;
+    border: 1px solid #0b4b87;
+    border-radius: 10px;
     background: #fff;
-    color: #003366;
-    padding: 8px 10px;
+    color: #0b3f73;
+    padding: 8px 12px;
     cursor: pointer;
     font-size: 0.84rem;
-    font-weight: 600;
+    font-weight: 700;
 }
 .secondary-btn:disabled {
     opacity: 0.6;
@@ -348,9 +358,9 @@
 .product-action-info {
     margin-bottom: 10px;
     padding: 10px;
-    border: 1px solid #dbe3ea;
+    border: 1px solid #d8e2ee;
     border-radius: 10px;
-    background: #f8fafc;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
     color: #334155;
     display: grid;
     gap: 4px;
@@ -358,9 +368,9 @@
 .product-detail-view {
     margin-bottom: 10px;
     padding: 10px;
-    border: 1px solid #dbe3ea;
+    border: 1px solid #d8e2ee;
     border-radius: 10px;
-    background: #fff;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
     display: grid;
     grid-template-columns: 1fr 1fr;
     gap: 10px;
@@ -386,18 +396,20 @@
     margin: 10px 0;
 }
 .panel-tab {
-    border: 1px solid #cbd5e1;
-    background: #f8fafc;
+    border: 1px solid #c9d7e8;
+    background: linear-gradient(180deg, #ffffff 0%, #f3f8ff 100%);
     color: #334155;
     border-radius: 999px;
     padding: 6px 12px;
     font-size: 0.84rem;
     cursor: pointer;
+    font-weight: 600;
 }
 .panel-tab.is-active {
-    border-color: #003366;
-    background: #003366;
+    border-color: #0b4b87;
+    background: linear-gradient(180deg, #0f5a9f 0%, #003366 100%);
     color: #fff;
+    box-shadow: 0 10px 18px rgba(0, 51, 102, 0.24);
 }
 .action-panel {
     margin-bottom: 4px;

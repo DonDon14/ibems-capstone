@@ -12,10 +12,10 @@
     </div>
 
     <div class="summary-grid">
-        <div class="summary-card"><span>Total Transactions</span><strong id="sd-txn-count">0</strong></div>
-        <div class="summary-card"><span>Total Sales</span><strong id="sd-sales-total">PHP 0.00</strong></div>
-        <div class="summary-card"><span>Products</span><strong id="sd-product-count">0</strong></div>
-        <div class="summary-card"><span>Total Stock Units</span><strong id="sd-stock-units">0</strong></div>
+        <?= view('components/stat_card', ['title' => 'Total Transactions', 'value' => '0', 'valueId' => 'sd-txn-count', 'icon' => 'bi bi-receipt-cutoff', 'tone' => 'users']) ?>
+        <?= view('components/stat_card', ['title' => 'Total Sales', 'value' => 'PHP 0.00', 'valueId' => 'sd-sales-total', 'icon' => 'bi bi-graph-up-arrow', 'tone' => 'sales']) ?>
+        <?= view('components/stat_card', ['title' => 'Products', 'value' => '0', 'valueId' => 'sd-product-count', 'icon' => 'bi bi-box-seam', 'tone' => 'finance']) ?>
+        <?= view('components/stat_card', ['title' => 'Total Stock Units', 'value' => '0', 'valueId' => 'sd-stock-units', 'icon' => 'bi bi-boxes', 'tone' => 'warning']) ?>
     </div>
 
     <div class="overview-table-wrap">

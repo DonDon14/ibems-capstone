@@ -8,7 +8,7 @@
     display: flex;
     justify-content: space-between;
     gap: 14px;
-    align-items: end;
+    align-items: flex-end;
 }
 
 .reports-top h3 {
@@ -91,6 +91,10 @@
     gap: 10px;
 }
 
+.reports-panels-top {
+    grid-template-columns: 1fr 1fr;
+}
+
 .summary-card {
     background: #fff;
     border: 1px solid #dbe3ea;
@@ -116,15 +120,11 @@
 }
 
 .reports-card {
-    background: #fff;
-    border: 1px solid #dbe3ea;
-    border-radius: 12px;
-    padding: 12px;
+    padding: 14px;
 }
 
 .reports-card h4 {
-    margin: 0 0 10px;
-    color: #003366;
+    margin: 0 0 12px;
 }
 
 .payment-records-grid {
@@ -140,6 +140,10 @@
     font-size: 0.76rem;
 }
 
+.payment-record strong {
+    margin-top: 4px;
+}
+
 .payment-record--highlight {
     background: #003366;
     border-color: #003366;
@@ -149,6 +153,12 @@
 .payment-record--highlight small,
 .payment-record--highlight strong {
     color: #fff;
+}
+
+.payment-record--highlight .metric-card-icon {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.38);
+    color: #ffffff;
 }
 
 .cash-control-form {
@@ -208,6 +218,10 @@
 
     .payment-records-grid {
         grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .reports-panels-top {
+        grid-template-columns: 1fr;
     }
 
     .cash-control-form {

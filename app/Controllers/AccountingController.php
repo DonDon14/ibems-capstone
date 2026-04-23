@@ -51,6 +51,187 @@ class AccountingController extends Controller
         return view('accounting/dashboard');
     }
 
+    public function dashboardData()
+    {
+        $db = Database::connect();
+
+        $accountsRow = $db->table('balances b')
+            ->select('COUNT(*) AS total_accounts, SUM(b.current_debt) AS total_debt, SUM(CASE WHEN b.current_debt > 0 THEN 1 ELSE 0 END) AS with_debt')
+            ->join('users u', 'u.id = b.user_id', 'inner')
+            ->where('u.is_active', 1)
+            ->whereIn('u.user_type', ['faculty', 'staff'])
+            ->get()
+            ->getRowArray() ?? [];
+
+        $todayStart = date('Y-m-d 00:00:00');
+        $todayEnd = date('Y-m-d 23:59:59');
+        $deductionRows = $db->table('audit_logs')
+            ->select('payload_json')
+            ->whereIn('action', [
+                'ACCOUNTING_DEDUCT_DEBT',
+                'ACCOUNTING_DEDUCT_FULL_DEBT',
+                'ACCOUNTING_SETTLEMENT_DEDUCT',
+            ])
+            ->where('created_at >=', $todayStart)
+            ->where('created_at <=', $todayEnd)
+            ->get()
+            ->getResultArray();
+
+        $todayDeductionCount = 0;
+        $todayDeductionAmount = 0.0;
+        foreach ($deductionRows as $row) {
+            $payload = json_decode((string) ($row['payload_json'] ?? ''), true);
+            if (!is_array($payload)) {
+                continue;
+            }
+            $amount = (float) ($payload['deducted_amount'] ?? 0);
+            if ($amount <= 0) {
+                continue;
+            }
+            $todayDeductionCount++;
+            $todayDeductionAmount += $amount;
+        }
+
+        $lastRun = $db->table('settlement_runs sr')
+            ->select('sr.id, sr.run_month, sr.run_at, sr.total_accounts, sr.total_debt_before, u.name AS run_by_name')
+            ->join('users u', 'u.id = sr.run_by', 'left')
+            ->orderBy('sr.id', 'DESC')
+            ->limit(1)
+            ->get()
+            ->getRowArray();
+
+        $topDebtAccounts = $db->table('balances b')
+            ->select('u.id AS user_id, u.employee_id, u.name, u.email, b.current_debt, b.credit_limit')
+            ->join('users u', 'u.id = b.user_id', 'inner')
+            ->where('u.is_active', 1)
+            ->whereIn('u.user_type', ['faculty', 'staff'])
+            ->where('b.current_debt >', 0)
+            ->orderBy('b.current_debt', 'DESC')
+            ->limit(5)
+            ->get()
+            ->getResultArray();
+
+        $trendByDate = [];
+        $trendSeed = [];
+        for ($i = 6; $i >= 0; $i--) {
+            $date = date('Y-m-d', strtotime("-{$i} day"));
+            $trendByDate[$date] = ['date' => $date, 'amount' => 0.0, 'count' => 0];
+            $trendSeed[] = $date;
+        }
+
+        $trendRows = $db->table('audit_logs')
+            ->select('created_at, payload_json')
+            ->whereIn('action', [
+                'ACCOUNTING_DEDUCT_DEBT',
+                'ACCOUNTING_DEDUCT_FULL_DEBT',
+                'ACCOUNTING_SETTLEMENT_DEDUCT',
+            ])
+            ->where('created_at >=', date('Y-m-d 00:00:00', strtotime('-6 day')))
+            ->where('created_at <=', date('Y-m-d 23:59:59'))
+            ->orderBy('created_at', 'ASC')
+            ->get()
+            ->getResultArray();
+
+        foreach ($trendRows as $row) {
+            $date = substr((string) ($row['created_at'] ?? ''), 0, 10);
+            if (!isset($trendByDate[$date])) {
+                continue;
+            }
+
+            $payload = json_decode((string) ($row['payload_json'] ?? ''), true);
+            if (!is_array($payload)) {
+                continue;
+            }
+
+            $amount = (float) ($payload['deducted_amount'] ?? 0);
+            if ($amount <= 0) {
+                continue;
+            }
+
+            $trendByDate[$date]['amount'] += $amount;
+            $trendByDate[$date]['count'] += 1;
+        }
+
+        $trend = [];
+        foreach ($trendSeed as $date) {
+            $trend[] = $trendByDate[$date];
+        }
+
+        $recentActivities = $db->table('audit_logs al')
+            ->select('al.id, al.action, al.created_at, al.payload_json, actor.name AS actor_name, target.name AS target_name')
+            ->join('users actor', 'actor.id = al.actor_id', 'left')
+            ->join('users target', 'target.id = al.entity_id AND al.entity = "balances"', 'left')
+            ->whereIn('al.action', [
+                'ACCOUNTING_IMPORT_HR_CSV',
+                'ACCOUNTING_DEDUCT_DEBT',
+                'ACCOUNTING_DEDUCT_FULL_DEBT',
+                'ACCOUNTING_UPDATE_CREDIT_LIMIT',
+                'ACCOUNTING_RUN_SETTLEMENT',
+                'ACCOUNTING_SETTLEMENT_DEDUCT',
+            ])
+            ->orderBy('al.id', 'DESC')
+            ->limit(10)
+            ->get()
+            ->getResultArray();
+
+        $activityFeed = array_map(static function (array $row): array {
+            $action = (string) ($row['action'] ?? '');
+            $payload = json_decode((string) ($row['payload_json'] ?? ''), true);
+            if (!is_array($payload)) {
+                $payload = [];
+            }
+
+            $label = $action;
+            if ($action === 'ACCOUNTING_IMPORT_HR_CSV') {
+                $label = 'Imported HR CSV';
+            } elseif ($action === 'ACCOUNTING_DEDUCT_DEBT') {
+                $label = 'Manual debt deduction';
+            } elseif ($action === 'ACCOUNTING_DEDUCT_FULL_DEBT') {
+                $label = 'Full debt deduction';
+            } elseif ($action === 'ACCOUNTING_UPDATE_CREDIT_LIMIT') {
+                $label = 'Updated credit limit';
+            } elseif ($action === 'ACCOUNTING_RUN_SETTLEMENT') {
+                $label = 'Ran monthly settlement';
+            } elseif ($action === 'ACCOUNTING_SETTLEMENT_DEDUCT') {
+                $label = 'Settlement deduction entry';
+            }
+
+            return [
+                'id' => (int) ($row['id'] ?? 0),
+                'label' => $label,
+                'actor_name' => $row['actor_name'] ?: 'Unknown',
+                'target_name' => $row['target_name'] ?: null,
+                'amount' => (float) ($payload['deducted_amount'] ?? 0),
+                'created_at' => $row['created_at'] ?? null,
+            ];
+        }, $recentActivities);
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'summary' => [
+                'total_accounts' => (int) ($accountsRow['total_accounts'] ?? 0),
+                'with_debt' => (int) ($accountsRow['with_debt'] ?? 0),
+                'total_debt' => (float) ($accountsRow['total_debt'] ?? 0),
+                'today_deduction_count' => $todayDeductionCount,
+                'today_deduction_amount' => $todayDeductionAmount,
+                'last_settlement_month' => $lastRun['run_month'] ?? null,
+                'last_settlement_at' => $lastRun['run_at'] ?? null,
+            ],
+            'top_debt_accounts' => array_map(static function (array $row): array {
+                return [
+                    'user_id' => (int) ($row['user_id'] ?? 0),
+                    'employee_id' => $row['employee_id'],
+                    'name' => $row['name'],
+                    'email' => $row['email'],
+                    'current_debt' => (float) ($row['current_debt'] ?? 0),
+                    'credit_limit' => (float) ($row['credit_limit'] ?? 0),
+                ];
+            }, $topDebtAccounts),
+            'trend' => $trend,
+            'activity' => $activityFeed,
+        ]);
+    }
+
     public function debts()
     {
         return view('accounting/debts');
@@ -1003,6 +1184,7 @@ class AccountingController extends Controller
         }
 
         $currentDebt = (float) $balance['current_debt'];
+        $creditLimit = (float) ($balance['credit_limit'] ?? 0);
         if ($currentDebt <= 0) {
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',

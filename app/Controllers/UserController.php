@@ -12,6 +12,134 @@ class UserController extends Controller
         return view('user/dashboard');
     }
 
+    public function dashboardData()
+    {
+        $userId = (int) session()->get('user_id');
+        if ($userId <= 0) {
+            return $this->response->setStatusCode(401)->setJSON([
+                'status' => 'error',
+                'message' => 'Not authenticated.',
+            ]);
+        }
+
+        $db = Database::connect();
+
+        $balance = $db->table('balances')
+            ->select('credit_limit, current_debt')
+            ->where('user_id', $userId)
+            ->get()
+            ->getRowArray();
+
+        $txnSummary = $db->table('transactions')
+            ->select('COUNT(*) AS txn_count, COALESCE(SUM(amount),0) AS total_spent')
+            ->where('user_id', $userId)
+            ->get()
+            ->getRowArray();
+
+        $cashbookSummaryRows = $db->table('debt_cashbook_entries')
+            ->select('direction, COALESCE(SUM(amount),0) AS total_amount')
+            ->where('user_id', $userId)
+            ->groupBy('direction')
+            ->get()
+            ->getResultArray();
+
+        $debtAddedTotal = 0.0;
+        $deductedTotal = 0.0;
+        foreach ($cashbookSummaryRows as $row) {
+            $direction = strtolower((string) ($row['direction'] ?? ''));
+            $amount = (float) ($row['total_amount'] ?? 0);
+            if ($direction === 'debit') {
+                $debtAddedTotal += $amount;
+            } elseif ($direction === 'credit') {
+                $deductedTotal += $amount;
+            }
+        }
+
+        $recentTransactions = $db->table('transactions t')
+            ->select('t.id, t.client_txn_id, t.created_at, t.payment_method, t.amount, s.store_name')
+            ->join('stores s', 's.id = t.store_id', 'left')
+            ->where('t.user_id', $userId)
+            ->orderBy('t.id', 'DESC')
+            ->limit(5)
+            ->get()
+            ->getResultArray();
+
+        $recentCashbook = $db->table('debt_cashbook_entries')
+            ->select('id, created_at, entry_type, direction, amount, debt_after, remarks')
+            ->where('user_id', $userId)
+            ->orderBy('id', 'DESC')
+            ->limit(8)
+            ->get()
+            ->getResultArray();
+
+        $trendByDate = [];
+        $trendSeed = [];
+        for ($i = 6; $i >= 0; $i--) {
+            $date = date('Y-m-d', strtotime("-{$i} day"));
+            $trendByDate[$date] = ['date' => $date, 'amount' => 0.0];
+            $trendSeed[] = $date;
+        }
+
+        $trendRows = $db->table('transactions')
+            ->select('created_at, amount')
+            ->where('user_id', $userId)
+            ->where('created_at >=', date('Y-m-d 00:00:00', strtotime('-6 day')))
+            ->where('created_at <=', date('Y-m-d 23:59:59'))
+            ->orderBy('created_at', 'ASC')
+            ->get()
+            ->getResultArray();
+
+        foreach ($trendRows as $row) {
+            $date = substr((string) ($row['created_at'] ?? ''), 0, 10);
+            if (!isset($trendByDate[$date])) {
+                continue;
+            }
+            $trendByDate[$date]['amount'] += (float) ($row['amount'] ?? 0);
+        }
+
+        $trend = [];
+        foreach ($trendSeed as $date) {
+            $trend[] = $trendByDate[$date];
+        }
+
+        $summary = [
+            'credit_limit' => (float) ($balance['credit_limit'] ?? 0),
+            'current_debt' => (float) ($balance['current_debt'] ?? 0),
+            'available_credit' => max(0, (float) ($balance['credit_limit'] ?? 0) - (float) ($balance['current_debt'] ?? 0)),
+            'txn_count' => (int) ($txnSummary['txn_count'] ?? 0),
+            'total_spent' => (float) ($txnSummary['total_spent'] ?? 0),
+            'debt_added_total' => $debtAddedTotal,
+            'debt_deducted_total' => $deductedTotal,
+        ];
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'summary' => $summary,
+            'trend' => $trend,
+            'recent_transactions' => array_map(static function (array $row): array {
+                return [
+                    'id' => (int) ($row['id'] ?? 0),
+                    'client_txn_id' => (string) ($row['client_txn_id'] ?? ''),
+                    'created_at' => (string) ($row['created_at'] ?? ''),
+                    'payment_method' => (string) ($row['payment_method'] ?? ''),
+                    'amount' => (float) ($row['amount'] ?? 0),
+                    'store_name' => (string) ($row['store_name'] ?? ''),
+                ];
+            }, $recentTransactions),
+            'recent_cashbook' => array_map(static function (array $row): array {
+                return [
+                    'id' => (int) ($row['id'] ?? 0),
+                    'created_at' => (string) ($row['created_at'] ?? ''),
+                    'entry_type' => (string) ($row['entry_type'] ?? ''),
+                    'direction' => (string) ($row['direction'] ?? ''),
+                    'amount' => (float) ($row['amount'] ?? 0),
+                    'debt_after' => (float) ($row['debt_after'] ?? 0),
+                    'remarks' => (string) ($row['remarks'] ?? ''),
+                ];
+            }, $recentCashbook),
+        ]);
+    }
+
     public function history()
     {
         return view('user/history');
@@ -169,6 +297,86 @@ class UserController extends Controller
                     'store_name' => $row['store_name'] ?: ('Store #' . (int) $row['store_id']),
                 ];
             }, $rows),
+        ]);
+    }
+
+    public function transactionDetails(int $transactionId)
+    {
+        $userId = (int) session()->get('user_id');
+        if ($userId <= 0) {
+            return $this->response->setStatusCode(401)->setJSON([
+                'status' => 'error',
+                'message' => 'Not authenticated.',
+            ]);
+        }
+
+        if ($transactionId <= 0) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Invalid transaction id.',
+            ]);
+        }
+
+        $db = Database::connect();
+        $txn = $db->table('transactions t')
+            ->select('t.id, t.client_txn_id, t.created_at, t.payment_method, t.amount, t.customer_type, t.user_id, t.store_id, s.store_name, u.name AS customer_name')
+            ->join('stores s', 's.id = t.store_id', 'left')
+            ->join('users u', 'u.id = t.user_id', 'left')
+            ->where('t.id', $transactionId)
+            ->where('t.user_id', $userId)
+            ->get()
+            ->getRowArray();
+
+        if (!$txn) {
+            return $this->response->setStatusCode(404)->setJSON([
+                'status' => 'error',
+                'message' => 'Transaction not found.',
+            ]);
+        }
+
+        $itemsRaw = $db->table('transaction_items ti')
+            ->select('ti.product_id, ti.qty, ti.unit_price, ti.line_total, p.name AS product_name')
+            ->join('products p', 'p.id = ti.product_id', 'left')
+            ->where('ti.transaction_id', $transactionId)
+            ->orderBy('ti.id', 'ASC')
+            ->get()
+            ->getResultArray();
+
+        $items = array_map(static function (array $row): array {
+            $name = $row['product_name'] ?: ('Product #' . (int) ($row['product_id'] ?? 0));
+            return [
+                'name' => $name,
+                'qty' => (int) ($row['qty'] ?? 0),
+                'unit_price' => (float) ($row['unit_price'] ?? 0),
+                'line_total' => (float) ($row['line_total'] ?? 0),
+            ];
+        }, $itemsRaw);
+
+        $customerName = $txn['customer_name'] ?: (string) (session()->get('name') ?? 'User');
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'transaction' => [
+                'id' => (int) $txn['id'],
+                'client_txn_id' => (string) ($txn['client_txn_id'] ?? ''),
+                'created_at' => (string) ($txn['created_at'] ?? ''),
+                'payment_method' => (string) ($txn['payment_method'] ?? ''),
+                'amount' => (float) ($txn['amount'] ?? 0),
+                'customer_name' => $customerName,
+                'store_name' => (string) ($txn['store_name'] ?: ('Store #' . (int) ($txn['store_id'] ?? 0))),
+                'items' => $items,
+            ],
+        ]);
+    }
+
+    public function receiptPage(int $transactionId)
+    {
+        if ($transactionId <= 0) {
+            return redirect()->to('/user/history');
+        }
+
+        return view('user/receipt', [
+            'transaction_id' => $transactionId,
         ]);
     }
 }

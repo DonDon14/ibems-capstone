@@ -1,111 +1,45 @@
-.user-shell {
-    display: flex;
-    flex-direction: column;
-    gap: 14px;
-}
-
-.user-head h3 {
-    margin: 0;
-    color: #003366;
-}
-
-.user-head p {
-    margin: 4px 0 0;
-    color: #64748b;
-}
-
-.user-summary-grid {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 10px;
-}
-
-.summary-card {
-    background: #fff;
-    border: 1px solid #dbe3ea;
-    border-radius: 10px;
-    padding: 10px 12px;
-}
-
-.summary-card span {
-    display: block;
-    color: #64748b;
-    font-size: 0.8rem;
-}
-
-.summary-card strong {
-    color: #003366;
-    font-size: 1.02rem;
-}
-
 .user-filters {
     display: flex;
     flex-wrap: wrap;
     align-items: end;
-    gap: 8px;
-    background: #fff;
-    border: 1px solid #dbe3ea;
-    border-radius: 12px;
+    gap: 10px;
+    background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
+    border: 1px solid #d7e2ef;
+    border-radius: 14px;
     padding: 12px;
+    box-shadow: 0 12px 26px rgba(15, 23, 42, 0.08);
 }
 
-.field {
+.user-filters .field {
     display: flex;
     flex-direction: column;
     gap: 6px;
 }
 
-.field label {
+.user-filters .field label {
     font-size: 0.82rem;
     color: #64748b;
     font-weight: 600;
 }
 
-.field input {
-    border: 1px solid #d1d5db;
-    border-radius: 8px;
-    padding: 8px 10px;
+.user-filters .field input {
+    min-width: 170px;
 }
 
-.primary-btn {
-    border: 0;
-    border-radius: 8px;
-    background: #003366;
-    color: #fff;
-    padding: 8px 10px;
+.uh-row-clickable {
     cursor: pointer;
-    font-size: 0.84rem;
 }
 
-.history-action {
-    border: 0;
-    border-radius: 8px;
-    background: #003366;
-    color: #fff;
-    padding: 8px 10px;
-    cursor: pointer;
-    font-size: 0.84rem;
-}
-
-.history-action.alt {
-    background: #64748b;
-}
-
-.user-table-wrap {
-    overflow: auto;
-    background: #fff;
-    border: 1px solid #dbe3ea;
-    border-radius: 12px;
-}
-
-@media (max-width: 1100px) {
-    .user-summary-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
-    }
+.uh-row-clickable:hover {
+    background: #f4f9ff;
 }
 
 @media (max-width: 900px) {
-    .user-summary-grid {
-        grid-template-columns: 1fr;
+    .user-filters {
+        align-items: stretch;
+    }
+
+    .user-filters .field input {
+        min-width: 150px;
     }
 }

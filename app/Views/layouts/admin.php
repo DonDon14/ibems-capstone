@@ -51,6 +51,7 @@ if ($initials === '') {
         <nav class="app-menu">
             <a href="/admin/dashboard" class="<?= $isActive('admin/dashboard') ?>"><i class="bi bi-speedometer2"></i><span>Dashboard</span></a>
             <a href="/admin/stores" class="<?= $isActive('admin/stores') ?>"><i class="bi bi-shop-window"></i><span>Stores & POS</span></a>
+            <a href="/admin/products" class="<?= $isActive('admin/products') ?>"><i class="bi bi-box-seam"></i><span>Products</span></a>
             <a href="/admin/accounting-debts" class="<?= $isActive('admin/accounting-debts') ?>"><i class="bi bi-cash-coin"></i><span>Accounting Debts</span></a>
             <a href="/admin/user-view" class="<?= $isActive('admin/user-view') ?>"><i class="bi bi-people"></i><span>User Management</span></a>
         </nav>

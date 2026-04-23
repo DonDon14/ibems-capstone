@@ -268,3 +268,61 @@ Use this prompt in a new chat:
     - payment breakdown
     - top products
     - daily trend
+
+## Go-Live Checklist (Execution Tracker)
+
+### A) Stabilization & Regression
+- [ ] Run smoke test before each session (`php spark ibems:smoke`)
+- [ ] Verify critical login flows:
+  - [ ] single-role login redirect works
+  - [ ] multi-role login shows role picker
+  - [ ] selected role gates access correctly (`RoleFilter`)
+- [ ] Verify core business flows:
+  - [ ] POS cash transaction
+  - [ ] POS debt transaction
+  - [ ] inventory add/update/adjust
+  - [ ] accounting debt deduction
+  - [ ] settlement run apply (new month + duplicate month lock)
+
+### B) Security & Data Integrity
+- [ ] Validate authorization checks for all write endpoints (`/store/*`, `/accounting/*`, `/admin/*`)
+- [ ] Standardize server-side validation messages and HTTP codes
+- [ ] Confirm audit logging for critical actions
+- [ ] Confirm CSRF works across modal/AJAX forms without token mismatch
+- [ ] Run data integrity audit before deployment (`php spark ibems:data-audit`)
+- [ ] Run route security audit before deployment (`php spark ibems:route-audit`)
+
+### C) UAT & UX Consistency
+- [ ] Standard modal behavior (view-first then edit where applicable)
+- [ ] Standard table style and hover/row click behavior across portals
+- [ ] Final pass on sidebar/header responsiveness (desktop + mobile)
+- [ ] Verify receipt modal consistency across pages
+
+### D) Deployment Readiness
+- [ ] `.env` production checklist (app base URL, DB, cookies/session, security)
+- [ ] Migration and rollback procedure documented
+- [ ] Database backup/restore routine documented
+- [ ] Admin bootstrap account + role assignment procedure documented
+- [ ] Final pre-deploy smoke run and signoff
+- [ ] Run full preflight suite (`php spark ibems:preflight`)
+
+### Current Focus (Started)
+- [x] Multi-role login and role picker implemented
+- [x] Admin multi-role user assignment implemented
+- [x] Store officer assignment now syncs `user_roles` + legacy role
+- [x] Added deploy smoke command foundation (`php spark ibems:smoke`)
+- [x] Added auth/role audit command (`php spark ibems:auth-audit`)
+- [x] Added data integrity audit command (`php spark ibems:data-audit`)
+- [x] Added route security audit command (`php spark ibems:route-audit`)
+- [x] Added aggregated preflight command (`php spark ibems:preflight`)
+- [x] Added UAT pass/fail checklist (`docs/IBEMS_UAT_CHECKLIST.md`)
+- [x] Fixed accounting full deduction cashbook logging bug (`deductFullDebt`)
+- [x] Implemented Admin Product Management module (`/admin/products`)
+  - product list + search/filter by store
+  - include inactive toggle
+  - edit modal (sku/name/variant/category/barcode/image_url/price/status)
+- [x] Upgraded User Portal transaction history to standard receipt flow
+  - clickable transaction rows in `/user/history`
+  - receipt modal + print support via shared `receipt-standard.js`
+  - secured user-owned transaction detail API (`GET /user/transactions/{id}`)
+  - dedicated user receipt reference page (`GET /user/receipt/{id}`)

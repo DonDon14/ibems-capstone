@@ -6,79 +6,58 @@
 
 <?= $this->section('content') ?>
 <section class="acct-shell">
-    <div class="acct-head">
+    <div class="dashboard-title acct-head">
         <div>
             <h3>Debt Management</h3>
             <p>Search employees, deduct debt, and update credit limit.</p>
         </div>
     </div>
 
-    <div class="acct-summary">
-        <div class="summary-card">
-            <span>Accounts</span>
-            <strong id="acct-count">0</strong>
-        </div>
-        <div class="summary-card">
-            <span>Total Debt</span>
-            <strong id="acct-total-debt">PHP 0.00</strong>
-        </div>
-        <div class="summary-card">
-            <span>Today Deductions</span>
-            <strong id="acct-today-count">0</strong>
-        </div>
-        <div class="summary-card">
-            <span>Today Deducted Amount</span>
-            <strong id="acct-today-amount">PHP 0.00</strong>
-        </div>
+    <div class="dashboard-grid acct-summary">
+        <?= view('components/stat_card', ['title' => 'Accounts', 'value' => '0', 'valueId' => 'acct-count', 'icon' => 'bi bi-people', 'tone' => 'users']) ?>
+        <?= view('components/stat_card', ['title' => 'Total Debt', 'value' => 'PHP 0.00', 'valueId' => 'acct-total-debt', 'icon' => 'bi bi-cash-stack', 'tone' => 'debt']) ?>
+        <?= view('components/stat_card', ['title' => 'Today Deductions', 'value' => '0', 'valueId' => 'acct-today-count', 'icon' => 'bi bi-calendar-check', 'tone' => 'warning']) ?>
+        <?= view('components/stat_card', ['title' => 'Today Deducted Amount', 'value' => 'PHP 0.00', 'valueId' => 'acct-today-amount', 'icon' => 'bi bi-coin', 'tone' => 'finance']) ?>
     </div>
 
+    <article class="dash-panel">
     <div class="acct-filters acct-filters-redesign">
         <div class="acct-filters-main">
-            <div class="field field-search">
-                <label for="acct-search">Search Employee</label>
-                <input id="acct-search" type="search" placeholder="Name, email, or employee ID">
+            <div class="acct-search-wrap">
+                <i class="bi bi-search" aria-hidden="true"></i>
+                <input id="acct-search" type="search" placeholder="Search name, ID, office...">
             </div>
-            <label class="toggle-check">
+            <label class="toggle-check acct-toggle-inline">
                 <input id="acct-debt-only" type="checkbox">
                 <span>Debt only</span>
             </label>
         </div>
         <div class="acct-filters-actions">
             <div class="action-group action-group-primary">
-                <button id="acct-refresh-btn" class="history-action alt" type="button">Refresh</button>
+                <button id="acct-refresh-btn" class="history-action alt" type="button"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
             </div>
             <div class="action-group action-group-tools">
-                <button id="open-settlement-run" class="history-action" type="button">Settlement Run</button>
-                <button id="open-deduction-mode" class="history-action" type="button">Deduction Mode</button>
-                <button id="open-import-csv" class="history-action" type="button">Import HR CSV</button>
+                <button id="open-settlement-run" class="history-action" type="button"><i class="bi bi-calendar2-check"></i> Settlement Run</button>
+                <button id="open-deduction-mode" class="history-action" type="button"><i class="bi bi-cash-coin"></i> Deduction Mode</button>
+                <button id="open-import-csv" class="history-action" type="button"><i class="bi bi-file-earmark-arrow-up"></i> Import HR CSV</button>
             </div>
         </div>
     </div>
+    </article>
 
+    <article class="dash-panel">
     <div class="acct-table-wrap table-standard-wrap">
-        <table class="table table-standard">
-            <thead>
-                <tr>
-                    <th>Employee ID</th>
-                    <th>Name</th>
-                    <th>Email</th>
-                    <th>Category</th>
-                    <th>Status</th>
-                    <th>Current Debt</th>
-                    <th>Credit Limit</th>
-                    <th>Available</th>
-                </tr>
-            </thead>
-            <tbody id="acct-body">
-                <tr><td colspan="8">Loading records...</td></tr>
-            </tbody>
-        </table>
+        <p id="acct-count-text" class="acct-count-text">Showing 0 records</p>
+        <div id="acct-body" class="acct-record-list">
+            <div class="acct-empty">Loading records...</div>
+        </div>
     </div>
+    </article>
 
     <p id="acct-result" class="acct-result"></p>
 </section>
 
-<div id="deduction-mode-modal" class="acct-modal" style="display:none;">
+<div id="deduction-mode-modal" class="acct-modal is-hidden">
     <div class="acct-modal-card">
         <div class="acct-modal-head">
             <h4>Deduction Mode</h4>
@@ -120,7 +99,7 @@
     </div>
 </div>
 
-<div id="employee-modal" class="acct-modal" style="display:none;">
+<div id="employee-modal" class="acct-modal is-hidden">
     <div class="acct-modal-card">
         <div class="acct-modal-head">
             <h4>Employee Details</h4>
@@ -151,7 +130,7 @@
     </div>
 </div>
 
-<div id="settlement-run-modal" class="acct-modal" style="display:none;">
+<div id="settlement-run-modal" class="acct-modal is-hidden">
     <div class="acct-modal-card">
         <div class="acct-modal-head">
             <h4>Monthly Settlement Run</h4>
@@ -176,10 +155,10 @@
         </div>
 
         <div class="acct-summary settlement-summary">
-            <div class="summary-card"><span>Candidates</span><strong id="settle-candidate-count">0</strong></div>
-            <div class="summary-card"><span>Processable</span><strong id="settle-processable-count">0</strong></div>
-            <div class="summary-card"><span>Total Debt Before</span><strong id="settle-total-before">PHP 0.00</strong></div>
-            <div class="summary-card"><span>Total Deducted</span><strong id="settle-total-deducted">PHP 0.00</strong></div>
+            <?= view('components/stat_card', ['title' => 'Candidates', 'value' => '0', 'valueId' => 'settle-candidate-count', 'icon' => 'bi bi-people', 'tone' => 'users']) ?>
+            <?= view('components/stat_card', ['title' => 'Processable', 'value' => '0', 'valueId' => 'settle-processable-count', 'icon' => 'bi bi-check2-circle', 'tone' => 'sales']) ?>
+            <?= view('components/stat_card', ['title' => 'Total Debt Before', 'value' => 'PHP 0.00', 'valueId' => 'settle-total-before', 'icon' => 'bi bi-cash-stack', 'tone' => 'debt']) ?>
+            <?= view('components/stat_card', ['title' => 'Total Deducted', 'value' => 'PHP 0.00', 'valueId' => 'settle-total-deducted', 'icon' => 'bi bi-cash-coin', 'tone' => 'finance']) ?>
         </div>
 
         <div class="acct-table-wrap table-standard-wrap">
@@ -207,7 +186,7 @@
     </div>
 </div>
 
-<div id="settlement-run-details-modal" class="acct-modal" style="display:none;">
+<div id="settlement-run-details-modal" class="acct-modal is-hidden">
     <div class="acct-modal-card">
         <div class="acct-modal-head">
             <h4>Settlement Run Details</h4>
@@ -217,9 +196,9 @@
         <div id="settlement-details-head" class="mode-profile-empty">Loading settlement run details...</div>
 
         <div class="acct-summary settlement-summary">
-            <div class="summary-card"><span>Processed Accounts</span><strong id="settle-details-count">0</strong></div>
-            <div class="summary-card"><span>Total Deducted</span><strong id="settle-details-deducted">PHP 0.00</strong></div>
-            <div class="summary-card"><span>Total Debt After</span><strong id="settle-details-after">PHP 0.00</strong></div>
+            <?= view('components/stat_card', ['title' => 'Processed Accounts', 'value' => '0', 'valueId' => 'settle-details-count', 'icon' => 'bi bi-clipboard-check', 'tone' => 'users']) ?>
+            <?= view('components/stat_card', ['title' => 'Total Deducted', 'value' => 'PHP 0.00', 'valueId' => 'settle-details-deducted', 'icon' => 'bi bi-cash-coin', 'tone' => 'finance']) ?>
+            <?= view('components/stat_card', ['title' => 'Total Debt After', 'value' => 'PHP 0.00', 'valueId' => 'settle-details-after', 'icon' => 'bi bi-credit-card-2-front', 'tone' => 'debt']) ?>
         </div>
 
         <div class="acct-table-wrap table-standard-wrap">
@@ -242,7 +221,7 @@
     </div>
 </div>
 
-<div id="import-csv-modal" class="acct-modal" style="display:none;">
+<div id="import-csv-modal" class="acct-modal is-hidden">
     <div class="acct-modal-card">
         <div class="acct-modal-head">
             <h4>Import Employee CSV</h4>

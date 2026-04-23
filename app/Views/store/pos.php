@@ -45,7 +45,7 @@
                     <button id="open-scanner-btn" type="button" class="scan-inline-btn" title="Scan product QR/barcode">
                         <i class="bi bi-qr-code-scan"></i>
                     </button>
-                    <div id="scan-product-suggestions" class="scan-suggestions" style="display:none;"></div>
+                    <div id="scan-product-suggestions" class="scan-suggestions is-hidden"></div>
                 </div>
                 <input id="scan-qty-input" type="number" min="1" step="1" value="1" title="Quantity">
                 <button id="scan-add-btn" type="button" class="scan-add-btn"><i class="bi bi-plus-circle"></i> Add</button>
@@ -72,17 +72,17 @@
         <div class="payment-wrap">
             <label><i class="bi bi-credit-card-2-front"></i> Payment Method</label>
             <div class="payment-quick" id="payment-quick"></div>
-            <select id="payment-method" style="display:none;"></select>
+            <select id="payment-method" class="is-hidden"></select>
         </div>
 
-        <div id="debt-customer-wrap" class="payment-wrap" style="display:none;">
+        <div id="debt-customer-wrap" class="payment-wrap is-hidden">
             <label for="debt-customer-search">Debt Customer (Faculty/Staff)</label>
             <div class="debt-search-wrap">
                 <input id="debt-customer-search" type="search" placeholder="Search by name, email, or employee ID">
                 <button id="open-debt-scanner-btn" type="button" class="debt-scan-btn" title="Scan employee QR/ID">
                     <i class="bi bi-qr-code-scan"></i>
                 </button>
-                <div id="debt-customer-suggestions" class="debt-suggestions" style="display:none;"></div>
+                <div id="debt-customer-suggestions" class="debt-suggestions is-hidden"></div>
             </div>
         </div>
 
@@ -91,7 +91,7 @@
     </aside>
 </section>
 
-<div id="barcode-scanner-modal" class="receipt-modal" style="display:none;">
+<div id="barcode-scanner-modal" class="receipt-modal is-hidden">
     <div class="receipt-card scanner-card">
         <div class="receipt-head">
             <h3 id="scanner-title"><i class="bi bi-upc-scan"></i> Barcode Scanner</h3>
@@ -107,7 +107,7 @@
     </div>
 </div>
 
-<div id="confirm-transaction-modal" class="receipt-modal" style="display:none;">
+<div id="confirm-transaction-modal" class="receipt-modal is-hidden">
     <div class="receipt-card confirm-card">
         <div class="receipt-head">
             <h3><i class="bi bi-check2-square"></i> Confirm Transaction</h3>
@@ -123,11 +123,11 @@
     </div>
 </div>
 
-<div id="receipt-modal" class="receipt-modal" style="display:none;">
+<div id="receipt-modal" class="receipt-modal is-hidden">
     <div class="receipt-card">
         <div class="receipt-head">
             <h3>Transaction Receipt</h3>
-            <button id="receipt-close" type="button" class="receipt-close">×</button>
+            <button id="receipt-close" type="button" class="receipt-close">&times;</button>
         </div>
 
         <div id="receipt-content"></div>
@@ -138,7 +138,7 @@
     </div>
 </div>
 
-<div id="opening-balance-modal" class="receipt-modal" style="display:none;">
+<div id="opening-balance-modal" class="receipt-modal is-hidden">
     <div class="receipt-card confirm-card">
         <div class="receipt-head">
             <h3 id="opening-balance-title"><i class="bi bi-safe2"></i> Set Initial Opening Balance</h3>
@@ -165,3 +165,4 @@
 <script src="<?= base_url('assets/js/receipt-standard.js') ?>"></script>
 <script src="<?= base_url('assets/js/store-pos.js') ?>"></script>
 <?= $this->endSection() ?>
+

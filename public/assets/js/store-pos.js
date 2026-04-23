@@ -25,6 +25,58 @@ const isAdminUser = currentUserRole === "ADMIN";
 let openingBalanceMode = "create";
 let currentOpeningBalance = null;
 
+function ensureToastHost() {
+    let host = document.getElementById("toast-stack");
+    if (host) return host;
+
+    host = document.createElement("div");
+    host.id = "toast-stack";
+    host.className = "toast-stack";
+    document.body.appendChild(host);
+    return host;
+}
+
+function showToast(message, type = "success", timeoutMs = 3000) {
+    const text = String(message || "").trim();
+    if (text === "") return;
+
+    const host = ensureToastHost();
+    const toast = document.createElement("div");
+    const cssType = type === "error" ? "is-error" : "is-success";
+    toast.className = `toast-item ${cssType}`;
+    toast.textContent = text;
+    host.appendChild(toast);
+
+    window.setTimeout(() => {
+        toast.remove();
+    }, timeoutMs);
+}
+
+async function requestJson(url, options = {}, fallbackMessage = "Request failed.") {
+    let response;
+    try {
+        response = await fetch(url, options);
+    } catch (error) {
+        throw new Error("Network error. Please try again.");
+    }
+
+    let data = null;
+    try {
+        data = await response.json();
+    } catch (error) {
+        if (!response.ok) {
+            throw new Error(fallbackMessage);
+        }
+        return {};
+    }
+
+    if (!response.ok) {
+        throw new Error(data?.message || fallbackMessage);
+    }
+
+    return data || {};
+}
+
 function updateOpeningBalanceDisplay(opening = null, businessDate = null) {
     const displayEl = document.getElementById("opening-balance-display");
     const dateEl = document.getElementById("opening-balance-date");
@@ -164,6 +216,9 @@ function setResult(message, type) {
     const resultEl = document.getElementById("result");
     resultEl.textContent = message || "";
     resultEl.style.color = type === "error" ? "#b91c1c" : "#166534";
+    if (message) {
+        showToast(message, type === "error" ? "error" : "success");
+    }
 }
 
 function setOpeningBalanceResult(message, type) {
@@ -171,6 +226,9 @@ function setOpeningBalanceResult(message, type) {
     if (!resultEl) return;
     resultEl.textContent = message || "";
     resultEl.style.color = type === "error" ? "#b91c1c" : "#166534";
+    if (message) {
+        showToast(message, type === "error" ? "error" : "success");
+    }
 }
 
 function setPosTransactionEnabled(enabled) {
@@ -214,8 +272,11 @@ function closeOpeningBalanceModal() {
 async function loadOpeningBalanceStatus() {
     if (!activeStoreId) return;
     try {
-        const response = await fetch(`/store/opening-balance/status?store_id=${activeStoreId}`);
-        const data = await response.json();
+        const data = await requestJson(
+            `/store/opening-balance/status?store_id=${activeStoreId}`,
+            {},
+            "Unable to load opening balance status."
+        );
         if (!data || data.status !== "success") {
             throw new Error(data?.message || "Unable to load opening balance status.");
         }
@@ -255,16 +316,19 @@ async function saveOpeningBalance() {
     saveBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
     try {
         const endpoint = openingBalanceMode === "reset" ? "/store/opening-balance/reset" : "/store/opening-balance/set";
-        const response = await fetch(endpoint, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                store_id: activeStoreId,
-                opening_balance: amount,
-                note,
-            }),
-        });
-        const data = await response.json();
+        const data = await requestJson(
+            endpoint,
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    store_id: activeStoreId,
+                    opening_balance: amount,
+                    note,
+                }),
+            },
+            "Failed to save opening balance."
+        );
         if (!data || data.status !== "success") {
             throw new Error(data?.message || "Failed to save opening balance.");
         }
@@ -609,12 +673,12 @@ function renderProducts() {
     const grid = document.getElementById("product-grid");
 
     if (productsCache.length === 0) {
-        grid.innerHTML = '<div class="empty-state">No active products found for this store.</div>';
+        grid.innerHTML = '<div class="empty-state"><i class="bi bi-box-seam"></i><span>No active products in this store yet.</span></div>';
         return;
     }
 
     if (filteredProducts.length === 0) {
-        grid.innerHTML = '<div class="empty-state">No products match your filter.</div>';
+        grid.innerHTML = '<div class="empty-state"><i class="bi bi-search"></i><span>No products match your search or category.</span></div>';
         return;
     }
 
@@ -655,7 +719,7 @@ function renderCart() {
     const itemCountEl = document.getElementById("item-count");
 
     if (cart.length === 0) {
-        cartBody.innerHTML = '<div class="empty-state">Cart is empty.</div>';
+        cartBody.innerHTML = '<div class="empty-state"><i class="bi bi-cart-x"></i><span>No items in cart. Search products to begin.</span></div>';
         subtotalEl.textContent = formatMoney(0);
         totalEl.textContent = formatMoney(0);
         itemCountEl.textContent = "0";
@@ -722,17 +786,25 @@ function renderDebtSuggestions() {
 }
 
 async function loadDebtCustomers(query = "") {
-    const response = await fetch(`/store/debt-customers?q=${encodeURIComponent(query)}`);
-    const data = await response.json();
+    try {
+        const data = await requestJson(
+            `/store/debt-customers?q=${encodeURIComponent(query)}`,
+            {},
+            "Unable to load debt customers."
+        );
+        if (!data || data.status !== "success") {
+            debtCustomers = [];
+            renderDebtSuggestions();
+            return;
+        }
 
-    if (!data || data.status !== "success") {
+        debtCustomers = Array.isArray(data.customers) ? data.customers : [];
+        renderDebtSuggestions();
+    } catch (error) {
         debtCustomers = [];
         renderDebtSuggestions();
-        return;
+        setResult(error.message || "Unable to load debt customers.", "error");
     }
-
-    debtCustomers = Array.isArray(data.customers) ? data.customers : [];
-    renderDebtSuggestions();
 }
 
 function updateDebtCustomerVisibility() {
@@ -783,8 +855,11 @@ async function loadPaymentMethods() {
     if (!activeStoreId) return;
 
     try {
-        const response = await fetch(`/store/payment-methods?store_id=${activeStoreId}`);
-        const data = await response.json();
+        const data = await requestJson(
+            `/store/payment-methods?store_id=${activeStoreId}`,
+            {},
+            "Unable to load payment methods."
+        );
         if (!data || data.status !== "success") {
             throw new Error(data?.message || "Unable to load payment methods.");
         }
@@ -928,8 +1003,7 @@ function removeFromCart(productId) {
 }
 
 async function loadMyStores() {
-    const response = await fetch("/store/my-stores");
-    const data = await response.json();
+    const data = await requestJson("/store/my-stores", {}, "Unable to load store context.");
 
     if (!data || data.status !== "success" || !Array.isArray(data.stores) || data.stores.length === 0) {
         throw new Error("No assigned store found.");
@@ -943,13 +1017,16 @@ async function loadProducts() {
     const grid = document.getElementById("product-grid");
 
     if (!activeStoreId) {
-        grid.innerHTML = '<div class="empty-state">No active store selected.</div>';
+        grid.innerHTML = '<div class="empty-state"><i class="bi bi-shop-window"></i><span>No active store selected.</span></div>';
         return;
     }
 
     try {
-        const response = await fetch(`/store/products?store_id=${activeStoreId}`);
-        const data = await response.json();
+        const data = await requestJson(
+            `/store/products?store_id=${activeStoreId}`,
+            {},
+            "Unable to load products."
+        );
 
         if (!data || data.status !== "success") {
             productsCache = [];
@@ -1020,15 +1097,17 @@ async function processConfirmedTransaction(dataToProcess) {
         confirmBtn.disabled = true;
         confirmBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Processing...';
 
-        const response = await fetch("/pos/transactions", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
+        const data = await requestJson(
+            "/pos/transactions",
+            {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify(dataToProcess.payload),
             },
-            body: JSON.stringify(dataToProcess.payload),
-        });
-
-        const data = await response.json();
+            "Transaction failed, please try again."
+        );
 
         if (data.status === "success") {
             setResult("Transaction successful.", "ok");
@@ -1055,7 +1134,7 @@ async function processConfirmedTransaction(dataToProcess) {
         const message = data?.message || data?.messages?.error || "Transaction failed.";
         setResult(message, "error");
     } catch (error) {
-        setResult("Unable to submit transaction.", "error");
+        setResult(error.message || "Transaction failed, please try again.", "error");
     } finally {
         isSubmitting = false;
         submitBtn.disabled = false;

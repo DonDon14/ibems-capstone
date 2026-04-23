@@ -5,8 +5,8 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
-<section class="reports-shell">
-    <div class="reports-top">
+<section class="dashboard-shell reports-shell">
+    <div class="dashboard-title reports-top">
         <div>
             <h3>Store Financial Reports</h3>
             <p>Track sales, estimated cost, and profit by period.</p>
@@ -26,65 +26,51 @@
         </div>
     </div>
 
-    <div class="reports-summary-grid">
-        <article class="summary-card"><span>Total Sales</span><strong id="sum-sales">PHP 0.00</strong></article>
-        <article class="summary-card"><span>Estimated Cost</span><strong id="sum-cost">PHP 0.00</strong></article>
-        <article class="summary-card"><span>Estimated Profit</span><strong id="sum-profit">PHP 0.00</strong></article>
-        <article class="summary-card"><span>Profit Margin</span><strong id="sum-margin">0.00%</strong></article>
-        <article class="summary-card"><span>Transactions</span><strong id="sum-transactions">0</strong></article>
-        <article class="summary-card"><span>Items Sold</span><strong id="sum-items">0</strong></article>
-        <article class="summary-card"><span>Average Ticket</span><strong id="sum-ticket">PHP 0.00</strong></article>
-        <article class="summary-card"><span>Stock-in Cost</span><strong id="sum-stockin-cost">PHP 0.00</strong></article>
+    <div class="dashboard-grid reports-summary-grid">
+        <?= view('components/stat_card', ['title' => 'Total Sales', 'value' => 'PHP 0.00', 'valueId' => 'sum-sales', 'icon' => 'bi bi-graph-up-arrow', 'tone' => 'sales']) ?>
+        <?= view('components/stat_card', ['title' => 'Estimated Cost', 'value' => 'PHP 0.00', 'valueId' => 'sum-cost', 'icon' => 'bi bi-bag', 'tone' => 'finance']) ?>
+        <?= view('components/stat_card', ['title' => 'Estimated Profit', 'value' => 'PHP 0.00', 'valueId' => 'sum-profit', 'icon' => 'bi bi-cash-coin', 'tone' => 'finance']) ?>
+        <?= view('components/stat_card', ['title' => 'Profit Margin', 'value' => '0.00%', 'valueId' => 'sum-margin', 'icon' => 'bi bi-percent', 'tone' => 'sales']) ?>
+        <?= view('components/stat_card', ['title' => 'Transactions', 'value' => '0', 'valueId' => 'sum-transactions', 'icon' => 'bi bi-receipt', 'tone' => 'users']) ?>
+        <?= view('components/stat_card', ['title' => 'Items Sold', 'value' => '0', 'valueId' => 'sum-items', 'icon' => 'bi bi-box-seam', 'tone' => 'users']) ?>
+        <?= view('components/stat_card', ['title' => 'Average Ticket', 'value' => 'PHP 0.00', 'valueId' => 'sum-ticket', 'icon' => 'bi bi-ticket-perforated', 'tone' => 'finance']) ?>
+        <?= view('components/stat_card', ['title' => 'Stock-in Cost', 'value' => 'PHP 0.00', 'valueId' => 'sum-stockin-cost', 'icon' => 'bi bi-cart-plus', 'tone' => 'warning']) ?>
     </div>
 
-    <article class="reports-card">
-        <h4>Payment Records</h4>
+    <div class="dash-panels reports-panels-top">
+        <article class="dash-panel">
+            <h4><i class="bi bi-bar-chart"></i> Sales Trend</h4>
+            <p id="reports-range-label" class="muted">Selected period trend.</p>
+            <div class="dash-chart-wrap">
+                <canvas id="reports-trend-chart"></canvas>
+            </div>
+        </article>
+
+        <article class="dash-panel">
+            <h4><i class="bi bi-pie-chart"></i> Payment Mix</h4>
+            <p class="muted">Share of payment methods in selected period.</p>
+            <div class="dash-chart-wrap">
+                <canvas id="reports-payment-mix-chart"></canvas>
+            </div>
+        </article>
+    </div>
+
+    <article class="dash-panel reports-card">
+        <h4><i class="bi bi-cash-stack"></i> Payment Records</h4>
         <div class="payment-records-grid">
-            <article class="summary-card payment-record">
-                <span>Cash Sales</span>
-                <strong id="pay-cash">PHP 0.00</strong>
-                <small id="pay-cash-meta">0 transactions</small>
-            </article>
-            <article class="summary-card payment-record">
-                <span>GCash Sales</span>
-                <strong id="pay-gcash">PHP 0.00</strong>
-                <small id="pay-gcash-meta">0 transactions</small>
-            </article>
-            <article class="summary-card payment-record">
-                <span>Other Payments</span>
-                <strong id="pay-others">PHP 0.00</strong>
-                <small id="pay-others-meta">0 transactions</small>
-            </article>
-            <article class="summary-card payment-record">
-                <span>Debt Payments</span>
-                <strong id="pay-debt">PHP 0.00</strong>
-                <small id="pay-debt-meta">0 transactions</small>
-            </article>
-            <article class="summary-card payment-record">
-                <span>Initial Opening Balance</span>
-                <strong id="cash-opening">PHP 0.00</strong>
-                <small id="cash-date">Initial date: --</small>
-            </article>
-            <article class="summary-card payment-record">
-                <span>Expected Cash on Hand</span>
-                <strong id="cash-on-hand">PHP 0.00</strong>
-                <small id="cash-on-hand-meta">Opening + cash sales</small>
-            </article>
-            <article class="summary-card payment-record">
-                <span>Expected E-Cash on Hand</span>
-                <strong id="ecash-on-hand">PHP 0.00</strong>
-                <small id="ecash-on-hand-meta">E-cash sales + cash in/out</small>
-            </article>
-            <article class="summary-card payment-record payment-record--highlight">
-                <span>Total Revenue</span>
-                <strong id="pay-total-revenue">PHP 0.00</strong>
-                <small id="pay-total-meta">All payment methods combined</small>
-            </article>
+            <?= view('components/stat_card', ['title' => 'Cash Sales', 'value' => 'PHP 0.00', 'valueId' => 'pay-cash', 'icon' => 'bi bi-cash', 'tone' => 'sales', 'meta' => '0 transactions', 'metaId' => 'pay-cash-meta', 'class' => 'payment-record']) ?>
+            <?= view('components/stat_card', ['title' => 'GCash Sales', 'value' => 'PHP 0.00', 'valueId' => 'pay-gcash', 'icon' => 'bi bi-phone', 'tone' => 'finance', 'meta' => '0 transactions', 'metaId' => 'pay-gcash-meta', 'class' => 'payment-record']) ?>
+            <?= view('components/stat_card', ['title' => 'Other Payments', 'value' => 'PHP 0.00', 'valueId' => 'pay-others', 'icon' => 'bi bi-three-dots', 'tone' => 'finance', 'meta' => '0 transactions', 'metaId' => 'pay-others-meta', 'class' => 'payment-record']) ?>
+            <?= view('components/stat_card', ['title' => 'Debt Payments', 'value' => 'PHP 0.00', 'valueId' => 'pay-debt', 'icon' => 'bi bi-credit-card', 'tone' => 'debt', 'meta' => '0 transactions', 'metaId' => 'pay-debt-meta', 'class' => 'payment-record']) ?>
+            <?= view('components/stat_card', ['title' => 'Initial Opening Balance', 'value' => 'PHP 0.00', 'valueId' => 'cash-opening', 'icon' => 'bi bi-calendar2-plus', 'tone' => 'warning', 'meta' => 'Initial date: --', 'metaId' => 'cash-date', 'class' => 'payment-record']) ?>
+            <?= view('components/stat_card', ['title' => 'Expected Cash on Hand', 'value' => 'PHP 0.00', 'valueId' => 'cash-on-hand', 'icon' => 'bi bi-safe2', 'tone' => 'sales', 'meta' => 'Opening + cash sales', 'metaId' => 'cash-on-hand-meta', 'class' => 'payment-record']) ?>
+            <?= view('components/stat_card', ['title' => 'Expected E-Cash on Hand', 'value' => 'PHP 0.00', 'valueId' => 'ecash-on-hand', 'icon' => 'bi bi-wallet2', 'tone' => 'finance', 'meta' => 'E-cash sales + cash in/out', 'metaId' => 'ecash-on-hand-meta', 'class' => 'payment-record']) ?>
+            <?= view('components/stat_card', ['title' => 'Total Revenue', 'value' => 'PHP 0.00', 'valueId' => 'pay-total-revenue', 'icon' => 'bi bi-stars', 'tone' => 'sales', 'meta' => 'All payment methods combined', 'metaId' => 'pay-total-meta', 'class' => 'payment-record payment-record--highlight']) ?>
         </div>
     </article>
 
-    <article class="reports-card">
-        <h4>Cash Control (Per Store)</h4>
+    <article class="dash-panel reports-card">
+        <h4><i class="bi bi-safe2"></i> Cash Control (Per Store)</h4>
         <div class="cash-control-form">
             <div class="field">
                 <label for="cash-channel">Channel</label>
@@ -130,8 +116,8 @@
     </article>
 
     <div class="reports-panels">
-        <article class="reports-card">
-            <h4>Payment Breakdown</h4>
+        <article class="dash-panel reports-card">
+            <h4><i class="bi bi-list-check"></i> Payment Breakdown</h4>
             <div class="table-wrap table-standard-wrap">
                 <table class="table table-standard">
                     <thead>
@@ -148,8 +134,8 @@
             </div>
         </article>
 
-        <article class="reports-card">
-            <h4>Top Products</h4>
+        <article class="dash-panel reports-card">
+            <h4><i class="bi bi-stars"></i> Top Products</h4>
             <div class="table-wrap table-standard-wrap">
                 <table class="table table-standard">
                     <thead>
@@ -168,8 +154,8 @@
         </article>
     </div>
 
-    <article class="reports-card">
-        <h4>Daily Trend</h4>
+    <article class="dash-panel reports-card">
+        <h4><i class="bi bi-calendar3"></i> Daily Trend</h4>
         <div class="table-wrap table-standard-wrap">
             <table class="table table-standard">
                 <thead>
@@ -192,5 +178,6 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="<?= base_url('assets/js/store-reports.js') ?>"></script>
 <?= $this->endSection() ?>

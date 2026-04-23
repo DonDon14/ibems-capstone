@@ -12,7 +12,7 @@
             <p>View all products, adjust real stock counts, and add new stock.</p>
         </div>
         <div class="inventory-top-actions">
-            <a href="/store/settings" class="secondary-btn" style="text-decoration:none;">Manage Categories</a>
+            <a href="/store/settings" class="secondary-btn link-reset">Manage Categories</a>
             <button id="open-product-modal-top" class="primary-btn inventory-add-btn" type="button"><span class="plus">+</span> Add New Product</button>
         </div>
     </div>
@@ -45,7 +45,7 @@
     <p id="inventory-result" class="inventory-result"></p>
 </section>
 
-<div id="inventory-product-modal" class="inv-modal" style="display:none;">
+<div id="inventory-product-modal" class="inv-modal is-hidden">
     <div class="inv-modal-card">
         <div class="inv-modal-head">
             <h4>Add New Product</h4>
@@ -97,12 +97,12 @@
                         <label for="new-product-image-file">Image Upload</label>
                         <input id="new-product-image-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
                     </div>
-                    <div class="field" id="new-product-image-url-wrap" style="display:none;">
+                    <div class="field is-hidden" id="new-product-image-url-wrap">
                         <label for="new-product-image-url">Image URL</label>
                         <input id="new-product-image-url" type="url" placeholder="https://...">
                     </div>
                     <div class="image-preview-box field-wide">
-                        <img id="new-product-image-preview" alt="Preview" style="display:none;">
+                        <img id="new-product-image-preview" alt="Preview" class="is-hidden">
                         <span id="new-product-image-preview-empty">No image preview</span>
                     </div>
                 </div>
@@ -158,7 +158,7 @@
     </div>
 </div>
 
-<div id="inventory-product-action-modal" class="inv-modal" style="display:none;">
+<div id="inventory-product-action-modal" class="inv-modal is-hidden">
     <div class="inv-modal-card">
         <div class="inv-modal-head">
             <h4>Product Actions</h4>
@@ -199,7 +199,7 @@
                 </div>
             </div>
 
-            <div id="product-edit-wrap" style="display:none;">
+            <div id="product-edit-wrap" class="is-hidden">
                 <div class="form-grid">
                     <div class="field">
                         <label for="modal-product-sku">SKU</label>
@@ -236,7 +236,7 @@
                         <label for="modal-product-image-file">Image Upload</label>
                         <input id="modal-product-image-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
                     </div>
-                    <div class="field" id="modal-product-image-url-wrap" style="display:none;">
+                    <div class="field is-hidden" id="modal-product-image-url-wrap">
                         <label for="modal-product-image-url">Image URL</label>
                         <input id="modal-product-image-url" type="url" placeholder="https://...">
                     </div>
@@ -261,7 +261,7 @@
                 </div>
             </div>
 
-            <div id="modal-restock-panel" class="action-panel" style="display:none;">
+            <div id="modal-restock-panel" class="action-panel is-hidden">
                 <div class="form-grid">
                     <div class="field">
                         <label for="modal-restock-qty">Quantity</label>
@@ -292,9 +292,9 @@
 
         <div class="inv-modal-actions">
             <button id="modal-start-edit-product" class="secondary-btn" type="button">Edit Product</button>
-            <button id="modal-cancel-edit-product" class="secondary-btn" type="button" style="display:none;">Cancel Edit</button>
-            <button id="modal-save-product" class="secondary-btn" type="button" style="display:none;">Save Details</button>
-            <button id="modal-restock-submit" class="secondary-btn" type="button" style="display:none;">Submit Stock In</button>
+            <button id="modal-cancel-edit-product" class="secondary-btn is-hidden" type="button">Cancel Edit</button>
+            <button id="modal-save-product" class="secondary-btn is-hidden" type="button">Save Details</button>
+            <button id="modal-restock-submit" class="secondary-btn is-hidden" type="button">Submit Stock In</button>
             <button id="modal-save-adjustment" class="primary-btn" type="button">Save Adjustment</button>
         </div>
     </div>

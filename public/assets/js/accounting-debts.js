@@ -197,28 +197,45 @@ function closeSettlementRunDetails() {
 
 function renderRows(rows) {
     const body = document.getElementById("acct-body");
+    const countText = document.getElementById("acct-count-text");
     if (!Array.isArray(rows) || rows.length === 0) {
-        body.innerHTML = '<tr><td colspan="8">No records found.</td></tr>';
+        body.innerHTML = '<div class="acct-empty">No records found.</div>';
+        if (countText) countText.textContent = "Showing 0 records";
         renderSummary([]);
         return;
     }
 
+    if (countText) countText.textContent = `Showing ${rows.length} records`;
+
     body.innerHTML = rows.map((row) => `
-        <tr data-row-user="${row.user_id}" class="acct-row-clickable table-row-clickable">
-            <td>${aEscape(row.employee_id || "-")}</td>
-            <td>${aEscape(row.name)}</td>
-            <td>${aEscape(row.email)}</td>
-            <td><span class="table-chip acct-chip">${aEscape(aCategory(row.user_type))}</span></td>
-            <td><span class="table-status acct-status ${Number(row.is_active || 0) === 1 ? "is-active" : "is-inactive"}">${Number(row.is_active || 0) === 1 ? "Active" : "Inactive"}</span></td>
-            <td>
-                <div class="table-debt-wrap acct-debt-wrap">
-                    <span>${aEscape(aMoney(row.current_debt))}</span>
+        <article data-row-user="${row.user_id}" class="acct-record-row acct-row-clickable">
+            <div class="acct-person">
+                <div class="acct-avatar">${aEscape(String(row.name || "U").split(" ").filter(Boolean).slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join("") || "U")}</div>
+                <div class="acct-person-meta">
+                    <div class="acct-name-line">
+                        <strong>${aEscape(row.name)}</strong>
+                        <span class="table-chip acct-chip">${aEscape(aCategory(row.user_type))}</span>
+                        <span class="table-status acct-status ${Number(row.is_active || 0) === 1 ? "is-active" : "is-inactive"}">${Number(row.is_active || 0) === 1 ? "Active" : "Inactive"}</span>
+                    </div>
+                    <div class="acct-subline">${aEscape(row.employee_id || "-")} | ${aEscape(row.email)}</div>
+                </div>
+            </div>
+            <div class="acct-finance">
+                <div class="acct-fin-kv">
+                    <span>Current Debt</span>
+                    <strong class="${Number(row.current_debt || 0) > 0 ? "acct-money-debt" : ""}">${aEscape(aMoney(row.current_debt))}</strong>
                     <div class="table-debt-bar acct-debt-bar"><i style="width:${Math.min(100, (Number(row.current_debt || 0) / Math.max(1, Number(row.credit_limit || 0))) * 100)}%"></i></div>
                 </div>
-            </td>
-            <td>${aEscape(aMoney(row.credit_limit))}</td>
-            <td>${aEscape(aMoney(row.available_credit))}</td>
-        </tr>
+                <div class="acct-fin-kv">
+                    <span>Credit Limit</span>
+                    <strong>${aEscape(aMoney(row.credit_limit))}</strong>
+                </div>
+                <div class="acct-fin-kv">
+                    <span>Available</span>
+                    <strong>${aEscape(aMoney(row.available_credit))}</strong>
+                </div>
+            </div>
+        </article>
     `).join("");
 
     renderSummary(rows);

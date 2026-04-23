@@ -71,6 +71,21 @@ class ProductModel extends Model
                     ->update();
     }
 
+    public function deductStockIfAvailable(int $productId, int $qty): bool
+    {
+        if ($qty <= 0) {
+            return false;
+        }
+
+        $builder = $this->builder();
+        $builder->set('stock_qty', 'stock_qty - ' . $qty, false)
+            ->where('id', $productId)
+            ->where('stock_qty >=', $qty)
+            ->update();
+
+        return $this->db->affectedRows() > 0;
+    }
+
     public function addStock(int $productId, int $qty): bool
     {
         return $this->set('stock_qty', 'stock_qty + ' . $qty, false)

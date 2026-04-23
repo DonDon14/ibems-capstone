@@ -12,10 +12,10 @@
     </div>
 
     <div class="summary-grid">
-        <div class="summary-card"><span>Accounts</span><strong id="ad-account-count">0</strong></div>
-        <div class="summary-card"><span>With Debt</span><strong id="ad-debt-accounts">0</strong></div>
-        <div class="summary-card"><span>Total Debt</span><strong id="ad-total-debt">PHP 0.00</strong></div>
-        <div class="summary-card"><span>Today Deducted</span><strong id="ad-today-deducted">PHP 0.00</strong></div>
+        <?= view('components/stat_card', ['title' => 'Accounts', 'value' => '0', 'valueId' => 'ad-account-count', 'icon' => 'bi bi-people', 'tone' => 'users']) ?>
+        <?= view('components/stat_card', ['title' => 'With Debt', 'value' => '0', 'valueId' => 'ad-debt-accounts', 'icon' => 'bi bi-exclamation-circle', 'tone' => 'warning']) ?>
+        <?= view('components/stat_card', ['title' => 'Total Debt', 'value' => 'PHP 0.00', 'valueId' => 'ad-total-debt', 'icon' => 'bi bi-cash-stack', 'tone' => 'debt']) ?>
+        <?= view('components/stat_card', ['title' => 'Today Deducted', 'value' => 'PHP 0.00', 'valueId' => 'ad-today-deducted', 'icon' => 'bi bi-cash-coin', 'tone' => 'finance']) ?>
     </div>
 
     <div class="overview-table-wrap table-standard-wrap">

@@ -12,28 +12,41 @@
 </head>
 <body>
 <?php $ustpLogoUrl = base_url('assets/images/ustp_claveria_logo.jpg'); ?>
-    <main class="login-card">
-        <div class="login-brand">
-            <img src="<?= esc($ustpLogoUrl) ?>" alt="USTP Logo" class="login-brand-logo">
-            <div class="login-brand-text">
-                <strong>USTP IBEMS</strong>
-                <span>Integrated Business Enterprise Management System</span>
+    <main class="auth-shell">
+        <section class="auth-panel auth-panel-form">
+            <div class="auth-mark">
+                <img src="<?= esc($ustpLogoUrl) ?>" alt="USTP Logo" class="auth-mark-logo">
             </div>
-        </div>
-        <h1>IBEMS Login</h1>
-        <p>Sign in to continue to the system.</p>
+            <h1>Welcome Back</h1>
+            <p>Sign in to the Integrated Business Enterprise Management System.</p>
 
-        <form id="login-form">
-            <label for="email">Email</label>
-            <input id="email" name="email" type="email" required autocomplete="username">
+            <form id="login-form" class="auth-form">
+                <label for="email">Username</label>
+                <input id="email" name="email" type="email" required autocomplete="username" placeholder="you@example.com">
 
-            <label for="password">Password</label>
-            <input id="password" name="password" type="password" required autocomplete="current-password">
+                <label for="password">Password</label>
+                <input id="password" name="password" type="password" required autocomplete="current-password" placeholder="Enter your password">
 
-            <button id="submit-btn" type="submit">Login</button>
-        </form>
+                <button id="submit-btn" type="submit">Sign In to Dashboard</button>
+            </form>
 
-        <div id="status"></div>
+            <div class="demo-creds">
+                <strong>Demo Credentials</strong>
+                <span>Admin: admin@ibems.local / 123456</span>
+                <span>Store: store.main@ibems.local / 123456</span>
+            </div>
+
+            <div id="status"></div>
+        </section>
+
+        <section class="auth-panel auth-panel-art" aria-hidden="true">
+            <div class="auth-art-layer auth-art-1"></div>
+            <div class="auth-art-layer auth-art-2"></div>
+            <div class="auth-art-layer auth-art-3"></div>
+            <div class="auth-art-layer auth-art-4"></div>
+            <div class="auth-art-line auth-art-line-1"></div>
+            <div class="auth-art-line auth-art-line-2"></div>
+        </section>
     </main>
 
     <script src="<?= base_url('assets/js/csrf.js') ?>"></script>

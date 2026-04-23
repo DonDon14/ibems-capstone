@@ -2,6 +2,8 @@ let reportsStores = [];
 let reportsActiveStoreId = null;
 let reportsPeriod = "today";
 let reportsSummaryData = null;
+let reportsTrendChart = null;
+let reportsPaymentMixChart = null;
 
 function rMoney(value) {
     return `PHP ${Number(value || 0).toFixed(2)}`;
@@ -30,6 +32,136 @@ function rSetPeriod(nextPeriod) {
     document.getElementById("reports-custom-range").classList.toggle("hidden", reportsPeriod !== "custom");
 }
 
+function rRenderTrendBars(rows) {
+    const canvas = document.getElementById("reports-trend-chart");
+    if (!canvas || typeof window.Chart === "undefined") return;
+
+    if (reportsTrendChart) {
+        reportsTrendChart.destroy();
+        reportsTrendChart = null;
+    }
+
+    if (!Array.isArray(rows) || rows.length === 0) return;
+
+    const labels = rows.map((row) => String(row.date || "").slice(5));
+    const sales = rows.map((row) => Number(row.sales || 0));
+    const transactions = rows.map((row) => Number(row.transactions || 0));
+
+    reportsTrendChart = new window.Chart(canvas, {
+        data: {
+            labels,
+            datasets: [
+                {
+                    type: "bar",
+                    label: "Sales",
+                    data: sales,
+                    yAxisID: "y",
+                    borderRadius: 8,
+                    maxBarThickness: 28,
+                    backgroundColor: "rgba(37, 99, 235, 0.75)",
+                    borderColor: "rgba(30, 64, 175, 1)",
+                    borderWidth: 1,
+                },
+                {
+                    type: "line",
+                    label: "Transactions",
+                    data: transactions,
+                    yAxisID: "y1",
+                    tension: 0.3,
+                    borderWidth: 2,
+                    borderColor: "rgba(16, 185, 129, 1)",
+                    backgroundColor: "rgba(16, 185, 129, 0.2)",
+                    pointRadius: 3,
+                },
+            ],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: "top" },
+                tooltip: {
+                    callbacks: {
+                        label(context) {
+                            if (context.dataset.yAxisID === "y1") {
+                                return `Transactions: ${Number(context.parsed.y || 0)}`;
+                            }
+                            return `Sales: ${rMoney(context.parsed.y || 0)}`;
+                        },
+                    },
+                },
+            },
+            scales: {
+                x: { grid: { display: false } },
+                y: {
+                    beginAtZero: true,
+                    position: "left",
+                    ticks: {
+                        callback(value) {
+                            return `PHP ${Number(value).toFixed(0)}`;
+                        },
+                    },
+                },
+                y1: {
+                    beginAtZero: true,
+                    position: "right",
+                    grid: { drawOnChartArea: false },
+                },
+            },
+        },
+    });
+}
+
+function rRenderPaymentMix(rows) {
+    const canvas = document.getElementById("reports-payment-mix-chart");
+    if (!canvas || typeof window.Chart === "undefined") return;
+
+    if (reportsPaymentMixChart) {
+        reportsPaymentMixChart.destroy();
+        reportsPaymentMixChart = null;
+    }
+
+    if (!Array.isArray(rows) || rows.length === 0) return;
+
+    const labels = rows.map((row) => String(row.payment_method || "unknown").toUpperCase());
+    const values = rows.map((row) => Number(row.sales || 0));
+
+    reportsPaymentMixChart = new window.Chart(canvas, {
+        type: "doughnut",
+        data: {
+            labels,
+            datasets: [{
+                data: values,
+                backgroundColor: [
+                    "#2563eb",
+                    "#10b981",
+                    "#f59e0b",
+                    "#8b5cf6",
+                    "#ef4444",
+                    "#06b6d4",
+                    "#64748b",
+                ],
+                borderWidth: 1,
+                borderColor: "#ffffff",
+            }],
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { position: "bottom" },
+                tooltip: {
+                    callbacks: {
+                        label(context) {
+                            return `${context.label}: ${rMoney(context.parsed || 0)}`;
+                        },
+                    },
+                },
+            },
+        },
+    });
+}
+
 function rRenderSummary(data) {
     const summary = data?.summary || {};
     const stockIn = data?.stock_in || {};
@@ -45,6 +177,10 @@ function rRenderSummary(data) {
 
     const note = data?.notes?.profit_basis || "";
     document.getElementById("reports-note").textContent = note;
+    const range = data?.range || {};
+    const label = `${String(range.from || "-")} to ${String(range.to || "-")} (${String(range.period || "-").toUpperCase()})`;
+    const rangeEl = document.getElementById("reports-range-label");
+    if (rangeEl) rangeEl.textContent = label;
 }
 
 function rRenderPaymentRows(rows) {
@@ -267,6 +403,8 @@ async function rLoadSummary() {
         rRenderCashMovements([]);
         rRenderProductRows([]);
         rRenderTrendRows([]);
+        rRenderTrendBars([]);
+        rRenderPaymentMix([]);
         return;
     }
 
@@ -277,6 +415,8 @@ async function rLoadSummary() {
     rRenderCashMovements(data.cash_movements || []);
     rRenderProductRows(data.top_products || []);
     rRenderTrendRows(data.trend || []);
+    rRenderTrendBars(data.trend || []);
+    rRenderPaymentMix(data.payment_breakdown || []);
     rSetResult("", "ok");
 }
 

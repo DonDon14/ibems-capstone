@@ -19,6 +19,7 @@ $routes->get('login', 'PageController::login');
 $routes->get('dashboard', 'PageController::dashboard', ['filter' => 'role:ADMIN,STORE_SYSTEM,ACCOUNTING_OFFICE']);
 
 $routes->get('admin/dashboard', 'AdminController::dashboard', ['filter' => 'role:ADMIN']);
+$routes->get('admin/dashboard/data', 'AdminController::dashboardData', ['filter' => 'role:ADMIN']);
 $routes->get('admin/store-ops', 'AdminController::storeOps', ['filter' => 'role:ADMIN']);
 $routes->get('admin/accounting-debts', 'AdminController::accountingDebts', ['filter' => 'role:ADMIN']);
 $routes->get('admin/accounting-debts/data', 'AdminController::accountingDebtsData', ['filter' => 'role:ADMIN']);
@@ -28,6 +29,11 @@ $routes->get('admin/user-view/(:num)', 'AdminController::userViewDetail/$1', ['f
 $routes->post('admin/user-view/create', 'AdminController::createUser', ['filter' => 'role:ADMIN']);
 $routes->post('admin/user-view/update', 'AdminController::updateUser', ['filter' => 'role:ADMIN']);
 $routes->post('admin/user-view/import-csv', 'AdminController::importUsersCsv', ['filter' => 'role:ADMIN']);
+$routes->get('admin/products', 'AdminController::products', ['filter' => 'role:ADMIN']);
+$routes->get('admin/products/data', 'AdminController::productsData', ['filter' => 'role:ADMIN']);
+$routes->post('admin/products/create', 'AdminController::createProduct', ['filter' => 'role:ADMIN']);
+$routes->post('admin/products/update', 'AdminController::updateProduct', ['filter' => 'role:ADMIN']);
+$routes->post('admin/products/toggle-status', 'AdminController::toggleProductStatus', ['filter' => 'role:ADMIN']);
 $routes->get('admin/stores', 'AdminController::stores', ['filter' => 'role:ADMIN']);
 $routes->get('admin/stores/data', 'AdminController::storesData', ['filter' => 'role:ADMIN']);
 $routes->get('admin/stores/(:num)', 'AdminController::storeDetails/$1', ['filter' => 'role:ADMIN']);
@@ -71,12 +77,16 @@ $routes->post('store/inventory/add-product', 'StoreController::addProduct', ['fi
 $routes->post('store/inventory/update-product', 'StoreController::updateProduct', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
 
 $routes->get('user/dashboard', 'UserController::dashboard', ['filter' => 'role:USER,ADMIN']);
+$routes->get('user/dashboard/data', 'UserController::dashboardData', ['filter' => 'role:USER,ADMIN']);
 $routes->get('user/history', 'UserController::history', ['filter' => 'role:USER,ADMIN']);
 $routes->get('user/summary', 'UserController::summary', ['filter' => 'role:USER,ADMIN']);
 $routes->get('user/transactions', 'UserController::transactions', ['filter' => 'role:USER,ADMIN']);
+$routes->get('user/transactions/(:num)', 'UserController::transactionDetails/$1', ['filter' => 'role:USER,ADMIN']);
+$routes->get('user/receipt/(:num)', 'UserController::receiptPage/$1', ['filter' => 'role:USER,ADMIN']);
 $routes->get('user/cashbook', 'UserController::cashbook', ['filter' => 'role:USER,ADMIN']);
 
 $routes->get('accounting/dashboard', 'AccountingController::dashboard', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
+$routes->get('accounting/dashboard/data', 'AccountingController::dashboardData', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
 $routes->get('accounting/debts', 'AccountingController::debts', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
 $routes->get('accounting/debts/data', 'AccountingController::debtsData', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
 $routes->get('accounting/debts/profile', 'AccountingController::debtProfile', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);

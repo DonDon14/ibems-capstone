@@ -15,44 +15,33 @@
 
     <article class="staff-card">
         <h4>Debt Records</h4>
-        <div class="staff-filters">
-            <div class="field">
-                <label for="debt-search">Search Employee</label>
+        <div class="staff-filters staff-filter-panel">
+            <div class="staff-filter-main">
                 <div class="staff-search-wrap">
-                    <input id="debt-search" type="search" placeholder="Name, email, or employee ID">
+                    <i class="bi bi-search staff-search-icon" aria-hidden="true"></i>
+                    <input id="debt-search" type="search" placeholder="Search name, ID, office...">
                     <button id="debt-search-scan-btn" type="button" class="staff-scan-btn" title="Scan employee QR/ID">
                         <i class="bi bi-qr-code-scan"></i>
                     </button>
                 </div>
             </div>
-            <button id="debt-search-btn" class="primary-btn" type="button">Search</button>
+            <div class="staff-filter-actions">
+                <button id="debt-search-btn" class="history-action alt" type="button"><i class="bi bi-search"></i> Search</button>
+            </div>
         </div>
+        <p id="staff-count-text" class="staff-count-text">Showing 0 records</p>
 
         <div class="table-wrap table-standard-wrap">
-            <table class="table table-standard">
-                <thead>
-                    <tr>
-                        <th>Employee ID</th>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Category</th>
-                        <th>Status</th>
-                        <th>Current Debt</th>
-                        <th>Credit Limit</th>
-                        <th>Available Credit</th>
-                    </tr>
-                </thead>
-                <tbody id="debt-body">
-                    <tr><td colspan="8">Loading debt records...</td></tr>
-                </tbody>
-            </table>
+            <div id="debt-body" class="staff-record-list">
+                <div class="staff-empty">Loading debt records...</div>
+            </div>
         </div>
     </article>
 
     <p id="staff-result" class="staff-result"></p>
 </section>
 
-<div id="staff-employee-modal" class="receipt-modal" style="display:none;">
+<div id="staff-employee-modal" class="receipt-modal is-hidden">
     <div class="receipt-card staff-employee-card">
         <div class="receipt-head">
             <h3>Employee Transactions</h3>
@@ -94,7 +83,7 @@
     </div>
 </div>
 
-<div id="staff-receipt-modal" class="receipt-modal" style="display:none;">
+<div id="staff-receipt-modal" class="receipt-modal is-hidden">
     <div class="receipt-card">
         <div class="receipt-head">
             <h3>Transaction Receipt</h3>
@@ -109,7 +98,7 @@
     </div>
 </div>
 
-<div id="staff-scanner-modal" class="receipt-modal" style="display:none;">
+<div id="staff-scanner-modal" class="receipt-modal is-hidden">
     <div class="receipt-card scanner-card">
         <div class="receipt-head">
             <h3><i class="bi bi-person-badge"></i> Employee QR Scanner</h3>

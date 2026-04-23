@@ -30,7 +30,7 @@
     <p id="stores-result" class="stores-result"></p>
 </section>
 
-<div id="store-modal" class="admin-modal" style="display:none;">
+<div id="store-modal" class="admin-modal is-hidden">
     <div class="admin-modal-card">
         <div class="admin-modal-head">
             <h4 id="store-modal-title">Add Store</h4>
@@ -46,14 +46,14 @@
                 <label for="store-officer-search">Store Officer</label>
                 <input id="store-officer-search" type="search" placeholder="Type name, email, or employee ID">
                 <input id="store-officer-id" type="hidden">
-                <div id="store-officer-suggestions" class="officer-suggestions" style="display:none;"></div>
+                <div id="store-officer-suggestions" class="officer-suggestions is-hidden"></div>
             </div>
             <div class="field" id="store-logo-upload-wrap">
                 <label for="store-logo-file">Store Logo</label>
                 <input id="store-logo-file" type="file" accept="image/*">
                 <button id="store-logo-toggle" class="field-toggle-link" type="button">Use URL instead</button>
             </div>
-            <div class="field" id="store-logo-url-wrap" style="display:none;">
+            <div class="field is-hidden" id="store-logo-url-wrap">
                 <label for="store-logo-url">Store Logo URL</label>
                 <input id="store-logo-url" type="url" placeholder="https://...">
                 <button id="store-logo-toggle-url" class="field-toggle-link" type="button">Use Upload instead</button>

@@ -198,32 +198,49 @@ async function srLoadStores() {
 
 function srRenderDebts(rows) {
     const body = document.getElementById("debt-body");
+    const countText = document.getElementById("staff-count-text");
     if (!Array.isArray(rows) || rows.length === 0) {
-        body.innerHTML = '<tr><td colspan="8">No debt records found.</td></tr>';
+        body.innerHTML = '<div class="staff-empty">No debt records found.</div>';
+        if (countText) countText.textContent = "Showing 0 records";
         return;
     }
 
+    if (countText) countText.textContent = `Showing ${rows.length} records`;
+
     body.innerHTML = rows.map((row) => `
-        <tr class="sr-row-clickable table-row-clickable"
+        <article class="staff-record-row sr-row-clickable"
             data-debt-user-id="${Number(row.id || 0)}"
             data-debt-name="${srEscape(row.name)}"
             data-debt-employee="${srEscape(row.employee_id || "")}"
             data-debt-email="${srEscape(row.email || "")}"
             data-debt-category="${srEscape(row.user_type || "")}">
-            <td>${srEscape(row.employee_id || "-")}</td>
-            <td>${srEscape(row.name)}</td>
-            <td>${srEscape(row.email)}</td>
-            <td><span class="table-chip">${srEscape(srCategory(row.user_type))}</span></td>
-            <td><span class="table-status ${Number(row.is_active || 0) === 1 ? "is-active" : "is-inactive"}">${Number(row.is_active || 0) === 1 ? "Active" : "Inactive"}</span></td>
-            <td>
-                <div class="table-debt-wrap">
-                    <span>${srEscape(srMoney(row.current_debt))}</span>
+            <div class="staff-person">
+                <div class="staff-avatar">${srEscape(String(row.name || "U").split(" ").filter(Boolean).slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join("") || "U")}</div>
+                <div class="staff-person-meta">
+                    <div class="staff-name-line">
+                        <strong>${srEscape(row.name)}</strong>
+                        <span class="table-chip">${srEscape(srCategory(row.user_type))}</span>
+                        <span class="table-status ${Number(row.is_active || 0) === 1 ? "is-active" : "is-inactive"}">${Number(row.is_active || 0) === 1 ? "Active" : "Inactive"}</span>
+                    </div>
+                    <div class="staff-subline">${srEscape(row.employee_id || "-")} | ${srEscape(row.email)}</div>
+                </div>
+            </div>
+            <div class="staff-finance">
+                <div class="staff-fin-kv">
+                    <span>Current Debt</span>
+                    <strong class="${Number(row.current_debt || 0) > 0 ? "staff-money-debt" : ""}">${srEscape(srMoney(row.current_debt))}</strong>
                     <div class="table-debt-bar"><i style="width:${Math.min(100, (Number(row.current_debt || 0) / Math.max(1, Number(row.credit_limit || 0))) * 100)}%"></i></div>
                 </div>
-            </td>
-            <td>${srEscape(srMoney(row.credit_limit))}</td>
-            <td>${srEscape(srMoney(row.available_credit))}</td>
-        </tr>
+                <div class="staff-fin-kv">
+                    <span>Credit Limit</span>
+                    <strong>${srEscape(srMoney(row.credit_limit))}</strong>
+                </div>
+                <div class="staff-fin-kv">
+                    <span>Available Credit</span>
+                    <strong>${srEscape(srMoney(row.available_credit))}</strong>
+                </div>
+            </div>
+        </article>
     `).join("");
 }
 

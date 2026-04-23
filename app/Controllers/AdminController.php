@@ -4,7 +4,10 @@ namespace App\Controllers;
 
 use App\Models\AuditLogModel;
 use App\Models\BalanceModel;
+use App\Models\InventoryMovementModel;
+use App\Models\ProductModel;
 use App\Models\StoreModel;
+use App\Models\StoreCategoryModel;
 use App\Models\UserModel;
 use App\Models\UserRoleModel;
 use CodeIgniter\Controller;
@@ -15,6 +18,199 @@ class AdminController extends Controller
     public function dashboard()
     {
         return view('admin/dashboard');
+    }
+
+    public function dashboardData()
+    {
+        $db = Database::connect();
+        $today = new \DateTimeImmutable('today');
+        $rangeStartDate = $today->modify('-6 days')->format('Y-m-d');
+        $rangeStartTs = $rangeStartDate . ' 00:00:00';
+        $rangeEndTs = $today->format('Y-m-d') . ' 23:59:59';
+
+        $storeSummary = $db->table('stores')
+            ->select('COUNT(*) AS total_stores, SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) AS active_stores, SUM(CASE WHEN is_active = 0 THEN 1 ELSE 0 END) AS inactive_stores')
+            ->get()
+            ->getRowArray();
+
+        $officerSummary = $db->table('user_roles ur')
+            ->select('COUNT(DISTINCT ur.user_id) AS active_store_officers')
+            ->join('users u', 'u.id = ur.user_id', 'inner')
+            ->where('ur.role', 'STORE_SYSTEM')
+            ->where('u.is_active', 1)
+            ->get()
+            ->getRowArray();
+
+        $activeStoreOfficers = (int) ($officerSummary['active_store_officers'] ?? 0);
+        if ($activeStoreOfficers <= 0) {
+            $fallback = $db->table('users')
+                ->select('COUNT(*) AS active_store_officers')
+                ->where('is_active', 1)
+                ->where('role', 'STORE_SYSTEM')
+                ->get()
+                ->getRowArray();
+            $activeStoreOfficers = (int) ($fallback['active_store_officers'] ?? 0);
+        }
+
+        $debtSummary = $db->table('balances b')
+            ->select('SUM(CASE WHEN b.current_debt > 0 THEN 1 ELSE 0 END) AS debt_accounts, COALESCE(SUM(b.current_debt), 0) AS total_debt')
+            ->join('users u', 'u.id = b.user_id', 'inner')
+            ->where('u.is_active', 1)
+            ->get()
+            ->getRowArray();
+
+        $productAlerts = $db->table('products')
+            ->select('SUM(CASE WHEN is_active = 1 AND stock_qty <= 0 THEN 1 ELSE 0 END) AS out_of_stock_products')
+            ->get()
+            ->getRowArray();
+
+        $creditAlerts = $db->table('balances b')
+            ->select('SUM(CASE WHEN b.current_debt > b.credit_limit THEN 1 ELSE 0 END) AS over_credit_accounts')
+            ->join('users u', 'u.id = b.user_id', 'inner')
+            ->where('u.is_active', 1)
+            ->get()
+            ->getRowArray();
+
+        $todayStart = date('Y-m-d 00:00:00');
+        $todayEnd = date('Y-m-d 23:59:59');
+        $todayTxn = $db->table('transactions')
+            ->select('COUNT(*) AS txn_count, COALESCE(SUM(amount), 0) AS sales_total')
+            ->where('created_at >=', $todayStart)
+            ->where('created_at <=', $todayEnd)
+            ->get()
+            ->getRowArray();
+
+        $trendRows = $db->table('transactions')
+            ->select('DATE(created_at) AS sale_date, COUNT(*) AS txn_count, COALESCE(SUM(amount), 0) AS sales_total')
+            ->where('created_at >=', $rangeStartTs)
+            ->where('created_at <=', $rangeEndTs)
+            ->groupBy('DATE(created_at)')
+            ->orderBy('sale_date', 'ASC')
+            ->get()
+            ->getResultArray();
+
+        $trendMap = [];
+        foreach ($trendRows as $row) {
+            $trendMap[(string) ($row['sale_date'] ?? '')] = [
+                'transactions' => (int) ($row['txn_count'] ?? 0),
+                'sales' => (float) ($row['sales_total'] ?? 0),
+            ];
+        }
+        $trend = [];
+        for ($i = 0; $i < 7; $i++) {
+            $date = $today->modify('-' . (6 - $i) . ' days')->format('Y-m-d');
+            $trend[] = [
+                'date' => $date,
+                'transactions' => (int) ($trendMap[$date]['transactions'] ?? 0),
+                'sales' => (float) ($trendMap[$date]['sales'] ?? 0),
+            ];
+        }
+
+        $paymentRows = $db->table('transactions')
+            ->select('payment_method, COUNT(*) AS txn_count, COALESCE(SUM(amount), 0) AS sales_total')
+            ->where('created_at >=', $rangeStartTs)
+            ->where('created_at <=', $rangeEndTs)
+            ->groupBy('payment_method')
+            ->orderBy('sales_total', 'DESC')
+            ->get()
+            ->getResultArray();
+        $paymentBreakdown = array_map(static function (array $row): array {
+            return [
+                'payment_method' => strtoupper((string) ($row['payment_method'] ?? 'UNKNOWN')),
+                'transactions' => (int) ($row['txn_count'] ?? 0),
+                'sales' => (float) ($row['sales_total'] ?? 0),
+            ];
+        }, $paymentRows);
+
+        $topStoreRows = $db->table('transactions t')
+            ->select('s.id AS store_id, s.store_name, COUNT(t.id) AS txn_count, COALESCE(SUM(t.amount), 0) AS sales_total')
+            ->join('stores s', 's.id = t.store_id', 'inner')
+            ->where('t.created_at >=', $rangeStartTs)
+            ->where('t.created_at <=', $rangeEndTs)
+            ->groupBy('s.id, s.store_name')
+            ->orderBy('sales_total', 'DESC')
+            ->limit(5)
+            ->get()
+            ->getResultArray();
+        $topStores = array_map(static function (array $row): array {
+            return [
+                'store_id' => (int) ($row['store_id'] ?? 0),
+                'store_name' => (string) ($row['store_name'] ?? 'Store'),
+                'transactions' => (int) ($row['txn_count'] ?? 0),
+                'sales' => (float) ($row['sales_total'] ?? 0),
+            ];
+        }, $topStoreRows);
+
+        $topSellingItemRows = $db->table('transaction_items ti')
+            ->select('ti.product_id, p.name, COALESCE(SUM(ti.qty), 0) AS qty_sold, COALESCE(SUM(ti.line_total), 0) AS sales_total')
+            ->join('transactions t', 't.id = ti.transaction_id', 'inner')
+            ->join('products p', 'p.id = ti.product_id', 'left')
+            ->where('t.created_at >=', $rangeStartTs)
+            ->where('t.created_at <=', $rangeEndTs)
+            ->groupBy('ti.product_id, p.name')
+            ->orderBy('qty_sold', 'DESC')
+            ->orderBy('sales_total', 'DESC')
+            ->limit(8)
+            ->get()
+            ->getResultArray();
+        $topSellingItems = array_map(static function (array $row): array {
+            $productId = (int) ($row['product_id'] ?? 0);
+            return [
+                'product_id' => $productId,
+                'name' => (string) ($row['name'] ?? ('Product #' . $productId)),
+                'qty_sold' => (int) ($row['qty_sold'] ?? 0),
+                'sales' => (float) ($row['sales_total'] ?? 0),
+            ];
+        }, $topSellingItemRows);
+
+        $inactiveStores = (int) ($storeSummary['inactive_stores'] ?? 0);
+        $outOfStockProducts = (int) ($productAlerts['out_of_stock_products'] ?? 0);
+        $overCreditAccounts = (int) ($creditAlerts['over_credit_accounts'] ?? 0);
+        $openAlerts = $inactiveStores + $outOfStockProducts + $overCreditAccounts;
+
+        $healthMessages = [];
+        if ($inactiveStores > 0) {
+            $healthMessages[] = $inactiveStores . ' inactive store(s)';
+        }
+        if ($outOfStockProducts > 0) {
+            $healthMessages[] = $outOfStockProducts . ' out-of-stock product(s)';
+        }
+        if ($overCreditAccounts > 0) {
+            $healthMessages[] = $overCreditAccounts . ' over-credit account(s)';
+        }
+        $healthText = $openAlerts > 0
+            ? 'Attention needed: ' . implode(' | ', $healthMessages) . '.'
+            : 'All core modules are online. No alerts detected.';
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'summary' => [
+                'total_stores' => (int) ($storeSummary['total_stores'] ?? 0),
+                'active_store_officers' => $activeStoreOfficers,
+                'debt_accounts' => (int) ($debtSummary['debt_accounts'] ?? 0),
+                'total_debt' => (float) ($debtSummary['total_debt'] ?? 0),
+                'open_alerts' => $openAlerts,
+                'inactive_stores' => $inactiveStores,
+                'out_of_stock_products' => $outOfStockProducts,
+                'over_credit_accounts' => $overCreditAccounts,
+                'today_transactions' => (int) ($todayTxn['txn_count'] ?? 0),
+                'today_sales' => (float) ($todayTxn['sales_total'] ?? 0),
+            ],
+            'health' => [
+                'ok' => $openAlerts === 0,
+                'message' => $healthText,
+            ],
+            'analytics' => [
+                'range' => [
+                    'from' => $rangeStartDate,
+                    'to' => $today->format('Y-m-d'),
+                ],
+                'trend' => $trend,
+                'payment_breakdown' => $paymentBreakdown,
+                'top_stores' => $topStores,
+                'top_selling_items' => $topSellingItems,
+            ],
+        ]);
     }
 
     public function storeOps()
@@ -30,6 +226,388 @@ class AdminController extends Controller
     public function userView()
     {
         return view('admin/user-view');
+    }
+
+    public function products()
+    {
+        return view('admin/products');
+    }
+
+    public function productsData()
+    {
+        $q = trim((string) $this->request->getGet('q'));
+        $storeId = (int) ($this->request->getGet('store_id') ?? 0);
+        $includeInactive = (int) ($this->request->getGet('include_inactive') ?? 0) === 1;
+
+        $db = Database::connect();
+        $query = $db->table('products p')
+            ->select('p.id, p.store_id, p.sku, p.name, p.variant_label, p.category, p.barcode, p.image_url, p.price, p.stock_qty, p.is_active, p.updated_at, s.store_name')
+            ->join('stores s', 's.id = p.store_id', 'inner');
+
+        if ($storeId > 0) {
+            $query->where('p.store_id', $storeId);
+        }
+        if (!$includeInactive) {
+            $query->where('p.is_active', 1);
+        }
+        if ($q !== '') {
+            $query->groupStart()
+                ->like('p.name', $q)
+                ->orLike('p.sku', $q)
+                ->orLike('p.category', $q)
+                ->orLike('s.store_name', $q)
+                ->groupEnd();
+        }
+
+        $rows = $query->orderBy('s.store_name', 'ASC')
+            ->orderBy('p.name', 'ASC')
+            ->limit(500)
+            ->get()
+            ->getResultArray();
+
+        $stores = $db->table('stores')
+            ->select('id, store_name')
+            ->where('is_active', 1)
+            ->orderBy('store_name', 'ASC')
+            ->get()
+            ->getResultArray();
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'stores' => array_map(static function (array $row): array {
+                return [
+                    'id' => (int) $row['id'],
+                    'store_name' => (string) $row['store_name'],
+                ];
+            }, $stores),
+            'data' => array_map(static function (array $row): array {
+                return [
+                    'id' => (int) $row['id'],
+                    'store_id' => (int) $row['store_id'],
+                    'store_name' => (string) $row['store_name'],
+                    'sku' => (string) ($row['sku'] ?? ''),
+                    'name' => (string) ($row['name'] ?? ''),
+                    'variant_label' => (string) ($row['variant_label'] ?? ''),
+                    'category' => (string) ($row['category'] ?? ''),
+                    'barcode' => (string) ($row['barcode'] ?? ''),
+                    'image_url' => (string) ($row['image_url'] ?? ''),
+                    'price' => (float) ($row['price'] ?? 0),
+                    'stock_qty' => (int) ($row['stock_qty'] ?? 0),
+                    'is_active' => (bool) ($row['is_active'] ?? false),
+                    'updated_at' => (string) ($row['updated_at'] ?? ''),
+                ];
+            }, $rows),
+        ]);
+    }
+
+    public function updateProduct()
+    {
+        $request = $this->getRequestData();
+        $actorId = (int) session()->get('user_id');
+
+        $productId = (int) ($request['product_id'] ?? 0);
+        $storeId = (int) ($request['store_id'] ?? 0);
+        $sku = trim((string) ($request['sku'] ?? ''));
+        $name = trim((string) ($request['name'] ?? ''));
+        $variantLabel = trim((string) ($request['variant_label'] ?? ''));
+        $category = trim((string) ($request['category'] ?? ''));
+        $barcode = trim((string) ($request['barcode'] ?? ''));
+        $inputImageUrl = trim((string) ($request['image_url'] ?? ''));
+        $price = (float) ($request['price'] ?? -1);
+        $isActive = (int) ($request['is_active'] ?? 1) === 1 ? 1 : 0;
+
+        if ($productId <= 0 || $storeId <= 0 || $sku === '' || $name === '' || $price < 0) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Invalid product payload.',
+            ]);
+        }
+
+        $db = Database::connect();
+        $productModel = new \App\Models\ProductModel();
+        $auditLogModel = new AuditLogModel();
+
+        $product = $productModel->find($productId);
+        if (!$product || (int) ($product['store_id'] ?? 0) !== $storeId) {
+            return $this->response->setStatusCode(404)->setJSON([
+                'status' => 'error',
+                'message' => 'Product not found.',
+            ]);
+        }
+
+        $sameSku = $db->table('products')
+            ->where('store_id', $storeId)
+            ->where('sku', $sku)
+            ->where('id !=', $productId)
+            ->get()
+            ->getRowArray();
+        if ($sameSku) {
+            return $this->response->setStatusCode(409)->setJSON([
+                'status' => 'error',
+                'message' => 'SKU already exists in this store.',
+            ]);
+        }
+
+        if ($barcode !== '') {
+            $sameBarcode = $db->table('products')
+                ->where('store_id', $storeId)
+                ->where('barcode', $barcode)
+                ->where('id !=', $productId)
+                ->get()
+                ->getRowArray();
+            if ($sameBarcode) {
+                return $this->response->setStatusCode(409)->setJSON([
+                    'status' => 'error',
+                    'message' => 'Barcode already exists in this store.',
+                ]);
+            }
+        }
+
+        try {
+            $resolvedImageUrl = $this->resolveProductImageUrl($inputImageUrl, $product['image_url'] ?? null);
+        } catch (\RuntimeException $e) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => $e->getMessage(),
+            ]);
+        }
+
+        $db->transStart();
+
+        $productModel->update($productId, [
+            'sku' => $sku,
+            'name' => $name,
+            'variant_label' => $variantLabel !== '' ? $variantLabel : null,
+            'category' => $category !== '' ? $category : 'General',
+            'barcode' => $barcode !== '' ? $barcode : null,
+            'image_url' => $resolvedImageUrl !== '' ? $resolvedImageUrl : null,
+            'price' => $price,
+            'is_active' => $isActive,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $auditLogModel->insert([
+            'actor_id' => $actorId,
+            'action' => 'ADMIN_UPDATE_PRODUCT',
+            'entity' => 'products',
+            'entity_id' => $productId,
+            'payload_json' => json_encode([
+                'store_id' => $storeId,
+                'before' => [
+                    'sku' => $product['sku'] ?? '',
+                    'name' => $product['name'] ?? '',
+                    'variant_label' => $product['variant_label'] ?? null,
+                    'category' => $product['category'] ?? '',
+                    'barcode' => $product['barcode'] ?? null,
+                    'image_url' => $product['image_url'] ?? null,
+                    'price' => (float) ($product['price'] ?? 0),
+                    'is_active' => (bool) ($product['is_active'] ?? false),
+                ],
+                'after' => [
+                    'sku' => $sku,
+                    'name' => $name,
+                    'variant_label' => $variantLabel !== '' ? $variantLabel : null,
+                    'category' => $category !== '' ? $category : 'General',
+                    'barcode' => $barcode !== '' ? $barcode : null,
+                    'image_url' => $resolvedImageUrl !== '' ? $resolvedImageUrl : null,
+                    'price' => $price,
+                    'is_active' => (bool) $isActive,
+                ],
+            ]),
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $db->transComplete();
+        if (!$db->transStatus()) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'status' => 'error',
+                'message' => 'Failed to update product.',
+            ]);
+        }
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'product' => $productModel->find($productId),
+        ]);
+    }
+
+    public function createProduct()
+    {
+        $request = $this->getRequestData();
+        $actorId = (int) session()->get('user_id');
+
+        $storeId = (int) ($request['store_id'] ?? 0);
+        $sku = trim((string) ($request['sku'] ?? ''));
+        $name = trim((string) ($request['name'] ?? ''));
+        $variantLabel = trim((string) ($request['variant_label'] ?? ''));
+        $category = trim((string) ($request['category'] ?? ''));
+        $barcode = trim((string) ($request['barcode'] ?? ''));
+        $inputImageUrl = trim((string) ($request['image_url'] ?? ''));
+        $price = (float) ($request['price'] ?? -1);
+        $stockQty = (int) ($request['stock_qty'] ?? 0);
+        $isActive = (int) ($request['is_active'] ?? 1) === 1 ? 1 : 0;
+
+        if ($storeId <= 0 || $sku === '' || $name === '' || $price < 0 || $stockQty < 0) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Invalid product payload.',
+            ]);
+        }
+
+        $storeModel = new StoreModel();
+        $store = $storeModel->find($storeId);
+        if (!$store) {
+            return $this->response->setStatusCode(404)->setJSON([
+                'status' => 'error',
+                'message' => 'Store not found.',
+            ]);
+        }
+
+        $db = Database::connect();
+        $productModel = new ProductModel();
+        $categoryModel = new StoreCategoryModel();
+        $auditLogModel = new AuditLogModel();
+
+        if ($productModel->where('store_id', $storeId)->where('sku', $sku)->first()) {
+            return $this->response->setStatusCode(409)->setJSON([
+                'status' => 'error',
+                'message' => 'SKU already exists in this store.',
+            ]);
+        }
+
+        if ($barcode !== '') {
+            $sameBarcode = $db->table('products')
+                ->where('store_id', $storeId)
+                ->where('barcode', $barcode)
+                ->get()
+                ->getRowArray();
+            if ($sameBarcode) {
+                return $this->response->setStatusCode(409)->setJSON([
+                    'status' => 'error',
+                    'message' => 'Barcode already exists in this store.',
+                ]);
+            }
+        }
+
+        $category = $category !== '' ? $category : 'General';
+        $categoryModel->ensureCategory($storeId, $category);
+
+        try {
+            $resolvedImageUrl = $this->resolveProductImageUrl($inputImageUrl, null);
+        } catch (\RuntimeException $e) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => $e->getMessage(),
+            ]);
+        }
+
+        $db->transStart();
+
+        $productId = $productModel->insert([
+            'store_id' => $storeId,
+            'sku' => $sku,
+            'name' => $name,
+            'variant_label' => $variantLabel !== '' ? $variantLabel : null,
+            'category' => $category,
+            'barcode' => $barcode !== '' ? $barcode : null,
+            'image_url' => $resolvedImageUrl !== '' ? $resolvedImageUrl : null,
+            'price' => $price,
+            'stock_qty' => $stockQty,
+            'is_active' => $isActive,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $auditLogModel->insert([
+            'actor_id' => $actorId,
+            'action' => 'ADMIN_CREATE_PRODUCT',
+            'entity' => 'products',
+            'entity_id' => (int) $productId,
+            'payload_json' => json_encode([
+                'store_id' => $storeId,
+                'sku' => $sku,
+                'name' => $name,
+                'variant_label' => $variantLabel !== '' ? $variantLabel : null,
+                'category' => $category,
+                'barcode' => $barcode !== '' ? $barcode : null,
+                'image_url' => $resolvedImageUrl !== '' ? $resolvedImageUrl : null,
+                'price' => $price,
+                'stock_qty' => $stockQty,
+                'is_active' => (bool) $isActive,
+            ]),
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $db->transComplete();
+        if (!$db->transStatus() || !$productId) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'status' => 'error',
+                'message' => 'Failed to create product.',
+            ]);
+        }
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'product' => $productModel->find($productId),
+        ]);
+    }
+
+    public function toggleProductStatus()
+    {
+        $request = $this->getRequestData();
+        $actorId = (int) session()->get('user_id');
+        $productId = (int) ($request['product_id'] ?? 0);
+        $isActive = (int) ($request['is_active'] ?? -1);
+
+        if ($productId <= 0 || !in_array($isActive, [0, 1], true)) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Invalid status payload.',
+            ]);
+        }
+
+        $productModel = new ProductModel();
+        $auditLogModel = new AuditLogModel();
+        $product = $productModel->find($productId);
+        if (!$product) {
+            return $this->response->setStatusCode(404)->setJSON([
+                'status' => 'error',
+                'message' => 'Product not found.',
+            ]);
+        }
+
+        $db = Database::connect();
+        $db->transStart();
+
+        $productModel->update($productId, [
+            'is_active' => $isActive,
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $auditLogModel->insert([
+            'actor_id' => $actorId,
+            'action' => 'ADMIN_TOGGLE_PRODUCT_STATUS',
+            'entity' => 'products',
+            'entity_id' => $productId,
+            'payload_json' => json_encode([
+                'store_id' => (int) ($product['store_id'] ?? 0),
+                'sku' => (string) ($product['sku'] ?? ''),
+                'previous_is_active' => (int) ($product['is_active'] ?? 0),
+                'new_is_active' => $isActive,
+            ]),
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $db->transComplete();
+        if (!$db->transStatus()) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'status' => 'error',
+                'message' => 'Failed to update product status.',
+            ]);
+        }
+
+        return $this->response->setJSON([
+            'status' => 'success',
+        ]);
     }
 
     public function accountingDebtsData()
@@ -1066,6 +1644,51 @@ class AdminController extends Controller
         }
 
         return $this->request->getPost();
+    }
+
+    private function resolveProductImageUrl(string $inputUrl, ?string $currentUrl): ?string
+    {
+        $imageFile = $this->request->getFile('image_file');
+        $hasFile = $imageFile && $imageFile->getError() !== UPLOAD_ERR_NO_FILE;
+
+        if ($hasFile) {
+            if (!$imageFile->isValid()) {
+                throw new \RuntimeException('Invalid uploaded image file.');
+            }
+
+            $allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+            if (!in_array((string) $imageFile->getMimeType(), $allowedMimeTypes, true)) {
+                throw new \RuntimeException('Product image must be JPG, PNG, WEBP, or GIF.');
+            }
+
+            if ((int) $imageFile->getSize() > 2 * 1024 * 1024) {
+                throw new \RuntimeException('Product image size must be 2MB or less.');
+            }
+
+            $uploadDir = FCPATH . 'uploads/product-images';
+            if (!is_dir($uploadDir) && !mkdir($uploadDir, 0775, true) && !is_dir($uploadDir)) {
+                throw new \RuntimeException('Failed to prepare product image upload directory.');
+            }
+
+            $newName = $imageFile->getRandomName();
+            $imageFile->move($uploadDir, $newName);
+            $storedPath = '/uploads/product-images/' . $newName;
+
+            if ($currentUrl && strpos($currentUrl, '/uploads/product-images/') === 0) {
+                $oldFile = FCPATH . ltrim($currentUrl, '/');
+                if (is_file($oldFile)) {
+                    @unlink($oldFile);
+                }
+            }
+
+            return $storedPath;
+        }
+
+        if ($inputUrl !== '') {
+            return $inputUrl;
+        }
+
+        return $currentUrl;
     }
 
     private function extractRolesFromRequest(array $request): array
