@@ -1,0 +1,287 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1800" height="2200" viewBox="0 0 1800 2200">
+  <defs>
+    <style>
+      .bg { fill: #f7f8fb; }
+      .title { font: 700 42px Arial, sans-serif; fill: #172033; }
+      .subtitle { font: 400 18px Arial, sans-serif; fill: #526070; }
+      .entity { fill: #ffffff; stroke: #26364d; stroke-width: 2; rx: 8; }
+      .head { fill: #26364d; }
+      .headText { font: 700 18px Arial, sans-serif; fill: #ffffff; letter-spacing: 0; }
+      .field { font: 14px Consolas, "Courier New", monospace; fill: #1f2937; }
+      .pk { fill: #0f766e; font-weight: 700; }
+      .fk { fill: #1d4ed8; font-weight: 700; }
+      .uk { fill: #b45309; font-weight: 700; }
+      .rel { fill: none; stroke: #64748b; stroke-width: 2; }
+      .relText { font: 13px Arial, sans-serif; fill: #334155; }
+      .noteBox { fill: #eef6ff; stroke: #8ab4f8; stroke-width: 1.5; rx: 8; }
+      .note { font: 15px Arial, sans-serif; fill: #1e3a5f; }
+      .legend { font: 15px Arial, sans-serif; fill: #334155; }
+    </style>
+    <marker id="many" markerWidth="14" markerHeight="14" refX="13" refY="7" orient="auto" markerUnits="strokeWidth">
+      <path d="M1,1 L13,7 L1,13 M1,7 L13,7" fill="none" stroke="#64748b" stroke-width="1.8"/>
+    </marker>
+    <marker id="one" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto" markerUnits="strokeWidth">
+      <path d="M2,2 L2,10 M6,2 L6,10" fill="none" stroke="#64748b" stroke-width="1.8"/>
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1800" height="2200"/>
+  <text class="title" x="70" y="80">IBEMS Entity Relationship Diagram</text>
+  <text class="subtitle" x="70" y="112">Generated from CodeIgniter migrations in D:\BEMS\ibems\app\Database\Migrations</text>
+
+  <g transform="translate(70,150)">
+    <rect class="noteBox" x="0" y="0" width="500" height="58"/>
+    <text class="legend" x="18" y="24"><tspan class="pk">PK</tspan> = Primary Key   <tspan class="fk">FK</tspan> = Foreign Key   <tspan class="uk">UK</tspan> = Unique Key</text>
+    <text class="legend" x="18" y="46">Crow-foot arrow points toward the many-side relationship.</text>
+  </g>
+
+  <!-- Relationship lines behind entities -->
+  <g id="relationships">
+    <path class="rel" d="M410 460 C520 460 520 360 650 360" marker-start="url(#one)" marker-end="url(#many)"/>
+    <text class="relText" x="476" y="392">officer_id</text>
+
+    <path class="rel" d="M250 660 C250 740 250 740 250 810" marker-start="url(#one)" marker-end="url(#one)"/>
+    <text class="relText" x="265" y="742">user_id</text>
+
+    <path class="rel" d="M950 490 C950 560 950 560 950 630" marker-start="url(#one)" marker-end="url(#many)"/>
+    <text class="relText" x="965" y="565">store_id</text>
+
+    <path class="rel" d="M960 490 C1120 560 1180 650 1180 770" marker-start="url(#one)" marker-end="url(#many)"/>
+    <text class="relText" x="1084" y="620">store_id</text>
+
+    <path class="rel" d="M410 520 C650 600 800 690 1050 810" marker-start="url(#one)" marker-end="url(#many)"/>
+    <text class="relText" x="692" y="654">user_id</text>
+
+    <path class="rel" d="M1180 1050 C1180 1130 1180 1130 1180 1210" marker-start="url(#one)" marker-end="url(#many)"/>
+    <text class="relText" x="1195" y="1134">transaction_id</text>
+
+    <path class="rel" d="M1120 760 C1290 810 1410 980 1460 1210" marker-start="url(#one)" marker-end="url(#many)"/>
+    <text class="relText" x="1338" y="982">product_id</text>
+
+    <path class="rel" d="M950 930 C950 1080 780 1190 690 1360" marker-start="url(#one)" marker-end="url(#many)"/>
+    <text class="relText" x="788" y="1164">product_id</text>
+
+    <path class="rel" d="M870 490 C770 760 650 1080 610 1360" marker-start="url(#one)" marker-end="url(#many)"/>
+    <text class="relText" x="704" y="1020">store_id</text>
+
+    <path class="rel" d="M1080 1050 C930 1160 810 1270 700 1420" marker-start="url(#one)" marker-end="url(#many)"/>
+    <text class="relText" x="875" y="1220">txn_id</text>
+
+    <path class="rel" d="M190 660 C190 1180 190 1180 190 1620" marker-start="url(#one)" marker-end="url(#many)"/>
+    <text class="relText" x="205" y="1150">imported_by</text>
+
+    <path class="rel" d="M320 1840 C470 1840 470 1840 620 1840" marker-start="url(#one)" marker-end="url(#many)"/>
+    <text class="relText" x="410" y="1822">batch_id</text>
+
+    <path class="rel" d="M300 660 C550 990 900 1480 1120 1620" marker-start="url(#one)" marker-end="url(#many)"/>
+    <text class="relText" x="720" y="1260">run_by</text>
+
+    <path class="rel" d="M410 580 C900 760 1320 980 1540 1620" marker-start="url(#one)" marker-end="url(#many)"/>
+    <text class="relText" x="1240" y="1180">user_id</text>
+
+    <path class="rel" d="M1280 1050 C1440 1210 1510 1390 1580 1620" marker-start="url(#one)" marker-end="url(#many)"/>
+    <text class="relText" x="1510" y="1350">txn_id</text>
+
+    <path class="rel" d="M120 660 C80 1080 90 1380 100 1620" marker-start="url(#one)" marker-end="url(#many)"/>
+    <text class="relText" x="96" y="1260">actor_id</text>
+
+    <path class="rel" d="M410 390 C620 170 1270 170 1410 310" marker-start="url(#one)" marker-end="url(#many)"/>
+    <text class="relText" x="920" y="196">updated_by</text>
+  </g>
+
+  <!-- USERS -->
+  <g transform="translate(70,260)">
+    <rect class="entity" width="340" height="400"/>
+    <rect class="head" width="340" height="44"/>
+    <text class="headText" x="18" y="29">USERS</text>
+    <text class="field" x="18" y="74"><tspan class="pk">PK</tspan> id : int</text>
+    <text class="field" x="18" y="98"><tspan class="uk">UK</tspan> employee_id : varchar</text>
+    <text class="field" x="18" y="122">name : varchar</text>
+    <text class="field" x="18" y="146"><tspan class="uk">UK</tspan> email : varchar</text>
+    <text class="field" x="18" y="170">password_hash : varchar</text>
+    <text class="field" x="18" y="194">role : varchar</text>
+    <text class="field" x="18" y="218">user_type : varchar</text>
+    <text class="field" x="18" y="242"><tspan class="uk">UK</tspan> qr_token : varchar</text>
+    <text class="field" x="18" y="266">base_salary : decimal</text>
+    <text class="field" x="18" y="290">is_active : tinyint</text>
+    <text class="field" x="18" y="314">failed_login_attempts : int</text>
+    <text class="field" x="18" y="338">locked_until : datetime</text>
+    <text class="field" x="18" y="362">created_at : datetime</text>
+    <text class="field" x="18" y="386">updated_at : datetime</text>
+  </g>
+
+  <!-- STORES -->
+  <g transform="translate(650,290)">
+    <rect class="entity" width="300" height="200"/>
+    <rect class="head" width="300" height="44"/>
+    <text class="headText" x="18" y="29">STORES</text>
+    <text class="field" x="18" y="74"><tspan class="pk">PK</tspan> id : int</text>
+    <text class="field" x="18" y="98">store_name : varchar</text>
+    <text class="field" x="18" y="122"><tspan class="fk">FK</tspan> officer_id : int</text>
+    <text class="field" x="18" y="146">is_active : tinyint</text>
+    <text class="field" x="18" y="170">created_at : datetime</text>
+    <text class="field" x="18" y="194">updated_at : datetime</text>
+  </g>
+
+  <!-- APP SETTINGS -->
+  <g transform="translate(1410,300)">
+    <rect class="entity" width="320" height="176"/>
+    <rect class="head" width="320" height="44"/>
+    <text class="headText" x="18" y="29">APP_SETTINGS</text>
+    <text class="field" x="18" y="74"><tspan class="pk">PK</tspan> id : int</text>
+    <text class="field" x="18" y="98"><tspan class="uk">UK</tspan> setting_key : varchar</text>
+    <text class="field" x="18" y="122">setting_value : text</text>
+    <text class="field" x="18" y="146"><tspan class="fk">FK</tspan> updated_by : int</text>
+    <text class="field" x="18" y="170">updated_at : datetime</text>
+  </g>
+
+  <!-- BALANCES -->
+  <g transform="translate(70,810)">
+    <rect class="entity" width="340" height="152"/>
+    <rect class="head" width="340" height="44"/>
+    <text class="headText" x="18" y="29">BALANCES</text>
+    <text class="field" x="18" y="74"><tspan class="pk">PK</tspan> <tspan class="fk">FK</tspan> user_id : int</text>
+    <text class="field" x="18" y="98">credit_limit : decimal</text>
+    <text class="field" x="18" y="122">current_debt : decimal</text>
+    <text class="field" x="18" y="146">updated_at : datetime</text>
+  </g>
+
+  <!-- PRODUCTS -->
+  <g transform="translate(760,630)">
+    <rect class="entity" width="360" height="300"/>
+    <rect class="head" width="360" height="44"/>
+    <text class="headText" x="18" y="29">PRODUCTS</text>
+    <text class="field" x="18" y="74"><tspan class="pk">PK</tspan> id : int</text>
+    <text class="field" x="18" y="98"><tspan class="fk">FK</tspan> store_id : int</text>
+    <text class="field" x="18" y="122"><tspan class="uk">UK</tspan> sku : varchar</text>
+    <text class="field" x="18" y="146">name : varchar</text>
+    <text class="field" x="18" y="170">category : varchar</text>
+    <text class="field" x="18" y="194">image_path : varchar</text>
+    <text class="field" x="18" y="218">price : decimal</text>
+    <text class="field" x="18" y="242">stock_qty : int</text>
+    <text class="field" x="18" y="266">is_active : tinyint</text>
+    <text class="field" x="18" y="290">created_at / updated_at</text>
+  </g>
+
+  <!-- TRANSACTIONS -->
+  <g transform="translate(1050,770)">
+    <rect class="entity" width="360" height="280"/>
+    <rect class="head" width="360" height="44"/>
+    <text class="headText" x="18" y="29">TRANSACTIONS</text>
+    <text class="field" x="18" y="74"><tspan class="pk">PK</tspan> id : bigint</text>
+    <text class="field" x="18" y="98"><tspan class="uk">UK</tspan> client_txn_id : varchar</text>
+    <text class="field" x="18" y="122"><tspan class="fk">FK</tspan> user_id : int</text>
+    <text class="field" x="18" y="146"><tspan class="fk">FK</tspan> store_id : int</text>
+    <text class="field" x="18" y="170">customer_type : varchar</text>
+    <text class="field" x="18" y="194">amount : decimal</text>
+    <text class="field" x="18" y="218">payment_method : varchar</text>
+    <text class="field" x="18" y="242"><tspan class="uk">UK</tspan> reference_no : varchar</text>
+    <text class="field" x="18" y="266">status / created_at / synced_at</text>
+  </g>
+
+  <!-- TRANSACTION ITEMS -->
+  <g transform="translate(1410,1210)">
+    <rect class="entity" width="320" height="200"/>
+    <rect class="head" width="320" height="44"/>
+    <text class="headText" x="18" y="29">TRANSACTION_ITEMS</text>
+    <text class="field" x="18" y="74"><tspan class="pk">PK</tspan> id : bigint</text>
+    <text class="field" x="18" y="98"><tspan class="fk">FK</tspan> transaction_id : bigint</text>
+    <text class="field" x="18" y="122"><tspan class="fk">FK</tspan> product_id : int</text>
+    <text class="field" x="18" y="146">qty : int</text>
+    <text class="field" x="18" y="170">unit_price : decimal</text>
+    <text class="field" x="18" y="194">line_total : decimal</text>
+  </g>
+
+  <!-- INVENTORY MOVEMENTS -->
+  <g transform="translate(420,1360)">
+    <rect class="entity" width="320" height="248"/>
+    <rect class="head" width="320" height="44"/>
+    <text class="headText" x="18" y="29">INVENTORY_MOVEMENTS</text>
+    <text class="field" x="18" y="74"><tspan class="pk">PK</tspan> id : bigint</text>
+    <text class="field" x="18" y="98"><tspan class="fk">FK</tspan> product_id : int</text>
+    <text class="field" x="18" y="122"><tspan class="fk">FK</tspan> store_id : int</text>
+    <text class="field" x="18" y="146">type : varchar</text>
+    <text class="field" x="18" y="170">qty : int</text>
+    <text class="field" x="18" y="194">reason : varchar</text>
+    <text class="field" x="18" y="218"><tspan class="fk">FK</tspan> txn_id : bigint</text>
+    <text class="field" x="18" y="242">created_at : datetime</text>
+  </g>
+
+  <!-- AUDIT LOGS -->
+  <g transform="translate(70,1620)">
+    <rect class="entity" width="320" height="224"/>
+    <rect class="head" width="320" height="44"/>
+    <text class="headText" x="18" y="29">AUDIT_LOGS</text>
+    <text class="field" x="18" y="74"><tspan class="pk">PK</tspan> id : bigint</text>
+    <text class="field" x="18" y="98"><tspan class="fk">FK</tspan> actor_id : int</text>
+    <text class="field" x="18" y="122">action : varchar</text>
+    <text class="field" x="18" y="146">entity : varchar</text>
+    <text class="field" x="18" y="170">entity_id : varchar</text>
+    <text class="field" x="18" y="194">payload_json : text</text>
+    <text class="field" x="18" y="218">created_at : datetime</text>
+  </g>
+
+  <!-- SALARY IMPORT BATCHES -->
+  <g transform="translate(70,1880)">
+    <rect class="entity" width="320" height="224"/>
+    <rect class="head" width="320" height="44"/>
+    <text class="headText" x="18" y="29">SALARY_IMPORT_BATCHES</text>
+    <text class="field" x="18" y="74"><tspan class="pk">PK</tspan> id : bigint</text>
+    <text class="field" x="18" y="98">filename : varchar</text>
+    <text class="field" x="18" y="122"><tspan class="fk">FK</tspan> imported_by : int</text>
+    <text class="field" x="18" y="146">imported_at : datetime</text>
+    <text class="field" x="18" y="170">total_rows : int</text>
+    <text class="field" x="18" y="194">valid_rows : int</text>
+    <text class="field" x="18" y="218">invalid_rows : int</text>
+  </g>
+
+  <!-- SALARY IMPORT ROWS -->
+  <g transform="translate(620,1728)">
+    <rect class="entity" width="330" height="248"/>
+    <rect class="head" width="330" height="44"/>
+    <text class="headText" x="18" y="29">SALARY_IMPORT_ROWS</text>
+    <text class="field" x="18" y="74"><tspan class="pk">PK</tspan> id : bigint</text>
+    <text class="field" x="18" y="98"><tspan class="fk">FK</tspan> batch_id : bigint</text>
+    <text class="field" x="18" y="122">employee_id : varchar</text>
+    <text class="field" x="18" y="146">name : varchar</text>
+    <text class="field" x="18" y="170">email : varchar</text>
+    <text class="field" x="18" y="194">monthly_salary : decimal</text>
+    <text class="field" x="18" y="218">status : varchar</text>
+    <text class="field" x="18" y="242">error_msg : varchar</text>
+  </g>
+
+  <!-- SETTLEMENT RUNS -->
+  <g transform="translate(1040,1620)">
+    <rect class="entity" width="320" height="224"/>
+    <rect class="head" width="320" height="44"/>
+    <text class="headText" x="18" y="29">SETTLEMENT_RUNS</text>
+    <text class="field" x="18" y="74"><tspan class="pk">PK</tspan> id : bigint</text>
+    <text class="field" x="18" y="98">run_month : varchar</text>
+    <text class="field" x="18" y="122"><tspan class="fk">FK</tspan> run_by : int</text>
+    <text class="field" x="18" y="146">run_at : datetime</text>
+    <text class="field" x="18" y="170">total_accounts : int</text>
+    <text class="field" x="18" y="194">total_debt_before : decimal</text>
+    <text class="field" x="18" y="218">notes : varchar</text>
+  </g>
+
+  <!-- NOTIFICATIONS -->
+  <g transform="translate(1410,1620)">
+    <rect class="entity" width="320" height="224"/>
+    <rect class="head" width="320" height="44"/>
+    <text class="headText" x="18" y="29">NOTIFICATIONS</text>
+    <text class="field" x="18" y="74"><tspan class="pk">PK</tspan> id : bigint</text>
+    <text class="field" x="18" y="98"><tspan class="fk">FK</tspan> user_id : int</text>
+    <text class="field" x="18" y="122"><tspan class="fk">FK</tspan> txn_id : bigint</text>
+    <text class="field" x="18" y="146">channel : varchar</text>
+    <text class="field" x="18" y="170">status : varchar</text>
+    <text class="field" x="18" y="194">sent_at : datetime</text>
+    <text class="field" x="18" y="218">error_msg : varchar</text>
+  </g>
+
+  <g transform="translate(1120,2000)">
+    <rect class="noteBox" width="610" height="92"/>
+    <text class="note" x="18" y="28">Implementation notes:</text>
+    <text class="note" x="18" y="52">- Walk-in transactions allow transactions.user_id to be null.</text>
+    <text class="note" x="18" y="76">- products has a composite unique key: store_id + sku.</text>
+  </g>
+</svg>
