@@ -76,6 +76,7 @@
 
         .sidebar-link {
             color: #c9d7ea;
+            border: 1px solid transparent;
             border-radius: 10px;
             padding: .62rem .72rem;
             display: flex;
@@ -188,7 +189,27 @@
 <?php else: ?>
 <?php
     $role = $user['role'];
-    $path = '/' . trim(service('uri')->getPath(), '/');
+    $normalizePath = static function (string $path): string {
+        $path = '/' . trim($path, '/');
+        $path = preg_replace('#/index\.php(?=/|$)#', '', $path) ?: '/';
+
+        if ($path === '') {
+            return '/';
+        }
+
+        return rtrim($path, '/') ?: '/';
+    };
+
+    $path = $normalizePath(service('uri')->getPath());
+    $isActiveMenu = static function (string $href) use ($path, $normalizePath): bool {
+        $href = $normalizePath($href);
+
+        if ($href === '/dashboard') {
+            return $path === $href;
+        }
+
+        return $path === $href || str_starts_with($path, $href . '/');
+    };
 
     $menus = [
         ['label' => 'Dashboard', 'href' => '/dashboard', 'icon' => 'bi-speedometer2', 'roles' => ['ADMIN', 'ACCOUNTING_OFFICE', 'STORE_SYSTEM', 'USER']],
@@ -238,8 +259,8 @@
     <div class="offcanvas-body">
         <div class="nav flex-column gap-1">
             <?php foreach ($visibleMenus as $item): ?>
-                <?php $active = str_starts_with($path, $item['href']) && $item['href'] !== '/dashboard' ? true : ($path === '/dashboard' && $item['href'] === '/dashboard'); ?>
-                <a href="<?= esc($item['href']) ?>" class="nav-link sidebar-link <?= $active ? 'active' : '' ?>"><i class="bi <?= esc($item['icon']) ?>"></i> <?= esc($item['label']) ?></a>
+                <?php $active = $isActiveMenu($item['href']); ?>
+                <a href="<?= esc(site_url($item['href'])) ?>" class="nav-link sidebar-link <?= $active ? 'active' : '' ?>" <?= $active ? 'aria-current="page"' : '' ?>><i class="bi <?= esc($item['icon']) ?>"></i> <?= esc($item['label']) ?></a>
             <?php endforeach; ?>
         </div>
         <hr>
@@ -252,8 +273,8 @@
         <aside class="col-md-3 col-lg-2 d-none d-md-block sidebar-panel py-3 px-2">
             <div class="nav flex-column gap-1">
                 <?php foreach ($visibleMenus as $item): ?>
-                    <?php $active = str_starts_with($path, $item['href']) && $item['href'] !== '/dashboard' ? true : ($path === '/dashboard' && $item['href'] === '/dashboard'); ?>
-                    <a href="<?= esc($item['href']) ?>" class="nav-link sidebar-link <?= $active ? 'active' : '' ?>"><i class="bi <?= esc($item['icon']) ?>"></i> <?= esc($item['label']) ?></a>
+                    <?php $active = $isActiveMenu($item['href']); ?>
+                    <a href="<?= esc(site_url($item['href'])) ?>" class="nav-link sidebar-link <?= $active ? 'active' : '' ?>" <?= $active ? 'aria-current="page"' : '' ?>><i class="bi <?= esc($item['icon']) ?>"></i> <?= esc($item['label']) ?></a>
                 <?php endforeach; ?>
             </div>
             <div class="mt-4 small text-light px-2">
