@@ -5,6 +5,8 @@ let employeeModalUserId = null;
 let employeeModalProfile = null;
 let settlementPreview = null;
 let settlementRunsCache = [];
+let importCsvPreviewReady = false;
+let activeSettlementDetails = null;
 
 function aEscape(value) {
     return String(value ?? "")
@@ -23,10 +25,30 @@ function aDateTime(value) {
     return new Date(value).toLocaleString();
 }
 
+function csvEscape(value) {
+    const text = String(value ?? "");
+    if (/[",\r\n]/.test(text)) {
+        return `"${text.replace(/"/g, '""')}"`;
+    }
+    return text;
+}
+
 function aCategory(value) {
     const text = String(value || "");
     if (!text) return "-";
     return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
+}
+
+function getDebtStatus(row) {
+    const key = String(row?.debt_status || "").trim() || "pending";
+    const label = String(row?.debt_status_label || "").trim() || aCategory(key.replace(/_/g, " "));
+    const tone = String(row?.debt_status_tone || "").trim() || "info";
+    return { key, label, tone };
+}
+
+function debtStatusPill(row) {
+    const status = getDebtStatus(row);
+    return `<span class="acct-debt-status is-${aEscape(status.tone)}">${aEscape(status.label)}</span>`;
 }
 
 function setAcctResult(message, type) {
@@ -138,6 +160,11 @@ async function openSettlementRunDetails(runId) {
     const modal = document.getElementById("settlement-run-details-modal");
     const head = document.getElementById("settlement-details-head");
     const body = document.getElementById("settlement-details-body");
+    const exportBtn = document.getElementById("settlement-details-export");
+    const printBtn = document.getElementById("settlement-details-print");
+    activeSettlementDetails = null;
+    if (exportBtn) exportBtn.disabled = true;
+    if (printBtn) printBtn.disabled = true;
     modal.style.display = "grid";
     head.innerHTML = "Loading settlement run details...";
     body.innerHTML = '<tr><td colspan="6">Loading details...</td></tr>';
@@ -154,9 +181,12 @@ async function openSettlementRunDetails(runId) {
             return;
         }
 
+        activeSettlementDetails = data;
         const run = data.run || {};
         const summary = data.summary || {};
         const notes = run.notes || {};
+        if (exportBtn) exportBtn.disabled = false;
+        if (printBtn) printBtn.disabled = false;
 
         head.innerHTML = `
             <div><strong>Run Month:</strong> ${aEscape(run.run_month || "-")}</div>
@@ -193,6 +223,121 @@ async function openSettlementRunDetails(runId) {
 
 function closeSettlementRunDetails() {
     document.getElementById("settlement-run-details-modal").style.display = "none";
+    activeSettlementDetails = null;
+    document.getElementById("settlement-details-export").disabled = true;
+    document.getElementById("settlement-details-print").disabled = true;
+}
+
+function exportSettlementDetailsCsv() {
+    if (!activeSettlementDetails) return;
+
+    const run = activeSettlementDetails.run || {};
+    const summary = activeSettlementDetails.summary || {};
+    const rows = Array.isArray(activeSettlementDetails.items) ? activeSettlementDetails.items : [];
+    const lines = [
+        ["Run Month", run.run_month || ""],
+        ["Run At", run.run_at || ""],
+        ["Run By", run.run_by_name || ""],
+        ["Processed Accounts", summary.processed_accounts || 0],
+        ["Total Deducted", Number(summary.total_deducted || 0).toFixed(2)],
+        ["Total Debt After", Number(summary.total_debt_after || 0).toFixed(2)],
+        [],
+        ["Employee ID", "Name", "Category", "Monthly Salary", "Previous Debt", "Deducted", "New Debt"],
+        ...rows.map((row) => [
+            row.employee_id || "",
+            row.name || "",
+            aCategory(row.category),
+            Number(row.monthly_salary || 0).toFixed(2),
+            Number(row.previous_debt || 0).toFixed(2),
+            Number(row.deducted_amount || 0).toFixed(2),
+            Number(row.new_debt || 0).toFixed(2),
+        ]),
+    ];
+
+    const csv = lines.map((line) => line.map(csvEscape).join(",")).join("\r\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `settlement-run-${String(run.run_month || "export")}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+}
+
+function printSettlementDetails() {
+    if (!activeSettlementDetails) return;
+
+    const run = activeSettlementDetails.run || {};
+    const summary = activeSettlementDetails.summary || {};
+    const rows = Array.isArray(activeSettlementDetails.items) ? activeSettlementDetails.items : [];
+    const popup = window.open("", "_blank", "width=980,height=720");
+    if (!popup) {
+        setAcctResult("Popup blocked. Please allow popups to print settlement details.", "error");
+        return;
+    }
+
+    popup.document.write(`
+        <!doctype html>
+        <html>
+        <head>
+            <title>Settlement Run ${aEscape(run.run_month || "")}</title>
+            <style>
+                body { font-family: Arial, sans-serif; color: #0f172a; margin: 24px; }
+                h1 { margin: 0 0 4px; font-size: 22px; }
+                .meta { color: #475569; margin-bottom: 16px; }
+                .summary { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin: 16px 0; }
+                .card { border: 1px solid #cbd5e1; border-radius: 8px; padding: 10px; }
+                .card span { display: block; color: #64748b; font-size: 12px; }
+                .card strong { font-size: 16px; }
+                table { width: 100%; border-collapse: collapse; margin-top: 12px; }
+                th, td { border: 1px solid #cbd5e1; padding: 8px; text-align: left; font-size: 12px; }
+                th { background: #f1f5f9; }
+            </style>
+        </head>
+        <body>
+            <h1>Settlement Run Summary</h1>
+            <div class="meta">
+                Month: ${aEscape(run.run_month || "-")}<br>
+                Run At: ${aEscape(aDateTime(run.run_at || new Date().toISOString()))}<br>
+                Run By: ${aEscape(run.run_by_name || "Unknown")}
+            </div>
+            <div class="summary">
+                <div class="card"><span>Processed Accounts</span><strong>${aEscape(String(summary.processed_accounts || 0))}</strong></div>
+                <div class="card"><span>Total Deducted</span><strong>${aEscape(aMoney(summary.total_deducted || 0))}</strong></div>
+                <div class="card"><span>Total Debt After</span><strong>${aEscape(aMoney(summary.total_debt_after || 0))}</strong></div>
+            </div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Employee</th>
+                        <th>Category</th>
+                        <th>Monthly Salary</th>
+                        <th>Previous Debt</th>
+                        <th>Deducted</th>
+                        <th>New Debt</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rows.map((row) => `
+                        <tr>
+                            <td>${aEscape(row.name || "-")}<br>${aEscape(row.employee_id || "-")}</td>
+                            <td>${aEscape(aCategory(row.category))}</td>
+                            <td>${aEscape(aMoney(row.monthly_salary || 0))}</td>
+                            <td>${aEscape(aMoney(row.previous_debt || 0))}</td>
+                            <td>${aEscape(aMoney(row.deducted_amount || 0))}</td>
+                            <td>${aEscape(aMoney(row.new_debt || 0))}</td>
+                        </tr>
+                    `).join("")}
+                </tbody>
+            </table>
+        </body>
+        </html>
+    `);
+    popup.document.close();
+    popup.focus();
+    popup.print();
 }
 
 function renderRows(rows) {
@@ -216,6 +361,7 @@ function renderRows(rows) {
                         <strong class="text-base font-bold text-slate-900">${aEscape(row.name)}</strong>
                         <span class="table-chip acct-chip">${aEscape(aCategory(row.user_type))}</span>
                         <span class="table-status acct-status ${Number(row.is_active || 0) === 1 ? "is-active" : "is-inactive"}">${Number(row.is_active || 0) === 1 ? "Active" : "Inactive"}</span>
+                        ${debtStatusPill(row)}
                     </div>
                     <div class="acct-subline truncate text-sm text-slate-500">${aEscape(row.employee_id || "-")} | ${aEscape(row.email)}</div>
                 </div>
@@ -418,7 +564,10 @@ async function loadHistory(userId) {
 function buildProfileHtml(p) {
     return `
         <div class="mode-profile-card rounded-xl border border-slate-200 bg-slate-50 p-3">
-            <h5 class="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">Selected Person</h5>
+            <div class="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <h5 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Selected Person</h5>
+                ${debtStatusPill(p)}
+            </div>
             <div class="mode-profile-grid grid gap-2 md:grid-cols-2">
                 <div class="kv rounded-lg border border-slate-200 bg-white p-2.5"><span class="block text-xs text-slate-500">Name</span><strong class="text-sm text-slate-900">${aEscape(p.name)}</strong></div>
                 <div class="kv rounded-lg border border-slate-200 bg-white p-2.5"><span class="block text-xs text-slate-500">Employee ID</span><strong class="text-sm text-slate-900">${aEscape(p.employee_id || "-")}</strong></div>
@@ -595,21 +744,57 @@ function closeEmployeeModal() {
 }
 
 function openImportModal() {
+    importCsvPreviewReady = false;
     document.getElementById("import-csv-modal").style.display = "grid";
     document.getElementById("import-csv-result").textContent = "";
+    document.getElementById("import-csv-valid").innerHTML = "";
     document.getElementById("import-csv-invalid").innerHTML = "";
+    document.getElementById("import-csv-submit").disabled = true;
 }
 
 function closeImportModal() {
     document.getElementById("import-csv-modal").style.display = "none";
+    importCsvPreviewReady = false;
 }
 
-async function submitImportCsv() {
+function renderCsvPreview(data) {
+    const resultEl = document.getElementById("import-csv-result");
+    const validEl = document.getElementById("import-csv-valid");
+    const invalidEl = document.getElementById("import-csv-invalid");
+    const validPreview = Array.isArray(data.valid_preview) ? data.valid_preview : [];
+    const invalidPreview = Array.isArray(data.invalid_preview) ? data.invalid_preview : [];
+
+    resultEl.style.color = data.invalid_rows > 0 ? "#92400e" : "#166534";
+    resultEl.textContent = `Preview ready. Total: ${data.total_rows}, Valid: ${data.valid_rows}, Invalid: ${data.invalid_rows}, Create: ${data.create_count}, Update: ${data.update_count}, Credit limit updates: ${data.credit_limit_update_count}`;
+
+    validEl.innerHTML = validPreview.length > 0 ? validPreview.map((row) => `
+        <div class="import-preview-item is-valid rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+            <strong>Line ${row.line}: ${aEscape(row.action === "create" ? "Create" : "Update")}</strong><br>
+            ${aEscape(row.name || "-")} (${aEscape(row.email || "-")})<br>
+            <span>${aEscape(aCategory(row.user_type))} | Salary ${aEscape(aMoney(row.monthly_salary || 0))}${row.credit_limit !== null ? ` | Credit ${aEscape(aMoney(row.credit_limit || 0))}` : ""}</span>
+        </div>
+    `).join("") : "";
+
+    invalidEl.innerHTML = invalidPreview.length > 0 ? invalidPreview.map((row) => `
+        <div class="invalid-item rounded-xl border border-amber-200 bg-amber-50 p-3">
+            <strong>Line ${row.line}</strong><br>
+            ${aEscape(row.name || "-")} (${aEscape(row.email || "-")})<br>
+            <span>${aEscape(row.error || "Invalid row")}</span>
+        </div>
+    `).join("") : "";
+}
+
+async function previewImportCsv() {
     const fileInput = document.getElementById("import-csv-file");
     const resultEl = document.getElementById("import-csv-result");
+    const validEl = document.getElementById("import-csv-valid");
     const invalidEl = document.getElementById("import-csv-invalid");
-    const button = document.getElementById("import-csv-submit");
+    const button = document.getElementById("import-csv-preview");
+    const applyButton = document.getElementById("import-csv-submit");
     const file = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+
+    importCsvPreviewReady = false;
+    applyButton.disabled = true;
 
     if (!file) {
         resultEl.style.color = "#b91c1c";
@@ -621,13 +806,14 @@ async function submitImportCsv() {
     formData.append("csv_file", file);
 
     button.disabled = true;
-    button.textContent = "Importing...";
+    button.textContent = "Previewing...";
     resultEl.style.color = "#334155";
-    resultEl.textContent = "Processing CSV...";
+    resultEl.textContent = "Checking CSV...";
+    validEl.innerHTML = "";
     invalidEl.innerHTML = "";
 
     try {
-        const response = await fetch("/accounting/debts/import-csv", {
+        const response = await fetch("/accounting/debts/preview-csv", {
             method: "POST",
             body: formData,
         });
@@ -638,27 +824,62 @@ async function submitImportCsv() {
             return;
         }
 
-        resultEl.style.color = "#166534";
-        resultEl.textContent = `Import complete. Total: ${data.total_rows}, Valid: ${data.valid_rows}, Invalid: ${data.invalid_rows}`;
+        renderCsvPreview(data);
+        importCsvPreviewReady = Number(data.valid_rows || 0) > 0;
+        applyButton.disabled = !importCsvPreviewReady;
+    } catch (error) {
+        resultEl.style.color = "#b91c1c";
+        resultEl.textContent = "CSV preview request failed.";
+    } finally {
+        button.disabled = false;
+        button.textContent = "Preview CSV";
+    }
+}
 
-        const invalidPreview = Array.isArray(data.invalid_preview) ? data.invalid_preview : [];
-        if (invalidPreview.length > 0) {
-            invalidEl.innerHTML = invalidPreview.map((row) => `
-                <div class="invalid-item rounded-xl border border-slate-200 bg-white p-3">
-                    <strong>Line ${row.line}</strong><br>
-                    ${aEscape(row.name || "-")} (${aEscape(row.email || "-")})<br>
-                    <span>${aEscape(row.error || "Invalid row")}</span>
-                </div>
-            `).join("");
+async function submitImportCsv() {
+    const fileInput = document.getElementById("import-csv-file");
+    const resultEl = document.getElementById("import-csv-result");
+    const button = document.getElementById("import-csv-submit");
+    const file = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
+
+    if (!file || !importCsvPreviewReady) {
+        resultEl.style.color = "#b91c1c";
+        resultEl.textContent = "Preview a valid CSV before applying import.";
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append("csv_file", file);
+
+    button.disabled = true;
+    button.textContent = "Applying...";
+    resultEl.style.color = "#334155";
+    resultEl.textContent = "Applying CSV import...";
+
+    try {
+        const response = await fetch("/accounting/debts/import-csv", {
+            method: "POST",
+            body: formData,
+        });
+        const data = await response.json();
+        if (!data || data.status !== "success") {
+            resultEl.style.color = "#b91c1c";
+            resultEl.textContent = data?.message || "CSV import failed.";
+            button.disabled = false;
+            button.textContent = "Apply Import";
+            return;
         }
 
+        resultEl.style.color = "#166534";
+        resultEl.textContent = `Import complete. Total: ${data.total_rows}, Valid: ${data.valid_rows}, Invalid: ${data.invalid_rows}`;
+        importCsvPreviewReady = false;
         await loadData();
     } catch (error) {
         resultEl.style.color = "#b91c1c";
         resultEl.textContent = "CSV import request failed.";
-    } finally {
         button.disabled = false;
-        button.textContent = "Upload and Import";
+    } finally {
+        button.textContent = "Apply Import";
     }
 }
 
@@ -700,10 +921,20 @@ document.getElementById("settlement-run-details-modal").addEventListener("click"
 document.getElementById("import-csv-modal").addEventListener("click", (event) => {
     if (event.target.id === "import-csv-modal") closeImportModal();
 });
+document.getElementById("import-csv-preview").addEventListener("click", previewImportCsv);
 document.getElementById("import-csv-submit").addEventListener("click", submitImportCsv);
+document.getElementById("import-csv-file").addEventListener("change", () => {
+    importCsvPreviewReady = false;
+    document.getElementById("import-csv-submit").disabled = true;
+    document.getElementById("import-csv-result").textContent = "";
+    document.getElementById("import-csv-valid").innerHTML = "";
+    document.getElementById("import-csv-invalid").innerHTML = "";
+});
 document.getElementById("settlement-preview-btn").addEventListener("click", previewSettlementRun);
 document.getElementById("settlement-apply-btn").addEventListener("click", applySettlementRun);
 document.getElementById("close-settlement-run-details").addEventListener("click", closeSettlementRunDetails);
+document.getElementById("settlement-details-export").addEventListener("click", exportSettlementDetailsCsv);
+document.getElementById("settlement-details-print").addEventListener("click", printSettlementDetails);
 document.getElementById("settlement-runs-list").addEventListener("click", async (event) => {
     const button = event.target.closest("[data-settle-run]");
     if (!button) return;

@@ -56,11 +56,12 @@
                     <th>Customer</th>
                     <th>Payment</th>
                     <th>Total</th>
+                    <th>Actions</th>
                 </tr>
             </thead>
             <tbody id="history-body">
                 <tr>
-                    <td colspan="5">Loading transactions...</td>
+                    <td colspan="6">Loading transactions...</td>
                 </tr>
             </tbody>
         </table>
@@ -79,7 +80,8 @@
         <div id="history-receipt-content"></div>
 
         <div class="receipt-actions">
-            <button id="history-receipt-print" type="button" class="primary-btn">Print Receipt</button>
+            <button id="history-receipt-view" type="button" class="history-action alt"><i class="bi bi-box-arrow-up-right"></i> View Receipt</button>
+            <button id="history-receipt-print" type="button" class="primary-btn"><i class="bi bi-printer"></i> Print Receipt</button>
         </div>
     </div>
 </div>

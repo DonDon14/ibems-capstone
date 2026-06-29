@@ -138,7 +138,7 @@ function renderUserTable(rows) {
             .map((part) => part.charAt(0).toUpperCase())
             .join("") || "U";
         return `
-        <article class="uv-record-row flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:shadow-sm" data-user-id="${row.id}">
+        <article class="uv-record-row flex cursor-pointer flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:shadow-sm" data-user-id="${row.id}" title="View employee details">
             <div class="uv-person flex min-w-0 items-center gap-3">
                 <div class="uv-avatar inline-flex h-11 w-11 flex-none items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-sm font-bold text-blue-700">${aEscape(initials)}</div>
                 <div class="uv-person-meta min-w-0">
@@ -161,9 +161,6 @@ function renderUserTable(rows) {
                 </div>
                 <button class="secondary-btn btn-sm" type="button" data-edit-user="${row.id}">
                     <i class="bi bi-pencil"></i> Edit
-                </button>
-                <button class="ghost-btn btn-sm uv-open-btn" type="button" data-view-user="${row.id}" aria-label="Open record">
-                    <i class="bi bi-chevron-down"></i>
                 </button>
             </div>
         </article>
@@ -430,14 +427,6 @@ document.getElementById("uv-body").addEventListener("click", (event) => {
         event.stopPropagation();
         const userId = Number(editBtn.getAttribute("data-edit-user") || 0);
         if (userId) openEditUser(userId);
-        return;
-    }
-
-    const viewBtn = event.target.closest("[data-view-user]");
-    if (viewBtn) {
-        event.stopPropagation();
-        const userId = Number(viewBtn.getAttribute("data-view-user") || 0);
-        if (userId) openViewUser(userId);
         return;
     }
 

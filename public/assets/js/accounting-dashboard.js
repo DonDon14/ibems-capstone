@@ -115,11 +115,66 @@ function acdRenderTopDebt(rows) {
     `).join("");
 }
 
+function acdAlertItem(title, detail, tone = "warning") {
+    return `
+        <div class="stack-item acd-alert-item is-${acdEscape(tone)}">
+            <div class="stack-item-head">
+                <strong>${acdEscape(title)}</strong>
+            </div>
+            <div class="stack-meta">${acdEscape(detail)}</div>
+        </div>
+    `;
+}
+
+function acdRenderAlerts(alerts) {
+    const container = document.getElementById("acd-alerts");
+    if (!container) return;
+
+    const safe = alerts || {};
+    const overLimit = Array.isArray(safe.over_limit) ? safe.over_limit : [];
+    const staleDebts = Array.isArray(safe.stale_debts) ? safe.stale_debts : [];
+    const failedImports = Array.isArray(safe.failed_imports) ? safe.failed_imports : [];
+    const html = [];
+
+    overLimit.forEach((row) => {
+        html.push(acdAlertItem(
+            `Over limit: ${row.name || "Employee"}`,
+            `${row.employee_id || "-"} | Debt ${acdMoney(row.current_debt || 0)} / Limit ${acdMoney(row.credit_limit || 0)} | Over ${acdMoney(row.over_amount || 0)}`,
+            "danger"
+        ));
+    });
+
+    staleDebts.forEach((row) => {
+        const lastActivity = row.last_cashbook_at ? String(row.last_cashbook_at) : "No cashbook activity";
+        html.push(acdAlertItem(
+            `Stale debt: ${row.name || "Employee"}`,
+            `${row.employee_id || "-"} | Debt ${acdMoney(row.current_debt || 0)} | Last activity: ${lastActivity}`,
+            "warning"
+        ));
+    });
+
+    failedImports.forEach((row) => {
+        html.push(acdAlertItem(
+            `Import needs review: ${row.filename || "CSV import"}`,
+            `${row.invalid_rows || 0} invalid of ${row.total_rows || 0} rows | Imported by ${row.imported_by_name || "Unknown"} | ${row.imported_at || "-"}`,
+            "info"
+        ));
+    });
+
+    if (html.length === 0) {
+        container.innerHTML = '<div class="mini-bar-empty">No accounting alerts detected.</div>';
+        return;
+    }
+
+    container.innerHTML = html.join("");
+}
+
 async function acdLoad() {
     const totalAccountsEl = document.getElementById("acd-total-accounts");
     const withDebtEl = document.getElementById("acd-with-debt");
     const totalDebtEl = document.getElementById("acd-total-debt");
     const todayDeductedEl = document.getElementById("acd-today-deducted");
+    const overLimitEl = document.getElementById("acd-over-limit");
     const lastSettlementEl = document.getElementById("acd-last-settlement");
 
     try {
@@ -134,6 +189,7 @@ async function acdLoad() {
         if (withDebtEl) withDebtEl.textContent = String(Number(summary.with_debt || 0));
         if (totalDebtEl) totalDebtEl.textContent = acdMoney(summary.total_debt || 0);
         if (todayDeductedEl) todayDeductedEl.textContent = acdMoney(summary.today_deduction_amount || 0);
+        if (overLimitEl) overLimitEl.textContent = String(Number(summary.over_limit_count || 0));
 
         if (lastSettlementEl) {
             if (summary.last_settlement_month) {
@@ -147,15 +203,18 @@ async function acdLoad() {
         acdRenderTrend(data.trend || []);
         acdRenderActivity(data.activity || []);
         acdRenderTopDebt(data.top_debt_accounts || []);
+        acdRenderAlerts(data.alerts || {});
     } catch (error) {
         if (totalAccountsEl) totalAccountsEl.textContent = "-";
         if (withDebtEl) withDebtEl.textContent = "-";
         if (totalDebtEl) totalDebtEl.textContent = "PHP 0.00";
         if (todayDeductedEl) todayDeductedEl.textContent = "PHP 0.00";
+        if (overLimitEl) overLimitEl.textContent = "0";
         if (lastSettlementEl) lastSettlementEl.textContent = "Last settlement: unavailable";
         acdRenderTrend([]);
         acdRenderActivity([]);
         acdRenderTopDebt([]);
+        acdRenderAlerts({});
     }
 }
 

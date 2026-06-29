@@ -23,7 +23,43 @@ let openingBalanceReady = false;
 const currentUserRole = String(document.querySelector(".pos-shell")?.dataset.userRole || "").toUpperCase();
 const isAdminUser = currentUserRole === "ADMIN";
 let openingBalanceMode = "create";
-let currentOpeningBalance = null;
+let currentDaySession = null;
+
+function setOpeningReadinessState(state, message = "") {
+    const shell = document.querySelector(".pos-shell");
+    const banner = document.getElementById("opening-balance-banner");
+    const statusEl = document.getElementById("opening-balance-status");
+    const guidanceEl = document.getElementById("opening-balance-guidance");
+    const normalized = ["ready", "blocked", "checking", "error"].includes(state) ? state : "checking";
+
+    if (shell) {
+        shell.classList.toggle("is-opening-ready", normalized === "ready");
+        shell.classList.toggle("is-opening-blocked", normalized !== "ready");
+    }
+
+    if (banner) {
+        banner.classList.remove("is-ready", "is-blocked", "is-checking", "is-error");
+        banner.classList.add(`is-${normalized}`);
+    }
+
+    if (statusEl) {
+        const labels = {
+            ready: "Ready",
+            blocked: "Setup Required",
+            checking: "Checking",
+            error: "Needs Review",
+        };
+        statusEl.textContent = labels[normalized] || "Checking";
+    }
+
+    if (guidanceEl) {
+        guidanceEl.textContent = message || (
+            normalized === "ready"
+                ? "POS is ready for transactions."
+                : "Transactions stay locked until today's store day is open."
+        );
+    }
+}
 
 function ensureToastHost() {
     let host = document.getElementById("toast-stack");
@@ -81,31 +117,70 @@ function updateOpeningBalanceDisplay(opening = null, businessDate = null) {
     const displayEl = document.getElementById("opening-balance-display");
     const dateEl = document.getElementById("opening-balance-date");
     const openBtn = document.getElementById("opening-balance-open-btn");
+    const closeBtn = document.getElementById("store-day-close-btn");
     if (!displayEl || !dateEl) return;
 
     if (!opening) {
         openingBalanceMode = "create";
-        displayEl.textContent = "Not set";
-        dateEl.textContent = "Set this once per store";
+        displayEl.textContent = "Store day not open";
+        dateEl.textContent = `Business date: ${businessDate || new Date().toISOString().slice(0, 10)}`;
+        setOpeningReadinessState("blocked", "Open today's store day before accepting POS transactions.");
         if (openBtn) {
             openBtn.disabled = false;
-            openBtn.innerHTML = '<i class="bi bi-pencil-square"></i> Set Initial Opening';
+            openBtn.innerHTML = '<i class="bi bi-pencil-square"></i> Open Store Day';
+        }
+        if (closeBtn) {
+            closeBtn.classList.add("is-hidden");
+            closeBtn.disabled = true;
         }
         return;
     }
 
-    displayEl.textContent = formatMoney(opening.opening_balance || 0);
-    dateEl.textContent = businessDate ? `Initial date: ${businessDate}` : "Initial opening set";
-    if (openBtn) {
-        if (isAdminUser) {
-            openingBalanceMode = "reset";
-            openBtn.disabled = false;
-            openBtn.innerHTML = '<i class="bi bi-shield-lock"></i> Admin Reset Opening';
-        } else {
-            openingBalanceMode = "locked";
+    const status = String(opening.status || "").toLowerCase();
+    const cash = Number(opening.opening_cash || 0);
+    const ecash = Number(opening.opening_ecash || 0);
+    displayEl.textContent = `Cash ${formatMoney(cash)} | E-Cash ${formatMoney(ecash)}`;
+    dateEl.textContent = `Business date: ${businessDate || opening.business_date || "-"}${opening.opened_at ? ` | Opened ${formatDateTime(opening.opened_at)}` : ""}`;
+
+    if (opening.is_stale_open) {
+        openingBalanceMode = "locked";
+        setOpeningReadinessState("blocked", "A previous store day is still open. Close it before opening today.");
+        if (openBtn) {
             openBtn.disabled = true;
-            openBtn.innerHTML = '<i class="bi bi-lock"></i> Opening Locked';
+            openBtn.innerHTML = '<i class="bi bi-lock"></i> Close Previous Day First';
         }
+        if (closeBtn) {
+            closeBtn.classList.remove("is-hidden");
+            closeBtn.disabled = false;
+        }
+        return;
+    }
+
+    if (status === "closed") {
+        openingBalanceMode = isAdminUser ? "reopen" : "locked";
+        setOpeningReadinessState("blocked", "Today is already closed. POS transactions are locked.");
+        if (openBtn) {
+            openBtn.disabled = !isAdminUser;
+            openBtn.innerHTML = isAdminUser
+                ? '<i class="bi bi-arrow-clockwise"></i> Admin Reopen Day'
+                : '<i class="bi bi-lock"></i> Store Day Closed';
+        }
+        if (closeBtn) {
+            closeBtn.classList.add("is-hidden");
+            closeBtn.disabled = true;
+        }
+        return;
+    }
+
+    openingBalanceMode = "locked";
+    setOpeningReadinessState("ready", "Store day is open. Cash and e-cash totals will flow into close-day variance.");
+    if (openBtn) {
+        openBtn.disabled = true;
+        openBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Store Day Open';
+    }
+    if (closeBtn) {
+        closeBtn.classList.remove("is-hidden");
+        closeBtn.disabled = false;
     }
 }
 
@@ -232,9 +307,8 @@ function setOpeningBalanceResult(message, type) {
 }
 
 function setPosTransactionEnabled(enabled) {
-    const submitBtn = document.getElementById("submit-transaction");
-    if (!submitBtn) return;
-    submitBtn.disabled = !enabled;
+    openingBalanceReady = !!enabled;
+    updateCheckoutState();
 }
 
 function openOpeningBalanceModal(prefill = null) {
@@ -244,20 +318,21 @@ function openOpeningBalanceModal(prefill = null) {
     const labelEl = document.getElementById("opening-balance-label");
     const saveBtn = document.getElementById("opening-balance-save");
     if (!modal) return;
-    if (prefill && typeof prefill.opening_balance !== "undefined") {
-        document.getElementById("opening-balance-input").value = Number(prefill.opening_balance || 0).toFixed(2);
-        document.getElementById("opening-balance-note").value = String(prefill.note || "");
+    if (prefill && typeof prefill.opening_cash !== "undefined") {
+        document.getElementById("opening-balance-input").value = Number(prefill.opening_cash || 0).toFixed(2);
+        document.getElementById("opening-ecash-input").value = Number(prefill.opening_ecash || 0).toFixed(2);
+        document.getElementById("opening-balance-note").value = String(prefill.opening_note || "");
     }
-    if (openingBalanceMode === "reset") {
-        if (titleEl) titleEl.innerHTML = '<i class="bi bi-shield-lock"></i> Admin Reset Initial Opening';
-        if (descEl) descEl.textContent = "Admin action: update the one-time initial opening balance for this store.";
-        if (labelEl) labelEl.textContent = "New Initial Opening Balance";
-        if (saveBtn) saveBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Save Reset';
+    if (openingBalanceMode === "reopen") {
+        if (titleEl) titleEl.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Admin Reopen Store Day';
+        if (descEl) descEl.textContent = "Admin action: reopen today's closed store day and replace the opening cash values.";
+        if (labelEl) labelEl.textContent = "Opening Cash";
+        if (saveBtn) saveBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Reopen Store Day';
     } else {
-        if (titleEl) titleEl.innerHTML = '<i class="bi bi-safe2"></i> Set Initial Opening Balance';
-        if (descEl) descEl.textContent = "Set this once when the store is first activated. Use cash in/out for adjustments after this.";
-        if (labelEl) labelEl.textContent = "Initial Opening Balance";
-        if (saveBtn) saveBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Save Initial Opening';
+        if (titleEl) titleEl.innerHTML = '<i class="bi bi-safe2"></i> Open Store Day';
+        if (descEl) descEl.textContent = "Enter today's starting cash and e-cash before accepting POS transactions.";
+        if (labelEl) labelEl.textContent = "Opening Cash";
+        if (saveBtn) saveBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Open Store Day';
     }
     setOpeningBalanceResult("", "ok");
     modal.style.display = "grid";
@@ -273,30 +348,28 @@ async function loadOpeningBalanceStatus() {
     if (!activeStoreId) return;
     try {
         const data = await requestJson(
-            `/store/opening-balance/status?store_id=${activeStoreId}`,
+            `/store/day-session/status?store_id=${activeStoreId}`,
             {},
-            "Unable to load opening balance status."
+            "Unable to load store day status."
         );
         if (!data || data.status !== "success") {
-            throw new Error(data?.message || "Unable to load opening balance status.");
+            throw new Error(data?.message || "Unable to load store day status.");
         }
 
         openingBalanceReady = !!data.is_opened;
-        currentOpeningBalance = data.opening || null;
-        updateOpeningBalanceDisplay(data.opening, data.business_date);
+        currentDaySession = data.session || null;
+        updateOpeningBalanceDisplay(data.session, data.business_date);
         setPosTransactionEnabled(openingBalanceReady);
-        if (!openingBalanceReady) {
-            openOpeningBalanceModal();
-        } else {
+        if (openingBalanceReady) {
             closeOpeningBalanceModal();
         }
     } catch (error) {
         openingBalanceReady = false;
-        currentOpeningBalance = null;
+        currentDaySession = null;
         updateOpeningBalanceDisplay(null, null);
+        setOpeningReadinessState("error", "Unable to verify store day status. Check connection or try again.");
         setPosTransactionEnabled(false);
-        openOpeningBalanceModal();
-        setOpeningBalanceResult("Unable to verify opening balance status.", "error");
+        setOpeningBalanceResult("Unable to verify store day status.", "error");
     }
 }
 
@@ -304,54 +377,138 @@ async function saveOpeningBalance() {
     if (!activeStoreId) return;
 
     const amount = Number(document.getElementById("opening-balance-input").value || 0);
+    const ecashAmount = Number(document.getElementById("opening-ecash-input").value || 0);
     const note = String(document.getElementById("opening-balance-note").value || "").trim();
     const saveBtn = document.getElementById("opening-balance-save");
 
-    if (amount < 0) {
-        setOpeningBalanceResult("Initial opening balance must be 0 or greater.", "error");
+    if (amount < 0 || ecashAmount < 0) {
+        setOpeningBalanceResult("Opening cash and e-cash must be 0 or greater.", "error");
         return;
     }
 
     saveBtn.disabled = true;
     saveBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
     try {
-        const endpoint = openingBalanceMode === "reset" ? "/store/opening-balance/reset" : "/store/opening-balance/set";
         const data = await requestJson(
-            endpoint,
+            "/store/day-session/open",
             {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     store_id: activeStoreId,
-                    opening_balance: amount,
+                    opening_cash: amount,
+                    opening_ecash: ecashAmount,
                     note,
                 }),
             },
-            "Failed to save opening balance."
+            "Failed to open store day."
         );
         if (!data || data.status !== "success") {
-            throw new Error(data?.message || "Failed to save opening balance.");
+            throw new Error(data?.message || "Failed to open store day.");
         }
 
         openingBalanceReady = true;
-        currentOpeningBalance = data.opening || null;
+        currentDaySession = data.session || null;
         setPosTransactionEnabled(true);
-        updateOpeningBalanceDisplay(data.opening, data.opening?.business_date || null);
+        updateOpeningBalanceDisplay(data.session, data.session?.business_date || null);
         closeOpeningBalanceModal();
         setResult(
-            openingBalanceMode === "reset"
-                ? `Initial opening balance reset: ${formatMoney(amount)}`
-                : `Initial opening balance set: ${formatMoney(amount)}`,
+            openingBalanceMode === "reopen"
+                ? `Store day reopened: cash ${formatMoney(amount)}, e-cash ${formatMoney(ecashAmount)}`
+                : `Store day opened: cash ${formatMoney(amount)}, e-cash ${formatMoney(ecashAmount)}`,
             "ok"
         );
     } catch (error) {
-        setOpeningBalanceResult(error.message || "Failed to save opening balance.", "error");
+        setOpeningBalanceResult(error.message || "Failed to open store day.", "error");
     } finally {
         saveBtn.disabled = false;
         saveBtn.innerHTML =
-            openingBalanceMode === "reset"
-                ? '<i class="bi bi-check2-circle"></i> Save Reset'
-                : '<i class="bi bi-check2-circle"></i> Save Initial Opening';
+            openingBalanceMode === "reopen"
+                ? '<i class="bi bi-check2-circle"></i> Reopen Store Day'
+                : '<i class="bi bi-check2-circle"></i> Open Store Day';
+    }
+}
+
+function setStoreDayCloseResult(message, type) {
+    const resultEl = document.getElementById("store-day-close-result");
+    if (!resultEl) return;
+    resultEl.textContent = message || "";
+    resultEl.style.color = type === "error" ? "#b91c1c" : "#166534";
+    if (message) {
+        showToast(message, type === "error" ? "error" : "success");
+    }
+}
+
+function openStoreDayCloseModal() {
+    const modal = document.getElementById("store-day-close-modal");
+    const summary = document.getElementById("store-day-close-summary");
+    if (!modal || !currentDaySession) return;
+
+    const expectedCash = Number(currentDaySession.expected_cash_on_hand ?? currentDaySession.expected_cash ?? 0);
+    const expectedEcash = Number(currentDaySession.expected_ecash_on_hand ?? currentDaySession.expected_ecash ?? 0);
+    document.getElementById("closing-cash-input").value = expectedCash.toFixed(2);
+    document.getElementById("closing-ecash-input").value = expectedEcash.toFixed(2);
+    document.getElementById("closing-note-input").value = "";
+    if (summary) {
+        summary.textContent = `Expected cash ${formatMoney(expectedCash)} | expected e-cash ${formatMoney(expectedEcash)}. Enter counted totals to calculate variance.`;
+    }
+    setStoreDayCloseResult("", "ok");
+    modal.style.display = "grid";
+}
+
+function closeStoreDayCloseModal() {
+    const modal = document.getElementById("store-day-close-modal");
+    if (!modal) return;
+    modal.style.display = "none";
+}
+
+async function saveStoreDayClose() {
+    if (!activeStoreId) return;
+
+    const countedCash = Number(document.getElementById("closing-cash-input").value || 0);
+    const countedEcash = Number(document.getElementById("closing-ecash-input").value || 0);
+    const note = String(document.getElementById("closing-note-input").value || "").trim();
+    const saveBtn = document.getElementById("store-day-close-save");
+
+    if (countedCash < 0 || countedEcash < 0) {
+        setStoreDayCloseResult("Counted cash and e-cash must be 0 or greater.", "error");
+        return;
+    }
+
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Closing...';
+    try {
+        const data = await requestJson(
+            "/store/day-session/close",
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    store_id: activeStoreId,
+                    counted_cash: countedCash,
+                    counted_ecash: countedEcash,
+                    note,
+                }),
+            },
+            "Failed to close store day."
+        );
+        if (!data || data.status !== "success") {
+            throw new Error(data?.message || "Failed to close store day.");
+        }
+
+        openingBalanceReady = false;
+        setPosTransactionEnabled(false);
+        closeStoreDayCloseModal();
+        await loadOpeningBalanceStatus();
+
+        const varianceCash = Number(data.session?.variance_cash || 0);
+        const varianceEcash = Number(data.session?.variance_ecash || 0);
+        setResult(`Store day closed. Variance: cash ${formatMoney(varianceCash)}, e-cash ${formatMoney(varianceEcash)}.`, "ok");
+    } catch (error) {
+        setStoreDayCloseResult(error.message || "Failed to close store day.", "error");
+    } finally {
+        saveBtn.disabled = false;
+        saveBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Close Store Day';
     }
 }
 
@@ -550,11 +707,32 @@ function getDebtCustomerLabelById(customerId) {
     return `${customer.name} (${categoryLabel})`;
 }
 
+function getDebtCustomerById(customerId) {
+    return (
+        selectedDebtCustomer && Number(selectedDebtCustomer.id) === Number(customerId)
+            ? selectedDebtCustomer
+            : debtCustomers.find((c) => Number(c.id) === Number(customerId))
+    ) || null;
+}
+
+function formatPaymentLabel(method) {
+    const key = String(method || "").toLowerCase();
+    if (key === "gcash") return "GCash";
+    if (key === "debt") return "Debt";
+    if (key === "cash") return "Cash";
+    if (key === "card") return "Card";
+    return key.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 function openReceiptModal(receipt) {
     lastReceipt = receipt;
     const modal = document.getElementById("receipt-modal");
+    const viewBtn = document.getElementById("receipt-view");
     if (window.IbemsReceipt) {
         window.IbemsReceipt.renderReceipt("receipt-content", receipt);
+    }
+    if (viewBtn) {
+        viewBtn.disabled = !receipt.lookupUrl;
     }
     modal.style.display = "grid";
 }
@@ -562,6 +740,25 @@ function openReceiptModal(receipt) {
 function closeReceiptModal() {
     const modal = document.getElementById("receipt-modal");
     modal.style.display = "none";
+}
+
+function renderSuccessStrip(receipt) {
+    const strip = document.getElementById("pos-success-strip");
+    if (!strip || !receipt) return;
+
+    strip.classList.remove("is-hidden");
+    strip.innerHTML = `
+        <div>
+            <span>Last transaction completed</span>
+            <strong>${formatMoney(receipt.totalAmount)}</strong>
+            <small>${escapeHtml(formatPaymentLabel(receipt.paymentMethod))} | ${escapeHtml(receipt.customerName || "Walk-in")}</small>
+        </div>
+        <div class="pos-success-actions">
+            <button type="button" data-pos-success-action="view"><i class="bi bi-box-arrow-up-right"></i> View</button>
+            <button type="button" data-pos-success-action="print"><i class="bi bi-printer"></i> Print</button>
+            <a href="/store/history"><i class="bi bi-clock-history"></i> History</a>
+        </div>
+    `;
 }
 
 function buildConfirmTransactionHtml(data) {
@@ -576,30 +773,81 @@ function buildConfirmTransactionHtml(data) {
         `)
         .join("");
 
-    const paymentLabel = String(data.paymentMethod || "").replace(/_/g, " ").toUpperCase();
-    const debtorLine = data.paymentMethod === "debt"
-        ? `<div class="confirm-meta-item"><span>Debtor</span><strong>${escapeHtml(data.debtCustomerLabel)}</strong></div>`
+    const paymentLabel = formatPaymentLabel(data.paymentMethod);
+    const totalItems = data.cartSnapshot.reduce((sum, item) => sum + Number(item.qty || 0), 0);
+    const debt = data.debtCustomer || null;
+    const currentDebt = Number(debt?.current_debt || 0);
+    const availableCredit = Number(debt?.available_credit || 0);
+    const creditLimit = currentDebt + availableCredit;
+    const projectedDebt = currentDebt + Number(data.totalAmount || 0);
+    const projectedRemainingCredit = Math.max(0, creditLimit - projectedDebt);
+    const debtWarning = data.paymentMethod === "debt"
+        ? `
+            <div class="confirm-warning">
+                <i class="bi bi-exclamation-triangle"></i>
+                <div>
+                    <strong>Debt transaction</strong>
+                    <span>This sale will be charged to ${escapeHtml(data.debtCustomerLabel)}. Projected remaining credit: ${formatMoney(projectedRemainingCredit)}.</span>
+                </div>
+            </div>
+        `
         : "";
+    const customerBlock = data.paymentMethod === "debt"
+        ? `
+            <section class="confirm-section">
+                <h4><i class="bi bi-person-vcard"></i> Debt Customer</h4>
+                <div class="confirm-meta-grid">
+                    <div class="confirm-meta-item"><span>Name</span><strong>${escapeHtml(debt?.name || data.debtCustomerLabel)}</strong></div>
+                    <div class="confirm-meta-item"><span>Type</span><strong>${escapeHtml(String(debt?.user_type || "N/A").replace(/\b\w/g, (letter) => letter.toUpperCase()))}</strong></div>
+                    <div class="confirm-meta-item"><span>Current Debt</span><strong>${formatMoney(currentDebt)}</strong></div>
+                    <div class="confirm-meta-item"><span>Transaction Amount</span><strong>${formatMoney(data.totalAmount)}</strong></div>
+                    <div class="confirm-meta-item"><span>Projected Debt</span><strong>${formatMoney(projectedDebt)}</strong></div>
+                    <div class="confirm-meta-item"><span>Remaining Credit</span><strong>${formatMoney(projectedRemainingCredit)}</strong></div>
+                </div>
+            </section>
+        `
+        : `
+            <section class="confirm-section">
+                <h4><i class="bi bi-person"></i> Customer</h4>
+                <div class="confirm-meta-grid">
+                    <div class="confirm-meta-item"><span>Customer Type</span><strong>Walk-in</strong></div>
+                    <div class="confirm-meta-item"><span>Debt Impact</span><strong>None</strong></div>
+                </div>
+            </section>
+        `;
 
     return `
-        <div class="confirm-meta-grid">
-            <div class="confirm-meta-item"><span>Store</span><strong>${escapeHtml(data.storeName)}</strong></div>
-            <div class="confirm-meta-item"><span>Payment</span><strong>${escapeHtml(paymentLabel)}</strong></div>
-            ${debtorLine}
-            <div class="confirm-meta-item"><span>Total Items</span><strong>${data.cartSnapshot.reduce((sum, item) => sum + Number(item.qty || 0), 0)}</strong></div>
-            <div class="confirm-meta-item"><span>Total Amount</span><strong>${formatMoney(data.totalAmount)}</strong></div>
+        <div class="confirm-summary-hero">
+            <div>
+                <span>Transaction Total</span>
+                <strong>${formatMoney(data.totalAmount)}</strong>
+                <small>${totalItems} item${totalItems === 1 ? "" : "s"} in this order</small>
+            </div>
+            <div class="confirm-payment-chip"><i class="bi bi-credit-card-2-front"></i>${escapeHtml(paymentLabel)}</div>
         </div>
-        <table class="receipt-table confirm-table">
-            <thead>
-                <tr>
-                    <th>Item</th>
-                    <th>Qty</th>
-                    <th>Price</th>
-                    <th>Line Total</th>
-                </tr>
-            </thead>
-            <tbody>${rows}</tbody>
-        </table>
+        ${debtWarning}
+        <section class="confirm-section">
+            <h4><i class="bi bi-shop-window"></i> Store & Payment</h4>
+            <div class="confirm-meta-grid">
+                <div class="confirm-meta-item"><span>Store</span><strong>${escapeHtml(data.storeName)}</strong></div>
+                <div class="confirm-meta-item"><span>Payment Method</span><strong>${escapeHtml(paymentLabel)}</strong></div>
+            </div>
+        </section>
+        ${customerBlock}
+        <section class="confirm-section">
+            <h4><i class="bi bi-basket"></i> Items</h4>
+            <table class="receipt-table confirm-table">
+                <thead>
+                    <tr>
+                        <th>Item</th>
+                        <th>Qty</th>
+                        <th>Price</th>
+                        <th>Line Total</th>
+                    </tr>
+                </thead>
+                <tbody>${rows}</tbody>
+            </table>
+        </section>
     `;
 }
 
@@ -629,6 +877,56 @@ function formatCredit(customer) {
     return `Avail ${formatMoney(available)} | Debt ${formatMoney(debt)}`;
 }
 
+function getStockState(stock, inCart = 0, threshold = 10) {
+    const safeStock = Number(stock || 0);
+    const safeInCart = Number(inCart || 0);
+    const parsedThreshold = Number(threshold);
+    const lowStockThreshold = Number.isFinite(parsedThreshold) ? Math.max(0, parsedThreshold) : 10;
+    if (safeStock <= 0) {
+        return { key: "out", label: "Out of stock", detail: "Unavailable" };
+    }
+    if (safeInCart >= safeStock) {
+        return { key: "maxed", label: "Max in cart", detail: `${safeStock} available` };
+    }
+    if (safeStock <= lowStockThreshold) {
+        return { key: "low", label: "Low stock", detail: `${safeStock - safeInCart} available` };
+    }
+    return { key: "in", label: "In stock", detail: `${safeStock - safeInCart} available` };
+}
+
+function updateCheckoutState() {
+    const submitBtn = document.getElementById("submit-transaction");
+    if (!submitBtn) return;
+
+    if (!openingBalanceReady) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="bi bi-lock"></i> Open Store Day First';
+        return;
+    }
+
+    if (cart.length === 0) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="bi bi-cart-plus"></i> Add Items to Continue';
+        return;
+    }
+
+    const paymentMethod = document.getElementById("payment-method")?.value || "";
+    if (!paymentMethod) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="bi bi-credit-card"></i> Select Payment Method';
+        return;
+    }
+
+    if (paymentMethod === "debt" && !selectedDebtCustomerId) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="bi bi-person-check"></i> Select Debt Customer';
+        return;
+    }
+
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Complete Transaction';
+}
+
 function applyProductFilters() {
     const query = searchQuery.trim().toLowerCase();
 
@@ -637,9 +935,17 @@ function applyProductFilters() {
         const variant = String(product.variant_label || "").toLowerCase();
         const sku = String(product.sku || "").toLowerCase();
         const barcode = String(product.barcode || "").toLowerCase();
+        const supplier = String(product.supplier || "").toLowerCase();
+        const locationBin = String(product.location_bin || "").toLowerCase();
         const category = String(product.category || "General");
 
-        const matchesQuery = !query || name.includes(query) || variant.includes(query) || sku.includes(query) || barcode.includes(query);
+        const matchesQuery = !query
+            || name.includes(query)
+            || variant.includes(query)
+            || sku.includes(query)
+            || barcode.includes(query)
+            || supplier.includes(query)
+            || locationBin.includes(query);
         const matchesCategory = activeCategory === "All" || category === activeCategory;
         return matchesQuery && matchesCategory;
     });
@@ -673,12 +979,12 @@ function renderProducts() {
     const grid = document.getElementById("product-grid");
 
     if (productsCache.length === 0) {
-        grid.innerHTML = '<div class="empty-state"><i class="bi bi-box-seam"></i><span>No active products in this store yet.</span></div>';
+        grid.innerHTML = '<div class="empty-state"><i class="bi bi-box-seam"></i><span>No active products in this store yet.</span><small>Add products in Inventory before using POS.</small></div>';
         return;
     }
 
     if (filteredProducts.length === 0) {
-        grid.innerHTML = '<div class="empty-state"><i class="bi bi-search"></i><span>No products match your search or category.</span></div>';
+        grid.innerHTML = '<div class="empty-state"><i class="bi bi-search"></i><span>No products match your search or category.</span><small>Try another SKU, barcode, product name, or category.</small></div>';
         return;
     }
 
@@ -687,24 +993,41 @@ function renderProducts() {
             const stock = Number(product.stock_qty || 0);
             const inCart = getCartQty(product.id);
             const canAdd = inCart < stock;
+            const stockState = getStockState(stock, inCart, product.low_stock_threshold ?? product.reorder_level ?? 10);
             const category = String(product.category || "General");
             const displayName = getProductDisplayName(product);
             const imageUrl = String(product.image_url || "").trim();
+            const supplier = String(product.supplier || "").trim();
+            const locationBin = String(product.location_bin || "").trim();
             const useImage = imageUrl !== "";
             const visualHtml = useImage
                 ? `<img class="product-visual" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(displayName)}">`
                 : `<div class="product-visual placeholder">${escapeHtml(getInitials(displayName))}</div>`;
+            const inCartHtml = inCart > 0 ? `<span class="product-cart-chip"><i class="bi bi-cart-check"></i>${inCart} in cart</span>` : "";
+            const operationsMeta = supplier || locationBin
+                ? `
+                    <div class="product-ops-meta">
+                        ${supplier ? `<span><i class="bi bi-truck"></i>${escapeHtml(supplier)}</span>` : ""}
+                        ${locationBin ? `<span><i class="bi bi-geo-alt"></i>${escapeHtml(locationBin)}</span>` : ""}
+                    </div>
+                `
+                : "";
 
             return `
-                <article class="product-card ${canAdd ? "" : "out-of-stock"}" data-product-card="${product.id}">
-                    ${visualHtml}
+                <article class="product-card stock-${stockState.key} ${canAdd ? "" : "out-of-stock"}" data-product-card="${product.id}" aria-disabled="${canAdd ? "false" : "true"}">
+                    <div class="product-card-top">
+                        ${visualHtml}
+                        <span class="stock-badge stock-${stockState.key}">${escapeHtml(stockState.label)}</span>
+                    </div>
                     <h5 class="product-name">${escapeHtml(displayName)}</h5>
                     <p class="product-meta">${escapeHtml(category)} | SKU: ${escapeHtml(product.sku)}</p>
+                    ${operationsMeta}
                     <div class="product-bottom">
                         <div>
                             <div class="product-price">${formatMoney(product.price)}</div>
-                            <div class="product-stock">Stock: ${stock} | In cart: ${inCart}</div>
+                            <div class="product-stock">${escapeHtml(stockState.detail)} | Stock: ${stock}</div>
                         </div>
+                        ${inCartHtml}
                     </div>
                 </article>
             `;
@@ -719,10 +1042,11 @@ function renderCart() {
     const itemCountEl = document.getElementById("item-count");
 
     if (cart.length === 0) {
-        cartBody.innerHTML = '<div class="empty-state"><i class="bi bi-cart-x"></i><span>No items in cart. Search products to begin.</span></div>';
+        cartBody.innerHTML = '<div class="empty-state cart-empty-state"><i class="bi bi-cart-plus"></i><span>No items in cart.</span><small>Search or scan products to start the order.</small></div>';
         subtotalEl.textContent = formatMoney(0);
         totalEl.textContent = formatMoney(0);
         itemCountEl.textContent = "0";
+        updateCheckoutState();
         return;
     }
 
@@ -737,18 +1061,22 @@ function renderCart() {
 
             const product = getProductById(item.product_id);
             const maxedOut = product ? Number(item.qty) >= Number(product.stock_qty || 0) : false;
+            const stockText = product ? `${Number(product.stock_qty || 0)} available` : "Stock unavailable";
 
             return `
-                <div class="cart-item">
+                <div class="cart-item ${maxedOut ? "is-maxed" : ""}">
                     <div class="cart-top">
-                        <p class="cart-name">${escapeHtml(item.name)}</p>
+                        <div>
+                            <p class="cart-name">${escapeHtml(item.name)}</p>
+                            <span class="cart-stock-note">${escapeHtml(stockText)}${maxedOut ? " | limit reached" : ""}</span>
+                        </div>
                         <span class="cart-line-total">${formatMoney(lineTotal)}</span>
                     </div>
                     <div class="cart-controls">
-                        <button class="cart-btn cart-dec" data-product-id="${item.product_id}" type="button">-</button>
-                        <span>${item.qty}</span>
-                        <button class="cart-btn cart-inc" data-product-id="${item.product_id}" type="button" ${maxedOut ? "disabled" : ""}>+</button>
-                        <button class="cart-btn remove cart-remove" data-product-id="${item.product_id}" type="button">Remove</button>
+                        <button class="cart-btn cart-dec" data-product-id="${item.product_id}" type="button" aria-label="Decrease ${escapeHtml(item.name)}">-</button>
+                        <span class="cart-qty">${item.qty}</span>
+                        <button class="cart-btn cart-inc" data-product-id="${item.product_id}" type="button" ${maxedOut ? "disabled" : ""} aria-label="Increase ${escapeHtml(item.name)}">+</button>
+                        <button class="cart-btn remove cart-remove" data-product-id="${item.product_id}" type="button"><i class="bi bi-trash"></i> Remove</button>
                     </div>
                 </div>
             `;
@@ -758,6 +1086,7 @@ function renderCart() {
     subtotalEl.textContent = formatMoney(subtotal);
     totalEl.textContent = formatMoney(subtotal);
     itemCountEl.textContent = String(itemCount);
+    updateCheckoutState();
 }
 
 function renderDebtSuggestions() {
@@ -832,8 +1161,9 @@ function renderPaymentMethods() {
     const methods = Array.isArray(paymentMethodsCache) ? paymentMethodsCache : [];
 
     if (methods.length === 0) {
-        chipsEl.innerHTML = "";
+        chipsEl.innerHTML = '<div class="payment-state is-empty"><i class="bi bi-credit-card"></i>No payment methods available.</div>';
         selectEl.innerHTML = "";
+        updateCheckoutState();
         return;
     }
 
@@ -851,9 +1181,23 @@ function renderPaymentMethods() {
         .join("");
 }
 
+function setPaymentMethodState(message, type = "info") {
+    const chipsEl = document.getElementById("payment-quick");
+    if (!chipsEl) return;
+
+    const stateClass = type === "error" ? "is-error" : type === "empty" ? "is-empty" : "is-loading";
+    chipsEl.innerHTML = `
+        <div class="payment-state ${stateClass}">
+            <i class="bi ${type === "error" ? "bi-exclamation-triangle" : type === "empty" ? "bi-credit-card" : "bi-arrow-repeat"}"></i>
+            ${escapeHtml(message)}
+        </div>
+    `;
+}
+
 async function loadPaymentMethods() {
     if (!activeStoreId) return;
 
+    setPaymentMethodState("Loading payment methods...");
     try {
         const data = await requestJson(
             `/store/payment-methods?store_id=${activeStoreId}`,
@@ -865,6 +1209,12 @@ async function loadPaymentMethods() {
         }
 
         paymentMethodsCache = Array.isArray(data.methods) ? data.methods : [];
+        if (paymentMethodsCache.length === 0) {
+            renderPaymentMethods();
+            setResult("No active payment methods configured for this store.", "error");
+            return;
+        }
+
         renderPaymentMethods();
         const preferred = paymentMethodsCache.find((m) => String(m.code) === "cash")?.code
             || paymentMethodsCache[0]?.code
@@ -877,6 +1227,13 @@ async function loadPaymentMethods() {
             { code: "debt", label: "Debt", icon_class: "bi bi-credit-card" },
         ];
         renderPaymentMethods();
+        const chipsWrap = document.getElementById("payment-quick");
+        if (chipsWrap) {
+            chipsWrap.insertAdjacentHTML(
+                "afterbegin",
+                '<div class="payment-state is-error"><i class="bi bi-exclamation-triangle"></i>Using fallback payment methods.</div>'
+            );
+        }
         setPaymentMethod("cash");
         setResult("Unable to load dynamic payment methods. Using fallback.", "error");
     }
@@ -889,6 +1246,7 @@ function setPaymentMethod(method) {
     chips.forEach((chip) => chip.classList.toggle("is-active", chip.dataset.method === method));
 
     updateDebtCustomerVisibility();
+    updateCheckoutState();
 }
 
 function refreshUi() {
@@ -1046,6 +1404,85 @@ async function loadProducts() {
     }
 }
 
+async function refreshProductsForCheckout() {
+    if (!activeStoreId) {
+        throw new Error("No active store selected.");
+    }
+
+    const data = await requestJson(
+        `/store/products?store_id=${activeStoreId}`,
+        {},
+        "Unable to refresh product stock."
+    );
+
+    if (!data || data.status !== "success" || !Array.isArray(data.products)) {
+        throw new Error(data?.message || "Unable to refresh product stock.");
+    }
+
+    productsCache = data.products;
+    buildCategories();
+    renderCategoryTabs();
+}
+
+async function preflightCartStock() {
+    await refreshProductsForCheckout();
+
+    const unavailable = [];
+    let adjusted = false;
+
+    cart = cart
+        .map((item) => {
+            const product = getProductById(item.product_id);
+            if (!product) {
+                unavailable.push(item.name);
+                adjusted = true;
+                return null;
+            }
+
+            const latestStock = Number(product.stock_qty || 0);
+            if (latestStock <= 0) {
+                unavailable.push(item.name);
+                adjusted = true;
+                return null;
+            }
+
+            if (Number(item.qty) > latestStock) {
+                adjusted = true;
+                return {
+                    ...item,
+                    qty: latestStock,
+                    price: Number(product.price || item.price),
+                    name: getProductDisplayName(product),
+                };
+            }
+
+            return {
+                ...item,
+                price: Number(product.price || item.price),
+                name: getProductDisplayName(product),
+            };
+        })
+        .filter(Boolean);
+
+    refreshUi();
+
+    if (unavailable.length > 0) {
+        return {
+            ok: false,
+            message: `Removed unavailable item(s): ${unavailable.join(", ")}. Review the cart before checkout.`,
+        };
+    }
+
+    if (adjusted) {
+        return {
+            ok: false,
+            message: "Cart quantities were adjusted to match latest stock. Review the cart before checkout.",
+        };
+    }
+
+    return { ok: true, message: "" };
+}
+
 function buildPendingTransaction() {
     const paymentMethod = document.getElementById("payment-method").value;
     if (!activeStoreId) return null;
@@ -1071,6 +1508,9 @@ function buildPendingTransaction() {
         price: Number(item.price),
     }));
     const totalAmount = cartSnapshot.reduce((sum, item) => sum + item.qty * item.price, 0);
+    const debtCustomer = paymentMethod === "debt" && selectedDebtCustomerId
+        ? getDebtCustomerById(selectedDebtCustomerId)
+        : null;
 
     return {
         payload,
@@ -1082,6 +1522,7 @@ function buildPendingTransaction() {
             paymentMethod === "debt" && selectedDebtCustomerId
                 ? getDebtCustomerLabelById(selectedDebtCustomerId)
                 : "N/A",
+        debtCustomer,
     };
 }
 
@@ -1093,7 +1534,7 @@ async function processConfirmedTransaction(dataToProcess) {
     try {
         isSubmitting = true;
         submitBtn.disabled = true;
-        submitBtn.textContent = "Processing...";
+        submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Processing...';
         confirmBtn.disabled = true;
         confirmBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Processing...';
 
@@ -1113,13 +1554,13 @@ async function processConfirmedTransaction(dataToProcess) {
             setResult("Transaction successful.", "ok");
             const receipt = {
                 transactionId: String(data.transaction_id),
-                clientTxnId: String(data.transaction_id),
-                createdAt: new Date().toISOString(),
+                clientTxnId: String(data.client_txn_id || data.transaction_id),
+                createdAt: data.created_at || new Date().toISOString(),
                 storeName: dataToProcess.storeName,
                 paymentMethod: dataToProcess.paymentMethod,
                 customerName: dataToProcess.paymentMethod === "debt" ? dataToProcess.debtCustomerLabel : "Walk-in",
                 debtCustomerLabel: dataToProcess.debtCustomerLabel,
-                totalAmount: dataToProcess.totalAmount,
+                totalAmount: Number(data.total_amount ?? dataToProcess.totalAmount),
                 items: dataToProcess.cartSnapshot,
                 lookupUrl: `${window.location.origin}/store/receipt/${encodeURIComponent(String(data.transaction_id))}`,
             };
@@ -1128,6 +1569,7 @@ async function processConfirmedTransaction(dataToProcess) {
             cart = [];
             await loadProducts();
             openReceiptModal(receipt);
+            renderSuccessStrip(receipt);
             return;
         }
 
@@ -1137,18 +1579,22 @@ async function processConfirmedTransaction(dataToProcess) {
         setResult(error.message || "Transaction failed, please try again.", "error");
     } finally {
         isSubmitting = false;
-        submitBtn.disabled = false;
-        submitBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Complete Transaction';
+        updateCheckoutState();
         confirmBtn.disabled = false;
         confirmBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Proceed';
     }
 }
 
-function submitTransaction() {
+async function submitTransaction() {
     if (isSubmitting) return;
     if (!openingBalanceReady) {
+        if (currentDaySession?.is_stale_open) {
+            openStoreDayCloseModal();
+            setResult("Close the previous store day before creating today's transactions.", "error");
+            return;
+        }
         openOpeningBalanceModal();
-        setResult("Set initial opening balance first before transaction.", "error");
+        setResult("Open today's store day before creating transactions.", "error");
         return;
     }
 
@@ -1167,13 +1613,31 @@ function submitTransaction() {
         return;
     }
 
+    const submitBtn = document.getElementById("submit-transaction");
+    try {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="bi bi-arrow-repeat"></i> Checking Stock...';
+        const preflight = await preflightCartStock();
+        if (!preflight.ok) {
+            setResult(preflight.message, "error");
+            updateCheckoutState();
+            return;
+        }
+    } catch (error) {
+        setResult(error.message || "Unable to verify stock before checkout.", "error");
+        updateCheckoutState();
+        return;
+    }
+
     const draft = buildPendingTransaction();
     if (!draft) {
         setResult("Unable to prepare transaction.", "error");
+        updateCheckoutState();
         return;
     }
 
     openConfirmTransactionModal(draft);
+    updateCheckoutState();
 }
 
 document.getElementById("product-grid").addEventListener("click", (event) => {
@@ -1293,6 +1757,7 @@ document.getElementById("debt-customer-search").addEventListener("input", async 
     const query = event.target.value || "";
     selectedDebtCustomerId = null;
     selectedDebtCustomer = null;
+    updateCheckoutState();
     await loadDebtCustomers(query);
 });
 
@@ -1308,6 +1773,7 @@ document.getElementById("debt-customer-suggestions").addEventListener("click", (
     selectedDebtCustomer = picked;
     document.getElementById("debt-customer-search").value = picked.name;
     document.getElementById("debt-customer-suggestions").style.display = "none";
+    updateCheckoutState();
     setResult(`Debt customer selected: ${picked.name}`, "ok");
 });
 
@@ -1323,7 +1789,9 @@ document.addEventListener("click", (event) => {
     if (box) box.style.display = "none";
 });
 
-document.getElementById("submit-transaction").addEventListener("click", submitTransaction);
+document.getElementById("submit-transaction").addEventListener("click", () => {
+    submitTransaction().catch((error) => setResult(error.message || "Unable to submit transaction.", "error"));
+});
 document.getElementById("confirm-proceed").addEventListener("click", async () => {
     if (!pendingTransaction) return;
     await processConfirmedTransaction(pendingTransaction);
@@ -1337,20 +1805,73 @@ document.getElementById("confirm-transaction-modal").addEventListener("click", (
 });
 document.getElementById("receipt-close").addEventListener("click", closeReceiptModal);
 document.getElementById("receipt-print").addEventListener("click", printReceipt);
+document.getElementById("receipt-view").addEventListener("click", () => {
+    if (!lastReceipt?.lookupUrl) return;
+    window.open(lastReceipt.lookupUrl, "_blank", "noopener");
+});
+document.getElementById("receipt-new").addEventListener("click", () => {
+    closeReceiptModal();
+    document.getElementById("product-search").focus();
+});
+document.getElementById("pos-success-strip").addEventListener("click", (event) => {
+    const actionBtn = event.target.closest("[data-pos-success-action]");
+    if (!actionBtn || !lastReceipt) return;
+
+    const action = actionBtn.getAttribute("data-pos-success-action");
+    if (action === "view" && lastReceipt.lookupUrl) {
+        window.open(lastReceipt.lookupUrl, "_blank", "noopener");
+        return;
+    }
+
+    if (action === "print") {
+        printReceipt();
+    }
+});
 document.getElementById("receipt-modal").addEventListener("click", (event) => {
     if (event.target.id === "receipt-modal") {
         closeReceiptModal();
     }
 });
 document.getElementById("opening-balance-save").addEventListener("click", saveOpeningBalance);
+document.getElementById("opening-balance-close").addEventListener("click", closeOpeningBalanceModal);
+document.getElementById("opening-balance-cancel").addEventListener("click", closeOpeningBalanceModal);
+document.getElementById("opening-balance-modal").addEventListener("click", (event) => {
+    if (event.target.id === "opening-balance-modal") {
+        closeOpeningBalanceModal();
+    }
+});
 document.getElementById("opening-balance-open-btn").addEventListener("click", () => {
     if (openingBalanceMode === "locked") return;
-    openOpeningBalanceModal(currentOpeningBalance);
+    openOpeningBalanceModal(currentDaySession);
 });
 document.getElementById("opening-balance-input").addEventListener("keydown", (event) => {
     if (event.key !== "Enter") return;
     event.preventDefault();
     saveOpeningBalance();
+});
+document.getElementById("opening-ecash-input").addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    saveOpeningBalance();
+});
+document.getElementById("store-day-close-btn").addEventListener("click", openStoreDayCloseModal);
+document.getElementById("store-day-close-x").addEventListener("click", closeStoreDayCloseModal);
+document.getElementById("store-day-close-cancel").addEventListener("click", closeStoreDayCloseModal);
+document.getElementById("store-day-close-save").addEventListener("click", saveStoreDayClose);
+document.getElementById("store-day-close-modal").addEventListener("click", (event) => {
+    if (event.target.id === "store-day-close-modal") {
+        closeStoreDayCloseModal();
+    }
+});
+document.getElementById("closing-cash-input").addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    saveStoreDayClose();
+});
+document.getElementById("closing-ecash-input").addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    saveStoreDayClose();
 });
 
 (async () => {

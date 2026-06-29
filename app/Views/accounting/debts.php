@@ -186,7 +186,11 @@
     <div class="acct-modal-card max-h-[92vh] w-[min(1320px,96vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
         <div class="acct-modal-head">
             <h4 class="text-lg font-bold text-slate-900">Settlement Run Details</h4>
-            <button id="close-settlement-run-details" type="button" class="acct-modal-close">x</button>
+            <div class="flex flex-wrap items-center gap-2">
+                <button id="settlement-details-export" type="button" class="history-action inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" disabled><i class="bi bi-download"></i> Export CSV</button>
+                <button id="settlement-details-print" type="button" class="history-action inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" disabled><i class="bi bi-printer"></i> Print</button>
+                <button id="close-settlement-run-details" type="button" class="acct-modal-close">x</button>
+            </div>
         </div>
 
         <div id="settlement-details-head" class="mode-profile-empty rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">Loading settlement run details...</div>
@@ -234,10 +238,14 @@
 
         <div class="inline-box flex flex-col gap-2">
             <input id="import-csv-file" class="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-blue-700" type="file" accept=".csv,.txt">
-            <button id="import-csv-submit" type="button" class="primary-btn inline-flex h-10 items-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700">Upload and Import</button>
+            <div class="flex flex-wrap gap-2">
+                <button id="import-csv-preview" type="button" class="primary-btn inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Preview CSV</button>
+                <button id="import-csv-submit" type="button" class="primary-btn inline-flex h-10 items-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700" disabled>Apply Import</button>
+            </div>
         </div>
 
         <div id="import-csv-result" class="import-result mt-3 text-sm"></div>
+        <div id="import-csv-valid" class="import-valid mt-2 max-h-56 space-y-2 overflow-auto text-sm"></div>
         <div id="import-csv-invalid" class="import-invalid mt-2 max-h-56 space-y-2 overflow-auto text-sm"></div>
     </div>
 </div>

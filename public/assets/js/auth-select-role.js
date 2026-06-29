@@ -17,9 +17,9 @@ function roleLabel(role) {
 
 function targetPathByRole(role) {
     const key = String(role || "").toUpperCase();
-    if (key === "STORE_SYSTEM") return "/store/pos";
-    if (key === "ACCOUNTING_OFFICE") return "/accounting/debts";
-    if (key === "ADMIN") return "/admin/stores";
+    if (key === "STORE_SYSTEM") return "/store/dashboard";
+    if (key === "ACCOUNTING_OFFICE") return "/accounting/dashboard";
+    if (key === "ADMIN") return "/admin/dashboard";
     if (key === "USER") return "/user/dashboard";
     return "/login";
 }
@@ -42,7 +42,7 @@ async function chooseRole(role) {
     }
 }
 
-function renderRoles(roles) {
+function renderRoles(roles, currentRole) {
     const safeRoles = Array.isArray(roles) ? roles : [];
     if (safeRoles.length === 0) {
         optionsEl.innerHTML = "";
@@ -50,11 +50,17 @@ function renderRoles(roles) {
         return;
     }
 
-    optionsEl.innerHTML = safeRoles.map((role) => `
-        <button type="button" class="auth-role-btn" data-role="${role}">
-            ${roleLabel(role)}
+    const activeRole = String(currentRole || "").toUpperCase();
+    optionsEl.innerHTML = safeRoles.map((role) => {
+        const roleKey = String(role || "").toUpperCase();
+        const isActive = roleKey !== "" && roleKey === activeRole;
+        return `
+        <button type="button" class="auth-role-btn${isActive ? " is-active" : ""}" data-role="${role}">
+            <span>${roleLabel(role)}</span>
+            ${isActive ? "<small>Current</small>" : ""}
         </button>
-    `).join("");
+    `;
+    }).join("");
 }
 
 optionsEl.addEventListener("click", async (event) => {
@@ -76,12 +82,7 @@ async function init() {
 
         const role = meData.user?.role || "";
         const roles = meData.user?.roles || [];
-        if (role) {
-            window.location.href = targetPathByRole(role);
-            return;
-        }
-
-        renderRoles(roles);
+        renderRoles(roles, role);
     } catch (error) {
         window.location.href = "/login";
     }

@@ -7,8 +7,8 @@ use App\Models\BalanceModel;
 use App\Models\DebtCashbookEntryModel;
 use App\Models\InventoryMovementModel;
 use App\Models\ProductModel;
+use App\Models\StoreDaySessionModel;
 use App\Models\StoreModel;
-use App\Models\StoreOpeningBalanceModel;
 use App\Models\StorePaymentMethodModel;
 use App\Models\TransactionItemModel;
 use App\Models\TransactionModel;
@@ -65,9 +65,10 @@ class TransactionService
             return $this->error('You cannot create transactions for this store.', 403);
         }
 
-        $openingBalanceModel = new StoreOpeningBalanceModel();
-        if (!$openingBalanceModel->getInitialByStore($storeId)) {
-            return $this->error('Initial opening balance is not set. Please set it first.');
+        $daySessionModel = new StoreDaySessionModel();
+        $todaySession = $daySessionModel->getToday($storeId);
+        if (!$todaySession || (string) ($todaySession['status'] ?? '') !== 'open') {
+            return $this->error('Store day is not open. Open today\'s store session before creating transactions.');
         }
 
         $paymentMethodModel = new StorePaymentMethodModel();
@@ -136,16 +137,19 @@ class TransactionService
         $db = Database::connect();
         $db->transBegin();
 
+        $clientTxnId = uniqid('txn_', true);
+        $createdAt = date('Y-m-d H:i:s');
+
         try {
             $txnId = $transactionModel->insert([
-                'client_txn_id' => uniqid('txn_', true),
+                'client_txn_id' => $clientTxnId,
                 'user_id' => $customerUserId,
                 'customer_type' => $customerType,
                 'store_id' => $storeId,
                 'amount' => $totalAmount,
                 'payment_method' => $paymentMethod,
                 'status' => 'completed',
-                'created_at' => date('Y-m-d H:i:s'),
+                'created_at' => $createdAt,
             ]);
 
             if (!$txnId) {
@@ -162,7 +166,7 @@ class TransactionService
                     'qty' => $qty,
                     'unit_price' => $row['unit_price'],
                     'line_total' => $row['line_total'],
-                    'created_at' => date('Y-m-d H:i:s'),
+                    'created_at' => $createdAt,
                 ])) {
                     throw new \RuntimeException('Failed to create transaction item.');
                 }
@@ -179,7 +183,7 @@ class TransactionService
                     'qty' => $qty,
                     'reason' => 'POS sale',
                     'txn_id' => $txnId,
-                    'created_at' => date('Y-m-d H:i:s'),
+                    'created_at' => $createdAt,
                 ])) {
                     throw new \RuntimeException('Failed to create inventory movement.');
                 }
@@ -200,7 +204,7 @@ class TransactionService
                         return ['product_id' => $productId, 'qty' => $qty];
                     }, array_keys($aggregatedItems), $aggregatedItems)),
                 ]),
-                'created_at' => date('Y-m-d H:i:s'),
+                'created_at' => $createdAt,
             ])) {
                 throw new \RuntimeException('Failed to write audit log.');
             }
@@ -234,8 +238,8 @@ class TransactionService
                         'payment_method' => 'debt',
                         'transaction_id' => (int) $txnId,
                     ]),
-                    'created_at' => date('Y-m-d H:i:s'),
-                    'updated_at' => date('Y-m-d H:i:s'),
+                    'created_at' => $createdAt,
+                    'updated_at' => $createdAt,
                 ]);
             }
 
@@ -252,6 +256,8 @@ class TransactionService
         return [
             'status' => 'success',
             'transaction_id' => (int) $txnId,
+            'client_txn_id' => $clientTxnId,
+            'created_at' => $createdAt,
             'total_amount' => $totalAmount,
             'code' => 200,
         ];

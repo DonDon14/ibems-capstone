@@ -12,6 +12,7 @@
         <?= view('components/stat_card', ['title' => 'With Debt', 'value' => '-', 'valueId' => 'acd-with-debt', 'icon' => 'bi bi-person-badge', 'tone' => 'warning']) ?>
         <?= view('components/stat_card', ['title' => 'Total Debt', 'value' => 'PHP 0.00', 'valueId' => 'acd-total-debt', 'icon' => 'bi bi-cash-coin', 'tone' => 'debt']) ?>
         <?= view('components/stat_card', ['title' => 'Today Deducted', 'value' => 'PHP 0.00', 'valueId' => 'acd-today-deducted', 'icon' => 'bi bi-calendar-check', 'tone' => 'finance']) ?>
+        <?= view('components/stat_card', ['title' => 'Over Limit', 'value' => '0', 'valueId' => 'acd-over-limit', 'icon' => 'bi bi-exclamation-triangle', 'tone' => 'warning']) ?>
     </div>
 
     <div class="dash-panels">
@@ -55,6 +56,13 @@
                     </tbody>
                 </table>
             </div>
+        </article>
+    </div>
+
+    <div class="dash-panels">
+        <article class="dash-panel">
+            <h4><i class="bi bi-exclamation-triangle"></i> Accounting Alerts</h4>
+            <div id="acd-alerts" class="stack-list"></div>
         </article>
     </div>
 </section>

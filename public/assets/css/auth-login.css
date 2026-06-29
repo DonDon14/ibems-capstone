@@ -186,7 +186,24 @@ button:disabled {
 }
 
 .auth-role-btn {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
     text-align: left;
+}
+
+.auth-role-btn small {
+    color: rgba(255, 255, 255, 0.82);
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+
+.auth-role-btn.is-active {
+    background: linear-gradient(180deg, #17459f 0%, #123575 100%);
+    box-shadow: 0 0 0 3px rgba(31, 87, 200, 0.16), 0 12px 22px rgba(23, 63, 150, 0.26);
 }
 
 .auth-panel-art {

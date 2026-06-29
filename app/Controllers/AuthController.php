@@ -7,21 +7,11 @@ use CodeIgniter\Controller;
 
 class AuthController extends Controller
 {
-    private function targetPathByRole(string $role): string
-    {
-        $role = strtoupper(trim($role));
-        if ($role === 'STORE_SYSTEM') return '/store/pos';
-        if ($role === 'ACCOUNTING_OFFICE') return '/accounting/debts';
-        if ($role === 'ADMIN') return '/admin/stores';
-        if ($role === 'USER') return '/user/dashboard';
-        return '/login';
-    }
-
     public function login()
     {
         $request = $this->request->getJSON(true) ?? $this->request->getPost();
 
-        $email    = $request['email'] ?? null;
+        $email    = strtolower(trim((string) ($request['email'] ?? '')));
         $password = $request['password'] ?? null;
 
         if (!$email || !$password) {
@@ -49,7 +39,10 @@ class AuthController extends Controller
             ]);
         }
 
+        session()->regenerate(true);
+
         $roles = $userModel->getEffectiveRoles($user);
+        $roles = array_values(array_filter(array_unique(array_map('ibems_normalize_role', $roles))));
         $activeRole = count($roles) === 1 ? $roles[0] : null;
 
         session()->set([
@@ -71,7 +64,7 @@ class AuthController extends Controller
                 'role' => $activeRole,
                 'roles' => $roles,
                 'requires_role_selection' => count($roles) > 1 && $activeRole === null,
-                'redirect_to' => $activeRole ? $this->targetPathByRole($activeRole) : '/auth/select-role',
+                'redirect_to' => $activeRole ? ibems_role_landing_path($activeRole) : site_url('auth/select-role'),
             ],
         ]);
     }
@@ -92,6 +85,8 @@ class AuthController extends Controller
             ]);
         }
 
+        ibems_refresh_session_roles();
+
         return $this->response->setJSON([
             'status' => 'success',
             'user' => [
@@ -109,6 +104,17 @@ class AuthController extends Controller
             return redirect()->to('/login');
         }
 
+        ibems_refresh_session_roles();
+        $availableRoles = ibems_available_roles();
+        if ($availableRoles === []) {
+            session()->destroy();
+            return redirect()->to('/login');
+        }
+
+        if (count($availableRoles) === 1 && ibems_current_role() !== null) {
+            return redirect()->to(ibems_role_landing_path($availableRoles[0]));
+        }
+
         return view('auth/select_role');
     }
 
@@ -123,8 +129,7 @@ class AuthController extends Controller
 
         $request = $this->request->getJSON(true) ?? $this->request->getPost();
         $role = strtoupper(trim((string) ($request['role'] ?? '')));
-        $available = array_map(static fn($r) => strtoupper(trim((string) $r)), (array) (session()->get('available_roles') ?? []));
-        $available = array_values(array_filter(array_unique($available), static fn($r) => $r !== ''));
+        $available = ibems_available_roles();
 
         if ($role === '' || !in_array($role, $available, true)) {
             return $this->response->setStatusCode(400)->setJSON([
@@ -138,19 +143,7 @@ class AuthController extends Controller
         return $this->response->setJSON([
             'status' => 'success',
             'role' => $role,
-            'redirect_to' => $this->targetPathByRole($role),
+            'redirect_to' => ibems_role_landing_path($role),
         ]);
-    }
-    
-    public function testLogin()
-    {
-        $data = [
-            'email' => 'faculty@test.com',
-            'password' => '123456'
-        ];
-
-        $this->request->setGlobal('post', $data);
-
-        return $this->login();
     }
 }

@@ -7,7 +7,7 @@
     const sidebar = document.querySelector(".app-sidebar");
     const brand = document.querySelector(".app-brand");
     const navLinks = Array.from(document.querySelectorAll(".app-menu a"));
-    const logoutLink = document.querySelector(".sidebar-logout a");
+    const logoutLink = document.querySelector(".sidebar-logout a, .sidebar-logout button");
     if (!shell || !btn) return;
 
     const isDesktop = () => window.matchMedia("(min-width: 1201px)").matches;
@@ -15,7 +15,7 @@
     const canCollapse = () => window.matchMedia("(min-width: 981px)").matches;
 
     const portalKey = () => {
-        const path = window.location.pathname.toLowerCase();
+        const path = window.location.pathname.toLowerCase().replace(/^\/index\.php(?=\/|$)/, "");
         if (path.startsWith("/admin")) return "admin";
         if (path.startsWith("/store")) return "store";
         if (path.startsWith("/accounting")) return "accounting";

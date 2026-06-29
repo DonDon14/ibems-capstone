@@ -18,21 +18,8 @@
 $name = (string) (session()->get('name') ?? 'User');
 $role = (string) (session()->get('role') ?? 'USER');
 $ustpLogoUrl = base_url('assets/images/ustp_claveria_logo.jpg');
-$path = trim((string) service('uri')->getPath(), '/');
-if (strpos($path, 'index.php/') === 0) {
-    $path = substr($path, strlen('index.php/'));
-}
-$isActive = static function (string $prefix) use ($path): string {
-    return strpos($path, $prefix) === 0 ? 'is-active' : '';
-};
-$parts = preg_split('/\s+/', trim($name)) ?: [];
-$initials = '';
-foreach (array_slice($parts, 0, 2) as $part) {
-    $initials .= strtoupper(substr($part, 0, 1));
-}
-if ($initials === '') {
-    $initials = 'US';
-}
+$initials = ibems_initials($name, 'US');
+$availableRoles = ibems_available_roles();
 ?>
 <div class="app-shell">
     <aside class="app-sidebar">
@@ -50,14 +37,17 @@ if ($initials === '') {
         </div>
 
         <nav class="app-menu">
-            <a href="/user/dashboard" class="<?= $isActive('user/dashboard') ?>"><i class="bi bi-speedometer2"></i><span>Dashboard</span></a>
-            <a href="/user/history" class="<?= $isActive('user/history') ?>"><i class="bi bi-clock-history"></i><span>History</span></a>
+            <a href="<?= site_url('user/dashboard') ?>" class="<?= ibems_is_active_path('user/dashboard') ?>" <?= ibems_is_active_path('user/dashboard') ? 'aria-current="page"' : '' ?>><i class="bi bi-speedometer2"></i><span>Dashboard</span></a>
+            <a href="<?= site_url('user/history') ?>" class="<?= ibems_is_active_path('user/history') ?>" <?= ibems_is_active_path('user/history') ? 'aria-current="page"' : '' ?>><i class="bi bi-clock-history"></i><span>History</span></a>
         </nav>
 
         <div class="app-sidebar-spacer"></div>
 
         <div class="sidebar-logout">
-            <a href="/auth/logout"><i class="bi bi-box-arrow-right"></i><span>Logout</span></a>
+            <form method="post" action="<?= site_url('auth/logout') ?>" class="sidebar-logout-form">
+                <?= csrf_field() ?>
+                <button type="submit"><i class="bi bi-box-arrow-right"></i><span>Logout</span></button>
+            </form>
         </div>
     </aside>
 
@@ -70,11 +60,20 @@ if ($initials === '') {
                 </div>
             </div>
 
-            <div class="topbar-profile">
-                <div class="profile-avatar"><?= esc($initials) ?></div>
-                <div class="profile-meta">
-                    <div class="profile-name"><?= esc($name) ?></div>
-                    <div class="profile-role"><?= esc($role) ?></div>
+            <div class="topbar-actions">
+                <?php if (count($availableRoles) > 1): ?>
+                    <a href="<?= site_url('auth/select-role') ?>" class="topbar-action">
+                        <i class="bi bi-shuffle"></i>
+                        <span>Switch Portal</span>
+                    </a>
+                <?php endif; ?>
+
+                <div class="topbar-profile">
+                    <div class="profile-avatar"><?= esc($initials) ?></div>
+                    <div class="profile-meta">
+                        <div class="profile-name"><?= esc($name) ?></div>
+                        <div class="profile-role"><?= esc($role) ?></div>
+                    </div>
                 </div>
             </div>
         </header>

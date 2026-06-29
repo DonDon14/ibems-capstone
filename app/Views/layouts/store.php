@@ -20,21 +20,8 @@ $email = (string) (session()->get('email') ?? '');
 $role = (string) (session()->get('role') ?? 'STORE_SYSTEM');
 $ustpLogoUrl = base_url('assets/images/ustp_claveria_logo.jpg');
 $profileImageUrl = (string) (session()->get('profile_image_url') ?? '');
-$path = trim((string) service('uri')->getPath(), '/');
-if (strpos($path, 'index.php/') === 0) {
-    $path = substr($path, strlen('index.php/'));
-}
-$isActive = static function (string $prefix) use ($path): string {
-    return strpos($path, $prefix) === 0 ? 'is-active' : '';
-};
-$parts = preg_split('/\s+/', trim($name)) ?: [];
-$initials = '';
-foreach (array_slice($parts, 0, 2) as $part) {
-    $initials .= strtoupper(substr($part, 0, 1));
-}
-if ($initials === '') {
-    $initials = 'SU';
-}
+$initials = ibems_initials($name, 'SU');
+$availableRoles = ibems_available_roles();
 $storeModel = new \App\Models\StoreModel();
 $stores = $storeModel->getAccessibleStores((int) session()->get('user_id'), $role);
 $activeStore = $stores[0] ?? null;
@@ -57,18 +44,22 @@ $storeLogoUrl = (string) ($activeStore['logo_url'] ?? '');
         </div>
 
         <nav class="app-menu">
-            <a href="/store/pos" class="<?= $isActive('store/pos') ?>"><i class="bi bi-cart3"></i><span>POS</span></a>
-            <a href="/store/inventory" class="<?= $isActive('store/inventory') ?>"><i class="bi bi-box-seam"></i><span>Inventory</span></a>
-            <a href="/store/reports" class="<?= $isActive('store/reports') ?>"><i class="bi bi-bar-chart-line"></i><span>Reports</span></a>
-            <a href="/store/history" class="<?= $isActive('store/history') ?>"><i class="bi bi-clock-history"></i><span>History</span></a>
-            <a href="/store/staff-records" class="<?= $isActive('store/staff-records') ?>"><i class="bi bi-person-vcard"></i><span>Employee Records</span></a>
-            <a href="/store/settings" class="<?= $isActive('store/settings') ?>"><i class="bi bi-gear"></i><span>Settings</span></a>
+            <a href="<?= site_url('store/dashboard') ?>" class="<?= ibems_is_active_path('store/dashboard') ?>" <?= ibems_is_active_path('store/dashboard') ? 'aria-current="page"' : '' ?>><i class="bi bi-speedometer2"></i><span>Dashboard</span></a>
+            <a href="<?= site_url('store/pos') ?>" class="<?= ibems_is_active_path('store/pos') ?>" <?= ibems_is_active_path('store/pos') ? 'aria-current="page"' : '' ?>><i class="bi bi-cart3"></i><span>POS</span></a>
+            <a href="<?= site_url('store/inventory') ?>" class="<?= ibems_is_active_path('store/inventory') ?>" <?= ibems_is_active_path('store/inventory') ? 'aria-current="page"' : '' ?>><i class="bi bi-box-seam"></i><span>Inventory</span></a>
+            <a href="<?= site_url('store/reports') ?>" class="<?= ibems_is_active_path('store/reports') ?>" <?= ibems_is_active_path('store/reports') ? 'aria-current="page"' : '' ?>><i class="bi bi-bar-chart-line"></i><span>Reports</span></a>
+            <a href="<?= site_url('store/history') ?>" class="<?= ibems_is_active_path('store/history') ?>" <?= ibems_is_active_path('store/history') ? 'aria-current="page"' : '' ?>><i class="bi bi-clock-history"></i><span>History</span></a>
+            <a href="<?= site_url('store/staff-records') ?>" class="<?= ibems_is_active_path('store/staff-records') ?>" <?= ibems_is_active_path('store/staff-records') ? 'aria-current="page"' : '' ?>><i class="bi bi-person-vcard"></i><span>Employee Records</span></a>
+            <a href="<?= site_url('store/settings') ?>" class="<?= ibems_is_active_path('store/settings') ?>" <?= ibems_is_active_path('store/settings') ? 'aria-current="page"' : '' ?>><i class="bi bi-gear"></i><span>Settings</span></a>
         </nav>
 
         <div class="app-sidebar-spacer"></div>
 
         <div class="sidebar-logout">
-            <a href="/auth/logout"><i class="bi bi-box-arrow-right"></i><span>Logout</span></a>
+            <form method="post" action="<?= site_url('auth/logout') ?>" class="sidebar-logout-form">
+                <?= csrf_field() ?>
+                <button type="submit"><i class="bi bi-box-arrow-right"></i><span>Logout</span></button>
+            </form>
         </div>
     </aside>
 
@@ -81,21 +72,24 @@ $storeLogoUrl = (string) ($activeStore['logo_url'] ?? '');
                 </div>
             </div>
 
-            <div class="topbar-profile">
-                <?php if ($storeLogoUrl !== ''): ?>
-                    <img src="<?= esc($storeLogoUrl) ?>" alt="Store Logo" class="store-logo">
-                <?php else: ?>
-                    <div class="store-logo-fallback"><?= esc(strtoupper(substr($storeName, 0, 1))) ?></div>
+            <div class="topbar-actions">
+                <?php if (count($availableRoles) > 1): ?>
+                    <a href="<?= site_url('auth/select-role') ?>" class="topbar-action">
+                        <i class="bi bi-shuffle"></i>
+                        <span>Switch Portal</span>
+                    </a>
                 <?php endif; ?>
 
-                <?php if ($profileImageUrl !== ''): ?>
-                    <img src="<?= esc($profileImageUrl) ?>" alt="Profile" class="profile-avatar-img">
-                <?php else: ?>
-                    <div class="profile-avatar"><?= esc($initials) ?></div>
-                <?php endif; ?>
-                <div class="profile-meta">
-                    <div class="profile-name"><?= esc($name) ?></div>
-                    <div class="profile-role"><?= esc($role) ?><?= $email !== '' ? ' | ' . esc($email) : '' ?></div>
+                <div class="topbar-profile">
+                    <?php if ($profileImageUrl !== ''): ?>
+                        <img src="<?= esc($profileImageUrl) ?>" alt="Profile" class="profile-avatar-img">
+                    <?php else: ?>
+                        <div class="profile-avatar"><?= esc($initials) ?></div>
+                    <?php endif; ?>
+                    <div class="profile-meta">
+                        <div class="profile-name"><?= esc($name) ?></div>
+                        <div class="profile-role"><?= esc($role) ?><?= $email !== '' ? ' | ' . esc($email) : '' ?></div>
+                    </div>
                 </div>
             </div>
         </header>

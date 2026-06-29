@@ -226,7 +226,7 @@ function rRenderPaymentRecords(rows, data) {
 
     const totalRevenue = Number(data?.summary?.total_sales || 0);
     const cashDrawer = data?.cash_drawer || {};
-    const openingBalance = Number(cashDrawer.opening_balance || 0);
+    const openingBalance = Number(cashDrawer.opening_cash ?? cashDrawer.opening_balance ?? 0);
     const expectedCashOnHand = Number(cashDrawer.expected_cash_on_hand || 0);
     const expectedEcashOnHand = Number(cashDrawer.expected_ecash_on_hand || 0);
     const openingDate = String(cashDrawer.opening_business_date || "--");
@@ -241,7 +241,7 @@ function rRenderPaymentRecords(rows, data) {
     document.getElementById("pay-debt-meta").textContent = `${debt.transactions} transactions`;
 
     document.getElementById("cash-opening").textContent = rMoney(openingBalance);
-    document.getElementById("cash-date").textContent = `Initial date: ${openingDate}`;
+    document.getElementById("cash-date").textContent = `Business date: ${openingDate}`;
     document.getElementById("cash-on-hand").textContent = rMoney(expectedCashOnHand);
     document.getElementById("ecash-on-hand").textContent = rMoney(expectedEcashOnHand);
     document.getElementById("pay-total-revenue").textContent = rMoney(totalRevenue);

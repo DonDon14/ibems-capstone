@@ -18,10 +18,13 @@ class ProductModel extends Model
         'name',
         'variant_label',
         'category',
+        'supplier',
         'image_url',
         'barcode',
         'price',
         'stock_qty',
+        'low_stock_threshold',
+        'location_bin',
         'is_active',
         'updated_at',
     ];
@@ -34,6 +37,7 @@ class ProductModel extends Model
         'store_id'  => 'integer',
         'price'     => 'float',
         'stock_qty' => 'integer',
+        'low_stock_threshold' => 'integer',
         'is_active' => 'boolean',
     ];
 

@@ -56,7 +56,7 @@ class AccountingController extends Controller
         $db = Database::connect();
 
         $accountsRow = $db->table('balances b')
-            ->select('COUNT(*) AS total_accounts, SUM(b.current_debt) AS total_debt, SUM(CASE WHEN b.current_debt > 0 THEN 1 ELSE 0 END) AS with_debt')
+            ->select('COUNT(*) AS total_accounts, SUM(b.current_debt) AS total_debt, SUM(CASE WHEN b.current_debt > 0 THEN 1 ELSE 0 END) AS with_debt, SUM(CASE WHEN b.current_debt > b.credit_limit AND b.current_debt > 0 THEN 1 ELSE 0 END) AS over_limit_count')
             ->join('users u', 'u.id = b.user_id', 'inner')
             ->where('u.is_active', 1)
             ->whereIn('u.user_type', ['faculty', 'staff'])
@@ -65,32 +65,16 @@ class AccountingController extends Controller
 
         $todayStart = date('Y-m-d 00:00:00');
         $todayEnd = date('Y-m-d 23:59:59');
-        $deductionRows = $db->table('audit_logs')
-            ->select('payload_json')
-            ->whereIn('action', [
-                'ACCOUNTING_DEDUCT_DEBT',
-                'ACCOUNTING_DEDUCT_FULL_DEBT',
-                'ACCOUNTING_SETTLEMENT_DEDUCT',
-            ])
+        $todayCashbook = $db->table('debt_cashbook_entries')
+            ->select('COUNT(*) AS entry_count, COALESCE(SUM(amount), 0) AS total_amount')
+            ->where('direction', 'credit')
             ->where('created_at >=', $todayStart)
             ->where('created_at <=', $todayEnd)
             ->get()
-            ->getResultArray();
+            ->getRowArray() ?? [];
 
-        $todayDeductionCount = 0;
-        $todayDeductionAmount = 0.0;
-        foreach ($deductionRows as $row) {
-            $payload = json_decode((string) ($row['payload_json'] ?? ''), true);
-            if (!is_array($payload)) {
-                continue;
-            }
-            $amount = (float) ($payload['deducted_amount'] ?? 0);
-            if ($amount <= 0) {
-                continue;
-            }
-            $todayDeductionCount++;
-            $todayDeductionAmount += $amount;
-        }
+        $todayDeductionCount = (int) ($todayCashbook['entry_count'] ?? 0);
+        $todayDeductionAmount = (float) ($todayCashbook['total_amount'] ?? 0);
 
         $lastRun = $db->table('settlement_runs sr')
             ->select('sr.id, sr.run_month, sr.run_at, sr.total_accounts, sr.total_debt_before, u.name AS run_by_name')
@@ -111,6 +95,42 @@ class AccountingController extends Controller
             ->get()
             ->getResultArray();
 
+        $overLimitAccounts = $db->table('balances b')
+            ->select('u.id AS user_id, u.employee_id, u.name, u.email, b.current_debt, b.credit_limit')
+            ->join('users u', 'u.id = b.user_id', 'inner')
+            ->where('u.is_active', 1)
+            ->whereIn('u.user_type', ['faculty', 'staff'])
+            ->where('b.current_debt > b.credit_limit', null, false)
+            ->where('b.current_debt >', 0)
+            ->orderBy('(b.current_debt - b.credit_limit)', 'DESC', false)
+            ->limit(5)
+            ->get()
+            ->getResultArray();
+
+        $staleCutoff = date('Y-m-d H:i:s', strtotime('-30 day'));
+        $staleDebtAccounts = $db->table('balances b')
+            ->select('u.id AS user_id, u.employee_id, u.name, u.email, b.current_debt, b.updated_at, MAX(dce.created_at) AS last_cashbook_at')
+            ->join('users u', 'u.id = b.user_id', 'inner')
+            ->join('debt_cashbook_entries dce', 'dce.user_id = u.id', 'left')
+            ->where('u.is_active', 1)
+            ->whereIn('u.user_type', ['faculty', 'staff'])
+            ->where('b.current_debt >', 0)
+            ->groupBy('u.id, u.employee_id, u.name, u.email, b.current_debt, b.updated_at')
+            ->having('(last_cashbook_at IS NULL OR last_cashbook_at < ' . $db->escape($staleCutoff) . ')', null, false)
+            ->orderBy('b.current_debt', 'DESC')
+            ->limit(5)
+            ->get()
+            ->getResultArray();
+
+        $failedImports = $db->table('salary_import_batches sib')
+            ->select('sib.id, sib.filename, sib.imported_at, sib.total_rows, sib.valid_rows, sib.invalid_rows, u.name AS imported_by_name')
+            ->join('users u', 'u.id = sib.imported_by', 'left')
+            ->where('sib.invalid_rows >', 0)
+            ->orderBy('sib.id', 'DESC')
+            ->limit(5)
+            ->get()
+            ->getResultArray();
+
         $trendByDate = [];
         $trendSeed = [];
         for ($i = 6; $i >= 0; $i--) {
@@ -119,13 +139,9 @@ class AccountingController extends Controller
             $trendSeed[] = $date;
         }
 
-        $trendRows = $db->table('audit_logs')
-            ->select('created_at, payload_json')
-            ->whereIn('action', [
-                'ACCOUNTING_DEDUCT_DEBT',
-                'ACCOUNTING_DEDUCT_FULL_DEBT',
-                'ACCOUNTING_SETTLEMENT_DEDUCT',
-            ])
+        $trendRows = $db->table('debt_cashbook_entries')
+            ->select('created_at, amount')
+            ->where('direction', 'credit')
             ->where('created_at >=', date('Y-m-d 00:00:00', strtotime('-6 day')))
             ->where('created_at <=', date('Y-m-d 23:59:59'))
             ->orderBy('created_at', 'ASC')
@@ -138,12 +154,7 @@ class AccountingController extends Controller
                 continue;
             }
 
-            $payload = json_decode((string) ($row['payload_json'] ?? ''), true);
-            if (!is_array($payload)) {
-                continue;
-            }
-
-            $amount = (float) ($payload['deducted_amount'] ?? 0);
+            $amount = (float) ($row['amount'] ?? 0);
             if ($amount <= 0) {
                 continue;
             }
@@ -214,6 +225,7 @@ class AccountingController extends Controller
                 'total_debt' => (float) ($accountsRow['total_debt'] ?? 0),
                 'today_deduction_count' => $todayDeductionCount,
                 'today_deduction_amount' => $todayDeductionAmount,
+                'over_limit_count' => (int) ($accountsRow['over_limit_count'] ?? 0),
                 'last_settlement_month' => $lastRun['run_month'] ?? null,
                 'last_settlement_at' => $lastRun['run_at'] ?? null,
             ],
@@ -227,6 +239,40 @@ class AccountingController extends Controller
                     'credit_limit' => (float) ($row['credit_limit'] ?? 0),
                 ];
             }, $topDebtAccounts),
+            'alerts' => [
+                'over_limit' => array_map(static function (array $row): array {
+                    return [
+                        'user_id' => (int) ($row['user_id'] ?? 0),
+                        'employee_id' => $row['employee_id'],
+                        'name' => $row['name'],
+                        'email' => $row['email'],
+                        'current_debt' => (float) ($row['current_debt'] ?? 0),
+                        'credit_limit' => (float) ($row['credit_limit'] ?? 0),
+                        'over_amount' => max(0, (float) ($row['current_debt'] ?? 0) - (float) ($row['credit_limit'] ?? 0)),
+                    ];
+                }, $overLimitAccounts),
+                'stale_debts' => array_map(static function (array $row): array {
+                    return [
+                        'user_id' => (int) ($row['user_id'] ?? 0),
+                        'employee_id' => $row['employee_id'],
+                        'name' => $row['name'],
+                        'email' => $row['email'],
+                        'current_debt' => (float) ($row['current_debt'] ?? 0),
+                        'last_cashbook_at' => $row['last_cashbook_at'] ?? null,
+                    ];
+                }, $staleDebtAccounts),
+                'failed_imports' => array_map(static function (array $row): array {
+                    return [
+                        'id' => (int) ($row['id'] ?? 0),
+                        'filename' => $row['filename'],
+                        'imported_at' => $row['imported_at'],
+                        'imported_by_name' => $row['imported_by_name'] ?: 'Unknown',
+                        'total_rows' => (int) ($row['total_rows'] ?? 0),
+                        'valid_rows' => (int) ($row['valid_rows'] ?? 0),
+                        'invalid_rows' => (int) ($row['invalid_rows'] ?? 0),
+                    ];
+                }, $failedImports),
+            ],
             'trend' => $trend,
             'activity' => $activityFeed,
         ]);
@@ -270,10 +316,11 @@ class AccountingController extends Controller
             ->get()
             ->getResultArray();
 
-        $data = array_map(static function (array $row): array {
+        $data = array_map(function (array $row): array {
             $creditLimit = (float) $row['credit_limit'];
             $currentDebt = (float) $row['current_debt'];
             $row['available_credit'] = max(0, $creditLimit - $currentDebt);
+            $row += $this->buildDebtStatus($creditLimit, $currentDebt);
             return $row;
         }, $rows);
 
@@ -313,6 +360,7 @@ class AccountingController extends Controller
         $creditLimit = (float) $row['credit_limit'];
         $currentDebt = (float) $row['current_debt'];
         $row['available_credit'] = max(0, $creditLimit - $currentDebt);
+        $row += $this->buildDebtStatus($creditLimit, $currentDebt);
 
         return $this->response->setJSON([
             'status' => 'success',
@@ -883,8 +931,10 @@ class AccountingController extends Controller
             $name = $rowAssoc['name'] ?? '';
             $email = $rowAssoc['email'] ?? '';
             $userType = strtolower((string) ($rowAssoc['user_type'] ?? ''));
-            $monthlySalary = (float) ($rowAssoc['monthly_salary'] ?? 0);
-            $creditLimit = $hasCreditLimit ? (float) ($rowAssoc['credit_limit'] ?? 0) : null;
+            $monthlySalaryRaw = $rowAssoc['monthly_salary'] ?? '';
+            $creditLimitRaw = $rowAssoc['credit_limit'] ?? '';
+            $monthlySalary = is_numeric($monthlySalaryRaw) ? (float) $monthlySalaryRaw : -1;
+            $creditLimit = $hasCreditLimit && $creditLimitRaw !== '' && is_numeric($creditLimitRaw) ? (float) $creditLimitRaw : null;
 
             $errors = [];
             if ($name === '') {
@@ -896,11 +946,11 @@ class AccountingController extends Controller
             if (!in_array($userType, ['faculty', 'staff'], true)) {
                 $errors[] = 'user_type must be faculty or staff';
             }
-            if ($monthlySalary < 0) {
-                $errors[] = 'monthly_salary must be >= 0';
+            if (!is_numeric($monthlySalaryRaw) || $monthlySalary < 0) {
+                $errors[] = 'monthly_salary must be a number >= 0';
             }
-            if ($hasCreditLimit && $creditLimit !== null && $creditLimit < 0) {
-                $errors[] = 'credit_limit must be >= 0';
+            if ($hasCreditLimit && $creditLimitRaw !== '' && (!is_numeric($creditLimitRaw) || (float) $creditLimitRaw < 0)) {
+                $errors[] = 'credit_limit must be a number >= 0';
             }
 
             if ($errors !== []) {
@@ -1053,6 +1103,164 @@ class AccountingController extends Controller
             'total_rows' => $totalRows,
             'valid_rows' => $validRows,
             'invalid_rows' => $invalidRows,
+            'invalid_preview' => $invalidPreview,
+        ]);
+    }
+
+    public function previewImportCsv()
+    {
+        $file = $this->request->getFile('csv_file');
+
+        if (!$file || !$file->isValid()) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Please upload a valid CSV file.',
+            ]);
+        }
+
+        $extension = strtolower((string) $file->getExtension());
+        if (!in_array($extension, ['csv', 'txt'], true)) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Unsupported file type. Use .csv',
+            ]);
+        }
+
+        $handle = fopen($file->getTempName(), 'rb');
+        if ($handle === false) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Unable to read CSV.',
+            ]);
+        }
+
+        $rawHeaders = fgetcsv($handle);
+        if (!is_array($rawHeaders) || $rawHeaders === []) {
+            fclose($handle);
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'CSV has no header row.',
+            ]);
+        }
+
+        $headers = array_map(static function ($value): string {
+            return strtolower(trim((string) $value));
+        }, $rawHeaders);
+
+        $required = ['employee_id', 'name', 'email', 'user_type', 'monthly_salary'];
+        foreach ($required as $field) {
+            if (!in_array($field, $headers, true)) {
+                fclose($handle);
+                return $this->response->setStatusCode(400)->setJSON([
+                    'status' => 'error',
+                    'message' => "Missing required column: {$field}",
+                ]);
+            }
+        }
+
+        $hasCreditLimit = in_array('credit_limit', $headers, true);
+        $db = Database::connect();
+        $totalRows = 0;
+        $validRows = 0;
+        $invalidRows = 0;
+        $createCount = 0;
+        $updateCount = 0;
+        $creditLimitUpdateCount = 0;
+        $invalidPreview = [];
+        $validPreview = [];
+
+        while (($rowValues = fgetcsv($handle)) !== false) {
+            $totalRows++;
+            $rowAssoc = [];
+            foreach ($headers as $index => $column) {
+                $rowAssoc[$column] = trim((string) ($rowValues[$index] ?? ''));
+            }
+
+            $employeeId = $rowAssoc['employee_id'] ?? '';
+            $name = $rowAssoc['name'] ?? '';
+            $email = $rowAssoc['email'] ?? '';
+            $userType = strtolower((string) ($rowAssoc['user_type'] ?? ''));
+            $monthlySalaryRaw = $rowAssoc['monthly_salary'] ?? '';
+            $creditLimitRaw = $rowAssoc['credit_limit'] ?? '';
+            $monthlySalary = is_numeric($monthlySalaryRaw) ? (float) $monthlySalaryRaw : -1;
+            $creditLimit = $hasCreditLimit && $creditLimitRaw !== '' && is_numeric($creditLimitRaw) ? (float) $creditLimitRaw : null;
+
+            $errors = [];
+            if ($name === '') {
+                $errors[] = 'name is required';
+            }
+            if ($email === '' || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                $errors[] = 'valid email is required';
+            }
+            if (!in_array($userType, ['faculty', 'staff'], true)) {
+                $errors[] = 'user_type must be faculty or staff';
+            }
+            if (!is_numeric($monthlySalaryRaw) || $monthlySalary < 0) {
+                $errors[] = 'monthly_salary must be a number >= 0';
+            }
+            if ($hasCreditLimit && $creditLimitRaw !== '' && (!is_numeric($creditLimitRaw) || (float) $creditLimitRaw < 0)) {
+                $errors[] = 'credit_limit must be a number >= 0';
+            }
+
+            if ($errors !== []) {
+                $invalidRows++;
+                if (count($invalidPreview) < 15) {
+                    $invalidPreview[] = [
+                        'line' => $totalRows + 1,
+                        'employee_id' => $employeeId,
+                        'name' => $name,
+                        'email' => $email,
+                        'error' => implode('; ', $errors),
+                    ];
+                }
+                continue;
+            }
+
+            $existingUser = null;
+            if ($employeeId !== '') {
+                $existingUser = $db->table('users')->where('employee_id', $employeeId)->get()->getRowArray();
+            }
+            if (!$existingUser) {
+                $existingUser = $db->table('users')->where('email', $email)->get()->getRowArray();
+            }
+
+            $validRows++;
+            $action = $existingUser ? 'update' : 'create';
+            if ($existingUser) {
+                $updateCount++;
+            } else {
+                $createCount++;
+            }
+            if ($hasCreditLimit && $creditLimit !== null) {
+                $creditLimitUpdateCount++;
+            }
+
+            if (count($validPreview) < 20) {
+                $validPreview[] = [
+                    'line' => $totalRows + 1,
+                    'employee_id' => $employeeId,
+                    'name' => $name,
+                    'email' => $email,
+                    'user_type' => $userType,
+                    'monthly_salary' => $monthlySalary,
+                    'credit_limit' => $creditLimit,
+                    'action' => $action,
+                ];
+            }
+        }
+
+        fclose($handle);
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'filename' => $file->getClientName(),
+            'total_rows' => $totalRows,
+            'valid_rows' => $validRows,
+            'invalid_rows' => $invalidRows,
+            'create_count' => $createCount,
+            'update_count' => $updateCount,
+            'credit_limit_update_count' => $creditLimitUpdateCount,
+            'valid_preview' => $validPreview,
             'invalid_preview' => $invalidPreview,
         ]);
     }
@@ -1311,5 +1519,43 @@ class AccountingController extends Controller
             'previous_credit_limit' => $previousLimit,
             'new_credit_limit' => $creditLimit,
         ]);
+    }
+
+    private function buildDebtStatus(float $creditLimit, float $currentDebt): array
+    {
+        if ($currentDebt <= 0) {
+            return [
+                'debt_status' => 'settled',
+                'debt_status_label' => 'Settled',
+                'debt_status_tone' => 'success',
+                'debt_ratio' => 0.0,
+            ];
+        }
+
+        if ($creditLimit > 0 && $currentDebt > $creditLimit) {
+            return [
+                'debt_status' => 'over_limit',
+                'debt_status_label' => 'Over Limit',
+                'debt_status_tone' => 'danger',
+                'debt_ratio' => $currentDebt / $creditLimit,
+            ];
+        }
+
+        $ratio = $creditLimit > 0 ? $currentDebt / $creditLimit : 1.0;
+        if ($ratio >= 0.5) {
+            return [
+                'debt_status' => 'partially_settled',
+                'debt_status_label' => 'Partially Settled',
+                'debt_status_tone' => 'warning',
+                'debt_ratio' => $ratio,
+            ];
+        }
+
+        return [
+            'debt_status' => 'pending',
+            'debt_status_label' => 'Pending',
+            'debt_status_tone' => 'info',
+            'debt_ratio' => $ratio,
+        ];
     }
 }

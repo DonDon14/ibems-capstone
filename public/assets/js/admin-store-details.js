@@ -24,6 +24,58 @@ function sdInitials(text) {
         .join("") || "PR";
 }
 
+function sdRenderDaySession(session) {
+    const wrap = document.getElementById("sd-day-session");
+    if (!wrap) return;
+
+    if (!session) {
+        wrap.innerHTML = '<div class="mini-bar-empty">No store day session recorded yet.</div>';
+        return;
+    }
+
+    const status = String(session.status || "").toUpperCase() || "UNKNOWN";
+    const openedBy = session.opened_by_name || "Unknown";
+    const closedBy = session.closed_by_name || "-";
+    wrap.innerHTML = `
+        <div class="stack-item">
+            <div class="stack-item-head">
+                <strong>${sdEscape(session.business_date || "-")}</strong>
+                <span>${sdEscape(status)}</span>
+            </div>
+            <div class="stack-meta">
+                Opening: ${sdEscape(sdMoney(session.opening_cash || 0))} cash | ${sdEscape(sdMoney(session.opening_ecash || 0))} e-cash
+            </div>
+            <div class="stack-meta">
+                Opened by ${sdEscape(openedBy)}${session.opened_at ? ` at ${sdEscape(sdDateTime(session.opened_at))}` : ""}
+            </div>
+            <div class="stack-meta">
+                Closed by ${sdEscape(closedBy)}${session.closed_at ? ` at ${sdEscape(sdDateTime(session.closed_at))}` : ""}
+            </div>
+        </div>
+    `;
+}
+
+function sdRenderOfficers(officers) {
+    const wrap = document.getElementById("sd-officers");
+    if (!wrap) return;
+
+    const rows = Array.isArray(officers) ? officers : [];
+    if (rows.length === 0) {
+        wrap.innerHTML = '<div class="mini-bar-empty">No assigned officer.</div>';
+        return;
+    }
+
+    wrap.innerHTML = rows.map((row) => `
+        <div class="stack-item">
+            <div class="stack-item-head">
+                <strong>${sdEscape(row.name || "No assigned officer")}</strong>
+                <span>${sdEscape(row.role || "Officer")}</span>
+            </div>
+            <div class="stack-meta">${sdEscape(row.email || "-")}</div>
+        </div>
+    `).join("");
+}
+
 async function loadStoreDetails() {
     const root = document.querySelector("[data-store-id]");
     if (!root) return;
@@ -44,6 +96,13 @@ async function loadStoreDetails() {
     document.getElementById("sd-sales-total").textContent = sdMoney(summary.sales_total || 0);
     document.getElementById("sd-product-count").textContent = String(summary.product_count || 0);
     document.getElementById("sd-stock-units").textContent = String(summary.stock_units || 0);
+    document.getElementById("sd-today-sales").textContent = sdMoney(summary.today_sales_total || 0);
+    document.getElementById("sd-debt-txns").textContent = String(summary.today_debt_txn_count || 0);
+    document.getElementById("sd-active-products").textContent = String(summary.active_products || 0);
+    document.getElementById("sd-low-stock").textContent = String(summary.low_stock_count || 0);
+
+    sdRenderDaySession(data.day_session || null);
+    sdRenderOfficers(data.officers || []);
 
     const inventory = Array.isArray(data.inventory) ? data.inventory : [];
     const inventoryBody = document.getElementById("sd-inventory-body");
@@ -61,7 +120,10 @@ async function loadStoreDetails() {
                         <span>${sdEscape(row.name)}</span>
                     </div>
                 </td>
-                <td>${Number(row.stock_qty || 0)}</td>
+                <td>
+                    ${Number(row.stock_qty || 0)}
+                    ${Number(row.stock_qty || 0) <= Number(row.low_stock_threshold ?? 10) && row.is_active ? '<span class="table-chip status-warning">Low</span>' : ""}
+                </td>
                 <td>${sdEscape(sdMoney(row.price || 0))}</td>
             </tr>
         `).join("");

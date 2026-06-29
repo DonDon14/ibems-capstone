@@ -20,12 +20,33 @@
             <p id="ad-health-message">Loading operations status...</p>
             <p id="ad-health-breakdown" class="dash-health-breakdown"></p>
         </article>
-        <article class="dash-panel">
+        <article class="dash-panel admin-quick-panel">
             <h4><i class="bi bi-lightning-charge"></i> Quick Access</h4>
-            <div class="quick-links">
-                <a href="/admin/stores"><i class="bi bi-shop"></i>Manage Stores & POS</a>
-                <a href="/admin/accounting-debts"><i class="bi bi-wallet2"></i>Review Accounting Debts</a>
-                <a href="/admin/user-view"><i class="bi bi-people"></i>Manage Users</a>
+            <div class="quick-links admin-quick-links">
+                <a href="<?= site_url('admin/stores') ?>">
+                    <span class="quick-link-icon"><i class="bi bi-shop"></i></span>
+                    <span class="quick-link-copy">
+                        <strong>Manage Stores & POS</strong>
+                        <small>Store setup, officer assignment, and POS access</small>
+                    </span>
+                    <i class="bi bi-arrow-right quick-link-arrow"></i>
+                </a>
+                <a href="<?= site_url('admin/accounting-debts') ?>">
+                    <span class="quick-link-icon"><i class="bi bi-wallet2"></i></span>
+                    <span class="quick-link-copy">
+                        <strong>Review Accounting Debts</strong>
+                        <small>Debt accounts, balances, and collection status</small>
+                    </span>
+                    <i class="bi bi-arrow-right quick-link-arrow"></i>
+                </a>
+                <a href="<?= site_url('admin/user-view') ?>">
+                    <span class="quick-link-icon"><i class="bi bi-people"></i></span>
+                    <span class="quick-link-copy">
+                        <strong>Manage Users</strong>
+                        <small>Profiles, roles, salary, and credit limits</small>
+                    </span>
+                    <i class="bi bi-arrow-right quick-link-arrow"></i>
+                </a>
             </div>
         </article>
     </div>

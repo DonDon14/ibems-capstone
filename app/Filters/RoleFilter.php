@@ -34,10 +34,10 @@ class RoleFilter implements FilterInterface
                 ]);
         }
 
-        $userRole = session()->get('role');
-        $availableRoles = (array) (session()->get('available_roles') ?? []);
+        $availableRoles = ibems_refresh_session_roles();
+        $userRole = ibems_current_role();
 
-        if ($userRole === null || trim((string) $userRole) === '') {
+        if ($userRole === null) {
             if (count($availableRoles) > 1) {
                 if ($this->isDocumentRequest($request)) {
                     return redirect()->to('/auth/select-role');
@@ -58,9 +58,11 @@ class RoleFilter implements FilterInterface
             }
         }
 
-        if (!empty($arguments) && !in_array($userRole, $arguments)) {
+        $allowedRoles = array_map(static fn ($role) => ibems_normalize_role((string) $role), (array) $arguments);
+
+        if ($allowedRoles !== [] && !in_array($userRole, $allowedRoles, true)) {
             if ($this->isDocumentRequest($request)) {
-                return redirect()->to('/dashboard');
+                return redirect()->to(ibems_role_landing_path($userRole));
             }
 
             return service('response')

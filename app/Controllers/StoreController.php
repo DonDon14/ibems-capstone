@@ -8,12 +8,204 @@ use App\Models\StoreCategoryModel;
 use App\Models\StorePaymentMethodModel;
 use App\Models\StoreOpeningBalanceModel;
 use App\Models\StoreCashMovementModel;
+use App\Models\StoreDaySessionModel;
 use App\Models\InventoryMovementModel;
 use App\Models\AuditLogModel;
 use Config\Database;
 
 class StoreController extends BaseController
 {
+    public function dashboard()
+    {
+        $role = (string) session()->get('role');
+        $userId = (int) session()->get('user_id');
+        $storeModel = new StoreModel();
+        $stores = $storeModel->getAccessibleStores($userId, $role);
+        $activeStore = $stores[0] ?? null;
+        $storeId = (int) ($activeStore['id'] ?? 0);
+
+        $summary = [
+            'store_count' => count($stores),
+            'today_sales' => 0.0,
+            'today_transactions' => 0,
+            'active_products' => 0,
+            'low_stock' => 0,
+        ];
+        $readiness = [
+            'is_opened' => false,
+            'business_date' => date('Y-m-d'),
+            'opening_balance' => 0.0,
+            'expected_cash_on_hand' => 0.0,
+            'expected_ecash_on_hand' => 0.0,
+            'cash_sales' => 0.0,
+            'ecash_sales' => 0.0,
+            'debt_sales' => 0.0,
+            'cash_in' => 0.0,
+            'cash_out' => 0.0,
+            'ecash_in' => 0.0,
+            'ecash_out' => 0.0,
+        ];
+        $lowStockProducts = [];
+        $recentTransactions = [];
+        $paymentBreakdown = [];
+
+        if ($storeId > 0) {
+            $db = Database::connect();
+            $todayStart = date('Y-m-d 00:00:00');
+            $todayEnd = date('Y-m-d 23:59:59');
+            $todayDate = date('Y-m-d');
+
+            $txn = $db->table('transactions')
+                ->select('COUNT(*) AS txn_count, COALESCE(SUM(amount), 0) AS total_sales')
+                ->where('store_id', $storeId)
+                ->where('created_at >=', $todayStart)
+                ->where('created_at <=', $todayEnd)
+                ->get()
+                ->getRowArray();
+
+            $products = $db->table('products')
+                ->select('COUNT(*) AS active_products, COALESCE(SUM(CASE WHEN stock_qty <= COALESCE(low_stock_threshold, 10) THEN 1 ELSE 0 END), 0) AS low_stock')
+                ->where('store_id', $storeId)
+                ->where('is_active', 1)
+                ->get()
+                ->getRowArray();
+
+            $summary['today_sales'] = (float) ($txn['total_sales'] ?? 0);
+            $summary['today_transactions'] = (int) ($txn['txn_count'] ?? 0);
+            $summary['active_products'] = (int) ($products['active_products'] ?? 0);
+            $summary['low_stock'] = (int) ($products['low_stock'] ?? 0);
+
+            $sessionModel = new StoreDaySessionModel();
+            $daySession = $sessionModel->getByStoreAndDate($storeId, $todayDate);
+            $sessionStartTs = $todayDate . ' 00:00:00';
+
+            $asOfPaymentRows = $db->table('transactions')
+                ->select('payment_method, COUNT(*) AS txn_count, COALESCE(SUM(amount), 0) AS total_sales')
+                ->where('store_id', $storeId)
+                ->where('created_at >=', $sessionStartTs)
+                ->where('created_at <=', $todayEnd)
+                ->groupBy('payment_method')
+                ->orderBy('total_sales', 'DESC')
+                ->get()
+                ->getResultArray();
+
+            $cashSales = 0.0;
+            $ecashSales = 0.0;
+            $debtSales = 0.0;
+            foreach ($asOfPaymentRows as $row) {
+                $method = strtolower((string) ($row['payment_method'] ?? ''));
+                $sales = (float) ($row['total_sales'] ?? 0);
+                if ($method === 'cash') {
+                    $cashSales += $sales;
+                } elseif ($method === 'debt') {
+                    $debtSales += $sales;
+                } else {
+                    $ecashSales += $sales;
+                }
+            }
+
+            $todayPaymentRows = $db->table('transactions')
+                ->select('payment_method, COUNT(*) AS txn_count, COALESCE(SUM(amount), 0) AS total_sales')
+                ->where('store_id', $storeId)
+                ->where('created_at >=', $todayStart)
+                ->where('created_at <=', $todayEnd)
+                ->groupBy('payment_method')
+                ->orderBy('total_sales', 'DESC')
+                ->get()
+                ->getResultArray();
+
+            $paymentBreakdown = array_map(static function (array $row): array {
+                return [
+                    'method' => (string) ($row['payment_method'] ?? 'unknown'),
+                    'transactions' => (int) ($row['txn_count'] ?? 0),
+                    'sales' => (float) ($row['total_sales'] ?? 0),
+                ];
+            }, $todayPaymentRows);
+
+            $movementRows = $db->table('store_cash_movements')
+                ->select('channel, movement_type, COALESCE(SUM(amount), 0) AS total_amount')
+                ->where('store_id', $storeId)
+                ->where('business_date >=', $todayDate)
+                ->where('business_date <=', $todayDate)
+                ->groupBy('channel, movement_type')
+                ->get()
+                ->getResultArray();
+
+            $cashIn = 0.0;
+            $cashOut = 0.0;
+            $ecashIn = 0.0;
+            $ecashOut = 0.0;
+            foreach ($movementRows as $row) {
+                $channel = strtolower((string) ($row['channel'] ?? 'cash'));
+                $type = strtolower((string) ($row['movement_type'] ?? 'cash_in'));
+                $amount = (float) ($row['total_amount'] ?? 0);
+                if ($channel === 'ecash') {
+                    if ($type === 'cash_out') {
+                        $ecashOut += $amount;
+                    } else {
+                        $ecashIn += $amount;
+                    }
+                    continue;
+                }
+
+                if ($type === 'cash_out') {
+                    $cashOut += $amount;
+                } else {
+                    $cashIn += $amount;
+                }
+            }
+
+            $readiness = [
+                'is_opened' => $daySession !== null && (string) ($daySession['status'] ?? '') === 'open',
+                'is_closed' => $daySession !== null && (string) ($daySession['status'] ?? '') === 'closed',
+                'business_date' => $todayDate,
+                'opening_balance' => (float) ($daySession['opening_cash'] ?? 0),
+                'opening_cash' => (float) ($daySession['opening_cash'] ?? 0),
+                'opening_ecash' => (float) ($daySession['opening_ecash'] ?? 0),
+                'expected_cash_on_hand' => (float) ($daySession['opening_cash'] ?? 0) + $cashSales + $cashIn - $cashOut,
+                'expected_ecash_on_hand' => (float) ($daySession['opening_ecash'] ?? 0) + $ecashSales + $ecashIn - $ecashOut,
+                'cash_sales' => $cashSales,
+                'ecash_sales' => $ecashSales,
+                'debt_sales' => $debtSales,
+                'cash_in' => $cashIn,
+                'cash_out' => $cashOut,
+                'ecash_in' => $ecashIn,
+                'ecash_out' => $ecashOut,
+            ];
+
+            $lowStockProducts = $db->table('products')
+                ->select('id, name, sku, category, stock_qty, low_stock_threshold')
+                ->where('store_id', $storeId)
+                ->where('is_active', 1)
+                ->where('stock_qty <= COALESCE(low_stock_threshold, 10)', null, false)
+                ->orderBy('stock_qty', 'ASC')
+                ->orderBy('name', 'ASC')
+                ->limit(5)
+                ->get()
+                ->getResultArray();
+
+            $recentTransactions = $db->table('transactions t')
+                ->select('t.id, t.client_txn_id, t.amount, t.payment_method, t.customer_type, t.created_at, u.name AS customer_name')
+                ->join('users u', 'u.id = t.user_id', 'left')
+                ->where('t.store_id', $storeId)
+                ->orderBy('t.created_at', 'DESC')
+                ->orderBy('t.id', 'DESC')
+                ->limit(5)
+                ->get()
+                ->getResultArray();
+        }
+
+        return view('store/dashboard', [
+            'stores' => $stores,
+            'activeStore' => $activeStore,
+            'summary' => $summary,
+            'readiness' => $readiness,
+            'lowStockProducts' => $lowStockProducts,
+            'recentTransactions' => $recentTransactions,
+            'paymentBreakdown' => $paymentBreakdown,
+        ]);
+    }
+
     public function pos()
     {
         return view('store/pos');
@@ -190,7 +382,6 @@ class StoreController extends BaseController
             ->where('t.created_at <=', $toTs)
             ->groupBy('ti.product_id, p.name, p.sku, p.category')
             ->orderBy('revenue', 'DESC')
-            ->limit(10)
             ->get()
             ->getResultArray();
 
@@ -217,6 +408,8 @@ class StoreController extends BaseController
                 'avg_unit_cost' => $avgCost,
             ];
         }
+
+        $topProducts = array_slice($topProducts, 0, 10);
 
         $trendRows = $db->table('transactions t')
             ->select('DATE(t.created_at) AS sale_date, COUNT(*) AS txn_count, COALESCE(SUM(t.amount), 0) AS total_sales')
@@ -259,12 +452,15 @@ class StoreController extends BaseController
             ];
         }, $paymentRows);
 
-        $openingModel = new StoreOpeningBalanceModel();
         $cashMovementModel = new StoreCashMovementModel();
         $todayDate = $today->format('Y-m-d');
+        $sessionModel = new StoreDaySessionModel();
+        $reportSession = $sessionModel->getByStoreAndDate($storeId, $toDate);
+        $openingModel = new StoreOpeningBalanceModel();
         $initialOpening = $openingModel->getInitialByStore($storeId);
-        $openingBalance = (float) ($initialOpening['opening_balance'] ?? 0);
-        $openingBusinessDate = (string) ($initialOpening['business_date'] ?? $todayDate);
+        $openingBalance = $reportSession ? (float) ($reportSession['opening_cash'] ?? 0) : (float) ($initialOpening['opening_balance'] ?? 0);
+        $openingEcash = $reportSession ? (float) ($reportSession['opening_ecash'] ?? 0) : 0.0;
+        $openingBusinessDate = $reportSession ? (string) ($reportSession['business_date'] ?? $toDate) : (string) ($initialOpening['business_date'] ?? $todayDate);
         $openingFromTs = $openingBusinessDate . ' 00:00:00';
         $cashSalesPeriod = 0.0;
         $eCashSalesPeriod = 0.0;
@@ -371,7 +567,7 @@ class StoreController extends BaseController
         }
 
         $cashOnHandAsOf = $openingBalance + $cashSalesAsOf + $asOfCashIn - $asOfCashOut;
-        $ecashOnHandAsOf = $eCashSalesAsOf + $asOfEcashIn - $asOfEcashOut;
+        $ecashOnHandAsOf = $openingEcash + $eCashSalesAsOf + $asOfEcashIn - $asOfEcashOut;
         $combinedOnHandAsOf = $cashOnHandAsOf + $ecashOnHandAsOf;
 
         $cashMovements = $cashMovementModel->getByStoreAndRange($storeId, $fromDate, $toDate, 200);
@@ -406,6 +602,9 @@ class StoreController extends BaseController
                 'business_date' => $toDate,
                 'opening_business_date' => $openingBusinessDate,
                 'opening_balance' => $openingBalance,
+                'opening_cash' => $openingBalance,
+                'opening_ecash' => $openingEcash,
+                'session_status' => (string) ($reportSession['status'] ?? ''),
                 'cash_sales' => $cashSalesAsOf,
                 'ecash_sales' => $eCashSalesAsOf,
                 'cash_in' => $asOfCashIn,
@@ -453,6 +652,196 @@ class StoreController extends BaseController
             'notes' => [
                 'profit_basis' => 'Estimated using weighted-average restock unit cost per product up to selected period end.',
             ],
+        ]);
+    }
+
+    public function daySessionStatus()
+    {
+        $storeId = (int) ($this->request->getGet('store_id') ?? 0);
+        $store = $this->resolveAccessibleStore($storeId);
+        if (!$store) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'You cannot access this store.',
+            ]);
+        }
+
+        $businessDate = date('Y-m-d');
+        $model = new StoreDaySessionModel();
+        $todaySession = $model->getByStoreAndDate((int) $store['id'], $businessDate);
+        $openSession = $model->getOpenByStore((int) $store['id']);
+        $session = $todaySession ?: $openSession;
+        $expected = $session ? $this->calculateStoreSessionExpected((int) $store['id'], $session) : null;
+        $isCurrentBusinessDate = $session !== null && (string) ($session['business_date'] ?? '') === $businessDate;
+        $isStaleOpen = $session !== null && (string) ($session['status'] ?? '') === 'open' && !$isCurrentBusinessDate;
+        $serializedSession = $session ? $this->serializeStoreDaySession($session, $expected) : null;
+        if ($serializedSession) {
+            $serializedSession['is_current_business_date'] = $isCurrentBusinessDate;
+            $serializedSession['is_stale_open'] = $isStaleOpen;
+        }
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'store_id' => (int) $store['id'],
+            'business_date' => $businessDate,
+            'is_opened' => $session !== null && (string) ($session['status'] ?? '') === 'open' && $isCurrentBusinessDate,
+            'is_closed' => $todaySession !== null && (string) ($todaySession['status'] ?? '') === 'closed',
+            'is_stale_open' => $isStaleOpen,
+            'session' => $serializedSession,
+        ]);
+    }
+
+    public function openDaySession()
+    {
+        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $storeId = (int) ($request['store_id'] ?? 0);
+        $openingCash = (float) ($request['opening_cash'] ?? $request['opening_balance'] ?? 0);
+        $openingEcash = (float) ($request['opening_ecash'] ?? 0);
+        $note = trim((string) ($request['note'] ?? ''));
+        $businessDate = date('Y-m-d');
+
+        if ($openingCash < 0 || $openingEcash < 0) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Opening cash and e-cash must be 0 or greater.',
+            ]);
+        }
+
+        $store = $this->resolveAccessibleStore($storeId);
+        if (!$store) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'You cannot access this store.',
+            ]);
+        }
+
+        $model = new StoreDaySessionModel();
+        $openSession = $model->getOpenByStore((int) $store['id']);
+        if ($openSession && (string) ($openSession['business_date'] ?? '') !== $businessDate) {
+            return $this->response->setStatusCode(409)->setJSON([
+                'status' => 'error',
+                'message' => 'Another store day is still open. Close it before opening today.',
+            ]);
+        }
+
+        $existing = $model->getByStoreAndDate((int) $store['id'], $businessDate);
+        if ($existing && (string) ($existing['status'] ?? '') === 'open') {
+            return $this->response->setStatusCode(409)->setJSON([
+                'status' => 'error',
+                'message' => 'Today is already open for this store.',
+            ]);
+        }
+
+        if ($existing && (string) ($existing['status'] ?? '') === 'closed' && (string) session()->get('role') !== 'ADMIN') {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'Today is already closed. Only admin can reopen it.',
+            ]);
+        }
+
+        $actorId = (int) session()->get('user_id');
+        $session = $model->openDay((int) $store['id'], $businessDate, $openingCash, $openingEcash, $actorId, $note);
+        $expected = $this->calculateStoreSessionExpected((int) $store['id'], $session);
+
+        $auditLogModel = new AuditLogModel();
+        $auditLogModel->insert([
+            'actor_id' => $actorId > 0 ? $actorId : null,
+            'action' => $existing ? 'REOPEN_STORE_DAY_SESSION' : 'OPEN_STORE_DAY_SESSION',
+            'entity' => 'store_day_sessions',
+            'entity_id' => (int) ($session['id'] ?? 0),
+            'payload_json' => json_encode([
+                'store_id' => (int) $store['id'],
+                'business_date' => $businessDate,
+                'opening_cash' => $openingCash,
+                'opening_ecash' => $openingEcash,
+            ]),
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'session' => $this->serializeStoreDaySession($session, $expected),
+        ]);
+    }
+
+    public function closeDaySession()
+    {
+        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $storeId = (int) ($request['store_id'] ?? 0);
+        $countedCash = (float) ($request['counted_cash'] ?? 0);
+        $countedEcash = (float) ($request['counted_ecash'] ?? 0);
+        $note = trim((string) ($request['note'] ?? ''));
+
+        if ($countedCash < 0 || $countedEcash < 0) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Counted cash and e-cash must be 0 or greater.',
+            ]);
+        }
+
+        $store = $this->resolveAccessibleStore($storeId);
+        if (!$store) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'You cannot access this store.',
+            ]);
+        }
+
+        $model = new StoreDaySessionModel();
+        $session = $model->getOpenByStore((int) $store['id']);
+        if (!$session || (string) ($session['status'] ?? '') !== 'open') {
+            return $this->response->setStatusCode(409)->setJSON([
+                'status' => 'error',
+                'message' => 'There is no open day session to close for this store.',
+            ]);
+        }
+        $businessDate = (string) ($session['business_date'] ?? date('Y-m-d'));
+
+        $expected = $this->calculateStoreSessionExpected((int) $store['id'], $session);
+        $expectedCash = (float) ($expected['expected_cash_on_hand'] ?? 0);
+        $expectedEcash = (float) ($expected['expected_ecash_on_hand'] ?? 0);
+        $actorId = (int) session()->get('user_id');
+        $now = date('Y-m-d H:i:s');
+
+        $model->update((int) $session['id'], [
+            'status' => 'closed',
+            'expected_cash' => $expectedCash,
+            'expected_ecash' => $expectedEcash,
+            'counted_cash' => $countedCash,
+            'counted_ecash' => $countedEcash,
+            'variance_cash' => $countedCash - $expectedCash,
+            'variance_ecash' => $countedEcash - $expectedEcash,
+            'closing_note' => $note !== '' ? $note : null,
+            'closed_by' => $actorId > 0 ? $actorId : null,
+            'closed_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $closed = $model->find((int) $session['id']) ?? $session;
+        $closedExpected = $this->calculateStoreSessionExpected((int) $store['id'], $closed);
+
+        $auditLogModel = new AuditLogModel();
+        $auditLogModel->insert([
+            'actor_id' => $actorId > 0 ? $actorId : null,
+            'action' => 'CLOSE_STORE_DAY_SESSION',
+            'entity' => 'store_day_sessions',
+            'entity_id' => (int) $session['id'],
+            'payload_json' => json_encode([
+                'store_id' => (int) $store['id'],
+                'business_date' => $businessDate,
+                'expected_cash' => $expectedCash,
+                'expected_ecash' => $expectedEcash,
+                'counted_cash' => $countedCash,
+                'counted_ecash' => $countedEcash,
+                'variance_cash' => $countedCash - $expectedCash,
+                'variance_ecash' => $countedEcash - $expectedEcash,
+            ]),
+            'created_at' => $now,
+        ]);
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'session' => $this->serializeStoreDaySession($closed, $closedExpected),
         ]);
     }
 
@@ -723,6 +1112,15 @@ class StoreController extends BaseController
             return $this->response->setStatusCode(403)->setJSON([
                 'status' => 'error',
                 'message' => 'You cannot access this store.',
+            ]);
+        }
+
+        $sessionModel = new StoreDaySessionModel();
+        $daySession = $sessionModel->getByStoreAndDate((int) $store['id'], $businessDate);
+        if (!$daySession || (string) ($daySession['status'] ?? '') !== 'open') {
+            return $this->response->setStatusCode(409)->setJSON([
+                'status' => 'error',
+                'message' => 'Cash movements require an open store day for the selected business date.',
             ]);
         }
 
@@ -1712,11 +2110,14 @@ class StoreController extends BaseController
         $name = trim((string) ($request['name'] ?? ''));
         $variantLabel = trim((string) ($request['variant_label'] ?? ''));
         $category = trim((string) ($request['category'] ?? ''));
+        $supplier = trim((string) ($request['supplier'] ?? ''));
         $barcode = trim((string) ($request['barcode'] ?? ''));
         $imageUrl = trim((string) ($request['image_url'] ?? ''));
         $sellPrice = (float) ($request['sell_price'] ?? 0);
         $initialStock = (int) ($request['initial_stock'] ?? 0);
         $unitCost = (float) ($request['unit_cost'] ?? 0);
+        $lowStockThreshold = max(0, (int) ($request['low_stock_threshold'] ?? 10));
+        $locationBin = trim((string) ($request['location_bin'] ?? ($request['location'] ?? '')));
         $reason = trim((string) ($request['reason'] ?? 'Initial stock'));
 
         if ($storeId <= 0 || $sku === '' || $name === '' || $sellPrice < 0 || $initialStock < 0 || $unitCost < 0) {
@@ -1779,10 +2180,13 @@ class StoreController extends BaseController
             'name' => $name,
             'variant_label' => $variantLabel !== '' ? $variantLabel : null,
             'category' => $category,
+            'supplier' => $supplier !== '' ? $supplier : null,
             'image_url' => $imageUrl !== '' ? $imageUrl : null,
             'barcode' => $barcode !== '' ? $barcode : null,
             'price' => $sellPrice,
             'stock_qty' => $initialStock,
+            'low_stock_threshold' => $lowStockThreshold,
+            'location_bin' => $locationBin !== '' ? $locationBin : null,
             'is_active' => 1,
             'updated_at' => date('Y-m-d H:i:s'),
         ]);
@@ -1819,10 +2223,13 @@ class StoreController extends BaseController
                 'name' => $name,
                 'variant_label' => $variantLabel !== '' ? $variantLabel : null,
                 'category' => $category,
+                'supplier' => $supplier !== '' ? $supplier : null,
                 'image_url' => $imageUrl,
                 'barcode' => $barcode !== '' ? $barcode : null,
                 'sell_price' => $sellPrice,
                 'initial_stock' => $initialStock,
+                'low_stock_threshold' => $lowStockThreshold,
+                'location_bin' => $locationBin !== '' ? $locationBin : null,
                 'unit_cost' => $unitCost,
                 'movement_id' => $movementId,
             ]),
@@ -1861,8 +2268,11 @@ class StoreController extends BaseController
         $name = trim((string) ($request['name'] ?? ''));
         $variantLabel = trim((string) ($request['variant_label'] ?? ''));
         $category = trim((string) ($request['category'] ?? ''));
+        $supplier = trim((string) ($request['supplier'] ?? ''));
         $barcode = trim((string) ($request['barcode'] ?? ''));
         $sellPrice = (float) ($request['sell_price'] ?? 0);
+        $lowStockThreshold = max(0, (int) ($request['low_stock_threshold'] ?? ($request['reorder_level'] ?? 10)));
+        $locationBin = trim((string) ($request['location_bin'] ?? ($request['location'] ?? '')));
         $inputImageUrl = trim((string) ($request['image_url'] ?? ''));
 
         if ($storeId <= 0 || $productId <= 0 || $sku === '' || $name === '' || $sellPrice < 0) {
@@ -1938,9 +2348,12 @@ class StoreController extends BaseController
             'name' => $name,
             'variant_label' => $variantLabel !== '' ? $variantLabel : null,
             'category' => $category,
+            'supplier' => $supplier !== '' ? $supplier : null,
             'image_url' => $resolvedImageUrl !== '' ? $resolvedImageUrl : null,
             'barcode' => $barcode !== '' ? $barcode : null,
             'price' => $sellPrice,
+            'low_stock_threshold' => $lowStockThreshold,
+            'location_bin' => $locationBin !== '' ? $locationBin : null,
             'updated_at' => date('Y-m-d H:i:s'),
         ]);
 
@@ -1957,18 +2370,24 @@ class StoreController extends BaseController
                     'name' => $product['name'],
                     'variant_label' => $product['variant_label'] ?? null,
                     'category' => $product['category'],
+                    'supplier' => $product['supplier'] ?? null,
                     'image_url' => $product['image_url'],
                     'barcode' => $product['barcode'] ?? null,
                     'price' => (float) $product['price'],
+                    'low_stock_threshold' => (int) ($product['low_stock_threshold'] ?? 10),
+                    'location_bin' => $product['location_bin'] ?? null,
                 ],
                 'after' => [
                     'sku' => $sku,
                     'name' => $name,
                     'variant_label' => $variantLabel !== '' ? $variantLabel : null,
                     'category' => $category,
+                    'supplier' => $supplier !== '' ? $supplier : null,
                     'image_url' => $resolvedImageUrl,
                     'barcode' => $barcode !== '' ? $barcode : null,
                     'price' => $sellPrice,
+                    'low_stock_threshold' => $lowStockThreshold,
+                    'location_bin' => $locationBin !== '' ? $locationBin : null,
                 ],
             ]),
             'created_at' => date('Y-m-d H:i:s'),
@@ -1986,6 +2405,139 @@ class StoreController extends BaseController
             'status' => 'success',
             'product' => $productModel->find($productId),
         ]);
+    }
+
+    private function serializeStoreDaySession(array $session, ?array $expected = null): array
+    {
+        $expected ??= $this->calculateStoreSessionExpected((int) ($session['store_id'] ?? 0), $session);
+        $openedBy = $session['opened_by'] ?? null;
+        $closedBy = $session['closed_by'] ?? null;
+
+        return [
+            'id' => (int) ($session['id'] ?? 0),
+            'store_id' => (int) ($session['store_id'] ?? 0),
+            'business_date' => (string) ($session['business_date'] ?? date('Y-m-d')),
+            'status' => (string) ($session['status'] ?? 'open'),
+            'opening_cash' => (float) ($session['opening_cash'] ?? 0),
+            'opening_ecash' => (float) ($session['opening_ecash'] ?? 0),
+            'opening_note' => (string) ($session['opening_note'] ?? ''),
+            'opened_by' => $openedBy !== null ? (int) $openedBy : null,
+            'opened_at' => (string) ($session['opened_at'] ?? ''),
+            'expected_cash' => ($session['expected_cash'] ?? null) !== null ? (float) $session['expected_cash'] : (float) ($expected['expected_cash_on_hand'] ?? 0),
+            'expected_ecash' => ($session['expected_ecash'] ?? null) !== null ? (float) $session['expected_ecash'] : (float) ($expected['expected_ecash_on_hand'] ?? 0),
+            'counted_cash' => ($session['counted_cash'] ?? null) !== null ? (float) $session['counted_cash'] : null,
+            'counted_ecash' => ($session['counted_ecash'] ?? null) !== null ? (float) $session['counted_ecash'] : null,
+            'variance_cash' => ($session['variance_cash'] ?? null) !== null ? (float) $session['variance_cash'] : null,
+            'variance_ecash' => ($session['variance_ecash'] ?? null) !== null ? (float) $session['variance_ecash'] : null,
+            'closing_note' => (string) ($session['closing_note'] ?? ''),
+            'closed_by' => $closedBy !== null ? (int) $closedBy : null,
+            'closed_at' => (string) ($session['closed_at'] ?? ''),
+            'cash_sales' => (float) ($expected['cash_sales'] ?? 0),
+            'ecash_sales' => (float) ($expected['ecash_sales'] ?? 0),
+            'debt_sales' => (float) ($expected['debt_sales'] ?? 0),
+            'cash_in' => (float) ($expected['cash_in'] ?? 0),
+            'cash_out' => (float) ($expected['cash_out'] ?? 0),
+            'ecash_in' => (float) ($expected['ecash_in'] ?? 0),
+            'ecash_out' => (float) ($expected['ecash_out'] ?? 0),
+            'expected_cash_on_hand' => (float) ($expected['expected_cash_on_hand'] ?? 0),
+            'expected_ecash_on_hand' => (float) ($expected['expected_ecash_on_hand'] ?? 0),
+            'expected_total_on_hand' => (float) ($expected['expected_total_on_hand'] ?? 0),
+        ];
+    }
+
+    private function calculateStoreSessionExpected(int $storeId, array $session): array
+    {
+        if ($storeId <= 0) {
+            return [
+                'cash_sales' => 0.0,
+                'ecash_sales' => 0.0,
+                'debt_sales' => 0.0,
+                'cash_in' => 0.0,
+                'cash_out' => 0.0,
+                'ecash_in' => 0.0,
+                'ecash_out' => 0.0,
+                'expected_cash_on_hand' => 0.0,
+                'expected_ecash_on_hand' => 0.0,
+                'expected_total_on_hand' => 0.0,
+            ];
+        }
+
+        $businessDate = (string) ($session['business_date'] ?? date('Y-m-d'));
+        $fromTs = $businessDate . ' 00:00:00';
+        $toTs = $businessDate . ' 23:59:59';
+        $db = Database::connect();
+
+        $paymentRows = $db->table('transactions')
+            ->select('payment_method, COALESCE(SUM(amount), 0) AS total_sales')
+            ->where('store_id', $storeId)
+            ->where('created_at >=', $fromTs)
+            ->where('created_at <=', $toTs)
+            ->groupBy('payment_method')
+            ->get()
+            ->getResultArray();
+
+        $cashSales = 0.0;
+        $ecashSales = 0.0;
+        $debtSales = 0.0;
+        foreach ($paymentRows as $row) {
+            $method = strtolower((string) ($row['payment_method'] ?? ''));
+            $sales = (float) ($row['total_sales'] ?? 0);
+            if ($method === 'cash') {
+                $cashSales += $sales;
+            } elseif ($method === 'debt') {
+                $debtSales += $sales;
+            } else {
+                $ecashSales += $sales;
+            }
+        }
+
+        $movementRows = $db->table('store_cash_movements')
+            ->select('channel, movement_type, COALESCE(SUM(amount), 0) AS total_amount')
+            ->where('store_id', $storeId)
+            ->where('business_date', $businessDate)
+            ->groupBy('channel, movement_type')
+            ->get()
+            ->getResultArray();
+
+        $cashIn = 0.0;
+        $cashOut = 0.0;
+        $ecashIn = 0.0;
+        $ecashOut = 0.0;
+        foreach ($movementRows as $row) {
+            $channel = strtolower((string) ($row['channel'] ?? 'cash'));
+            $type = strtolower((string) ($row['movement_type'] ?? 'cash_in'));
+            $amount = (float) ($row['total_amount'] ?? 0);
+            if ($channel === 'ecash') {
+                if ($type === 'cash_out') {
+                    $ecashOut += $amount;
+                } else {
+                    $ecashIn += $amount;
+                }
+                continue;
+            }
+
+            if ($type === 'cash_out') {
+                $cashOut += $amount;
+            } else {
+                $cashIn += $amount;
+            }
+        }
+
+        $expectedCash = (float) ($session['opening_cash'] ?? 0) + $cashSales + $cashIn - $cashOut;
+        $expectedEcash = (float) ($session['opening_ecash'] ?? 0) + $ecashSales + $ecashIn - $ecashOut;
+
+        return [
+            'cash_sales' => $cashSales,
+            'ecash_sales' => $ecashSales,
+            'debt_sales' => $debtSales,
+            'cash_in' => $cashIn,
+            'cash_out' => $cashOut,
+            'ecash_in' => $ecashIn,
+            'ecash_out' => $ecashOut,
+            'expected_cash_on_hand' => $expectedCash,
+            'expected_ecash_on_hand' => $expectedEcash,
+            'expected_total_on_hand' => $expectedCash + $expectedEcash,
+        ];
     }
 
     private function resolveAccessibleStore(int $requestedStoreId = 0): ?array

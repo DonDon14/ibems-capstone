@@ -217,6 +217,47 @@
     gap: 8px;
 }
 
+.acct-debt-status {
+    display: inline-flex;
+    align-items: center;
+    border-radius: 999px;
+    border: 1px solid #cbd5e1;
+    padding: 3px 8px;
+    font-size: 0.72rem;
+    font-weight: 800;
+    line-height: 1;
+    white-space: nowrap;
+}
+
+.acct-debt-status.is-success {
+    border-color: #bbf7d0;
+    background: #ecfdf5;
+    color: #047857;
+}
+
+.acct-debt-status.is-info {
+    border-color: #bfdbfe;
+    background: #eff6ff;
+    color: #1d4ed8;
+}
+
+.acct-debt-status.is-warning {
+    border-color: #fde68a;
+    background: #fffbeb;
+    color: #b45309;
+}
+
+.acct-debt-status.is-danger {
+    border-color: #fecdd3;
+    background: #fff1f2;
+    color: #be123c;
+}
+
+.import-preview-item,
+.invalid-item {
+    line-height: 1.4;
+}
+
 .acct-empty {
     border: 1px dashed #d3deea;
     border-radius: 12px;

@@ -1251,12 +1251,42 @@ class AdminController extends Controller
             ->get()
             ->getRowArray();
 
+        $todayStart = date('Y-m-d 00:00:00');
+        $todayEnd = date('Y-m-d 23:59:59');
+        $todaySummary = $db->table('transactions')
+            ->select('COUNT(*) AS txn_count, COALESCE(SUM(amount), 0) AS sales_total, SUM(CASE WHEN payment_method = "debt" THEN 1 ELSE 0 END) AS debt_txn_count, COALESCE(SUM(CASE WHEN payment_method = "debt" THEN amount ELSE 0 END), 0) AS debt_sales_total')
+            ->where('store_id', $storeId)
+            ->where('created_at >=', $todayStart)
+            ->where('created_at <=', $todayEnd)
+            ->get()
+            ->getRowArray();
+
         $inventory = $db->table('products p')
-            ->select('p.id, p.name, p.stock_qty, p.price, p.image_url')
+            ->select('p.id, p.name, p.stock_qty, p.price, p.image_url, p.is_active, p.low_stock_threshold')
             ->where('p.store_id', $storeId)
             ->orderBy('p.name', 'ASC')
             ->get()
             ->getResultArray();
+
+        $inventorySummary = $db->table('products p')
+            ->select('COUNT(*) AS product_count, COALESCE(SUM(CASE WHEN p.is_active = 1 THEN 1 ELSE 0 END), 0) AS active_products, COALESCE(SUM(CASE WHEN p.is_active = 1 AND p.stock_qty <= COALESCE(p.low_stock_threshold, 10) THEN 1 ELSE 0 END), 0) AS low_stock_count, COALESCE(SUM(p.stock_qty), 0) AS stock_units')
+            ->where('p.store_id', $storeId)
+            ->get()
+            ->getRowArray();
+
+        $daySession = null;
+        if ($db->tableExists('store_day_sessions')) {
+            $daySession = $db->table('store_day_sessions sds')
+                ->select('sds.business_date, sds.status, sds.opening_cash, sds.opening_ecash, sds.opened_at, sds.closed_at, opener.name AS opened_by_name, closer.name AS closed_by_name')
+                ->join('users opener', 'opener.id = sds.opened_by', 'left')
+                ->join('users closer', 'closer.id = sds.closed_by', 'left')
+                ->where('sds.store_id', $storeId)
+                ->orderBy('sds.business_date', 'DESC')
+                ->orderBy('sds.id', 'DESC')
+                ->limit(1)
+                ->get()
+                ->getRowArray();
+        }
 
         $recentTransactions = $db->table('transactions t')
             ->select('t.id, t.created_at, t.payment_method, t.amount, u.name AS customer_name')
@@ -1281,10 +1311,31 @@ class AdminController extends Controller
             'summary' => [
                 'txn_count' => (int) ($summary['txn_count'] ?? 0),
                 'sales_total' => (float) ($summary['sales_total'] ?? 0),
-                'product_count' => count($inventory),
-                'stock_units' => array_reduce($inventory, static function (int $carry, array $row): int {
-                    return $carry + (int) ($row['stock_qty'] ?? 0);
-                }, 0),
+                'product_count' => (int) ($inventorySummary['product_count'] ?? count($inventory)),
+                'stock_units' => (int) ($inventorySummary['stock_units'] ?? 0),
+                'active_products' => (int) ($inventorySummary['active_products'] ?? 0),
+                'low_stock_count' => (int) ($inventorySummary['low_stock_count'] ?? 0),
+                'today_txn_count' => (int) ($todaySummary['txn_count'] ?? 0),
+                'today_sales_total' => (float) ($todaySummary['sales_total'] ?? 0),
+                'today_debt_txn_count' => (int) ($todaySummary['debt_txn_count'] ?? 0),
+                'today_debt_sales_total' => (float) ($todaySummary['debt_sales_total'] ?? 0),
+            ],
+            'day_session' => $daySession ? [
+                'business_date' => (string) ($daySession['business_date'] ?? ''),
+                'status' => (string) ($daySession['status'] ?? ''),
+                'opening_cash' => (float) ($daySession['opening_cash'] ?? 0),
+                'opening_ecash' => (float) ($daySession['opening_ecash'] ?? 0),
+                'opened_at' => $daySession['opened_at'] ?? null,
+                'closed_at' => $daySession['closed_at'] ?? null,
+                'opened_by_name' => $daySession['opened_by_name'] ?: null,
+                'closed_by_name' => $daySession['closed_by_name'] ?: null,
+            ] : null,
+            'officers' => [
+                [
+                    'name' => $store['officer_name'] ?: 'No assigned officer',
+                    'email' => $store['officer_email'] ?: null,
+                    'role' => 'Primary Store Officer',
+                ],
             ],
             'inventory' => array_map(static function (array $row): array {
                 return [
@@ -1293,6 +1344,8 @@ class AdminController extends Controller
                     'stock_qty' => (int) ($row['stock_qty'] ?? 0),
                     'price' => (float) ($row['price'] ?? 0),
                     'image_url' => $row['image_url'] ?? null,
+                    'is_active' => (int) ($row['is_active'] ?? 0) === 1,
+                    'low_stock_threshold' => (int) ($row['low_stock_threshold'] ?? 10),
                 ];
             }, $inventory),
             'recent_transactions' => array_map(static function (array $row): array {

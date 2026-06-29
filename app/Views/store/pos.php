@@ -11,7 +11,7 @@
     <div class="pos-left panel">
         <header class="pos-toolbar">
             <div class="search-wrap">
-                <input id="product-search" type="search" placeholder="Search products by name or SKU">
+                <input id="product-search" type="search" placeholder="Search product, SKU, barcode, supplier, or bin">
             </div>
         </header>
 
@@ -26,15 +26,22 @@
 
     <aside class="pos-right panel">
         <h4><i class="bi bi-cart3"></i> Current Order</h4>
-        <div class="opening-balance-banner" id="opening-balance-banner">
+        <div class="opening-balance-banner is-checking" id="opening-balance-banner">
             <div class="opening-balance-info">
-                <span class="label"><i class="bi bi-safe2"></i> Initial Opening Balance</span>
+                <span class="label"><i class="bi bi-safe2"></i> POS Readiness</span>
+                <span class="opening-status-pill" id="opening-balance-status">Checking</span>
                 <strong id="opening-balance-display">Not set</strong>
-                <small id="opening-balance-date">Set this once per store</small>
+                <small id="opening-balance-date">Checking store day status...</small>
+                <small id="opening-balance-guidance">Transactions stay locked until today&apos;s store day is open.</small>
             </div>
-            <button id="opening-balance-open-btn" type="button" class="scan-btn">
-                <i class="bi bi-pencil-square"></i> Set Initial Opening
-            </button>
+            <div class="opening-balance-actions">
+                <button id="opening-balance-open-btn" type="button" class="scan-btn">
+                    <i class="bi bi-pencil-square"></i> Open Store Day
+                </button>
+                <button id="store-day-close-btn" type="button" class="scan-btn is-hidden">
+                    <i class="bi bi-door-closed"></i> Close Day
+                </button>
+            </div>
         </div>
 
         <div class="scan-quick-wrap">
@@ -88,6 +95,7 @@
 
         <button id="submit-transaction" class="primary-btn" type="button"><i class="bi bi-check2-circle"></i> Complete Transaction</button>
         <p id="result" class="result-msg"></p>
+        <div id="pos-success-strip" class="pos-success-strip is-hidden"></div>
     </aside>
 </section>
 
@@ -133,7 +141,9 @@
         <div id="receipt-content"></div>
 
         <div class="receipt-actions">
-            <button id="receipt-print" type="button" class="primary-btn">Print Receipt</button>
+            <button id="receipt-new" type="button" class="scan-btn"><i class="bi bi-plus-circle"></i> New Transaction</button>
+            <button id="receipt-view" type="button" class="scan-btn"><i class="bi bi-box-arrow-up-right"></i> View Receipt</button>
+            <button id="receipt-print" type="button" class="primary-btn"><i class="bi bi-printer"></i> Print Receipt</button>
         </div>
     </div>
 </div>
@@ -141,12 +151,17 @@
 <div id="opening-balance-modal" class="receipt-modal is-hidden">
     <div class="receipt-card confirm-card">
         <div class="receipt-head">
-            <h3 id="opening-balance-title"><i class="bi bi-safe2"></i> Set Initial Opening Balance</h3>
+            <h3 id="opening-balance-title"><i class="bi bi-safe2"></i> Open Store Day</h3>
+            <button id="opening-balance-close" type="button" class="receipt-close">&times;</button>
         </div>
-        <p id="opening-balance-description" class="scanner-status">Set this once when the store is first activated. Use cash in/out for adjustments after this.</p>
+        <p id="opening-balance-description" class="scanner-status">Enter today&apos;s starting cash and e-cash before accepting POS transactions.</p>
         <div class="payment-wrap">
-            <label id="opening-balance-label" for="opening-balance-input">Initial Opening Balance</label>
+            <label id="opening-balance-label" for="opening-balance-input">Opening Cash</label>
             <input id="opening-balance-input" type="number" min="0" step="0.01" value="0">
+        </div>
+        <div class="payment-wrap">
+            <label for="opening-ecash-input">Opening E-Cash</label>
+            <input id="opening-ecash-input" type="number" min="0" step="0.01" value="0">
         </div>
         <div class="payment-wrap">
             <label for="opening-balance-note">Note (optional)</label>
@@ -154,7 +169,35 @@
         </div>
         <p id="opening-balance-result" class="result-msg"></p>
         <div class="confirm-actions">
-            <button id="opening-balance-save" type="button" class="primary-btn"><i class="bi bi-check2-circle"></i> Save Initial Opening</button>
+            <button id="opening-balance-cancel" type="button" class="scan-btn">Later</button>
+            <button id="opening-balance-save" type="button" class="primary-btn"><i class="bi bi-check2-circle"></i> Open Store Day</button>
+        </div>
+    </div>
+</div>
+
+<div id="store-day-close-modal" class="receipt-modal is-hidden">
+    <div class="receipt-card confirm-card">
+        <div class="receipt-head">
+            <h3><i class="bi bi-door-closed"></i> Close Store Day</h3>
+            <button id="store-day-close-x" type="button" class="receipt-close">&times;</button>
+        </div>
+        <p id="store-day-close-summary" class="scanner-status">Review expected cash and enter counted totals.</p>
+        <div class="payment-wrap">
+            <label for="closing-cash-input">Counted Cash</label>
+            <input id="closing-cash-input" type="number" min="0" step="0.01" value="0">
+        </div>
+        <div class="payment-wrap">
+            <label for="closing-ecash-input">Counted E-Cash</label>
+            <input id="closing-ecash-input" type="number" min="0" step="0.01" value="0">
+        </div>
+        <div class="payment-wrap">
+            <label for="closing-note-input">Closing Note (optional)</label>
+            <input id="closing-note-input" type="text" placeholder="e.g. Cash count verified">
+        </div>
+        <p id="store-day-close-result" class="result-msg"></p>
+        <div class="confirm-actions">
+            <button id="store-day-close-cancel" type="button" class="scan-btn">Cancel</button>
+            <button id="store-day-close-save" type="button" class="primary-btn"><i class="bi bi-check2-circle"></i> Close Store Day</button>
         </div>
     </div>
 </div>

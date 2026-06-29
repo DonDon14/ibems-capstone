@@ -24,6 +24,12 @@ function hDateTime(value) {
     return new Date(value).toLocaleString();
 }
 
+function hPaymentLabel(method) {
+    const key = String(method || "").toLowerCase();
+    if (key === "gcash") return "GCash";
+    return key.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 function setHistoryResult(message, type) {
     const el = document.getElementById("history-result");
     el.textContent = message || "";
@@ -44,7 +50,7 @@ function renderTransactions(transactions) {
     const body = document.getElementById("history-body");
 
     if (!Array.isArray(transactions) || transactions.length === 0) {
-        body.innerHTML = '<tr><td colspan="5">No transactions found.</td></tr>';
+        body.innerHTML = '<tr><td colspan="6">No transactions found.</td></tr>';
         renderSummary([]);
         return;
     }
@@ -54,10 +60,16 @@ function renderTransactions(transactions) {
             (txn) => `
             <tr class="history-row-clickable table-row-clickable" data-txn-id="${txn.id}">
                 <td>${txn.id}</td>
-                <td>${hEscape(hDateTime(txn.created_at))}</td>
-                <td>${hEscape(txn.customer_name)}</td>
-                <td>${hEscape(String(txn.payment_method).toUpperCase())}</td>
-                <td>${hEscape(hMoney(txn.amount))}</td>
+                <td><span class="history-date">${hEscape(hDateTime(txn.created_at))}</span><small>${hEscape(txn.client_txn_id || "")}</small></td>
+                <td><strong>${hEscape(txn.customer_name)}</strong><small>${hEscape(hPaymentLabel(txn.customer_type || ""))}</small></td>
+                <td><span class="history-payment-pill payment-${hEscape(String(txn.payment_method || "").toLowerCase())}">${hEscape(hPaymentLabel(txn.payment_method))}</span></td>
+                <td><strong class="history-amount">${hEscape(hMoney(txn.amount))}</strong></td>
+                <td>
+                    <div class="history-row-actions">
+                        <button type="button" data-history-action="view" data-txn-id="${txn.id}"><i class="bi bi-eye"></i> View</button>
+                        <button type="button" data-history-action="print" data-txn-id="${txn.id}"><i class="bi bi-printer"></i> Print</button>
+                    </div>
+                </td>
             </tr>
         `
         )
@@ -80,7 +92,7 @@ async function loadStores() {
 
 async function loadTransactions() {
     const body = document.getElementById("history-body");
-    body.innerHTML = '<tr><td colspan="5">Loading transactions...</td></tr>';
+    body.innerHTML = '<tr><td colspan="6">Loading transactions...</td></tr>';
 
     const params = new URLSearchParams({
         store_id: String(historyActiveStoreId),
@@ -149,6 +161,11 @@ function printReceipt() {
     }
 }
 
+async function printReceiptById(transactionId) {
+    await openReceipt(transactionId);
+    printReceipt();
+}
+
 document.getElementById("history-apply-filters").addEventListener("click", async () => {
     historyFilters.dateFrom = document.getElementById("history-date-from").value || "";
     historyFilters.dateTo = document.getElementById("history-date-to").value || "";
@@ -170,6 +187,19 @@ document.getElementById("history-clear-filters").addEventListener("click", async
 });
 
 document.getElementById("history-body").addEventListener("click", async (event) => {
+    const actionBtn = event.target.closest("[data-history-action]");
+    if (actionBtn) {
+        event.stopPropagation();
+        const transactionId = Number(actionBtn.dataset.txnId || 0);
+        if (!transactionId) return;
+        if (actionBtn.dataset.historyAction === "print") {
+            await printReceiptById(transactionId);
+            return;
+        }
+        await openReceipt(transactionId);
+        return;
+    }
+
     const row = event.target.closest("[data-txn-id]");
     if (!row) return;
     await openReceipt(Number(row.dataset.txnId));
@@ -177,6 +207,10 @@ document.getElementById("history-body").addEventListener("click", async (event) 
 
 document.getElementById("history-receipt-close").addEventListener("click", closeReceipt);
 document.getElementById("history-receipt-print").addEventListener("click", printReceipt);
+document.getElementById("history-receipt-view").addEventListener("click", () => {
+    if (!selectedReceipt?.lookupUrl) return;
+    window.open(selectedReceipt.lookupUrl, "_blank", "noopener");
+});
 document.getElementById("history-receipt-modal").addEventListener("click", (event) => {
     if (event.target.id === "history-receipt-modal") {
         closeReceipt();

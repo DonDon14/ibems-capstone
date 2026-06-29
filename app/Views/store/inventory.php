@@ -20,25 +20,63 @@
     <article class="inventory-card">
         <div class="inventory-list-head">
             <h4>Products</h4>
-            <input id="inventory-search" type="search" placeholder="Search product name or SKU">
+            <div class="inventory-filter-controls">
+                <input id="inventory-search" type="search" placeholder="Search product, SKU, barcode, supplier, or bin">
+                <select id="inventory-category-filter" aria-label="Filter by category">
+                    <option value="">All Categories</option>
+                </select>
+                <select id="inventory-stock-filter" aria-label="Filter by stock status">
+                    <option value="">All Stock</option>
+                    <option value="in">In Stock</option>
+                    <option value="low">Low Stock</option>
+                    <option value="out">Out of Stock</option>
+                </select>
+                <button id="inventory-clear-filters" class="secondary-btn" type="button">Clear</button>
+            </div>
+        </div>
+        <div id="inventory-stock-summary" class="inventory-stock-summary" aria-live="polite">
+            <div class="inventory-summary-pill">
+                <span>Products</span>
+                <strong>Loading...</strong>
+            </div>
         </div>
         <div class="inventory-table-wrap">
             <table class="table">
                 <thead>
                     <tr>
-                        <th>Image</th>
-                        <th>SKU</th>
                         <th>Product</th>
-                        <th>Variant</th>
                         <th>Category</th>
                         <th>Price</th>
-                        <th>Current Stock</th>
+                        <th>Stock Status</th>
+                        <th>Action</th>
                     </tr>
                 </thead>
                 <tbody id="inventory-product-body">
-                    <tr><td colspan="7">Loading products...</td></tr>
+                    <tr><td colspan="5">Loading products...</td></tr>
                 </tbody>
             </table>
+        </div>
+    </article>
+
+    <article class="inventory-card">
+        <div class="inventory-list-head">
+            <div>
+                <h4>Recent Stock Activity</h4>
+                <p class="inventory-card-subtitle">Latest stock-in, adjustment, and sale movements for the selected store.</p>
+            </div>
+            <div class="inventory-movement-controls">
+                <label for="inventory-movement-type">Activity Type</label>
+                <select id="inventory-movement-type">
+                    <option value="">All Activity</option>
+                    <option value="restock">Stock In</option>
+                    <option value="adjustment">Adjustments</option>
+                    <option value="sale">Sales</option>
+                </select>
+                <button id="refresh-inventory-movements" class="secondary-btn" type="button">Refresh</button>
+            </div>
+        </div>
+        <div id="inventory-movement-list" class="inventory-movement-list">
+            <div class="inventory-movement-empty">Loading stock activity...</div>
         </div>
     </article>
 
@@ -146,9 +184,22 @@
                         <input id="new-product-low-stock" type="number" min="0" step="1" value="0">
                         <small class="field-help">Threshold to trigger low stock alerts.</small>
                     </div>
+                    <div class="field field-wide">
+                        <label for="new-product-reason">Initial Stock Reason</label>
+                        <input id="new-product-reason" type="text" value="Initial stock">
+                    </div>
                 </div>
             </div>
 
+            <div class="create-product-section section-review">
+                <h5>Creation Readiness</h5>
+                <div id="new-product-readiness" class="create-readiness">
+                    <div class="readiness-item is-pending">
+                        <span></span>
+                        <strong>Complete required product details.</strong>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <div class="inv-modal-actions">
@@ -161,7 +212,7 @@
 <div id="inventory-product-action-modal" class="inv-modal is-hidden">
     <div class="inv-modal-card">
         <div class="inv-modal-head">
-            <h4>Product Actions</h4>
+            <h4>Manage Product</h4>
             <button id="close-product-action-modal" type="button" class="inv-modal-close">x</button>
         </div>
 
@@ -186,12 +237,24 @@
                     <strong id="product-view-category">-</strong>
                 </div>
                 <div class="detail-item">
+                    <span>Supplier</span>
+                    <strong id="product-view-supplier">-</strong>
+                </div>
+                <div class="detail-item">
+                    <span>Location/Bin</span>
+                    <strong id="product-view-location">-</strong>
+                </div>
+                <div class="detail-item">
                     <span>Barcode</span>
                     <strong id="product-view-barcode">-</strong>
                 </div>
                 <div class="detail-item">
                     <span>Price</span>
                     <strong id="product-view-price">PHP 0.00</strong>
+                </div>
+                <div class="detail-item">
+                    <span>Low Stock Threshold</span>
+                    <strong id="product-view-low-stock">10</strong>
                 </div>
                 <div class="detail-item detail-item-wide">
                     <span>Image</span>
@@ -218,8 +281,20 @@
                         <select id="modal-product-category"></select>
                     </div>
                     <div class="field">
+                        <label for="modal-product-supplier">Supplier (optional)</label>
+                        <input id="modal-product-supplier" type="text" placeholder="Supplier name">
+                    </div>
+                    <div class="field">
+                        <label for="modal-product-location">Location/Bin (optional)</label>
+                        <input id="modal-product-location" type="text" placeholder="e.g. Aisle 3, Bin 12">
+                    </div>
+                    <div class="field">
                         <label for="modal-product-price">Sell Price</label>
                         <input id="modal-product-price" type="number" min="0" step="0.01" value="0">
+                    </div>
+                    <div class="field">
+                        <label for="modal-product-low-stock">Low Stock Threshold</label>
+                        <input id="modal-product-low-stock" type="number" min="0" step="1" value="10">
                     </div>
                     <div class="field">
                         <label for="modal-product-image-source">Product Image Source</label>
@@ -257,6 +332,20 @@
                     <div class="field">
                         <label for="modal-stock-reason">Reason</label>
                         <input id="modal-stock-reason" type="text" value="Physical count adjustment">
+                    </div>
+                </div>
+                <div id="modal-adjust-preview" class="adjust-preview">
+                    <div>
+                        <span>Current</span>
+                        <strong id="modal-adjust-current">0</strong>
+                    </div>
+                    <div>
+                        <span>Target</span>
+                        <strong id="modal-adjust-target">0</strong>
+                    </div>
+                    <div>
+                        <span>Difference</span>
+                        <strong id="modal-adjust-diff">No change</strong>
                     </div>
                 </div>
             </div>

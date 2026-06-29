@@ -8,7 +8,7 @@ use CodeIgniter\Router\RouteCollection;
 $routes->get('/', 'PageController::login');
 
 $routes->post('auth/login', 'AuthController::login');
-$routes->get('auth/logout', 'AuthController::logout');
+$routes->post('auth/logout', 'AuthController::logout');
 $routes->get('auth/me', 'AuthController::me');
 $routes->get('auth/select-role', 'AuthController::selectRolePage');
 $routes->post('auth/select-role', 'AuthController::selectRole');
@@ -44,6 +44,7 @@ $routes->post('admin/stores/update', 'AdminController::updateStore', ['filter' =
 $routes->post('admin/stores/toggle-status', 'AdminController::toggleStoreStatus', ['filter' => 'role:ADMIN']);
 
 $routes->get('store/pos', 'StoreController::pos', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
+$routes->get('store/dashboard', 'StoreController::dashboard', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
 $routes->get('store/history', 'StoreController::history', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
 $routes->get('store/inventory', 'StoreController::inventory', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
 $routes->get('store/reports', 'StoreController::reports', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
@@ -59,6 +60,9 @@ $routes->get('store/payment-methods', 'StoreController::paymentMethods', ['filte
 $routes->post('store/payment-methods/create', 'StoreController::createPaymentMethod', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
 $routes->post('store/payment-methods/update', 'StoreController::updatePaymentMethod', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
 $routes->post('store/payment-methods/delete', 'StoreController::deletePaymentMethod', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
+$routes->get('store/day-session/status', 'StoreController::daySessionStatus', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
+$routes->post('store/day-session/open', 'StoreController::openDaySession', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
+$routes->post('store/day-session/close', 'StoreController::closeDaySession', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
 $routes->get('store/opening-balance/status', 'StoreController::openingBalanceStatus', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
 $routes->post('store/opening-balance/set', 'StoreController::setOpeningBalance', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
 $routes->post('store/opening-balance/reset', 'StoreController::resetOpeningBalance', ['filter' => 'role:ADMIN']);
@@ -96,6 +100,7 @@ $routes->get('accounting/settlement/preview', 'AccountingController::settlementP
 $routes->post('accounting/settlement/apply', 'AccountingController::applySettlementRun', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
 $routes->get('accounting/settlement/runs', 'AccountingController::settlementRuns', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
 $routes->get('accounting/settlement/runs/(:num)', 'AccountingController::settlementRunDetails/$1', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
+$routes->post('accounting/debts/preview-csv', 'AccountingController::previewImportCsv', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
 $routes->post('accounting/debts/import-csv', 'AccountingController::importCsv', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
 $routes->post('accounting/debts/deduct', 'AccountingController::deductDebt', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
 $routes->post('accounting/debts/deduct-full', 'AccountingController::deductFullDebt', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
