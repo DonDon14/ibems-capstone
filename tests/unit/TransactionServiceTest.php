@@ -20,47 +20,10 @@ final class TransactionServiceTest extends CIUnitTestCase
         $db = Database::connect();
         $now = date('Y-m-d H:i:s');
 
-        $db->table('stores')->insert([
-            'id' => 1,
-            'store_name' => 'Test Store',
-            'officer_id' => 7,
-            'is_active' => 1,
-            'created_at' => $now,
-        ]);
-
-        $db->table('store_opening_balances')->insert([
-            'store_id' => 1,
-            'business_date' => date('Y-m-d'),
-            'opening_balance' => 1000,
-            'note' => 'Initial',
-            'opened_by' => 7,
-            'opened_at' => $now,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
-
-        $db->table('store_payment_methods')->insert([
-            'store_id' => 1,
-            'code' => 'cash',
-            'label' => 'Cash',
-            'icon_class' => 'bi bi-cash',
-            'sort_order' => 10,
-            'is_active' => 1,
-            'is_system_reserved' => 0,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
-
-        $db->table('products')->insert([
-            'id' => 101,
-            'store_id' => 1,
-            'sku' => 'SKU-101',
-            'name' => 'Coffee',
-            'price' => 50,
-            'stock_qty' => 3,
-            'is_active' => 1,
-            'updated_at' => $now,
-        ]);
+        $this->seedStore($now);
+        $this->seedOpenStoreDay($now);
+        $this->seedPaymentMethod('cash', true, $now);
+        $this->seedProduct(101, 3, 50, $now);
 
         $service = new TransactionService();
         $result = $service->createTransaction([
@@ -96,47 +59,10 @@ final class TransactionServiceTest extends CIUnitTestCase
         $db = Database::connect();
         $now = date('Y-m-d H:i:s');
 
-        $db->table('stores')->insert([
-            'id' => 1,
-            'store_name' => 'Test Store',
-            'officer_id' => 7,
-            'is_active' => 1,
-            'created_at' => $now,
-        ]);
-
-        $db->table('store_opening_balances')->insert([
-            'store_id' => 1,
-            'business_date' => date('Y-m-d'),
-            'opening_balance' => 1000,
-            'note' => 'Initial',
-            'opened_by' => 7,
-            'opened_at' => $now,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
-
-        $db->table('store_payment_methods')->insert([
-            'store_id' => 1,
-            'code' => 'cash',
-            'label' => 'Cash',
-            'icon_class' => 'bi bi-cash',
-            'sort_order' => 10,
-            'is_active' => 1,
-            'is_system_reserved' => 0,
-            'created_at' => $now,
-            'updated_at' => $now,
-        ]);
-
-        $db->table('products')->insert([
-            'id' => 101,
-            'store_id' => 1,
-            'sku' => 'SKU-101',
-            'name' => 'Coffee',
-            'price' => 50,
-            'stock_qty' => 1,
-            'is_active' => 1,
-            'updated_at' => $now,
-        ]);
+        $this->seedStore($now);
+        $this->seedOpenStoreDay($now);
+        $this->seedPaymentMethod('cash', true, $now);
+        $this->seedProduct(101, 1, 50, $now);
 
         $service = new TransactionService();
         $result = $service->createTransaction([
@@ -160,6 +86,193 @@ final class TransactionServiceTest extends CIUnitTestCase
         $this->assertSame(1, (int) ($product['stock_qty'] ?? 0));
     }
 
+    public function testDisabledPaymentMethodIsRejectedBeforeWritingTransaction(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+
+        $this->seedStore($now);
+        $this->seedOpenStoreDay($now);
+        $this->seedPaymentMethod('cash', false, $now);
+        $this->seedProduct(101, 3, 50, $now);
+
+        $service = new TransactionService();
+        $result = $service->createTransaction([
+            'store_id' => 1,
+            'payment_method' => 'cash',
+            'customer_type' => 'walk_in',
+            'items' => [
+                ['product_id' => 101, 'qty' => 1],
+            ],
+        ], 7, 'STORE_SYSTEM');
+
+        $this->assertSame('error', $result['status']);
+        $this->assertSame('Invalid or disabled payment method.', $result['message']);
+        $this->assertSame(0, $db->table('transactions')->countAllResults());
+    }
+
+    public function testClosedStoreDayRejectsTransaction(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+
+        $this->seedStore($now);
+        $this->seedPaymentMethod('cash', true, $now);
+        $this->seedProduct(101, 3, 50, $now);
+
+        $service = new TransactionService();
+        $result = $service->createTransaction([
+            'store_id' => 1,
+            'payment_method' => 'cash',
+            'customer_type' => 'walk_in',
+            'items' => [
+                ['product_id' => 101, 'qty' => 1],
+            ],
+        ], 7, 'STORE_SYSTEM');
+
+        $this->assertSame('error', $result['status']);
+        $this->assertStringContainsString('Store day is not open', (string) $result['message']);
+        $this->assertSame(0, $db->table('transactions')->countAllResults());
+    }
+
+    public function testDebtPaymentRejectsInvalidCustomerType(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+
+        $this->seedStore($now);
+        $this->seedOpenStoreDay($now);
+        $this->seedPaymentMethod('debt', true, $now);
+        $this->seedProduct(101, 3, 50, $now);
+        $this->seedDebtCustomer(501, 'student', 500, 0, '1234', $now);
+
+        $service = new TransactionService();
+        $result = $service->createTransaction([
+            'store_id' => 1,
+            'payment_method' => 'debt',
+            'customer_user_id' => 501,
+            'debt_pin' => '1234',
+            'items' => [
+                ['product_id' => 101, 'qty' => 1],
+            ],
+        ], 7, 'STORE_SYSTEM');
+
+        $this->assertSame('error', $result['status']);
+        $this->assertSame('Only faculty/staff can use debt payment.', $result['message']);
+        $this->assertSame(0, $db->table('transactions')->countAllResults());
+    }
+
+    public function testDebtPaymentRejectsInsufficientCredit(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+
+        $this->seedStore($now);
+        $this->seedOpenStoreDay($now);
+        $this->seedPaymentMethod('debt', true, $now);
+        $this->seedProduct(101, 3, 50, $now);
+        $this->seedDebtCustomer(501, 'faculty', 100, 75, '1234', $now);
+
+        $service = new TransactionService();
+        $result = $service->createTransaction([
+            'store_id' => 1,
+            'payment_method' => 'debt',
+            'customer_user_id' => 501,
+            'debt_pin' => '1234',
+            'items' => [
+                ['product_id' => 101, 'qty' => 1],
+            ],
+        ], 7, 'STORE_SYSTEM');
+
+        $this->assertSame('error', $result['status']);
+        $this->assertSame('Insufficient credit.', $result['message']);
+        $this->assertSame(0, $db->table('transactions')->countAllResults());
+
+        $balance = $db->table('balances')->where('user_id', 501)->get()->getRowArray();
+        $this->assertSame(75.0, (float) ($balance['current_debt'] ?? 0));
+    }
+
+    private function seedStore(string $now): void
+    {
+        Database::connect()->table('stores')->insert([
+            'id' => 1,
+            'store_name' => 'Test Store',
+            'officer_id' => 7,
+            'is_active' => 1,
+            'created_at' => $now,
+        ]);
+    }
+
+    private function seedOpenStoreDay(string $now): void
+    {
+        Database::connect()->table('store_day_sessions')->insert([
+            'store_id' => 1,
+            'business_date' => date('Y-m-d'),
+            'status' => 'open',
+            'opening_cash' => 1000,
+            'opening_ecash' => 500,
+            'opening_note' => 'Test open day',
+            'opened_by' => 7,
+            'opened_at' => $now,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+    }
+
+    private function seedPaymentMethod(string $code, bool $isActive, string $now): void
+    {
+        Database::connect()->table('store_payment_methods')->insert([
+            'store_id' => 1,
+            'code' => $code,
+            'label' => ucfirst(str_replace('_', ' ', $code)),
+            'icon_class' => 'bi bi-cash',
+            'sort_order' => 10,
+            'is_active' => $isActive ? 1 : 0,
+            'is_system_reserved' => $code === 'debt' ? 1 : 0,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+    }
+
+    private function seedProduct(int $id, int $stockQty, float $price, string $now): void
+    {
+        Database::connect()->table('products')->insert([
+            'id' => $id,
+            'store_id' => 1,
+            'sku' => 'SKU-' . $id,
+            'name' => 'Coffee',
+            'price' => $price,
+            'stock_qty' => $stockQty,
+            'is_active' => 1,
+            'updated_at' => $now,
+        ]);
+    }
+
+    private function seedDebtCustomer(int $userId, string $userType, float $creditLimit, float $currentDebt, string $pin, string $now): void
+    {
+        $db = Database::connect();
+        $db->table('users')->insert([
+            'id' => $userId,
+            'employee_id' => 'EMP-' . $userId,
+            'name' => 'Debt Customer',
+            'email' => 'debt' . $userId . '@example.test',
+            'password_hash' => password_hash('123456', PASSWORD_BCRYPT),
+            'debt_pin_hash' => password_hash($pin, PASSWORD_BCRYPT),
+            'role' => 'USER',
+            'user_type' => $userType,
+            'base_salary' => 0,
+            'is_active' => 1,
+            'created_at' => $now,
+        ]);
+
+        $db->table('balances')->insert([
+            'user_id' => $userId,
+            'credit_limit' => $creditLimit,
+            'current_debt' => $currentDebt,
+            'updated_at' => $now,
+        ]);
+    }
+
     private function resetSchema(): void
     {
         $db = Database::connect();
@@ -172,8 +285,11 @@ final class TransactionServiceTest extends CIUnitTestCase
             'transaction_items',
             'transactions',
             'audit_logs',
+            'balances',
+            'users',
             'products',
             'store_payment_methods',
+            'store_day_sessions',
             'store_opening_balances',
             'stores',
         ];
@@ -202,6 +318,29 @@ final class TransactionServiceTest extends CIUnitTestCase
             updated_at TEXT
         )');
 
+        $db->query('CREATE TABLE ' . $tn('store_day_sessions') . ' (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            store_id INTEGER NOT NULL,
+            business_date TEXT NOT NULL,
+            status TEXT NOT NULL,
+            opening_cash REAL NOT NULL DEFAULT 0,
+            opening_ecash REAL NOT NULL DEFAULT 0,
+            opening_note TEXT,
+            opened_by INTEGER,
+            opened_at TEXT,
+            closed_by INTEGER,
+            closed_at TEXT,
+            counted_cash REAL,
+            counted_ecash REAL,
+            expected_cash REAL,
+            expected_ecash REAL,
+            cash_variance REAL,
+            ecash_variance REAL,
+            closing_note TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )');
+
         $db->query('CREATE TABLE ' . $tn('store_payment_methods') . ' (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             store_id INTEGER NOT NULL,
@@ -212,6 +351,29 @@ final class TransactionServiceTest extends CIUnitTestCase
             is_active INTEGER NOT NULL DEFAULT 1,
             is_system_reserved INTEGER NOT NULL DEFAULT 0,
             created_at TEXT,
+            updated_at TEXT
+        )');
+
+        $db->query('CREATE TABLE ' . $tn('users') . ' (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            employee_id TEXT,
+            name TEXT NOT NULL,
+            email TEXT NOT NULL,
+            password_hash TEXT,
+            debt_pin_hash TEXT,
+            role TEXT NOT NULL,
+            user_type TEXT NOT NULL,
+            qr_token TEXT,
+            profile_image_url TEXT,
+            base_salary REAL,
+            is_active INTEGER NOT NULL DEFAULT 1,
+            created_at TEXT
+        )');
+
+        $db->query('CREATE TABLE ' . $tn('balances') . ' (
+            user_id INTEGER PRIMARY KEY,
+            credit_limit REAL NOT NULL DEFAULT 0,
+            current_debt REAL NOT NULL DEFAULT 0,
             updated_at TEXT
         )');
 

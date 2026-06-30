@@ -1,6 +1,6 @@
 # IBEMS System Implementation Checklist
 
-Last updated: 2026-06-30
+Last updated: 2026-07-01
 Active project path: `D:\xampp\htdocs\ibems-tailwind-test`
 
 Use this file as the durable work tracker when the chat context is compressed. Update each checkbox as work is completed, and add short notes under the relevant module instead of relying only on chat history.
@@ -70,8 +70,8 @@ Use this file as the durable work tracker when the chat context is compressed. U
 
 ## Phase 5 - Cross-System Data Integrity
 
-- [ ] Create end-to-end smoke checklist: login, switch role, inventory create, stock-in, POS sale, receipt, history, accounting debt update, settlement.
-- [ ] Add backend validation tests for transaction creation: stock race, disabled payment method, missing opening balance, invalid debt customer, insufficient credit.
+- [x] Create end-to-end smoke checklist: login, switch role, inventory create, stock-in, POS sale, receipt, history, accounting debt update, settlement.
+- [x] Add backend validation tests for transaction creation: stock race, disabled payment method, missing opening balance, invalid debt customer, insufficient credit.
 - [x] Add migration-backed storage for hashed debt authorization PINs on user accounts.
 - [ ] Add backend validation tests for inventory: duplicate SKU, duplicate barcode, low-stock threshold, supplier/location persistence, stock movement creation.
 - [ ] Add seed data covering low-stock, out-of-stock, debt customers, over-limit customer, multiple stores, and multi-role users.
