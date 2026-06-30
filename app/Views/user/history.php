@@ -19,6 +19,14 @@
         <?= view('components/stat_card', ['title' => 'Total Purchases', 'value' => 'PHP 0.00', 'valueId' => 'uh-total-spent', 'icon' => 'bi bi-bag-check', 'tone' => 'finance']) ?>
     </div>
 
+    <article id="uh-debt-status-card" class="user-status-card user-status-card--info">
+        <div>
+            <span id="uh-debt-status-label" class="user-status-badge">Loading</span>
+            <h4>Debt Status</h4>
+            <p id="uh-debt-status-message">Checking your current debt balance.</p>
+        </div>
+    </article>
+
     <div class="user-filters">
         <div class="field">
             <label for="uh-date-from">From</label>
@@ -41,10 +49,11 @@
                     <th>Payment</th>
                     <th>Amount</th>
                     <th>Reference</th>
+                    <th>Receipt</th>
                 </tr>
             </thead>
             <tbody id="uh-body">
-                <tr><td colspan="5">Loading transactions...</td></tr>
+                <tr><td colspan="6">Loading transactions...</td></tr>
             </tbody>
         </table>
     </div>

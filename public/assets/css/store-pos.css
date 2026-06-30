@@ -596,6 +596,59 @@
     background: #f8fafc;
 }
 
+.debt-pin-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 10px;
+    border: 1px solid #dbe7f5;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
+}
+
+.debt-pin-wrap label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #1e3a5f;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+
+.debt-pin-wrap input {
+    height: 40px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 9px 12px;
+    letter-spacing: 0;
+    color: #0f172a;
+    background: #fff;
+}
+
+.debt-pin-wrap input:focus {
+    border-color: #2563eb;
+    outline: 2px solid rgba(37, 99, 235, 0.15);
+}
+
+.debt-pin-wrap input:disabled {
+    background: #f1f5f9;
+    color: #64748b;
+}
+
+.debt-pin-wrap small {
+    color: #64748b;
+    font-size: 0.76rem;
+    line-height: 1.25;
+}
+
+.debt-pin-wrap small.is-ready {
+    color: #047857;
+}
+
+.debt-pin-wrap small.is-error {
+    color: #b42318;
+}
+
 .scan-suggestion-empty {
     padding: 10px 12px;
     font-size: 0.84rem;

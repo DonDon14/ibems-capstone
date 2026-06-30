@@ -17,6 +17,7 @@ class UserModel extends Model
         'name',
         'email',
         'password_hash',
+        'debt_pin_hash',
         'role',
         'user_type',
         'qr_token',

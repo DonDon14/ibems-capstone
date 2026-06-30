@@ -19,6 +19,15 @@
             <label for="store-search">Search</label>
             <input id="store-search" type="search" placeholder="Store name or officer">
         </div>
+        <div class="field">
+            <label for="store-status-filter">Status</label>
+            <select id="store-status-filter">
+                <option value="">All Stores</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="unassigned">Unassigned</option>
+            </select>
+        </div>
         <button id="store-search-btn" class="primary-btn" type="button">Search</button>
         <button id="store-refresh-btn" class="history-action alt" type="button">Refresh</button>
     </div>
@@ -44,9 +53,15 @@
             </div>
             <div class="field">
                 <label for="store-officer-search">Store Officer</label>
-                <input id="store-officer-search" type="search" placeholder="Type name, email, or employee ID">
+                <div class="officer-picker-row">
+                    <input id="store-officer-search" type="search" placeholder="Optional: type name, email, or employee ID">
+                    <button id="clear-store-officer" type="button" class="field-icon-btn" title="Clear assigned officer">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
                 <input id="store-officer-id" type="hidden">
                 <div id="store-officer-suggestions" class="officer-suggestions is-hidden"></div>
+                <small id="store-officer-help" class="field-help">Stores can be created first and assigned to an officer later.</small>
             </div>
             <div class="field" id="store-logo-upload-wrap">
                 <label for="store-logo-file">Store Logo</label>

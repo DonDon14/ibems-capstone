@@ -26,6 +26,7 @@ class TransactionService
             'payment_method' => 'required|max_length[50]',
             'customer_user_id' => 'permit_empty|is_natural_no_zero',
             'customer_type' => 'permit_empty|in_list[walk_in,faculty,staff,student]',
+            'debt_pin' => 'permit_empty|regex_match[/^[0-9]{4,6}$/]',
             'items' => 'required',
         ]);
 
@@ -37,6 +38,7 @@ class TransactionService
         $paymentMethod = strtolower(trim((string) ($request['payment_method'] ?? '')));
         $customerUserId = isset($request['customer_user_id']) ? (int) $request['customer_user_id'] : null;
         $customerType = (string) ($request['customer_type'] ?? 'walk_in');
+        $debtPin = trim((string) ($request['debt_pin'] ?? ''));
         $items = $request['items'] ?? [];
 
         if (!is_array($items) || $items === []) {
@@ -78,6 +80,7 @@ class TransactionService
         }
 
         $userModel = new UserModel();
+        $customer = null;
         if ($customerUserId) {
             $customer = $userModel->getActiveUserById($customerUserId);
             if (!$customer) {
@@ -122,6 +125,28 @@ class TransactionService
             }
             if (!in_array($customerType, ['faculty', 'staff'], true)) {
                 return $this->error('Only faculty/staff can use debt payment.');
+            }
+            if ($debtPin === '') {
+                return $this->error('Enter the customer debt PIN to authorize this debt transaction.');
+            }
+            if (!$customer || trim((string) ($customer['debt_pin_hash'] ?? '')) === '') {
+                return $this->error('Selected customer has no debt PIN set. Ask them to set it in their user portal first.');
+            }
+            if (!password_verify($debtPin, (string) ($customer['debt_pin_hash'] ?? ''))) {
+                (new AuditLogModel())->insert([
+                    'actor_id' => $actorId > 0 ? $actorId : null,
+                    'action' => 'FAILED_DEBT_PIN',
+                    'entity' => 'users',
+                    'entity_id' => $customerUserId,
+                    'payload_json' => json_encode([
+                        'store_id' => $storeId,
+                        'amount' => $totalAmount,
+                        'customer_user_id' => $customerUserId,
+                    ]),
+                    'created_at' => date('Y-m-d H:i:s'),
+                ]);
+
+                return $this->error('Invalid debt PIN.');
             }
             if (!$balanceModel->canUseCredit($customerUserId, $totalAmount)) {
                 return $this->error('Insufficient credit.');

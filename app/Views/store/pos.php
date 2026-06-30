@@ -91,6 +91,11 @@
                 </button>
                 <div id="debt-customer-suggestions" class="debt-suggestions is-hidden"></div>
             </div>
+            <div id="debt-pin-wrap" class="debt-pin-wrap is-hidden">
+                <label for="debt-pin-input"><i class="bi bi-shield-lock"></i> Debt Authorization PIN</label>
+                <input id="debt-pin-input" type="password" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="Enter debtor PIN">
+                <small id="debt-pin-help">PIN is verified securely when the transaction is submitted.</small>
+            </div>
         </div>
 
         <button id="submit-transaction" class="primary-btn" type="button"><i class="bi bi-check2-circle"></i> Complete Transaction</button>

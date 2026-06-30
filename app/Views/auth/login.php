@@ -35,6 +35,8 @@
                 <strong>Demo Credentials</strong>
                 <span>Admin: admin@ibems.local / 123456</span>
                 <span>Store: store.main@ibems.local / 123456</span>
+                <span>Accounting: accounting@ibems.local / 123456</span>
+                <span>User: maria.santos@ibems.local / 123456</span>
             </div>
 
             <div id="status"></div>

@@ -59,8 +59,10 @@ class AdminController extends Controller
             ->get()
             ->getRowArray();
 
+        $todayDate = $today->format('Y-m-d');
+
         $productAlerts = $db->table('products')
-            ->select('SUM(CASE WHEN is_active = 1 AND stock_qty <= 0 THEN 1 ELSE 0 END) AS out_of_stock_products')
+            ->select('SUM(CASE WHEN is_active = 1 AND stock_qty <= 0 THEN 1 ELSE 0 END) AS out_of_stock_products, SUM(CASE WHEN is_active = 1 AND stock_qty > 0 AND stock_qty <= COALESCE(low_stock_threshold, 10) THEN 1 ELSE 0 END) AS low_stock_products')
             ->get()
             ->getRowArray();
 
@@ -70,6 +72,39 @@ class AdminController extends Controller
             ->where('u.is_active', 1)
             ->get()
             ->getRowArray();
+
+        $storeDaySummary = [
+            'open_today' => 0,
+            'closed_today' => 0,
+            'not_open_today' => 0,
+        ];
+        $storesNotOpenRows = [];
+        if ($db->tableExists('store_day_sessions')) {
+            $sessionSummary = $db->table('stores s')
+                ->select('SUM(CASE WHEN sds.status = "open" THEN 1 ELSE 0 END) AS open_today, SUM(CASE WHEN sds.status = "closed" THEN 1 ELSE 0 END) AS closed_today')
+                ->join('store_day_sessions sds', 'sds.store_id = s.id AND sds.business_date = ' . $db->escape($todayDate), 'left', false)
+                ->where('s.is_active', 1)
+                ->get()
+                ->getRowArray();
+
+            $storeDaySummary['open_today'] = (int) ($sessionSummary['open_today'] ?? 0);
+            $storeDaySummary['closed_today'] = (int) ($sessionSummary['closed_today'] ?? 0);
+            $storeDaySummary['not_open_today'] = max(
+                0,
+                (int) ($storeSummary['active_stores'] ?? 0) - $storeDaySummary['open_today'] - $storeDaySummary['closed_today']
+            );
+
+            $storesNotOpenRows = $db->table('stores s')
+                ->select('s.id, s.store_name, u.name AS officer_name')
+                ->join('store_day_sessions sds', 'sds.store_id = s.id AND sds.business_date = ' . $db->escape($todayDate), 'left', false)
+                ->join('users u', 'u.id = s.officer_id', 'left')
+                ->where('s.is_active', 1)
+                ->where('sds.id IS NULL', null, false)
+                ->orderBy('s.store_name', 'ASC')
+                ->limit(5)
+                ->get()
+                ->getResultArray();
+        }
 
         $todayStart = date('Y-m-d 00:00:00');
         $todayEnd = date('Y-m-d 23:59:59');
@@ -165,15 +200,23 @@ class AdminController extends Controller
 
         $inactiveStores = (int) ($storeSummary['inactive_stores'] ?? 0);
         $outOfStockProducts = (int) ($productAlerts['out_of_stock_products'] ?? 0);
+        $lowStockProducts = (int) ($productAlerts['low_stock_products'] ?? 0);
         $overCreditAccounts = (int) ($creditAlerts['over_credit_accounts'] ?? 0);
-        $openAlerts = $inactiveStores + $outOfStockProducts + $overCreditAccounts;
+        $storesNotOpenToday = (int) ($storeDaySummary['not_open_today'] ?? 0);
+        $openAlerts = $inactiveStores + $storesNotOpenToday + $outOfStockProducts + $lowStockProducts + $overCreditAccounts;
 
         $healthMessages = [];
         if ($inactiveStores > 0) {
             $healthMessages[] = $inactiveStores . ' inactive store(s)';
         }
+        if ($storesNotOpenToday > 0) {
+            $healthMessages[] = $storesNotOpenToday . ' store(s) not opened today';
+        }
         if ($outOfStockProducts > 0) {
             $healthMessages[] = $outOfStockProducts . ' out-of-stock product(s)';
+        }
+        if ($lowStockProducts > 0) {
+            $healthMessages[] = $lowStockProducts . ' low-stock product(s)';
         }
         if ($overCreditAccounts > 0) {
             $healthMessages[] = $overCreditAccounts . ' over-credit account(s)';
@@ -181,6 +224,58 @@ class AdminController extends Controller
         $healthText = $openAlerts > 0
             ? 'Attention needed: ' . implode(' | ', $healthMessages) . '.'
             : 'All core modules are online. No alerts detected.';
+
+        $lowStockRows = $db->table('products p')
+            ->select('p.id, p.name, p.sku, p.stock_qty, COALESCE(p.low_stock_threshold, 10) AS threshold_qty, s.store_name')
+            ->join('stores s', 's.id = p.store_id', 'inner')
+            ->where('p.is_active', 1)
+            ->where('p.stock_qty <= COALESCE(p.low_stock_threshold, 10)', null, false)
+            ->orderBy('p.stock_qty', 'ASC')
+            ->orderBy('p.name', 'ASC')
+            ->limit(5)
+            ->get()
+            ->getResultArray();
+
+        $overCreditRows = $db->table('balances b')
+            ->select('u.id, u.employee_id, u.name, b.current_debt, b.credit_limit')
+            ->join('users u', 'u.id = b.user_id', 'inner')
+            ->where('u.is_active', 1)
+            ->where('b.current_debt > b.credit_limit', null, false)
+            ->orderBy('(b.current_debt - b.credit_limit)', 'DESC', false)
+            ->limit(5)
+            ->get()
+            ->getResultArray();
+
+        $alerts = [];
+        foreach ($storesNotOpenRows as $row) {
+            $alerts[] = [
+                'tone' => 'warning',
+                'label' => 'Store Day',
+                'title' => (string) ($row['store_name'] ?? 'Store') . ' has not opened today',
+                'detail' => 'Officer: ' . ((string) ($row['officer_name'] ?? '') !== '' ? (string) $row['officer_name'] : 'Unassigned'),
+                'href' => site_url('admin/stores/' . (int) ($row['id'] ?? 0)),
+            ];
+        }
+        foreach ($lowStockRows as $row) {
+            $stockQty = (int) ($row['stock_qty'] ?? 0);
+            $alerts[] = [
+                'tone' => $stockQty <= 0 ? 'danger' : 'warning',
+                'label' => $stockQty <= 0 ? 'Out of Stock' : 'Low Stock',
+                'title' => (string) ($row['name'] ?? 'Product'),
+                'detail' => (string) ($row['store_name'] ?? 'Store') . ' | SKU ' . (string) ($row['sku'] ?? '-') . ' | Stock ' . $stockQty . ' / Threshold ' . (int) ($row['threshold_qty'] ?? 10),
+                'href' => site_url('admin/products'),
+            ];
+        }
+        foreach ($overCreditRows as $row) {
+            $overAmount = max(0, (float) ($row['current_debt'] ?? 0) - (float) ($row['credit_limit'] ?? 0));
+            $alerts[] = [
+                'tone' => 'danger',
+                'label' => 'Over Credit',
+                'title' => (string) ($row['name'] ?? 'User'),
+                'detail' => 'Employee ' . (string) ($row['employee_id'] ?? '-') . ' | Over by PHP ' . number_format($overAmount, 2),
+                'href' => site_url('admin/accounting-debts'),
+            ];
+        }
 
         return $this->response->setJSON([
             'status' => 'success',
@@ -192,7 +287,11 @@ class AdminController extends Controller
                 'open_alerts' => $openAlerts,
                 'inactive_stores' => $inactiveStores,
                 'out_of_stock_products' => $outOfStockProducts,
+                'low_stock_products' => $lowStockProducts,
                 'over_credit_accounts' => $overCreditAccounts,
+                'stores_open_today' => (int) ($storeDaySummary['open_today'] ?? 0),
+                'stores_closed_today' => (int) ($storeDaySummary['closed_today'] ?? 0),
+                'stores_not_open_today' => $storesNotOpenToday,
                 'today_transactions' => (int) ($todayTxn['txn_count'] ?? 0),
                 'today_sales' => (float) ($todayTxn['sales_total'] ?? 0),
             ],
@@ -210,6 +309,7 @@ class AdminController extends Controller
                 'top_stores' => $topStores,
                 'top_selling_items' => $topSellingItems,
             ],
+            'alerts' => array_slice($alerts, 0, 12),
         ]);
     }
 
@@ -233,19 +333,138 @@ class AdminController extends Controller
         return view('admin/products');
     }
 
+    public function audit()
+    {
+        return view('admin/audit');
+    }
+
+    public function auditData()
+    {
+        $q = trim((string) $this->request->getGet('q'));
+        $action = trim((string) $this->request->getGet('action'));
+        $entity = trim((string) $this->request->getGet('entity'));
+        $dateFrom = trim((string) $this->request->getGet('date_from'));
+        $dateTo = trim((string) $this->request->getGet('date_to'));
+        $limit = max(25, min(200, (int) ($this->request->getGet('limit') ?? 100)));
+
+        $db = Database::connect();
+        $query = $db->table('audit_logs al')
+            ->select('al.id, al.actor_id, al.action, al.entity, al.entity_id, al.payload_json, al.created_at, u.name AS actor_name, u.email AS actor_email')
+            ->join('users u', 'u.id = al.actor_id', 'left');
+
+        if ($action !== '') {
+            $query->where('al.action', $action);
+        }
+        if ($entity !== '') {
+            $query->where('al.entity', $entity);
+        }
+        if ($dateFrom !== '') {
+            $query->where('al.created_at >=', $dateFrom . ' 00:00:00');
+        }
+        if ($dateTo !== '') {
+            $query->where('al.created_at <=', $dateTo . ' 23:59:59');
+        }
+        if ($q !== '') {
+            $query->groupStart()
+                ->like('al.action', $q)
+                ->orLike('al.entity', $q)
+                ->orLike('al.payload_json', $q)
+                ->orLike('u.name', $q)
+                ->orLike('u.email', $q)
+                ->groupEnd();
+        }
+
+        $rows = $query->orderBy('al.created_at', 'DESC')
+            ->orderBy('al.id', 'DESC')
+            ->limit($limit)
+            ->get()
+            ->getResultArray();
+
+        $summary = $db->table('audit_logs')
+            ->select('COUNT(*) AS total_events, SUM(CASE WHEN DATE(created_at) = CURDATE() THEN 1 ELSE 0 END) AS today_events, COUNT(DISTINCT actor_id) AS actor_count, COUNT(DISTINCT action) AS action_count')
+            ->get()
+            ->getRowArray() ?? [];
+
+        $actions = $db->table('audit_logs')
+            ->select('action')
+            ->groupBy('action')
+            ->orderBy('action', 'ASC')
+            ->get()
+            ->getResultArray();
+
+        $entities = $db->table('audit_logs')
+            ->select('entity')
+            ->where('entity IS NOT NULL', null, false)
+            ->where('entity !=', '')
+            ->groupBy('entity')
+            ->orderBy('entity', 'ASC')
+            ->get()
+            ->getResultArray();
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'summary' => [
+                'total_events' => (int) ($summary['total_events'] ?? 0),
+                'today_events' => (int) ($summary['today_events'] ?? 0),
+                'actor_count' => (int) ($summary['actor_count'] ?? 0),
+                'action_count' => (int) ($summary['action_count'] ?? 0),
+                'visible_events' => count($rows),
+            ],
+            'actions' => array_values(array_map(static fn(array $row): string => (string) ($row['action'] ?? ''), $actions)),
+            'entities' => array_values(array_map(static fn(array $row): string => (string) ($row['entity'] ?? ''), $entities)),
+            'data' => array_map(function (array $row): array {
+                $payload = json_decode((string) ($row['payload_json'] ?? ''), true);
+                if (!is_array($payload)) {
+                    $payload = [];
+                }
+
+                return [
+                    'id' => (int) $row['id'],
+                    'actor_id' => isset($row['actor_id']) ? (int) $row['actor_id'] : null,
+                    'actor_name' => (string) ($row['actor_name'] ?? 'System'),
+                    'actor_email' => (string) ($row['actor_email'] ?? ''),
+                    'action' => (string) ($row['action'] ?? ''),
+                    'action_label' => $this->formatAuditAction((string) ($row['action'] ?? '')),
+                    'entity' => (string) ($row['entity'] ?? ''),
+                    'entity_id' => isset($row['entity_id']) ? (int) $row['entity_id'] : null,
+                    'payload' => $payload,
+                    'payload_summary' => $this->summarizeAuditPayload($payload),
+                    'created_at' => (string) ($row['created_at'] ?? ''),
+                ];
+            }, $rows),
+        ]);
+    }
+
     public function productsData()
     {
         $q = trim((string) $this->request->getGet('q'));
         $storeId = (int) ($this->request->getGet('store_id') ?? 0);
+        $stockStatus = trim((string) $this->request->getGet('stock_status'));
+        $category = trim((string) $this->request->getGet('category'));
+        $supplier = trim((string) $this->request->getGet('supplier'));
         $includeInactive = (int) ($this->request->getGet('include_inactive') ?? 0) === 1;
 
         $db = Database::connect();
         $query = $db->table('products p')
-            ->select('p.id, p.store_id, p.sku, p.name, p.variant_label, p.category, p.barcode, p.image_url, p.price, p.stock_qty, p.is_active, p.updated_at, s.store_name')
+            ->select('p.id, p.store_id, p.sku, p.name, p.variant_label, p.category, p.supplier, p.location_bin, p.barcode, p.image_url, p.price, p.stock_qty, COALESCE(p.low_stock_threshold, 10) AS low_stock_threshold, p.is_active, p.updated_at, s.store_name')
             ->join('stores s', 's.id = p.store_id', 'inner');
 
         if ($storeId > 0) {
             $query->where('p.store_id', $storeId);
+        }
+        if ($category !== '') {
+            $query->where('p.category', $category);
+        }
+        if ($supplier !== '') {
+            $query->where('p.supplier', $supplier);
+        }
+        if ($stockStatus === 'out') {
+            $query->where('p.stock_qty <=', 0);
+        } elseif ($stockStatus === 'low') {
+            $query->where('p.stock_qty >', 0);
+            $query->where('p.stock_qty <= COALESCE(p.low_stock_threshold, 10)', null, false);
+        } elseif ($stockStatus === 'healthy') {
+            $query->where('p.stock_qty > COALESCE(p.low_stock_threshold, 10)', null, false);
         }
         if (!$includeInactive) {
             $query->where('p.is_active', 1);
@@ -255,6 +474,9 @@ class AdminController extends Controller
                 ->like('p.name', $q)
                 ->orLike('p.sku', $q)
                 ->orLike('p.category', $q)
+                ->orLike('p.supplier', $q)
+                ->orLike('p.location_bin', $q)
+                ->orLike('p.barcode', $q)
                 ->orLike('s.store_name', $q)
                 ->groupEnd();
         }
@@ -265,6 +487,14 @@ class AdminController extends Controller
             ->get()
             ->getResultArray();
 
+        $summaryQuery = $db->table('products p')
+            ->select('COUNT(*) AS total_products, SUM(CASE WHEN p.is_active = 1 THEN 1 ELSE 0 END) AS active_products, SUM(CASE WHEN p.is_active = 1 AND p.stock_qty <= 0 THEN 1 ELSE 0 END) AS out_of_stock, SUM(CASE WHEN p.is_active = 1 AND p.stock_qty > 0 AND p.stock_qty <= COALESCE(p.low_stock_threshold, 10) THEN 1 ELSE 0 END) AS low_stock, SUM(CASE WHEN p.is_active = 0 THEN 1 ELSE 0 END) AS inactive_products')
+            ->join('stores s', 's.id = p.store_id', 'inner');
+        if ($storeId > 0) {
+            $summaryQuery->where('p.store_id', $storeId);
+        }
+        $summary = $summaryQuery->get()->getRowArray() ?? [];
+
         $stores = $db->table('stores')
             ->select('id, store_name')
             ->where('is_active', 1)
@@ -272,15 +502,46 @@ class AdminController extends Controller
             ->get()
             ->getResultArray();
 
+        $categories = $db->table('products')
+            ->select('category')
+            ->where('category IS NOT NULL', null, false)
+            ->where('category !=', '')
+            ->groupBy('category')
+            ->orderBy('category', 'ASC')
+            ->get()
+            ->getResultArray();
+
+        $suppliers = $db->table('products')
+            ->select('supplier')
+            ->where('supplier IS NOT NULL', null, false)
+            ->where('supplier !=', '')
+            ->groupBy('supplier')
+            ->orderBy('supplier', 'ASC')
+            ->get()
+            ->getResultArray();
+
         return $this->response->setJSON([
             'status' => 'success',
+            'summary' => [
+                'total_products' => (int) ($summary['total_products'] ?? 0),
+                'active_products' => (int) ($summary['active_products'] ?? 0),
+                'out_of_stock' => (int) ($summary['out_of_stock'] ?? 0),
+                'low_stock' => (int) ($summary['low_stock'] ?? 0),
+                'inactive_products' => (int) ($summary['inactive_products'] ?? 0),
+                'visible_products' => count($rows),
+            ],
             'stores' => array_map(static function (array $row): array {
                 return [
                     'id' => (int) $row['id'],
                     'store_name' => (string) $row['store_name'],
                 ];
             }, $stores),
+            'categories' => array_values(array_map(static fn(array $row): string => (string) ($row['category'] ?? ''), $categories)),
+            'suppliers' => array_values(array_map(static fn(array $row): string => (string) ($row['supplier'] ?? ''), $suppliers)),
             'data' => array_map(static function (array $row): array {
+                $stockQty = (int) ($row['stock_qty'] ?? 0);
+                $threshold = (int) ($row['low_stock_threshold'] ?? 10);
+                $stockStatus = $stockQty <= 0 ? 'out' : ($stockQty <= $threshold ? 'low' : 'healthy');
                 return [
                     'id' => (int) $row['id'],
                     'store_id' => (int) $row['store_id'],
@@ -289,10 +550,14 @@ class AdminController extends Controller
                     'name' => (string) ($row['name'] ?? ''),
                     'variant_label' => (string) ($row['variant_label'] ?? ''),
                     'category' => (string) ($row['category'] ?? ''),
+                    'supplier' => (string) ($row['supplier'] ?? ''),
+                    'location_bin' => (string) ($row['location_bin'] ?? ''),
                     'barcode' => (string) ($row['barcode'] ?? ''),
                     'image_url' => (string) ($row['image_url'] ?? ''),
                     'price' => (float) ($row['price'] ?? 0),
-                    'stock_qty' => (int) ($row['stock_qty'] ?? 0),
+                    'stock_qty' => $stockQty,
+                    'low_stock_threshold' => $threshold,
+                    'stock_status' => $stockStatus,
                     'is_active' => (bool) ($row['is_active'] ?? false),
                     'updated_at' => (string) ($row['updated_at'] ?? ''),
                 ];
@@ -764,7 +1029,6 @@ class AdminController extends Controller
         $employeeId = trim((string) ($request['employee_id'] ?? ''));
         $name = trim((string) ($request['name'] ?? ''));
         $email = strtolower(trim((string) ($request['email'] ?? '')));
-        $role = strtoupper(trim((string) ($request['role'] ?? 'USER')));
         $userType = strtolower(trim((string) ($request['user_type'] ?? 'staff')));
         $roles = $this->extractRolesFromRequest($request);
         $baseSalary = (float) ($request['base_salary'] ?? 0);
@@ -788,9 +1052,7 @@ class AdminController extends Controller
 
         $allowedRoles = ['USER', 'STORE_SYSTEM', 'ACCOUNTING_OFFICE', 'ADMIN'];
         $allowedTypes = ['faculty', 'staff', 'student'];
-        if (empty($roles)) {
-            $roles = [$role];
-        }
+        $roles = $this->sanitizeRoles($roles, ['USER']);
         foreach ($roles as $selectedRole) {
             if (!in_array($selectedRole, $allowedRoles, true)) {
                 return $this->response->setStatusCode(400)->setJSON([
@@ -798,12 +1060,6 @@ class AdminController extends Controller
                     'message' => 'Invalid role.',
                 ]);
             }
-        }
-        if (!in_array($role, $allowedRoles, true)) {
-            return $this->response->setStatusCode(400)->setJSON([
-                'status' => 'error',
-                'message' => 'Invalid role.',
-            ]);
         }
         if (!in_array($userType, $allowedTypes, true)) {
             return $this->response->setStatusCode(400)->setJSON([
@@ -896,7 +1152,6 @@ class AdminController extends Controller
         $employeeId = trim((string) ($request['employee_id'] ?? ''));
         $name = trim((string) ($request['name'] ?? ''));
         $email = strtolower(trim((string) ($request['email'] ?? '')));
-        $role = strtoupper(trim((string) ($request['role'] ?? 'USER')));
         $userType = strtolower(trim((string) ($request['user_type'] ?? 'staff')));
         $roles = $this->extractRolesFromRequest($request);
         $baseSalary = (float) ($request['base_salary'] ?? 0);
@@ -918,9 +1173,7 @@ class AdminController extends Controller
 
         $allowedRoles = ['USER', 'STORE_SYSTEM', 'ACCOUNTING_OFFICE', 'ADMIN'];
         $allowedTypes = ['faculty', 'staff', 'student'];
-        if (empty($roles)) {
-            $roles = [$role];
-        }
+        $roles = $this->sanitizeRoles($roles, ['USER']);
         foreach ($roles as $selectedRole) {
             if (!in_array($selectedRole, $allowedRoles, true)) {
                 return $this->response->setStatusCode(400)->setJSON([
@@ -929,7 +1182,7 @@ class AdminController extends Controller
                 ]);
             }
         }
-        if (!in_array($role, $allowedRoles, true) || !in_array($userType, $allowedTypes, true)) {
+        if (!in_array($userType, $allowedTypes, true)) {
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
                 'message' => 'Invalid role or user type.',
@@ -1191,6 +1444,7 @@ class AdminController extends Controller
     public function storesData()
     {
         $q = trim((string) $this->request->getGet('q'));
+        $status = trim((string) $this->request->getGet('status'));
         $db = Database::connect();
         $query = $db->table('stores s')
             ->select('s.id, s.store_name, s.logo_url, s.is_active, s.created_at, s.officer_id, u.name AS officer_name, u.email AS officer_email')
@@ -1202,6 +1456,13 @@ class AdminController extends Controller
                 ->orLike('u.name', $q)
                 ->orLike('u.email', $q)
                 ->groupEnd();
+        }
+        if ($status === 'active') {
+            $query->where('s.is_active', 1);
+        } elseif ($status === 'inactive') {
+            $query->where('s.is_active', 0);
+        } elseif ($status === 'unassigned') {
+            $query->where('s.officer_id IS NULL', null, false);
         }
 
         $rows = $query->orderBy('s.store_name', 'ASC')->get()->getResultArray();
@@ -1364,20 +1625,21 @@ class AdminController extends Controller
     {
         $q = trim((string) $this->request->getGet('q'));
         $db = Database::connect();
-        $query = $db->table('users')
-            ->select('id, employee_id, name, email, role, user_type')
-            ->where('is_active', 1)
-            ->whereIn('user_type', ['faculty', 'staff']);
+        $query = $db->table('users u')
+            ->select('u.id, u.employee_id, u.name, u.email, u.role, u.user_type, s.id AS assigned_store_id, s.store_name AS assigned_store_name')
+            ->join('stores s', 's.officer_id = u.id', 'left')
+            ->where('u.is_active', 1)
+            ->whereIn('u.user_type', ['faculty', 'staff']);
 
         if ($q !== '') {
             $query->groupStart()
-                ->like('name', $q)
-                ->orLike('email', $q)
-                ->orLike('employee_id', $q)
+                ->like('u.name', $q)
+                ->orLike('u.email', $q)
+                ->orLike('u.employee_id', $q)
                 ->groupEnd();
         }
 
-        $rows = $query->orderBy('name', 'ASC')->limit(300)->get()->getResultArray();
+        $rows = $query->orderBy('u.name', 'ASC')->limit(300)->get()->getResultArray();
 
         return $this->response->setJSON([
             'status' => 'success',
@@ -1389,6 +1651,8 @@ class AdminController extends Controller
                     'email' => $row['email'],
                     'role' => $row['role'],
                     'user_type' => $row['user_type'],
+                    'assigned_store_id' => isset($row['assigned_store_id']) ? (int) $row['assigned_store_id'] : null,
+                    'assigned_store_name' => $row['assigned_store_name'] ?? null,
                 ];
             }, $rows),
         ]);
@@ -1402,10 +1666,10 @@ class AdminController extends Controller
         $officerId = (int) ($request['officer_id'] ?? 0);
         $logoUrl = trim((string) ($request['logo_url'] ?? ''));
 
-        if ($storeName === '' || $officerId <= 0) {
+        if ($storeName === '') {
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
-                'message' => 'Store name and officer are required.',
+                'message' => 'Store name is required.',
             ]);
         }
 
@@ -1414,20 +1678,22 @@ class AdminController extends Controller
         $auditLogModel = new AuditLogModel();
         $userModel = new UserModel();
 
-        $officer = $userModel->find($officerId);
-        if (!$officer || !(bool) $officer['is_active'] || !in_array($officer['user_type'], ['faculty', 'staff'], true)) {
-            return $this->response->setStatusCode(400)->setJSON([
-                'status' => 'error',
-                'message' => 'Invalid store officer. Only active faculty/staff can be assigned.',
-            ]);
-        }
+        if ($officerId > 0) {
+            $officer = $userModel->find($officerId);
+            if (!$officer || !(bool) $officer['is_active'] || !in_array($officer['user_type'], ['faculty', 'staff'], true)) {
+                return $this->response->setStatusCode(400)->setJSON([
+                    'status' => 'error',
+                    'message' => 'Invalid store officer. Only active faculty/staff can be assigned.',
+                ]);
+            }
 
-        $existingOfficerStore = $storeModel->where('officer_id', $officerId)->first();
-        if ($existingOfficerStore) {
-            return $this->response->setStatusCode(409)->setJSON([
-                'status' => 'error',
-                'message' => 'Officer is already assigned to another store.',
-            ]);
+            $existingOfficerStore = $storeModel->where('officer_id', $officerId)->first();
+            if ($existingOfficerStore) {
+                return $this->response->setStatusCode(409)->setJSON([
+                    'status' => 'error',
+                    'message' => 'Officer is already assigned to another store.',
+                ]);
+            }
         }
 
         try {
@@ -1443,13 +1709,13 @@ class AdminController extends Controller
 
         $storeId = $storeModel->insert([
             'store_name' => $storeName,
-            'officer_id' => $officerId,
+            'officer_id' => $officerId > 0 ? $officerId : null,
             'logo_url' => $logoUrl !== '' ? $logoUrl : null,
             'is_active' => 1,
             'created_at' => date('Y-m-d H:i:s'),
         ]);
 
-        if ($storeId) {
+        if ($storeId && $officerId > 0) {
             $this->addRoleToUser($officerId, 'STORE_SYSTEM', $userModel);
         }
 
@@ -1460,7 +1726,7 @@ class AdminController extends Controller
             'entity_id' => $storeId,
             'payload_json' => json_encode([
                 'store_name' => $storeName,
-                'officer_id' => $officerId,
+                'officer_id' => $officerId > 0 ? $officerId : null,
                 'logo_url' => $logoUrl,
             ]),
             'created_at' => date('Y-m-d H:i:s'),
@@ -1489,10 +1755,18 @@ class AdminController extends Controller
         $officerId = (int) ($request['officer_id'] ?? 0);
         $logoUrl = trim((string) ($request['logo_url'] ?? ''));
 
-        if ($storeId <= 0 || $storeName === '' || $officerId <= 0) {
+        $isActive = isset($request['is_active']) ? (int) $request['is_active'] : null;
+
+        if ($storeId <= 0 || $storeName === '') {
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
                 'message' => 'Invalid store update payload.',
+            ]);
+        }
+        if ($isActive !== null && !in_array($isActive, [0, 1], true)) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Invalid store status.',
             ]);
         }
 
@@ -1509,20 +1783,22 @@ class AdminController extends Controller
             ]);
         }
 
-        $officer = $userModel->find($officerId);
-        if (!$officer || !(bool) $officer['is_active'] || !in_array($officer['user_type'], ['faculty', 'staff'], true)) {
-            return $this->response->setStatusCode(400)->setJSON([
-                'status' => 'error',
-                'message' => 'Invalid store officer. Only active faculty/staff can be assigned.',
-            ]);
-        }
+        if ($officerId > 0) {
+            $officer = $userModel->find($officerId);
+            if (!$officer || !(bool) $officer['is_active'] || !in_array($officer['user_type'], ['faculty', 'staff'], true)) {
+                return $this->response->setStatusCode(400)->setJSON([
+                    'status' => 'error',
+                    'message' => 'Invalid store officer. Only active faculty/staff can be assigned.',
+                ]);
+            }
 
-        $existingOfficerStore = $storeModel->where('officer_id', $officerId)->first();
-        if ($existingOfficerStore && (int) $existingOfficerStore['id'] !== $storeId) {
-            return $this->response->setStatusCode(409)->setJSON([
-                'status' => 'error',
-                'message' => 'Officer is already assigned to another store.',
-            ]);
+            $existingOfficerStore = $storeModel->where('officer_id', $officerId)->first();
+            if ($existingOfficerStore && (int) $existingOfficerStore['id'] !== $storeId) {
+                return $this->response->setStatusCode(409)->setJSON([
+                    'status' => 'error',
+                    'message' => 'Officer is already assigned to another store.',
+                ]);
+            }
         }
 
         try {
@@ -1538,13 +1814,20 @@ class AdminController extends Controller
 
         $previousOfficerId = (int) $store['officer_id'];
 
-        $storeModel->update($storeId, [
+        $storePayload = [
             'store_name' => $storeName,
-            'officer_id' => $officerId,
+            'officer_id' => $officerId > 0 ? $officerId : null,
             'logo_url' => $logoUrl !== '' ? $logoUrl : null,
-        ]);
+        ];
+        if ($isActive !== null) {
+            $storePayload['is_active'] = $isActive;
+        }
 
-        $this->addRoleToUser($officerId, 'STORE_SYSTEM', $userModel);
+        $storeModel->update($storeId, $storePayload);
+
+        if ($officerId > 0) {
+            $this->addRoleToUser($officerId, 'STORE_SYSTEM', $userModel);
+        }
 
         if ($previousOfficerId > 0 && $previousOfficerId !== $officerId) {
             $assignedCount = $db->table('stores')->where('officer_id', $previousOfficerId)->countAllResults();
@@ -1563,11 +1846,13 @@ class AdminController extends Controller
                     'store_name' => $store['store_name'],
                     'officer_id' => (int) $store['officer_id'],
                     'logo_url' => $store['logo_url'] ?? null,
+                    'is_active' => (int) ($store['is_active'] ?? 0),
                 ],
                 'after' => [
                     'store_name' => $storeName,
-                    'officer_id' => $officerId,
+                    'officer_id' => $officerId > 0 ? $officerId : null,
                     'logo_url' => $logoUrl !== '' ? $logoUrl : null,
+                    'is_active' => $isActive !== null ? $isActive : (int) ($store['is_active'] ?? 0),
                 ],
             ]),
             'created_at' => date('Y-m-d H:i:s'),
@@ -1777,6 +2062,48 @@ class AdminController extends Controller
             }
         }
         return array_values(array_unique($roles));
+    }
+
+    private function sanitizeRoles(array $roles, array $fallback = ['USER']): array
+    {
+        $roles = array_values(array_unique(array_map(static fn($role): string => strtoupper(trim((string) $role)), $roles)));
+        $roles = array_values(array_filter($roles, static fn($role): bool => $role !== ''));
+
+        if (!empty($roles)) {
+            return $roles;
+        }
+
+        return array_values(array_unique(array_map(static fn($role): string => strtoupper(trim((string) $role)), $fallback)));
+    }
+
+    private function formatAuditAction(string $action): string
+    {
+        $value = str_replace('_', ' ', trim($action));
+        $value = strtolower($value);
+
+        return ucwords($value);
+    }
+
+    private function summarizeAuditPayload(array $payload): string
+    {
+        $parts = [];
+        foreach (['store_name', 'name', 'email', 'sku', 'payment_method', 'business_date', 'month', 'run_id'] as $key) {
+            if (isset($payload[$key]) && $payload[$key] !== '') {
+                $parts[] = ucwords(str_replace('_', ' ', $key)) . ': ' . (string) $payload[$key];
+            }
+        }
+
+        foreach (['amount', 'total', 'created', 'updated', 'invalid', 'stock_qty', 'qty'] as $key) {
+            if (isset($payload[$key]) && is_scalar($payload[$key])) {
+                $parts[] = ucwords(str_replace('_', ' ', $key)) . ': ' . (string) $payload[$key];
+            }
+        }
+
+        if (isset($payload['before']) || isset($payload['after'])) {
+            $parts[] = 'Changed fields recorded';
+        }
+
+        return implode(' | ', array_slice($parts, 0, 4));
     }
 
     private function pickPrimaryRole(array $roles): string

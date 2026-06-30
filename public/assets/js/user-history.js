@@ -26,10 +26,37 @@ function uhEntryLabel(value) {
     return key.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
+function uhApplyDebtStatus(summary) {
+    const tone = String(summary.debt_status_tone || "info");
+    const card = document.getElementById("uh-debt-status-card");
+    if (card) {
+        card.classList.remove(
+            "user-status-card--success",
+            "user-status-card--info",
+            "user-status-card--warning",
+            "user-status-card--danger"
+        );
+        card.classList.add(`user-status-card--${tone}`);
+        card.dataset.status = String(summary.debt_status || "unpaid");
+    }
+
+    const label = document.getElementById("uh-debt-status-label");
+    const message = document.getElementById("uh-debt-status-message");
+    if (label) label.textContent = String(summary.debt_status_label || "Unpaid");
+    if (message) {
+        message.textContent = String(summary.debt_status_message || "You have an unpaid balance within your available credit limit.");
+    }
+}
+
 async function loadUserSummaryCards() {
     const response = await fetch("/user/summary");
     const data = await response.json();
     if (!data || data.status !== "success" || !data.summary) {
+        uhApplyDebtStatus({
+            debt_status_tone: "danger",
+            debt_status_label: "Unavailable",
+            debt_status_message: "Unable to load your debt status right now.",
+        });
         return;
     }
     const s = data.summary;
@@ -38,6 +65,7 @@ async function loadUserSummaryCards() {
     if (byId("uh-current-debt")) byId("uh-current-debt").textContent = uhMoney(s.current_debt);
     if (byId("uh-available-credit")) byId("uh-available-credit").textContent = uhMoney(s.available_credit);
     if (byId("uh-total-spent")) byId("uh-total-spent").textContent = uhMoney(s.total_spent);
+    uhApplyDebtStatus(s);
 }
 
 async function loadUserTransactions() {
@@ -52,12 +80,12 @@ async function loadUserTransactions() {
     const body = document.getElementById("uh-body");
 
     if (!data || data.status !== "success" || !Array.isArray(data.data)) {
-        body.innerHTML = '<tr><td colspan="5">Unable to load transactions.</td></tr>';
+        body.innerHTML = '<tr><td colspan="6">Unable to load transactions.</td></tr>';
         return;
     }
 
     if (data.data.length === 0) {
-        body.innerHTML = '<tr><td colspan="5">No transactions found.</td></tr>';
+        body.innerHTML = '<tr><td colspan="6">No transactions found.</td></tr>';
         return;
     }
 
@@ -68,6 +96,11 @@ async function loadUserTransactions() {
             <td>${uhEscape(String(row.payment_method || "").toUpperCase())}</td>
             <td>${uhEscape(uhMoney(row.amount))}</td>
             <td>${uhEscape(row.client_txn_id || `TXN-${row.id}`)}</td>
+            <td>
+                <a class="history-action" href="/user/receipt/${encodeURIComponent(String(row.id))}">
+                    Receipt
+                </a>
+            </td>
         </tr>
     `).join("");
 }
@@ -93,7 +126,15 @@ async function loadUserCashbook() {
         return;
     }
 
-    body.innerHTML = data.data.map((row) => `
+    body.innerHTML = data.data.map((row) => {
+        const referenceId = Number(row.reference_id || 0);
+        const canOpenReceipt = String(row.reference_type || "").toLowerCase() === "transaction" && referenceId > 0;
+        const remarks = uhEscape(row.remarks || "-");
+        const remarksHtml = canOpenReceipt
+            ? `<a class="user-inline-link" href="/user/receipt/${encodeURIComponent(String(referenceId))}">${remarks}</a>`
+            : remarks;
+
+        return `
         <tr>
             <td>${uhEscape(uhDateTime(row.created_at))}</td>
             <td>${uhEscape(uhEntryLabel(row.entry_type))}</td>
@@ -102,9 +143,10 @@ async function loadUserCashbook() {
             <td>${uhEscape(uhMoney(row.debt_before))}</td>
             <td>${uhEscape(uhMoney(row.debt_after))}</td>
             <td>${uhEscape(uhMoney(row.available_credit_snapshot))}</td>
-            <td>${uhEscape(row.remarks || "-")}</td>
+            <td>${remarksHtml}</td>
         </tr>
-    `).join("");
+    `;
+    }).join("");
 }
 
 async function openReceipt(transactionId) {
@@ -131,11 +173,11 @@ async function openReceipt(transactionId) {
     if (window.IbemsReceipt) {
         window.IbemsReceipt.renderReceipt("uh-receipt-content", uhSelectedReceipt);
     }
-    document.getElementById("uh-receipt-modal").style.display = "grid";
+    document.getElementById("uh-receipt-modal").classList.remove("is-hidden");
 }
 
 function closeReceipt() {
-    document.getElementById("uh-receipt-modal").style.display = "none";
+    document.getElementById("uh-receipt-modal").classList.add("is-hidden");
 }
 
 function printReceipt() {
@@ -159,6 +201,7 @@ document.getElementById("uh-clear").addEventListener("click", () => {
 });
 
 document.getElementById("uh-body").addEventListener("click", async (event) => {
+    if (event.target.closest("a")) return;
     const row = event.target.closest("[data-txn-id]");
     if (!row) return;
     await openReceipt(Number(row.dataset.txnId));

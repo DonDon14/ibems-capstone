@@ -42,6 +42,7 @@ $availableRoles = ibems_available_roles();
             <a href="<?= site_url('admin/products') ?>" class="<?= ibems_is_active_path('admin/products') ?>" <?= ibems_is_active_path('admin/products') ? 'aria-current="page"' : '' ?>><i class="bi bi-box-seam"></i><span>Products</span></a>
             <a href="<?= site_url('admin/accounting-debts') ?>" class="<?= ibems_is_active_path('admin/accounting-debts') ?>" <?= ibems_is_active_path('admin/accounting-debts') ? 'aria-current="page"' : '' ?>><i class="bi bi-cash-coin"></i><span>Accounting Debts</span></a>
             <a href="<?= site_url('admin/user-view') ?>" class="<?= ibems_is_active_path('admin/user-view') ?>" <?= ibems_is_active_path('admin/user-view') ? 'aria-current="page"' : '' ?>><i class="bi bi-people"></i><span>User Management</span></a>
+            <a href="<?= site_url('admin/audit') ?>" class="<?= ibems_is_active_path('admin/audit') ?>" <?= ibems_is_active_path('admin/audit') ? 'aria-current="page"' : '' ?>><i class="bi bi-journal-text"></i><span>Audit Log</span></a>
         </nav>
 
         <div class="app-sidebar-spacer"></div>

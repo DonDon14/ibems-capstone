@@ -1,69 +1,208 @@
-# CodeIgniter 4 Application Starter
+# IBEMS Capstone
 
-## What is CodeIgniter?
+Integrated Business Enterprise Management System for school store operations, POS transactions, inventory, debt monitoring, accounting settlement, and role-based portals.
 
-CodeIgniter is a PHP full-stack web framework that is light, fast, flexible and secure.
-More information can be found at the [official site](https://codeigniter.com).
+## Current Local Setup
 
-This repository holds a composer-installable app starter.
-It has been built from the
-[development repository](https://github.com/codeigniter4/CodeIgniter4).
+Active local project path:
 
-More information about the plans for version 4 can be found in [CodeIgniter 4](https://forum.codeigniter.com/forumdisplay.php?fid=28) on the forums.
+```powershell
+D:\xampp\htdocs\ibems-tailwind-test
+```
 
-You can read the [user guide](https://codeigniter.com/user_guide/)
-corresponding to the latest version of the framework.
+Default local URL:
 
-## Installation & updates
+```text
+http://localhost:8080
+```
 
-`composer create-project codeigniter4/appstarter` then `composer update` whenever
-there is a new release of the framework.
+The app is configured in `.env` with:
 
-When updating, check the release notes to see if there are any changes you might need to apply
-to your `app` folder. The affected files can be copied or merged from
-`vendor/codeigniter4/framework/app`.
+```ini
+app.baseURL = 'http://localhost:8080/'
+database.default.database = ibems_tailwind_test
+database.default.username = root
+database.default.password =
+database.default.port = 3306
+```
 
-## Setup
+## How To Run
 
-Copy `env` to `.env` and tailor for your app, specifically the baseURL
-and any database settings.
+1. Start MySQL from XAMPP.
 
-## Important Change with index.php
+2. Open PowerShell in the project folder:
 
-`index.php` is no longer in the root of the project! It has been moved inside the *public* folder,
-for better security and separation of components.
+```powershell
+cd D:\xampp\htdocs\ibems-tailwind-test
+```
 
-This means that you should configure your web server to "point" to your project's *public* folder, and
-not to the project root. A better practice would be to configure a virtual host to point there. A poor practice would be to point your web server to the project root and expect to enter *public/...*, as the rest of your logic and the
-framework are exposed.
+3. Install PHP dependencies if `vendor` is missing:
 
-**Please** read the user guide for a better explanation of how CI4 works!
+```powershell
+composer install
+```
 
-## Repository Management
+4. Apply database migrations:
 
-We use GitHub issues, in our main repository, to track **BUGS** and to track approved **DEVELOPMENT** work packages.
-We use our [forum](http://forum.codeigniter.com) to provide SUPPORT and to discuss
-FEATURE REQUESTS.
+```powershell
+php spark migrate
+```
 
-This repository is a "distribution" one, built by our release preparation script.
-Problems with it can be raised on our forum, or as issues in the main repository.
+5. Seed demo data if the database is empty:
 
-## Server Requirements
+```powershell
+php spark db:seed InitialSeeder
+```
 
-PHP version 8.2 or higher is required, with the following extensions installed:
+Optional smaller account-only seeder:
 
-- [intl](http://php.net/manual/en/intl.requirements.php)
-- [mbstring](http://php.net/manual/en/mbstring.installation.php)
+```powershell
+php spark db:seed PortalAccountsSeeder
+```
 
-> [!WARNING]
-> - The end of life date for PHP 7.4 was November 28, 2022.
-> - The end of life date for PHP 8.0 was November 26, 2023.
-> - The end of life date for PHP 8.1 was December 31, 2025.
-> - If you are still using below PHP 8.2, you should upgrade immediately.
-> - The end of life date for PHP 8.2 will be December 31, 2026.
+6. Start the app on the configured port:
 
-Additionally, make sure that the following extensions are enabled in your PHP:
+```powershell
+php spark serve --port 8080
+```
 
-- json (enabled by default - don't turn it off)
-- [mysqlnd](http://php.net/manual/en/mysqlnd.install.php) if you plan to use MySQL
-- [libcurl](http://php.net/manual/en/curl.requirements.php) if you plan to use the HTTP\CURLRequest library
+7. Open:
+
+```text
+http://localhost:8080
+```
+
+Important: CodeIgniter generates CSS, JS, image, and debugbar URLs from `.env` `app.baseURL`. The browser host and port must match `app.baseURL`. This project is currently configured for `http://localhost:8080`, so use exactly that URL.
+
+## If Port 8080 Is Busy
+
+Using another port requires two changes. First update `.env`:
+
+```ini
+app.baseURL = 'http://localhost:8082/'
+```
+
+Then restart the app on the same port:
+
+```powershell
+php spark serve --port 8082
+```
+
+Do not browse to `8082` while `.env` still says `8080`. The HTML may load, but the CSS, JS, images, and debugbar will still point to `8080`, causing failed asset requests in the console.
+
+To return to the default port, change `.env` back to:
+
+```ini
+app.baseURL = 'http://localhost:8080/'
+```
+
+Then restart:
+
+```powershell
+php spark serve --port 8080
+```
+
+## Demo Credentials
+
+All seeded demo accounts use this password:
+
+```text
+123456
+```
+
+Primary seeded accounts:
+
+| Portal | Email | Password |
+| --- | --- | --- |
+| Admin | `admin@ibems.local` | `123456` |
+| Accounting | `accounting@ibems.local` | `123456` |
+| Store - Main | `store.main@ibems.local` | `123456` |
+| Store - Tech | `store.tech@ibems.local` | `123456` |
+| User - Faculty | `maria.santos@ibems.local` | `123456` |
+| User - Staff | `mark.delacruz@ibems.local` | `123456` |
+| User - Student | `jane.estrella@ibems.local` | `123456` |
+
+Additional `PortalAccountsSeeder` accounts, if seeded:
+
+| Portal | Email | Password |
+| --- | --- | --- |
+| Store | `store@ibems.local` | `123456` |
+| User | `user@ibems.local` | `123456` |
+
+## Debt PIN Testing
+
+Debt purchases require the debtor to set their own debt authorization PIN first.
+
+1. Log in as a faculty or staff user.
+2. Open User Dashboard.
+3. Set a 4 to 6 digit Debt Authorization PIN.
+4. Log in as a Store user.
+5. In POS, choose Debt payment, select the debtor, enter their PIN, then complete checkout.
+
+The PIN is stored only as a hash. Store and admin users cannot view it.
+
+## Frontend Assets
+
+Tailwind support is available, but most current screens still use project CSS under `public/assets/css`.
+
+Install Node dependencies if needed:
+
+```powershell
+npm install
+```
+
+Build Tailwind assets:
+
+```powershell
+npm run build:tailwind
+```
+
+Watch Tailwind assets during UI work:
+
+```powershell
+npm run watch:tailwind
+```
+
+## Useful Checks
+
+Run PHP syntax checks on changed PHP files:
+
+```powershell
+php -l app\Controllers\UserController.php
+```
+
+Run JavaScript syntax checks on changed JS files:
+
+```powershell
+node --check public\assets\js\store-pos.js
+```
+
+Check migration status:
+
+```powershell
+php spark migrate:status
+```
+
+## Common Startup Mistakes
+
+- Opening `http://127.0.0.1:8080` when `php spark serve` announced `http://localhost:8080`.
+- Opening `http://localhost:8082` while `.env` `app.baseURL` is still `http://localhost:8080/`.
+- Starting `php spark serve --port 8082` without changing `.env` to the same `8082` base URL.
+- Starting the PHP server before MySQL is running.
+- Changing `.env` `app.baseURL` without restarting `php spark serve`.
+- Running commands from `D:\BEMS` instead of `D:\xampp\htdocs\ibems-tailwind-test`.
+- Using the old `D:\xampp\htdocs\ibems` project folder instead of the current advanced version.
+
+## Repository
+
+GitHub repository:
+
+```text
+https://github.com/DonDon14/ibems-capstone
+```
+
+Current working branch used for the advanced local version:
+
+```text
+tailwind-2026-migration
+```

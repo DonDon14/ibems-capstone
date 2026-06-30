@@ -9,6 +9,7 @@ $routes->get('/', 'PageController::login');
 
 $routes->post('auth/login', 'AuthController::login');
 $routes->post('auth/logout', 'AuthController::logout');
+$routes->get('auth/logout', 'AuthController::logout');
 $routes->get('auth/me', 'AuthController::me');
 $routes->get('auth/select-role', 'AuthController::selectRolePage');
 $routes->post('auth/select-role', 'AuthController::selectRole');
@@ -31,9 +32,8 @@ $routes->post('admin/user-view/update', 'AdminController::updateUser', ['filter'
 $routes->post('admin/user-view/import-csv', 'AdminController::importUsersCsv', ['filter' => 'role:ADMIN']);
 $routes->get('admin/products', 'AdminController::products', ['filter' => 'role:ADMIN']);
 $routes->get('admin/products/data', 'AdminController::productsData', ['filter' => 'role:ADMIN']);
-$routes->post('admin/products/create', 'AdminController::createProduct', ['filter' => 'role:ADMIN']);
-$routes->post('admin/products/update', 'AdminController::updateProduct', ['filter' => 'role:ADMIN']);
-$routes->post('admin/products/toggle-status', 'AdminController::toggleProductStatus', ['filter' => 'role:ADMIN']);
+$routes->get('admin/audit', 'AdminController::audit', ['filter' => 'role:ADMIN']);
+$routes->get('admin/audit/data', 'AdminController::auditData', ['filter' => 'role:ADMIN']);
 $routes->get('admin/stores', 'AdminController::stores', ['filter' => 'role:ADMIN']);
 $routes->get('admin/stores/data', 'AdminController::storesData', ['filter' => 'role:ADMIN']);
 $routes->get('admin/stores/(:num)', 'AdminController::storeDetails/$1', ['filter' => 'role:ADMIN']);
@@ -82,6 +82,8 @@ $routes->post('store/inventory/update-product', 'StoreController::updateProduct'
 
 $routes->get('user/dashboard', 'UserController::dashboard', ['filter' => 'role:USER,ADMIN']);
 $routes->get('user/dashboard/data', 'UserController::dashboardData', ['filter' => 'role:USER,ADMIN']);
+$routes->get('user/debt-pin/status', 'UserController::debtPinStatus', ['filter' => 'role:USER,ADMIN']);
+$routes->post('user/debt-pin/set', 'UserController::setDebtPin', ['filter' => 'role:USER,ADMIN']);
 $routes->get('user/history', 'UserController::history', ['filter' => 'role:USER,ADMIN']);
 $routes->get('user/summary', 'UserController::summary', ['filter' => 'role:USER,ADMIN']);
 $routes->get('user/transactions', 'UserController::transactions', ['filter' => 'role:USER,ADMIN']);

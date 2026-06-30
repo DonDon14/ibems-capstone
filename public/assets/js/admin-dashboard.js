@@ -131,6 +131,88 @@ function adRenderTopStores(rows) {
     `).join("");
 }
 
+function adPaymentLabel(value) {
+    return String(value || "UNKNOWN")
+        .toLowerCase()
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function adRenderStoreDayStatus(summary) {
+    const container = document.getElementById("ad-store-day-status");
+    if (!container) return;
+
+    const rows = [
+        { label: "Open Today", value: Number(summary.stores_open_today || 0), tone: "ready" },
+        { label: "Closed Today", value: Number(summary.stores_closed_today || 0), tone: "neutral" },
+        { label: "Not Opened", value: Number(summary.stores_not_open_today || 0), tone: Number(summary.stores_not_open_today || 0) > 0 ? "warning" : "ready" },
+    ];
+
+    container.innerHTML = rows.map((row) => `
+        <div class="admin-status-pill is-${adEscape(row.tone)}">
+            <span>${adEscape(row.label)}</span>
+            <strong>${row.value}</strong>
+        </div>
+    `).join("");
+}
+
+function adRenderAlerts(rows) {
+    const container = document.getElementById("ad-alerts-list");
+    if (!container) return;
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+        container.innerHTML = '<div class="admin-empty-state"><i class="bi bi-check2-circle"></i><span>No operational alerts right now.</span></div>';
+        return;
+    }
+
+    container.innerHTML = rows.map((row) => {
+        const href = String(row.href || "").trim();
+        const tag = href ? "a" : "div";
+        const hrefAttr = href ? ` href="${adEscape(href)}"` : "";
+        return `
+            <${tag}${hrefAttr} class="admin-alert-item is-${adEscape(row.tone || "warning")}">
+                <span class="admin-alert-label">${adEscape(row.label || "Alert")}</span>
+                <span class="admin-alert-copy">
+                    <strong>${adEscape(row.title || "Attention needed")}</strong>
+                    <small>${adEscape(row.detail || "")}</small>
+                </span>
+                ${href ? '<i class="bi bi-arrow-right"></i>' : ""}
+            </${tag}>
+        `;
+    }).join("");
+}
+
+function adRenderPaymentBreakdown(rows) {
+    const container = document.getElementById("ad-payment-breakdown");
+    if (!container) return;
+
+    if (!Array.isArray(rows) || rows.length === 0) {
+        container.innerHTML = '<div class="admin-empty-state">No payments recorded in the last 7 days.</div>';
+        return;
+    }
+
+    const totalSales = rows.reduce((sum, row) => sum + Number(row.sales || 0), 0);
+    container.innerHTML = rows.map((row) => {
+        const sales = Number(row.sales || 0);
+        const pct = totalSales > 0 ? Math.round((sales / totalSales) * 100) : 0;
+        return `
+            <div class="admin-payment-item">
+                <div class="admin-payment-row">
+                    <strong>${adEscape(adPaymentLabel(row.payment_method))}</strong>
+                    <span>${adEscape(adMoney(sales))}</span>
+                </div>
+                <div class="admin-payment-meta">
+                    <span>${Number(row.transactions || 0)} txn(s)</span>
+                    <span>${pct}%</span>
+                </div>
+                <div class="admin-payment-track" aria-hidden="true">
+                    <i style="width: ${pct}%;"></i>
+                </div>
+            </div>
+        `;
+    }).join("");
+}
+
 async function adLoadDashboard() {
     const totalStoresEl = document.getElementById("ad-total-stores");
     const activeOfficersEl = document.getElementById("ad-active-store-officers");
@@ -158,12 +240,15 @@ async function adLoadDashboard() {
             `Today Sales: ${adMoney(summary.today_sales || 0)}`,
             `Total Debt: ${adMoney(summary.total_debt || 0)}`,
         ].join(" | ");
+        adRenderStoreDayStatus(summary);
+        adRenderAlerts(data.alerts || []);
 
         const analytics = data.analytics || {};
         adDestroyCharts();
         adRenderSalesTrendChart(analytics.trend || []);
         adRenderTopItemsChart(analytics.top_selling_items || []);
         adRenderTopStores(analytics.top_stores || []);
+        adRenderPaymentBreakdown(analytics.payment_breakdown || []);
     } catch (error) {
         totalStoresEl.textContent = "-";
         activeOfficersEl.textContent = "-";
@@ -171,6 +256,9 @@ async function adLoadDashboard() {
         openAlertsEl.textContent = "-";
         healthMessageEl.textContent = "Unable to load operations status right now.";
         healthBreakdownEl.textContent = "";
+        adRenderStoreDayStatus({});
+        adRenderAlerts([]);
+        adRenderPaymentBreakdown([]);
         adDestroyCharts();
         adRenderTopStores([]);
     }

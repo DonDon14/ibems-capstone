@@ -1,6 +1,7 @@
 <?= $this->extend('layouts/user') ?>
 
 <?= $this->section('styles') ?>
+<link rel="stylesheet" href="<?= base_url('assets/css/user-portal.css') ?>">
 <link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>">
 <?= $this->endSection() ?>
 
@@ -13,6 +14,14 @@
 
     <div id="user-receipt-page-content"></div>
     <p id="user-receipt-page-result" class="stores-result"></p>
+    <div class="user-receipt-actions">
+        <a href="<?= site_url('user/history') ?>" class="history-action alt">
+            <i class="bi bi-arrow-left"></i> Back to History
+        </a>
+        <button id="user-receipt-page-print" type="button" class="primary-btn">
+            <i class="bi bi-printer"></i> Print Receipt
+        </button>
+    </div>
 </section>
 <?= $this->endSection() ?>
 
@@ -22,6 +31,8 @@
     (async function () {
         const transactionId = <?= (int) ($transaction_id ?? 0) ?>;
         const resultEl = document.getElementById("user-receipt-page-result");
+        const printBtn = document.getElementById("user-receipt-page-print");
+        let currentReceipt = null;
 
         try {
             const response = await fetch(`/user/transactions/${transactionId}`);
@@ -31,7 +42,7 @@
             }
 
             const tx = data.transaction;
-            const receipt = {
+            currentReceipt = {
                 transactionId: tx.id,
                 clientTxnId: tx.client_txn_id,
                 createdAt: tx.created_at,
@@ -43,11 +54,17 @@
                 lookupUrl: `${window.location.origin}/user/receipt/${encodeURIComponent(String(tx.id))}`,
             };
 
-            window.IbemsReceipt.renderReceipt("user-receipt-page-content", receipt);
+            window.IbemsReceipt.renderReceipt("user-receipt-page-content", currentReceipt);
         } catch (error) {
             resultEl.textContent = error.message || "Unable to load receipt.";
             resultEl.style.color = "#b91c1c";
         }
+
+        printBtn?.addEventListener("click", () => {
+            if (currentReceipt && window.IbemsReceipt) {
+                window.IbemsReceipt.printReceipt(currentReceipt);
+            }
+        });
     })();
 </script>
 <?= $this->endSection() ?>

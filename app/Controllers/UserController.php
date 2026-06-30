@@ -2,8 +2,11 @@
 
 namespace App\Controllers;
 
+use App\Models\AuditLogModel;
+use App\Models\UserModel;
 use CodeIgniter\Controller;
 use Config\Database;
+use Config\Services;
 
 class UserController extends Controller
 {
@@ -111,6 +114,7 @@ class UserController extends Controller
             'debt_added_total' => $debtAddedTotal,
             'debt_deducted_total' => $deductedTotal,
         ];
+        $summary = array_merge($summary, $this->buildDebtStatus($summary['credit_limit'], $summary['current_debt']));
 
         return $this->response->setJSON([
             'status' => 'success',
@@ -137,6 +141,109 @@ class UserController extends Controller
                     'remarks' => (string) ($row['remarks'] ?? ''),
                 ];
             }, $recentCashbook),
+        ]);
+    }
+
+    public function debtPinStatus()
+    {
+        $userId = (int) session()->get('user_id');
+        if ($userId <= 0) {
+            return $this->response->setStatusCode(401)->setJSON([
+                'status' => 'error',
+                'message' => 'Not authenticated.',
+            ]);
+        }
+
+        $userModel = new UserModel();
+        $user = $userModel->find($userId);
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'has_pin' => $user && trim((string) ($user['debt_pin_hash'] ?? '')) !== '',
+        ]);
+    }
+
+    public function setDebtPin()
+    {
+        $userId = (int) session()->get('user_id');
+        if ($userId <= 0) {
+            return $this->response->setStatusCode(401)->setJSON([
+                'status' => 'error',
+                'message' => 'Not authenticated.',
+            ]);
+        }
+
+        $payload = $this->request->getJSON(true);
+        if (!is_array($payload)) {
+            $payload = $this->request->getPost();
+        }
+
+        $validation = Services::validation();
+        $validation->setRules([
+            'pin' => 'required|regex_match[/^[0-9]{4,6}$/]',
+            'pin_confirm' => 'required|matches[pin]',
+        ], [
+            'pin' => [
+                'regex_match' => 'Debt PIN must be 4 to 6 digits.',
+            ],
+            'pin_confirm' => [
+                'matches' => 'Debt PIN confirmation does not match.',
+            ],
+        ]);
+
+        if (!$validation->run($payload)) {
+            $errors = $validation->getErrors();
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => $errors[array_key_first($errors)] ?? 'Invalid debt PIN.',
+            ]);
+        }
+
+        $userModel = new UserModel();
+        $user = $userModel->find($userId);
+        if (!$user) {
+            return $this->response->setStatusCode(404)->setJSON([
+                'status' => 'error',
+                'message' => 'User account not found.',
+            ]);
+        }
+
+        $hasExistingPin = trim((string) ($user['debt_pin_hash'] ?? '')) !== '';
+        if ($hasExistingPin) {
+            $currentPassword = (string) ($payload['current_password'] ?? '');
+            if ($currentPassword === '' || !password_verify($currentPassword, (string) ($user['password_hash'] ?? ''))) {
+                return $this->response->setStatusCode(400)->setJSON([
+                    'status' => 'error',
+                    'message' => 'Enter your current password to change your debt PIN.',
+                ]);
+            }
+        }
+
+        $pin = (string) ($payload['pin'] ?? '');
+        if (!$userModel->update($userId, [
+            'debt_pin_hash' => password_hash($pin, PASSWORD_BCRYPT),
+        ])) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'status' => 'error',
+                'message' => 'Unable to update debt PIN.',
+            ]);
+        }
+
+        (new AuditLogModel())->insert([
+            'actor_id' => $userId,
+            'action' => $hasExistingPin ? 'CHANGE_DEBT_PIN' : 'SET_DEBT_PIN',
+            'entity' => 'users',
+            'entity_id' => $userId,
+            'payload_json' => json_encode([
+                'self_service' => true,
+            ]),
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'message' => $hasExistingPin ? 'Debt PIN updated.' : 'Debt PIN set.',
+            'has_pin' => true,
         ]);
     }
 
@@ -197,7 +304,7 @@ class UserController extends Controller
                 'total_spent' => (float) ($txnSummary['total_spent'] ?? 0),
                 'debt_added_total' => $debtAddedTotal,
                 'debt_deducted_total' => $deductedTotal,
-            ],
+            ] + $this->buildDebtStatus((float) ($balance['credit_limit'] ?? 0), (float) ($balance['current_debt'] ?? 0)),
         ]);
     }
 
@@ -378,5 +485,47 @@ class UserController extends Controller
         return view('user/receipt', [
             'transaction_id' => $transactionId,
         ]);
+    }
+
+    private function buildDebtStatus(float $creditLimit, float $currentDebt): array
+    {
+        if ($currentDebt <= 0) {
+            return [
+                'debt_status' => 'paid',
+                'debt_status_label' => 'Paid',
+                'debt_status_tone' => 'success',
+                'debt_status_message' => 'Your account has no unpaid debt.',
+                'debt_ratio' => 0.0,
+            ];
+        }
+
+        if ($creditLimit > 0 && $currentDebt > $creditLimit) {
+            return [
+                'debt_status' => 'over_limit',
+                'debt_status_label' => 'Over Limit',
+                'debt_status_tone' => 'danger',
+                'debt_status_message' => 'Your current debt is above your credit limit. Please coordinate with Accounting before adding more debt purchases.',
+                'debt_ratio' => $currentDebt / $creditLimit,
+            ];
+        }
+
+        $ratio = $creditLimit > 0 ? $currentDebt / $creditLimit : 1.0;
+        if ($ratio >= 0.5) {
+            return [
+                'debt_status' => 'partially_settled',
+                'debt_status_label' => 'Partially Settled',
+                'debt_status_tone' => 'warning',
+                'debt_status_message' => 'You have an unpaid balance and have used more than half of your credit limit.',
+                'debt_ratio' => $ratio,
+            ];
+        }
+
+        return [
+            'debt_status' => 'unpaid',
+            'debt_status_label' => 'Unpaid',
+            'debt_status_tone' => 'info',
+            'debt_status_message' => 'You have an unpaid balance within your available credit limit.',
+            'debt_ratio' => $ratio,
+        ];
     }
 }

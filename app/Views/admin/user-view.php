@@ -4,7 +4,7 @@
 <section class="admin-overview-shell space-y-5">
     <div class="admin-overview-head">
         <h3 class="text-3xl font-bold tracking-tight text-slate-900">Employee Records</h3>
-        <p class="mt-1 text-base text-slate-600">Manage employee and student profiles, government IDs, salary, and credit.</p>
+        <p class="mt-1 text-base text-slate-600">Manage employee and student profiles, roles, salary, credit, and account status.</p>
     </div>
 
     <div class="summary-grid grid gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -176,7 +176,7 @@
         <div class="field space-y-1">
             <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-import-file">CSV File</label>
             <input id="uv-import-file" class="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-blue-700" type="file" accept=".csv,text/csv">
-            <small class="text-sm text-slate-500">Required columns: name, email, role, user_type. Optional: employee_id, base_salary, credit_limit, is_active.</small>
+            <small class="text-sm text-slate-500">Required columns: name, email, role, user_type. Use comma, pipe, semicolon, or spaces for multiple roles. Optional: employee_id, base_salary, credit_limit, is_active.</small>
         </div>
         <div class="admin-modal-actions">
             <button id="uv-import-submit" class="primary-btn inline-flex h-10 items-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700" type="button">Import</button>

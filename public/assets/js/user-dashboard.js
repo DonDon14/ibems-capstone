@@ -21,6 +21,155 @@ function uEntryLabel(value) {
 }
 
 let uTrendChart = null;
+let uHasDebtPin = false;
+
+function uSetText(id, value) {
+    const el = document.getElementById(id);
+    if (el) el.textContent = value;
+}
+
+function uApplyDebtStatus(prefix, summary) {
+    const status = String(summary.debt_status || "unpaid");
+    const tone = String(summary.debt_status_tone || "info");
+    const label = String(summary.debt_status_label || "Unpaid");
+    const message = String(summary.debt_status_message || "You have an unpaid balance within your available credit limit.");
+    const card = document.getElementById(`${prefix}-debt-status-card`);
+
+    if (card) {
+        card.classList.remove(
+            "user-status-card--success",
+            "user-status-card--info",
+            "user-status-card--warning",
+            "user-status-card--danger"
+        );
+        card.classList.add(`user-status-card--${tone}`);
+        card.dataset.status = status;
+    }
+
+    uSetText(`${prefix}-debt-status-label`, label);
+    uSetText(`${prefix}-debt-status-message`, message);
+}
+
+function uSetPinResult(message = "", tone = "") {
+    const result = document.getElementById("u-pin-form-result");
+    if (!result) return;
+    result.textContent = message;
+    result.classList.remove("is-error", "is-success");
+    if (tone) result.classList.add(tone === "success" ? "is-success" : "is-error");
+}
+
+function uRenderPinStatus() {
+    uSetText(
+        "u-debt-pin-status",
+        uHasDebtPin
+            ? "PIN is configured. Stores can verify debt purchases using your PIN."
+            : "No PIN is configured yet. Set one before using debt payment at POS."
+    );
+
+    const button = document.getElementById("u-open-pin-modal");
+    if (button) {
+        button.innerHTML = uHasDebtPin ? '<i class="bi bi-key"></i> Change PIN' : '<i class="bi bi-key"></i> Set PIN';
+    }
+}
+
+async function uLoadDebtPinStatus() {
+    try {
+        const response = await fetch("/user/debt-pin/status");
+        const data = await response.json();
+        if (!data || data.status !== "success") {
+            throw new Error(data?.message || "Unable to load debt PIN status.");
+        }
+        uHasDebtPin = !!data.has_pin;
+    } catch (error) {
+        uHasDebtPin = false;
+        uSetText("u-debt-pin-status", "Unable to check PIN status right now.");
+    } finally {
+        uRenderPinStatus();
+    }
+}
+
+function uOpenPinModal() {
+    const modal = document.getElementById("u-debt-pin-modal");
+    const currentWrap = document.getElementById("u-current-password-wrap");
+    const help = document.getElementById("u-pin-form-help");
+    const form = document.getElementById("u-debt-pin-form");
+    if (form) form.reset();
+    uSetPinResult("");
+
+    if (currentWrap) currentWrap.classList.toggle("is-hidden", !uHasDebtPin);
+    if (help) {
+        help.textContent = uHasDebtPin
+            ? "Enter your current password, then choose a new 4 to 6 digit debt PIN."
+            : "Use a 4 to 6 digit PIN. Stores will ask for this only when charging purchases to debt.";
+    }
+
+    if (modal) modal.classList.remove("is-hidden");
+}
+
+function uClosePinModal() {
+    const modal = document.getElementById("u-debt-pin-modal");
+    if (modal) modal.classList.add("is-hidden");
+}
+
+function uNormalizePinInput(event) {
+    const input = event.target;
+    input.value = String(input.value || "").replace(/\D/g, "").slice(0, 6);
+}
+
+async function uSubmitDebtPin(event) {
+    event.preventDefault();
+
+    const pin = String(document.getElementById("u-debt-pin")?.value || "");
+    const pinConfirm = String(document.getElementById("u-debt-pin-confirm")?.value || "");
+    const currentPassword = String(document.getElementById("u-current-password")?.value || "");
+
+    if (!/^[0-9]{4,6}$/.test(pin)) {
+        uSetPinResult("Debt PIN must be 4 to 6 digits.", "error");
+        return;
+    }
+    if (pin !== pinConfirm) {
+        uSetPinResult("Debt PIN confirmation does not match.", "error");
+        return;
+    }
+    if (uHasDebtPin && !currentPassword) {
+        uSetPinResult("Enter your current password to change your debt PIN.", "error");
+        return;
+    }
+
+    const submitBtn = document.getElementById("u-save-pin");
+    try {
+        if (submitBtn) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
+        }
+
+        const response = await fetch("/user/debt-pin/set", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                current_password: currentPassword,
+                pin,
+                pin_confirm: pinConfirm,
+            }),
+        });
+        const data = await response.json();
+        if (!data || data.status !== "success") {
+            throw new Error(data?.message || "Unable to update debt PIN.");
+        }
+
+        uHasDebtPin = true;
+        uRenderPinStatus();
+        uSetPinResult(data.message || "Debt PIN saved.", "success");
+        setTimeout(uClosePinModal, 550);
+    } catch (error) {
+        uSetPinResult(error.message || "Unable to update debt PIN.", "error");
+    } finally {
+        if (submitBtn) {
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Save PIN';
+        }
+    }
+}
 
 function uRenderCreditMeter(summary) {
     const creditLimit = Number(summary.credit_limit || 0);
@@ -128,7 +277,7 @@ function uRenderRecentCashbook(rows) {
                     <span>${uEscape(sign + " " + uMoney(row.amount || 0))}</span>
                 </div>
                 <div class="stack-meta">
-                    ${uEscape(String(row.created_at || "").replace("T", " "))} · Debt After: ${uEscape(uMoney(row.debt_after || 0))}
+                    ${uEscape(String(row.created_at || "").replace("T", " "))} - Debt After: ${uEscape(uMoney(row.debt_after || 0))}
                 </div>
             </div>
         `;
@@ -172,12 +321,18 @@ async function loadUserDashboard() {
         if (byId("u-debt-deducted-total")) byId("u-debt-deducted-total").textContent = uMoney(s.debt_deducted_total);
         if (byId("u-total-spent")) byId("u-total-spent").textContent = uMoney(s.total_spent);
         if (byId("u-txn-count")) byId("u-txn-count").textContent = String(s.txn_count || 0);
+        uApplyDebtStatus("u", s);
         uRenderCreditMeter(s);
 
         uRenderTrend(data.trend || []);
         uRenderRecentCashbook(data.recent_cashbook || []);
         uRenderRecentTransactions(data.recent_transactions || []);
     } catch (error) {
+        uApplyDebtStatus("u", {
+            debt_status_tone: "danger",
+            debt_status_label: "Unavailable",
+            debt_status_message: "Unable to load your debt status right now.",
+        });
         uRenderCreditMeter({});
         uRenderTrend([]);
         uRenderRecentCashbook([]);
@@ -185,4 +340,15 @@ async function loadUserDashboard() {
     }
 }
 
+document.getElementById("u-open-pin-modal")?.addEventListener("click", uOpenPinModal);
+document.getElementById("u-pin-modal-close")?.addEventListener("click", uClosePinModal);
+document.getElementById("u-pin-modal-cancel")?.addEventListener("click", uClosePinModal);
+document.getElementById("u-debt-pin-modal")?.addEventListener("click", (event) => {
+    if (event.target.id === "u-debt-pin-modal") uClosePinModal();
+});
+document.getElementById("u-debt-pin")?.addEventListener("input", uNormalizePinInput);
+document.getElementById("u-debt-pin-confirm")?.addEventListener("input", uNormalizePinInput);
+document.getElementById("u-debt-pin-form")?.addEventListener("submit", uSubmitDebtPin);
+
 loadUserDashboard();
+uLoadDebtPinStatus();

@@ -19,6 +19,7 @@
             <h4><i class="bi bi-heart-pulse"></i> Operations Health</h4>
             <p id="ad-health-message">Loading operations status...</p>
             <p id="ad-health-breakdown" class="dash-health-breakdown"></p>
+            <div id="ad-store-day-status" class="admin-status-grid"></div>
         </article>
         <article class="dash-panel admin-quick-panel">
             <h4><i class="bi bi-lightning-charge"></i> Quick Access</h4>
@@ -47,6 +48,21 @@
                     </span>
                     <i class="bi bi-arrow-right quick-link-arrow"></i>
                 </a>
+            </div>
+        </article>
+    </div>
+
+    <div class="dash-panels">
+        <article class="dash-panel">
+            <h4><i class="bi bi-exclamation-triangle"></i> Operational Alerts</h4>
+            <div id="ad-alerts-list" class="admin-alert-list">
+                <div class="admin-empty-state">Loading alerts...</div>
+            </div>
+        </article>
+        <article class="dash-panel">
+            <h4><i class="bi bi-credit-card-2-front"></i> Payment Breakdown (Last 7 Days)</h4>
+            <div id="ad-payment-breakdown" class="admin-payment-list">
+                <div class="admin-empty-state">Loading payment breakdown...</div>
             </div>
         </article>
     </div>

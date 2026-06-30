@@ -1631,7 +1631,7 @@ class StoreController extends BaseController
         $db = Database::connect();
 
         $builder = $db->table('users u')
-            ->select('u.id, u.employee_id, u.name, u.email, u.user_type, u.is_active, b.credit_limit, b.current_debt')
+            ->select('u.id, u.employee_id, u.name, u.email, u.user_type, u.is_active, u.debt_pin_hash, b.credit_limit, b.current_debt')
             ->join('balances b', 'b.user_id = u.id', 'inner')
             ->where('u.is_active', 1)
             ->whereIn('u.user_type', ['faculty', 'staff'])
@@ -1652,6 +1652,8 @@ class StoreController extends BaseController
             $creditLimit = (float) $row['credit_limit'];
             $currentDebt = (float) $row['current_debt'];
             $row['available_credit'] = max(0, $creditLimit - $currentDebt);
+            $row['has_debt_pin'] = trim((string) ($row['debt_pin_hash'] ?? '')) !== '';
+            unset($row['debt_pin_hash']);
             return $row;
         }, $rows);
 

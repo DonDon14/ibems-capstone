@@ -30,6 +30,12 @@ function formatTypeLabel(type) {
     return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
 }
 
+function renderRoleChips(roles) {
+    return roles.map((role) => `
+        <span class="uv-role-chip inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">${aEscape(formatRoleLabel(role))}</span>
+    `).join("");
+}
+
 function normalizeRoles(roles, fallbackRole) {
     if (Array.isArray(roles) && roles.length) {
         return [...new Set(roles.map((role) => String(role || "").toUpperCase()).filter(Boolean))];
@@ -127,7 +133,6 @@ function renderUserTable(rows) {
 
     body.innerHTML = rows.map((row) => {
         const roles = normalizeRoles(row.roles, row.role);
-        const mainRole = roles[0] || "USER";
         const statusText = row.is_active ? "Active" : "Inactive";
         const debt = Number(row.current_debt || 0);
         const creditLimit = Number(row.credit_limit || 0);
@@ -138,18 +143,18 @@ function renderUserTable(rows) {
             .map((part) => part.charAt(0).toUpperCase())
             .join("") || "U";
         return `
-        <article class="uv-record-row flex cursor-pointer flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:shadow-sm" data-user-id="${row.id}" title="View employee details">
-            <div class="uv-person flex min-w-0 items-center gap-3">
+        <article class="uv-record-row flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:shadow-sm" data-user-id="${row.id}">
+            <button class="uv-row-view flex min-w-0 grow items-center gap-3 text-left" type="button" data-view-user="${row.id}" title="View employee details">
                 <div class="uv-avatar inline-flex h-11 w-11 flex-none items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-sm font-bold text-blue-700">${aEscape(initials)}</div>
                 <div class="uv-person-meta min-w-0">
                     <div class="uv-name-line flex flex-wrap items-center gap-2">
                         <strong class="text-base font-bold text-slate-900">${aEscape(row.name || "-")}</strong>
-                        <span class="uv-tag inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-700">${aEscape(formatRoleLabel(mainRole))}</span>
                         <span class="uv-status inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${row.is_active ? "is-active bg-emerald-100 text-emerald-700" : "is-inactive bg-amber-100 text-amber-700"}">${statusText}</span>
                     </div>
                     <div class="uv-subline truncate text-sm text-slate-500">${aEscape(row.employee_id || "-")} | ${aEscape(formatTypeLabel(row.user_type))} | ${aEscape(row.email || "-")}</div>
+                    <div class="uv-role-list mt-2 flex flex-wrap gap-1.5">${renderRoleChips(roles)}</div>
                 </div>
-            </div>
+            </button>
             <div class="uv-finance flex flex-wrap items-center justify-end gap-4">
                 <div class="uv-fin-kv grid gap-0.5">
                     <span class="text-xs text-slate-500">Debt</span>
@@ -159,7 +164,7 @@ function renderUserTable(rows) {
                     <span class="text-xs text-slate-500">Credit Limit</span>
                     <strong class="text-sm font-semibold text-slate-900">${aEscape(aMoney(creditLimit))}</strong>
                 </div>
-                <button class="secondary-btn btn-sm" type="button" data-edit-user="${row.id}">
+                <button class="secondary-btn btn-sm uv-edit-btn" type="button" data-edit-user="${row.id}" title="Edit employee profile">
                     <i class="bi bi-pencil"></i> Edit
                 </button>
             </div>
@@ -333,7 +338,8 @@ async function importUsersCsv() {
     }
 
     closeModal("uv-import-modal");
-    setUvResult(`Import done. Created: ${data.created}, Updated: ${data.updated}, Invalid: ${data.invalid}`, "ok");
+    const invalidNote = Number(data.invalid || 0) > 0 ? ` ${data.invalid} row(s) skipped.` : "";
+    setUvResult(`Import done. Created: ${data.created}, updated: ${data.updated}.${invalidNote}`, Number(data.invalid || 0) > 0 ? "error" : "ok");
     await loadUserView();
 }
 
@@ -430,9 +436,9 @@ document.getElementById("uv-body").addEventListener("click", (event) => {
         return;
     }
 
-    const row = event.target.closest(".uv-record-row");
-    if (!row) return;
-    const userId = Number(row.getAttribute("data-user-id") || 0);
+    const viewTarget = event.target.closest("[data-view-user], .uv-record-row");
+    if (!viewTarget) return;
+    const userId = Number(viewTarget.getAttribute("data-view-user") || viewTarget.getAttribute("data-user-id") || 0);
     if (userId) openViewUser(userId);
 });
 

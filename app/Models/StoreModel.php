@@ -25,7 +25,7 @@ class StoreModel extends Model
 
     protected array $casts = [
         'id'         => 'integer',
-        'officer_id' => 'integer',
+        'officer_id' => '?integer',
         'is_active'  => 'boolean',
     ];
 

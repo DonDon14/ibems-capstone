@@ -9,6 +9,7 @@ let activeCategory = "All";
 let debtCustomers = [];
 let selectedDebtCustomerId = null;
 let selectedDebtCustomer = null;
+let selectedDebtPin = "";
 let isSubmitting = false;
 let lastReceipt = null;
 let lastCardAddAt = 0;
@@ -662,8 +663,13 @@ function autoSelectDebtCustomerByCode(rawCode) {
 
     selectedDebtCustomerId = Number(exact.id);
     selectedDebtCustomer = exact;
+    selectedDebtPin = "";
+    const debtPinInput = document.getElementById("debt-pin-input");
+    if (debtPinInput) debtPinInput.value = "";
     document.getElementById("debt-customer-search").value = exact.name;
     document.getElementById("debt-customer-suggestions").style.display = "none";
+    updateDebtPinUi();
+    updateCheckoutState();
     setResult(`Debt customer selected: ${exact.name}`, "ok");
     return true;
 }
@@ -673,6 +679,8 @@ async function handleDetectedScannerCode(rawValue) {
         const searchInput = document.getElementById("debt-customer-search");
         searchInput.value = rawValue;
         selectedDebtCustomerId = null;
+        selectedDebtCustomer = null;
+        selectedDebtPin = "";
         await loadDebtCustomers(rawValue);
         autoSelectDebtCustomerByCode(rawValue);
         await closeScannerModal();
@@ -877,6 +885,41 @@ function formatCredit(customer) {
     return `Avail ${formatMoney(available)} | Debt ${formatMoney(debt)}`;
 }
 
+function updateDebtPinUi() {
+    const wrap = document.getElementById("debt-pin-wrap");
+    const help = document.getElementById("debt-pin-help");
+    const input = document.getElementById("debt-pin-input");
+    if (!wrap || !help || !input) return;
+
+    const paymentMethod = document.getElementById("payment-method")?.value || "";
+    const shouldShow = paymentMethod === "debt" && !!selectedDebtCustomerId;
+    wrap.style.display = shouldShow ? "flex" : "none";
+
+    if (!shouldShow) {
+        selectedDebtPin = "";
+        input.value = "";
+        input.disabled = false;
+        help.textContent = "PIN is verified securely when the transaction is submitted.";
+        help.classList.remove("is-error", "is-ready");
+        return;
+    }
+
+    if (selectedDebtCustomer && selectedDebtCustomer.has_debt_pin === false) {
+        input.disabled = true;
+        input.value = "";
+        selectedDebtPin = "";
+        help.textContent = "This customer must set a debt PIN in the User Portal before using debt payment.";
+        help.classList.add("is-error");
+        help.classList.remove("is-ready");
+        return;
+    }
+
+    input.disabled = false;
+    help.textContent = selectedDebtPin ? "PIN ready for secure verification." : "Ask the debtor to enter their PIN before checkout.";
+    help.classList.toggle("is-ready", !!selectedDebtPin);
+    help.classList.remove("is-error");
+}
+
 function getStockState(stock, inCart = 0, threshold = 10) {
     const safeStock = Number(stock || 0);
     const safeInCart = Number(inCart || 0);
@@ -921,6 +964,20 @@ function updateCheckoutState() {
         submitBtn.disabled = true;
         submitBtn.innerHTML = '<i class="bi bi-person-check"></i> Select Debt Customer';
         return;
+    }
+
+    if (paymentMethod === "debt") {
+        if (selectedDebtCustomer && selectedDebtCustomer.has_debt_pin === false) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="bi bi-shield-exclamation"></i> Customer PIN Not Set';
+            return;
+        }
+
+        if (!selectedDebtPin) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="bi bi-shield-lock"></i> Enter Debt PIN';
+            return;
+        }
     }
 
     submitBtn.disabled = false;
@@ -1142,6 +1199,7 @@ function updateDebtCustomerVisibility() {
 
     if (paymentMethod === "debt") {
         wrap.style.display = "flex";
+        updateDebtPinUi();
         if (debtCustomers.length === 0) {
             loadDebtCustomers().catch(() => setResult("Unable to load debt customers.", "error"));
         }
@@ -1151,8 +1209,12 @@ function updateDebtCustomerVisibility() {
     wrap.style.display = "none";
     selectedDebtCustomerId = null;
     selectedDebtCustomer = null;
+    selectedDebtPin = "";
     document.getElementById("debt-customer-search").value = "";
+    const debtPinInput = document.getElementById("debt-pin-input");
+    if (debtPinInput) debtPinInput.value = "";
     document.getElementById("debt-customer-suggestions").style.display = "none";
+    updateDebtPinUi();
 }
 
 function renderPaymentMethods() {
@@ -1489,13 +1551,14 @@ function buildPendingTransaction() {
 
     if (cart.length === 0) return null;
 
-    if (paymentMethod === "debt" && !selectedDebtCustomerId) return null;
+    if (paymentMethod === "debt" && (!selectedDebtCustomerId || !selectedDebtPin)) return null;
 
     const payload = {
         customer_type: "walk_in",
         customer_user_id: paymentMethod === "debt" ? selectedDebtCustomerId : null,
         store_id: activeStoreId,
         payment_method: paymentMethod,
+        debt_pin: paymentMethod === "debt" ? selectedDebtPin : "",
         items: cart.map((item) => ({
             product_id: Number(item.product_id),
             qty: Number(item.qty),
@@ -1567,6 +1630,9 @@ async function processConfirmedTransaction(dataToProcess) {
 
             closeConfirmTransactionModal(true);
             cart = [];
+            selectedDebtPin = "";
+            const debtPinInput = document.getElementById("debt-pin-input");
+            if (debtPinInput) debtPinInput.value = "";
             await loadProducts();
             openReceiptModal(receipt);
             renderSuccessStrip(receipt);
@@ -1611,6 +1677,20 @@ async function submitTransaction() {
     if (document.getElementById("payment-method").value === "debt" && !selectedDebtCustomerId) {
         setResult("Select an employee (Faculty/Staff) for debt payment.", "error");
         return;
+    }
+
+    if (document.getElementById("payment-method").value === "debt") {
+        if (selectedDebtCustomer && selectedDebtCustomer.has_debt_pin === false) {
+            setResult("This customer must set a debt PIN in the User Portal before using debt payment.", "error");
+            updateCheckoutState();
+            return;
+        }
+
+        if (!selectedDebtPin) {
+            setResult("Enter the customer's debt PIN before checkout.", "error");
+            updateCheckoutState();
+            return;
+        }
     }
 
     const submitBtn = document.getElementById("submit-transaction");
@@ -1757,6 +1837,10 @@ document.getElementById("debt-customer-search").addEventListener("input", async 
     const query = event.target.value || "";
     selectedDebtCustomerId = null;
     selectedDebtCustomer = null;
+    selectedDebtPin = "";
+    const debtPinInput = document.getElementById("debt-pin-input");
+    if (debtPinInput) debtPinInput.value = "";
+    updateDebtPinUi();
     updateCheckoutState();
     await loadDebtCustomers(query);
 });
@@ -1771,10 +1855,21 @@ document.getElementById("debt-customer-suggestions").addEventListener("click", (
 
     selectedDebtCustomerId = customerId;
     selectedDebtCustomer = picked;
+    selectedDebtPin = "";
+    const debtPinInput = document.getElementById("debt-pin-input");
+    if (debtPinInput) debtPinInput.value = "";
     document.getElementById("debt-customer-search").value = picked.name;
     document.getElementById("debt-customer-suggestions").style.display = "none";
+    updateDebtPinUi();
     updateCheckoutState();
     setResult(`Debt customer selected: ${picked.name}`, "ok");
+});
+
+document.getElementById("debt-pin-input").addEventListener("input", (event) => {
+    selectedDebtPin = String(event.target.value || "").replace(/\D/g, "").slice(0, 6);
+    event.target.value = selectedDebtPin;
+    updateDebtPinUi();
+    updateCheckoutState();
 });
 
 document.addEventListener("click", (event) => {

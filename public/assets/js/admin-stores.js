@@ -61,9 +61,15 @@ function renderOfficerSuggestions(query) {
         const role = formatRoleLabel(officer.role);
         const type = formatTypeLabel(officer.user_type);
         const employee = officer.employee_id ? `${sEscape(officer.employee_id)} - ` : "";
+        const assignedStoreId = Number(officer.assigned_store_id || 0);
+        const isAssignedElsewhere = assignedStoreId > 0 && assignedStoreId !== Number(editingStoreId || 0);
+        const assignmentText = assignedStoreId > 0
+            ? `Assigned to ${officer.assigned_store_name || "another store"}`
+            : "Available";
         return `
-            <button class="officer-suggestion-item" type="button" data-officer-pick="${officer.id}">
-                ${employee}${sEscape(officer.name)} (${sEscape(officer.email)}) - ${sEscape(role)} / ${sEscape(type)}
+            <button class="officer-suggestion-item ${isAssignedElsewhere ? "is-disabled" : ""}" type="button" data-officer-pick="${officer.id}" ${isAssignedElsewhere ? "disabled" : ""}>
+                <span>${employee}${sEscape(officer.name)} (${sEscape(officer.email)})</span>
+                <small>${sEscape(role)} / ${sEscape(type)} - ${sEscape(assignmentText)}</small>
             </button>
         `;
     }).join("");
@@ -95,32 +101,19 @@ function renderStores(rows) {
         const logo = row.logo_url
             ? `<img src="${sEscape(row.logo_url)}" alt="${sEscape(row.store_name)} logo" class="store-logo-img">`
             : `<div class="store-logo-fallback">${sEscape(initials || "S")}</div>`;
+        const isActive = Number(row.is_active) === 1;
         return `
             <a href="/admin/stores/${row.id}" class="store-card">
                 <div class="store-card-logo">${logo}</div>
                 <div class="store-card-meta">
                     <strong>${sEscape(row.store_name)}</strong>
+                    <span class="status-badge ${isActive ? "active" : "inactive"}">${isActive ? "Active" : "Inactive"}</span>
                     <small>${sEscape(row.officer_name || "No assigned officer")}</small><br>
+                    ${row.officer_email ? `<small>${sEscape(row.officer_email)}</small><br>` : ""}
                     <small>${row.created_at ? sEscape(sDateTime(row.created_at)) : "-"}</small>
                 </div>
                 <div class="store-card-right">
-                    <button
-                        class="card-menu-btn"
-                        type="button"
-                        aria-label="Store actions"
-                        data-card-menu-toggle="${row.id}"
-                    >...</button>
-                    <div class="card-menu" data-card-menu="${row.id}">
-                        <button class="card-menu-item" type="button" data-edit-store="${row.id}">Edit</button>
-                        <button
-                            class="card-menu-item card-menu-status ${Number(row.is_active) === 1 ? "is-active" : "is-inactive"}"
-                            type="button"
-                            data-toggle-store="${row.id}"
-                            data-next-status="${Number(row.is_active) === 1 ? 0 : 1}"
-                        >
-                            ${Number(row.is_active) === 1 ? "Active" : "Inactive"}
-                        </button>
-                    </div>
+                    <button class="card-action-btn" type="button" data-edit-store="${row.id}"><i class="bi bi-pencil"></i> Edit</button>
                 </div>
             </a>
         `;
@@ -138,8 +131,10 @@ async function loadOfficers() {
 
 async function loadStores() {
     const q = (document.getElementById("store-search").value || "").trim();
+    const status = document.getElementById("store-status-filter")?.value || "";
     const params = new URLSearchParams();
     if (q) params.set("q", q);
+    if (status) params.set("status", status);
 
     const response = await fetch(`/admin/stores/data?${params.toString()}`);
     const data = await response.json();
@@ -201,8 +196,8 @@ async function saveStore() {
     const isActive = Number(document.getElementById("store-active").value || 1);
     const button = document.getElementById("store-save-btn");
 
-    if (!name || officerId <= 0) {
-        setStoresResult("Store name and officer are required.", "error");
+    if (!name) {
+        setStoresResult("Store name is required.", "error");
         return;
     }
 
@@ -239,17 +234,6 @@ async function saveStore() {
             return;
         }
 
-        if (editingStoreId && isActive !== -1) {
-            await fetch("/admin/stores/toggle-status", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    store_id: editingStoreId,
-                    is_active: isActive,
-                }),
-            });
-        }
-
         setStoresResult(editingStoreId ? "Store updated." : "Store created.", "ok");
         closeStoreModal();
         await loadStores();
@@ -261,36 +245,16 @@ async function saveStore() {
     }
 }
 
-async function toggleStoreStatus(storeId, nextStatus) {
-    const confirmed = window.confirm(`Confirm ${Number(nextStatus) === 1 ? "activation" : "deactivation"} of this store?`);
-    if (!confirmed) return;
-
-    const response = await fetch("/admin/stores/toggle-status", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            store_id: Number(storeId),
-            is_active: Number(nextStatus),
-        }),
-    });
-    const data = await response.json();
-    if (!data || data.status !== "success") {
-        setStoresResult(data?.message || "Failed to update store status.", "error");
-        return;
-    }
-
-    setStoresResult("Store status updated.", "ok");
-    await loadStores();
-}
-
 document.getElementById("store-search-btn").addEventListener("click", async () => {
     await loadStores();
 });
 
 document.getElementById("store-refresh-btn").addEventListener("click", async () => {
     document.getElementById("store-search").value = "";
+    document.getElementById("store-status-filter").value = "";
     await loadStores();
 });
+document.getElementById("store-status-filter").addEventListener("change", loadStores);
 
 document.getElementById("open-store-modal").addEventListener("click", () => openStoreModal("create"));
 document.getElementById("close-store-modal").addEventListener("click", closeStoreModal);
@@ -314,12 +278,17 @@ document.getElementById("store-officer-search").addEventListener("input", (event
     document.getElementById("store-officer-id").value = "";
     renderOfficerSuggestions(query);
 });
+document.getElementById("clear-store-officer").addEventListener("click", () => {
+    document.getElementById("store-officer-search").value = "";
+    document.getElementById("store-officer-id").value = "";
+    document.getElementById("store-officer-suggestions").style.display = "none";
+});
 document.getElementById("store-officer-search").addEventListener("focus", (event) => {
     renderOfficerSuggestions(event.target.value || "");
 });
 document.getElementById("store-officer-suggestions").addEventListener("click", (event) => {
     const item = event.target.closest("[data-officer-pick]");
-    if (!item) return;
+    if (!item || item.disabled) return;
     const officerId = Number(item.getAttribute("data-officer-pick") || 0);
     if (!officerId) return;
 
@@ -332,48 +301,17 @@ document.getElementById("store-officer-suggestions").addEventListener("click", (
 });
 
 document.getElementById("stores-gallery").addEventListener("click", async (event) => {
-    const toggleMenuBtn = event.target.closest("[data-card-menu-toggle]");
-    if (toggleMenuBtn) {
-        event.preventDefault();
-        const id = toggleMenuBtn.getAttribute("data-card-menu-toggle");
-        document.querySelectorAll(".card-menu.is-open").forEach((menu) => {
-            if (menu.getAttribute("data-card-menu") !== id) {
-                menu.classList.remove("is-open");
-            }
-        });
-        const menu = document.querySelector(`[data-card-menu="${id}"]`);
-        if (menu) {
-            menu.classList.toggle("is-open");
-        }
-        return;
-    }
-
     const editBtn = event.target.closest("[data-edit-store]");
     if (editBtn) {
         event.preventDefault();
         const storeId = Number(editBtn.getAttribute("data-edit-store"));
         const store = storesData.find((row) => Number(row.id) === storeId);
         if (!store) return;
-        document.querySelectorAll(".card-menu.is-open").forEach((menu) => menu.classList.remove("is-open"));
         openStoreModal("edit", store);
-        return;
-    }
-
-    const toggleBtn = event.target.closest("[data-toggle-store]");
-    if (toggleBtn) {
-        event.preventDefault();
-        document.querySelectorAll(".card-menu.is-open").forEach((menu) => menu.classList.remove("is-open"));
-        await toggleStoreStatus(
-            toggleBtn.getAttribute("data-toggle-store"),
-            toggleBtn.getAttribute("data-next-status")
-        );
     }
 });
 
 document.addEventListener("click", (event) => {
-    if (!event.target.closest(".store-card-right")) {
-        document.querySelectorAll(".card-menu.is-open").forEach((menu) => menu.classList.remove("is-open"));
-    }
     if (!event.target.closest("#store-officer-search") && !event.target.closest("#store-officer-suggestions")) {
         const suggestionBox = document.getElementById("store-officer-suggestions");
         if (suggestionBox) suggestionBox.style.display = "none";

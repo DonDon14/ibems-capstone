@@ -1,6 +1,6 @@
 # IBEMS System Implementation Checklist
 
-Last updated: 2026-06-24
+Last updated: 2026-06-30
 Active project path: `D:\xampp\htdocs\ibems-tailwind-test`
 
 Use this file as the durable work tracker when the chat context is compressed. Update each checkbox as work is completed, and add short notes under the relevant module instead of relying only on chat history.
@@ -33,6 +33,8 @@ Use this file as the durable work tracker when the chat context is compressed. U
 - [x] POS: Return and display real `client_txn_id`, `created_at`, and backend total in immediate receipt.
 - [x] POS: Add a checkout preflight refresh that revalidates cart stock against latest `/store/products` before opening the confirmation modal.
 - [x] POS: Show clearer credit impact for debt checkout before final confirmation: current debt, transaction amount, projected debt, remaining credit.
+- [x] POS: Require debtor-owned authorization PIN only for debt payment, with server-side verification and failed-attempt audit logging.
+- [x] POS: Surface missing debtor PIN setup before checkout without exposing PIN hashes.
 - [x] POS: Add empty/error/loading states for payment method load failures.
 - [x] Store History: Verify transaction details and receipt links use the same receipt data contract as POS.
 - [x] Store Reports: Verify sales, stock-in cost, projected profit, payment breakdown, and cash movement summaries reconcile after test transactions.
@@ -49,26 +51,28 @@ Use this file as the durable work tracker when the chat context is compressed. U
 
 ## Phase 3 - Admin Workflow
 
-- [ ] Admin Dashboard: Review metrics against real store/accounting/user data and remove any placeholder values.
-- [ ] Admin Stores: Audit store create/edit/toggle-status flow, officer assignment, and store details page.
+- [x] Admin Dashboard: Review metrics against real store/accounting/user data and remove any placeholder values.
+- [x] Admin Stores: Audit store create/edit/toggle-status flow, officer assignment, and store details page.
 - [x] Admin Store Details: Add operational snapshot: assigned officers, active products, today sales, debt transactions, low-stock count.
-- [ ] Admin User Management: Review create/edit/import flows, role assignments, credit limit, salary, and status toggles.
-- [ ] Admin User Management: Ensure record-click and explicit actions are not redundant or confusing.
-- [ ] Admin Products: Decide whether admin product management should remain separate from store inventory or become a read-only oversight view.
-- [ ] Admin Audit: Add an admin-facing audit log screen for product changes, stock adjustments, POS transactions, settlement runs, and user edits.
+- [x] Admin User Management: Review create/edit/import flows, role assignments, credit limit, salary, and status toggles.
+- [x] Admin User Management: Ensure record-click and explicit actions are not redundant or confusing.
+- [x] Admin Products: Converted admin product management into a read-only oversight view; Store Inventory remains the operational product management surface.
+- [x] Admin Audit: Add an admin-facing audit log screen for product changes, stock adjustments, POS transactions, settlement runs, and user edits.
 
 ## Phase 4 - User Portal
 
-- [ ] User Dashboard: Review debt summary, recent purchases, credit limit, and current balance presentation.
-- [ ] User History: Verify filters, receipt links, and transaction details.
-- [ ] User Cashbook: Confirm whether cashbook route has a complete UI; implement or remove route if incomplete.
-- [ ] User Receipt: Align receipt display with Store receipt and shared `receipt-standard.js`.
-- [ ] User Portal: Add clear debt status messaging for paid, unpaid, partially settled, and over-limit states.
+- [x] User Dashboard: Review debt summary, recent purchases, credit limit, and current balance presentation.
+- [x] User Portal: Add self-service debt PIN setup/change flow; require current password when changing an existing PIN.
+- [x] User History: Verify filters, receipt links, and transaction details.
+- [x] User Cashbook: Confirm whether cashbook route has a complete UI; implement or remove route if incomplete.
+- [x] User Receipt: Align receipt display with Store receipt and shared `receipt-standard.js`.
+- [x] User Portal: Add clear debt status messaging for paid, unpaid, partially settled, and over-limit states.
 
 ## Phase 5 - Cross-System Data Integrity
 
 - [ ] Create end-to-end smoke checklist: login, switch role, inventory create, stock-in, POS sale, receipt, history, accounting debt update, settlement.
 - [ ] Add backend validation tests for transaction creation: stock race, disabled payment method, missing opening balance, invalid debt customer, insufficient credit.
+- [x] Add migration-backed storage for hashed debt authorization PINs on user accounts.
 - [ ] Add backend validation tests for inventory: duplicate SKU, duplicate barcode, low-stock threshold, supplier/location persistence, stock movement creation.
 - [ ] Add seed data covering low-stock, out-of-stock, debt customers, over-limit customer, multiple stores, and multi-role users.
 - [ ] Normalize all dates/times and money formatting through shared helpers where practical.
@@ -88,7 +92,7 @@ Use this file as the durable work tracker when the chat context is compressed. U
 - [ ] Run `php -l` on changed PHP files before every handoff.
 - [ ] Run `node --check` on changed JS files before every handoff.
 - [ ] Run `php spark migrate` after adding migrations.
-- [ ] Run a browser smoke test on `http://127.0.0.1:8082` after major UI changes.
+- [ ] Run a browser smoke test on `http://localhost:8080` after major UI changes.
 - [ ] Update this checklist after each completed implementation.
 - [ ] Keep unrelated user changes intact; do not revert dirty files unless explicitly requested.
 - [ ] Before pushing to GitHub, review `git status --short`, summarize changed scope, then commit intentionally.
