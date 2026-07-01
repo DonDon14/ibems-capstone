@@ -74,7 +74,7 @@ Use this file as the durable work tracker when the chat context is compressed. U
 - [x] Add backend validation tests for transaction creation: stock race, disabled payment method, missing opening balance, invalid debt customer, insufficient credit.
 - [x] Add migration-backed storage for hashed debt authorization PINs on user accounts.
 - [x] Add backend validation tests for inventory: duplicate SKU, duplicate barcode, low-stock threshold, supplier/location persistence, stock movement creation.
-- [ ] Add seed data covering low-stock, out-of-stock, debt customers, over-limit customer, multiple stores, and multi-role users.
+- [x] Add seed data covering low-stock, out-of-stock, debt customers, over-limit customer, multiple stores, and multi-role users.
 - [ ] Normalize all dates/times and money formatting through shared helpers where practical.
 - [ ] Review all `ADMIN` access paths to ensure admins can inspect without accidentally bypassing store/accounting constraints.
 
