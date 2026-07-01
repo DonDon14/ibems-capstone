@@ -615,26 +615,6 @@
     font-weight: 700;
 }
 
-.debt-pin-wrap input {
-    height: 40px;
-    border: 1px solid #cbd5e1;
-    border-radius: 10px;
-    padding: 9px 12px;
-    letter-spacing: 0;
-    color: #0f172a;
-    background: #fff;
-}
-
-.debt-pin-wrap input:focus {
-    border-color: #2563eb;
-    outline: 2px solid rgba(37, 99, 235, 0.15);
-}
-
-.debt-pin-wrap input:disabled {
-    background: #f1f5f9;
-    color: #64748b;
-}
-
 .debt-pin-wrap small {
     color: #64748b;
     font-size: 0.76rem;
@@ -647,6 +627,37 @@
 
 .debt-pin-wrap small.is-error {
     color: #b42318;
+}
+
+.debt-pin-open-btn {
+    justify-content: center;
+}
+
+.debt-pin-open-btn.is-ready {
+    border-color: #047857;
+    background: #ecfdf5;
+    color: #047857;
+}
+
+.debt-pin-modal-card {
+    max-width: 440px;
+}
+
+#debt-pin-input {
+    height: 48px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 10px 12px;
+    color: #0f172a;
+    background: #fff;
+    font-size: 1.15rem;
+    text-align: center;
+    letter-spacing: 0.18em;
+}
+
+#debt-pin-input:focus {
+    border-color: #2563eb;
+    outline: 2px solid rgba(37, 99, 235, 0.15);
 }
 
 .scan-suggestion-empty {

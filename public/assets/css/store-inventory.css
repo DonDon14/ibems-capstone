@@ -474,6 +474,43 @@
     border-radius: 8px;
 }
 
+.field-wide {
+    grid-column: 1 / -1;
+}
+
+.modal-image-preview-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.modal-image-preview-grid .image-preview-box {
+    align-content: center;
+    gap: 6px;
+    min-height: 132px;
+    text-align: center;
+}
+
+.modal-image-preview-grid .image-preview-box span {
+    color: #334155;
+    font-size: 0.78rem;
+    font-weight: 800;
+    text-transform: uppercase;
+}
+
+.modal-image-preview-grid img {
+    display: none;
+    max-width: 100%;
+    max-height: 110px;
+    object-fit: contain;
+    border-radius: 8px;
+}
+
+.modal-image-preview-grid small {
+    color: #64748b;
+    font-size: 0.78rem;
+}
+
 .readonly-field label {
     color: #64748b;
 }

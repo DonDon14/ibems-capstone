@@ -92,9 +92,11 @@
                 <div id="debt-customer-suggestions" class="debt-suggestions is-hidden"></div>
             </div>
             <div id="debt-pin-wrap" class="debt-pin-wrap is-hidden">
-                <label for="debt-pin-input"><i class="bi bi-shield-lock"></i> Debt Authorization PIN</label>
-                <input id="debt-pin-input" type="password" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="Enter debtor PIN">
+                <label><i class="bi bi-shield-lock"></i> Debt Authorization PIN</label>
                 <small id="debt-pin-help">PIN is verified securely when the transaction is submitted.</small>
+                <button id="open-debt-pin-modal" type="button" class="scan-btn debt-pin-open-btn">
+                    <i class="bi bi-key"></i> Enter PIN
+                </button>
             </div>
         </div>
 
@@ -116,6 +118,25 @@
             <div class="scanner-actions">
                 <button id="scanner-stop" type="button" class="scan-btn"><i class="bi bi-stop-fill"></i> Stop</button>
             </div>
+        </div>
+    </div>
+</div>
+
+<div id="debt-pin-modal" class="receipt-modal is-hidden">
+    <div class="receipt-card debt-pin-modal-card">
+        <div class="receipt-head">
+            <h3><i class="bi bi-shield-lock"></i> Debt Authorization PIN</h3>
+            <button id="debt-pin-close" type="button" class="receipt-close">&times;</button>
+        </div>
+        <p id="debt-pin-modal-summary" class="scanner-status">Ask the debtor to enter their PIN.</p>
+        <div class="payment-wrap">
+            <label for="debt-pin-input">PIN</label>
+            <input id="debt-pin-input" type="password" inputmode="numeric" autocomplete="off" maxlength="6" placeholder="4 to 6 digits">
+        </div>
+        <p id="debt-pin-modal-result" class="result-msg"></p>
+        <div class="confirm-actions">
+            <button id="debt-pin-cancel" type="button" class="scan-btn">Cancel</button>
+            <button id="debt-pin-save" type="button" class="primary-btn"><i class="bi bi-check2-circle"></i> Use PIN</button>
         </div>
     </div>
 </div>

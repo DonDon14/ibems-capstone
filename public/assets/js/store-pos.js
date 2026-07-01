@@ -889,7 +889,8 @@ function updateDebtPinUi() {
     const wrap = document.getElementById("debt-pin-wrap");
     const help = document.getElementById("debt-pin-help");
     const input = document.getElementById("debt-pin-input");
-    if (!wrap || !help || !input) return;
+    const openButton = document.getElementById("open-debt-pin-modal");
+    if (!wrap || !help || !input || !openButton) return;
 
     const paymentMethod = document.getElementById("payment-method")?.value || "";
     const shouldShow = paymentMethod === "debt" && !!selectedDebtCustomerId;
@@ -899,6 +900,9 @@ function updateDebtPinUi() {
         selectedDebtPin = "";
         input.value = "";
         input.disabled = false;
+        openButton.disabled = false;
+        openButton.classList.remove("is-ready");
+        openButton.innerHTML = '<i class="bi bi-key"></i> Enter PIN';
         help.textContent = "PIN is verified securely when the transaction is submitted.";
         help.classList.remove("is-error", "is-ready");
         return;
@@ -908,6 +912,9 @@ function updateDebtPinUi() {
         input.disabled = true;
         input.value = "";
         selectedDebtPin = "";
+        openButton.disabled = true;
+        openButton.classList.remove("is-ready");
+        openButton.innerHTML = '<i class="bi bi-shield-exclamation"></i> PIN Not Set';
         help.textContent = "This customer must set a debt PIN in the User Portal before using debt payment.";
         help.classList.add("is-error");
         help.classList.remove("is-ready");
@@ -915,9 +922,81 @@ function updateDebtPinUi() {
     }
 
     input.disabled = false;
-    help.textContent = selectedDebtPin ? "PIN ready for secure verification." : "Ask the debtor to enter their PIN before checkout.";
+    openButton.disabled = false;
+    openButton.classList.toggle("is-ready", !!selectedDebtPin);
+    openButton.innerHTML = selectedDebtPin
+        ? '<i class="bi bi-check2-circle"></i> PIN Entered'
+        : '<i class="bi bi-key"></i> Enter PIN';
+    help.textContent = selectedDebtPin ? "PIN ready for secure verification." : "Use the PIN modal before checkout.";
     help.classList.toggle("is-ready", !!selectedDebtPin);
     help.classList.remove("is-error");
+}
+
+function openDebtPinModal() {
+    const modal = document.getElementById("debt-pin-modal");
+    const input = document.getElementById("debt-pin-input");
+    const summary = document.getElementById("debt-pin-modal-summary");
+    const result = document.getElementById("debt-pin-modal-result");
+    if (!modal || !input) return;
+
+    if (!selectedDebtCustomerId) {
+        setResult("Select a debt customer before entering a PIN.", "error");
+        return;
+    }
+
+    if (selectedDebtCustomer && selectedDebtCustomer.has_debt_pin === false) {
+        setResult("This customer must set a debt PIN in the User Portal before using debt payment.", "error");
+        return;
+    }
+
+    if (summary) {
+        summary.textContent = `Ask ${selectedDebtCustomer?.name || "the debtor"} to enter their debt authorization PIN.`;
+    }
+    if (result) {
+        result.textContent = "";
+        result.className = "result-msg";
+    }
+
+    input.value = selectedDebtPin;
+    modal.style.display = "grid";
+    setTimeout(() => input.focus(), 30);
+}
+
+function closeDebtPinModal(clearDraft = false) {
+    const modal = document.getElementById("debt-pin-modal");
+    const input = document.getElementById("debt-pin-input");
+    const result = document.getElementById("debt-pin-modal-result");
+    if (clearDraft && input) {
+        input.value = selectedDebtPin;
+    }
+    if (result) {
+        result.textContent = "";
+        result.className = "result-msg";
+    }
+    if (modal) modal.style.display = "none";
+}
+
+function saveDebtPinFromModal() {
+    const input = document.getElementById("debt-pin-input");
+    const result = document.getElementById("debt-pin-modal-result");
+    const pin = String(input?.value || "").replace(/\D/g, "").slice(0, 6);
+
+    if (!/^[0-9]{4,6}$/.test(pin)) {
+        if (result) {
+            result.textContent = "Enter a 4 to 6 digit PIN.";
+            result.className = "result-msg error";
+        }
+        input?.focus();
+        return false;
+    }
+
+    selectedDebtPin = pin;
+    if (input) input.value = pin;
+    updateDebtPinUi();
+    updateCheckoutState();
+    closeDebtPinModal();
+    setResult("Debt PIN captured for secure verification.", "ok");
+    return true;
 }
 
 function getStockState(stock, inCart = 0, threshold = 10) {
@@ -974,7 +1053,7 @@ function updateCheckoutState() {
         }
 
         if (!selectedDebtPin) {
-            submitBtn.disabled = true;
+            submitBtn.disabled = false;
             submitBtn.innerHTML = '<i class="bi bi-shield-lock"></i> Enter Debt PIN';
             return;
         }
@@ -1687,7 +1766,8 @@ async function submitTransaction() {
         }
 
         if (!selectedDebtPin) {
-            setResult("Enter the customer's debt PIN before checkout.", "error");
+            openDebtPinModal();
+            setResult("Enter the customer's debt PIN in the secure PIN modal.", "error");
             updateCheckoutState();
             return;
         }
@@ -1866,10 +1946,28 @@ document.getElementById("debt-customer-suggestions").addEventListener("click", (
 });
 
 document.getElementById("debt-pin-input").addEventListener("input", (event) => {
-    selectedDebtPin = String(event.target.value || "").replace(/\D/g, "").slice(0, 6);
-    event.target.value = selectedDebtPin;
-    updateDebtPinUi();
-    updateCheckoutState();
+    event.target.value = String(event.target.value || "").replace(/\D/g, "").slice(0, 6);
+    const result = document.getElementById("debt-pin-modal-result");
+    if (result) {
+        result.textContent = "";
+        result.className = "result-msg";
+    }
+});
+
+document.getElementById("debt-pin-input").addEventListener("keydown", (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    saveDebtPinFromModal();
+});
+
+document.getElementById("open-debt-pin-modal").addEventListener("click", openDebtPinModal);
+document.getElementById("debt-pin-save").addEventListener("click", saveDebtPinFromModal);
+document.getElementById("debt-pin-cancel").addEventListener("click", () => closeDebtPinModal(true));
+document.getElementById("debt-pin-close").addEventListener("click", () => closeDebtPinModal(true));
+document.getElementById("debt-pin-modal").addEventListener("click", (event) => {
+    if (event.target.id === "debt-pin-modal") {
+        closeDebtPinModal(true);
+    }
 });
 
 document.addEventListener("click", (event) => {

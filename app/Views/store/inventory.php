@@ -315,6 +315,21 @@
                         <label for="modal-product-image-url">Image URL</label>
                         <input id="modal-product-image-url" type="url" placeholder="https://...">
                     </div>
+                    <div class="field field-wide">
+                        <label>Product Image Preview</label>
+                        <div class="modal-image-preview-grid">
+                            <div class="image-preview-box">
+                                <span>Current</span>
+                                <img id="modal-product-current-image" alt="Current product image">
+                                <small id="modal-product-current-image-empty">No current image</small>
+                            </div>
+                            <div class="image-preview-box">
+                                <span>New</span>
+                                <img id="modal-product-new-image" alt="New product image preview">
+                                <small id="modal-product-new-image-empty">Upload a file or enter a URL</small>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 

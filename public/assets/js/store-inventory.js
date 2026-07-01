@@ -8,6 +8,7 @@ let invModalProductId = null;
 let invProductEditMode = false;
 let invModalPanel = "adjust";
 let invCreatePreviewObjectUrl = null;
+let invModalPreviewObjectUrl = null;
 let invCategories = [];
 let invCreateSnapshot = null;
 let invMovements = [];
@@ -340,8 +341,10 @@ function invOpenProductActionModal(productId) {
     document.getElementById("modal-product-barcode").value = product.barcode || "";
     document.getElementById("modal-product-image-url").value = product.image_url || "";
     document.getElementById("modal-product-image-file").value = "";
-    document.getElementById("modal-product-image-source").value = product.image_url ? "url" : "upload";
+    document.getElementById("modal-product-image-source").value = "upload";
     invToggleModalProductImageInput();
+    invRenderModalProductCurrentImage(product.image_url || "");
+    invUpdateModalProductImagePreview();
     document.getElementById("product-view-sku").textContent = product.sku || "-";
     document.getElementById("product-view-name").textContent = product.name || "-";
     document.getElementById("product-view-variant").textContent = product.variant_label || "-";
@@ -368,6 +371,10 @@ function invOpenProductActionModal(productId) {
 function invCloseProductActionModal() {
     invModalProductId = null;
     invSetProductEditMode(false);
+    if (invModalPreviewObjectUrl) {
+        URL.revokeObjectURL(invModalPreviewObjectUrl);
+        invModalPreviewObjectUrl = null;
+    }
     document.getElementById("inventory-product-action-modal").style.display = "none";
 }
 
@@ -562,6 +569,56 @@ function invToggleModalProductImageInput() {
     const source = document.getElementById("modal-product-image-source").value;
     document.getElementById("modal-product-image-upload-wrap").style.display = source === "upload" ? "flex" : "none";
     document.getElementById("modal-product-image-url-wrap").style.display = source === "url" ? "flex" : "none";
+    invUpdateModalProductImagePreview();
+}
+
+function invRenderModalProductCurrentImage(imageUrl) {
+    const img = document.getElementById("modal-product-current-image");
+    const empty = document.getElementById("modal-product-current-image-empty");
+    const resolved = String(imageUrl || "").trim();
+    if (!img || !empty) return;
+
+    if (resolved !== "") {
+        img.src = resolved;
+        img.style.display = "block";
+        empty.style.display = "none";
+    } else {
+        img.removeAttribute("src");
+        img.style.display = "none";
+        empty.style.display = "block";
+    }
+}
+
+function invUpdateModalProductImagePreview() {
+    const source = (document.getElementById("modal-product-image-source").value || "upload").trim();
+    const imageUrl = (document.getElementById("modal-product-image-url").value || "").trim();
+    const imageFile = document.getElementById("modal-product-image-file").files[0] || null;
+    const preview = document.getElementById("modal-product-new-image");
+    const empty = document.getElementById("modal-product-new-image-empty");
+    if (!preview || !empty) return;
+
+    if (invModalPreviewObjectUrl) {
+        URL.revokeObjectURL(invModalPreviewObjectUrl);
+        invModalPreviewObjectUrl = null;
+    }
+
+    let resolved = "";
+    if (source === "upload" && imageFile) {
+        invModalPreviewObjectUrl = URL.createObjectURL(imageFile);
+        resolved = invModalPreviewObjectUrl;
+    } else if (source === "url" && imageUrl !== "") {
+        resolved = imageUrl;
+    }
+
+    if (resolved !== "") {
+        preview.src = resolved;
+        preview.style.display = "block";
+        empty.style.display = "none";
+    } else {
+        preview.removeAttribute("src");
+        preview.style.display = "none";
+        empty.style.display = "block";
+    }
 }
 
 function invUpdateCreateProductProjection() {
@@ -990,6 +1047,8 @@ document.getElementById("new-product-initial-stock").addEventListener("input", i
 document.getElementById("new-product-low-stock").addEventListener("input", invUpdateCreateProductProjection);
 document.getElementById("new-product-reason").addEventListener("input", invUpdateCreateProductProjection);
 document.getElementById("modal-product-image-source").addEventListener("change", invToggleModalProductImageInput);
+document.getElementById("modal-product-image-file").addEventListener("change", invUpdateModalProductImagePreview);
+document.getElementById("modal-product-image-url").addEventListener("input", invUpdateModalProductImagePreview);
 document.getElementById("modal-start-edit-product").addEventListener("click", () => invSetProductEditMode(true));
 document.getElementById("modal-cancel-edit-product").addEventListener("click", () => invSetProductEditMode(false));
 document.getElementById("modal-panel-adjust-btn").addEventListener("click", () => invSetModalPanel("adjust"));
