@@ -15,7 +15,7 @@ function sEscape(value) {
 }
 
 function sDateTime(value) {
-    return new Date(value).toLocaleString();
+    return window.IbemsFormat?.dateTime(value) || new Date(value).toLocaleString();
 }
 
 function setStoresResult(message, type) {

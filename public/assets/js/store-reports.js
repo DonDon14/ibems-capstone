@@ -6,7 +6,7 @@ let reportsTrendChart = null;
 let reportsPaymentMixChart = null;
 
 function rMoney(value) {
-    return `PHP ${Number(value || 0).toFixed(2)}`;
+    return window.IbemsFormat?.money(value) || `PHP ${Number(value || 0).toFixed(2)}`;
 }
 
 function rEscape(value) {
@@ -98,7 +98,7 @@ function rRenderTrendBars(rows) {
                     position: "left",
                     ticks: {
                         callback(value) {
-                            return `PHP ${Number(value).toFixed(0)}`;
+                            return window.IbemsFormat?.money(value, { decimals: 0 }) || `PHP ${Number(value).toFixed(0)}`;
                         },
                     },
                 },

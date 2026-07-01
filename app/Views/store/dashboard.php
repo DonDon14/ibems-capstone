@@ -8,7 +8,7 @@
     $lowStockProducts = is_array($lowStockProducts ?? null) ? $lowStockProducts : [];
     $recentTransactions = is_array($recentTransactions ?? null) ? $recentTransactions : [];
     $paymentBreakdown = is_array($paymentBreakdown ?? null) ? $paymentBreakdown : [];
-    $money = static fn ($value): string => 'PHP ' . number_format((float) $value, 2);
+    $money = static fn ($value): string => ibems_money($value);
     $paymentLabel = static function ($method): string {
         $key = strtolower((string) $method);
         return match ($key) {
@@ -25,7 +25,7 @@
     </div>
 
     <div class="dashboard-grid">
-        <?= view('components/stat_card', ['title' => 'Today Sales', 'value' => 'PHP ' . number_format((float) ($summary['today_sales'] ?? 0), 2), 'icon' => 'bi bi-cash-coin', 'tone' => 'sales']) ?>
+        <?= view('components/stat_card', ['title' => 'Today Sales', 'value' => ibems_money($summary['today_sales'] ?? 0), 'icon' => 'bi bi-cash-coin', 'tone' => 'sales']) ?>
         <?= view('components/stat_card', ['title' => 'Transactions Today', 'value' => (string) ((int) ($summary['today_transactions'] ?? 0)), 'icon' => 'bi bi-receipt', 'tone' => 'users']) ?>
         <?= view('components/stat_card', ['title' => 'Active Products', 'value' => (string) ((int) ($summary['active_products'] ?? 0)), 'icon' => 'bi bi-box-seam', 'tone' => 'finance']) ?>
         <?= view('components/stat_card', ['title' => 'Low Stock Items', 'value' => (string) ((int) ($summary['low_stock'] ?? 0)), 'icon' => 'bi bi-exclamation-triangle', 'tone' => 'warning']) ?>
@@ -152,7 +152,7 @@
                             </div>
                             <div class="stack-meta">
                                 <?= esc((string) (($txn['customer_name'] ?? null) ?: $paymentLabel($txn['customer_type'] ?? 'Walk In'))) ?>
-                                · <?= esc(date('M d, h:i A', strtotime((string) ($txn['created_at'] ?? 'now')))) ?>
+                                · <?= esc(ibems_datetime((string) ($txn['created_at'] ?? 'now'))) ?>
                             </div>
                         </a>
                     <?php endforeach; ?>

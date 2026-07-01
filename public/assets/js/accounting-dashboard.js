@@ -1,5 +1,5 @@
 function acdMoney(value) {
-    return `PHP ${Number(value || 0).toFixed(2)}`;
+    return window.IbemsFormat?.money(value) || `PHP ${Number(value || 0).toFixed(2)}`;
 }
 
 function acdEscape(value) {
@@ -60,7 +60,7 @@ function acdRenderTrend(rows) {
                     beginAtZero: true,
                     ticks: {
                         callback(value) {
-                            return `PHP ${Number(value).toFixed(0)}`;
+                            return window.IbemsFormat?.money(value, { decimals: 0 }) || `PHP ${Number(value).toFixed(0)}`;
                         },
                     },
                 },

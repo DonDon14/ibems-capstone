@@ -9,12 +9,11 @@
     }
 
     function money(value) {
-        return `PHP ${Number(value || 0).toFixed(2)}`;
+        return window.IbemsFormat?.money(value) || `PHP ${Number(value || 0).toFixed(2)}`;
     }
 
     function formatDateTime(value) {
-        const date = value ? new Date(value) : new Date();
-        return date.toLocaleString();
+        return window.IbemsFormat?.dateTime(value) || new Date(value || Date.now()).toLocaleString();
     }
 
     function qrImageCandidates(text) {

@@ -11,9 +11,7 @@ function auditEscape(value) {
 
 function auditDateTime(value) {
     if (!value) return "-";
-    const date = new Date(String(value).replace(" ", "T"));
-    if (Number.isNaN(date.getTime())) return String(value);
-    return date.toLocaleString();
+    return window.IbemsFormat?.dateTime(value) || new Date(String(value).replace(" ", "T")).toLocaleString();
 }
 
 function auditSetResult(message, type) {

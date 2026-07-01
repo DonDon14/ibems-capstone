@@ -17,11 +17,11 @@ function srEscape(value) {
 }
 
 function srMoney(value) {
-    return `PHP ${Number(value || 0).toFixed(2)}`;
+    return window.IbemsFormat?.money(value) || `PHP ${Number(value || 0).toFixed(2)}`;
 }
 
 function srDateTime(value) {
-    return new Date(value).toLocaleString();
+    return window.IbemsFormat?.dateTime(value) || new Date(value).toLocaleString();
 }
 
 function srCategory(value) {
@@ -253,7 +253,7 @@ function srRenderTransactions(rows) {
 
     body.innerHTML = rows.map((row) => `
         <tr class="sr-row-clickable table-row-clickable" data-txn-id="${row.id}">
-            <td class="border border-slate-200 px-3 py-2 text-sm text-slate-700">${srEscape(new Date(row.created_at).toLocaleString())}</td>
+            <td class="border border-slate-200 px-3 py-2 text-sm text-slate-700">${srEscape(srDateTime(row.created_at))}</td>
             <td class="border border-slate-200 px-3 py-2 text-sm text-slate-700">${srEscape(String(row.payment_method || "").toUpperCase())}</td>
             <td class="border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-900">${srEscape(srMoney(row.amount))}</td>
             <td class="border border-slate-200 px-3 py-2 text-sm text-slate-700">${srEscape(srMoney(row.staff.current_debt))}</td>

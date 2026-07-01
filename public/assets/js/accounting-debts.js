@@ -18,11 +18,11 @@ function aEscape(value) {
 }
 
 function aMoney(value) {
-    return `PHP ${Number(value || 0).toFixed(2)}`;
+    return window.IbemsFormat?.money(value) || `PHP ${Number(value || 0).toFixed(2)}`;
 }
 
 function aDateTime(value) {
-    return new Date(value).toLocaleString();
+    return window.IbemsFormat?.dateTime(value) || new Date(value).toLocaleString();
 }
 
 function csvEscape(value) {

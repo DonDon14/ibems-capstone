@@ -134,3 +134,19 @@ if (! function_exists('ibems_initials')) {
         return $initials !== '' ? $initials : $fallback;
     }
 }
+
+if (! function_exists('ibems_money')) {
+    function ibems_money(float|int|string|null $value, int $decimals = 2): string
+    {
+        return 'PHP ' . number_format((float) ($value ?? 0), $decimals);
+    }
+}
+
+if (! function_exists('ibems_datetime')) {
+    function ibems_datetime(?string $value, string $format = 'M d, h:i A'): string
+    {
+        $timestamp = strtotime((string) ($value ?: 'now'));
+
+        return $timestamp !== false ? date($format, $timestamp) : '-';
+    }
+}

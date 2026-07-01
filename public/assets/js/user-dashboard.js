@@ -1,5 +1,5 @@
 function uMoney(value) {
-    return `PHP ${Number(value || 0).toFixed(2)}`;
+    return window.IbemsFormat?.money(value) || `PHP ${Number(value || 0).toFixed(2)}`;
 }
 
 function uEscape(value) {
@@ -249,7 +249,7 @@ function uRenderTrend(rows) {
                     beginAtZero: true,
                     ticks: {
                         callback(value) {
-                            return `PHP ${Number(value).toFixed(0)}`;
+                            return window.IbemsFormat?.money(value, { decimals: 0 }) || `PHP ${Number(value).toFixed(0)}`;
                         },
                     },
                 },
@@ -277,7 +277,7 @@ function uRenderRecentCashbook(rows) {
                     <span>${uEscape(sign + " " + uMoney(row.amount || 0))}</span>
                 </div>
                 <div class="stack-meta">
-                    ${uEscape(String(row.created_at || "").replace("T", " "))} - Debt After: ${uEscape(uMoney(row.debt_after || 0))}
+                    ${uEscape(window.IbemsFormat?.dateTime(row.created_at) || String(row.created_at || "").replace("T", " "))} - Debt After: ${uEscape(uMoney(row.debt_after || 0))}
                 </div>
             </div>
         `;
@@ -295,7 +295,7 @@ function uRenderRecentTransactions(rows) {
 
     body.innerHTML = rows.map((row) => `
         <tr>
-            <td>${uEscape(new Date(row.created_at).toLocaleString())}</td>
+            <td>${uEscape(window.IbemsFormat?.dateTime(row.created_at) || new Date(row.created_at).toLocaleString())}</td>
             <td>${uEscape(row.store_name || "-")}</td>
             <td>${uEscape(String(row.payment_method || "").toUpperCase())}</td>
             <td>${uEscape(uMoney(row.amount || 0))}</td>

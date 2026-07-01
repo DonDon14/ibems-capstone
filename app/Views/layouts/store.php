@@ -105,6 +105,7 @@ $storeLogoUrl = (string) ($activeStore['logo_url'] ?? '');
 </div>
 
 <script src="<?= base_url('assets/js/csrf.js') ?>"></script>
+<script src="<?= base_url('assets/js/ibems-format.js') ?>"></script>
 <script src="<?= base_url('assets/js/app-layout.js') ?>"></script>
 <?= $this->renderSection('scripts') ?>
 </body>

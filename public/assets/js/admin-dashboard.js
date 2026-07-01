@@ -2,7 +2,7 @@ let adSalesTrendChart = null;
 let adTopItemsChart = null;
 
 function adMoney(value) {
-    return `PHP ${Number(value || 0).toFixed(2)}`;
+    return window.IbemsFormat?.money(value) || `PHP ${Number(value || 0).toFixed(2)}`;
 }
 
 function adEscape(value) {

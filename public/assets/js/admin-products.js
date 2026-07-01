@@ -11,7 +11,7 @@ function apEscape(value) {
 }
 
 function apMoney(value) {
-    return `PHP ${Number(value || 0).toFixed(2)}`;
+    return window.IbemsFormat?.money(value) || `PHP ${Number(value || 0).toFixed(2)}`;
 }
 
 function apSetResult(message, type) {

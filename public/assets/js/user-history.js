@@ -1,11 +1,11 @@
 let uhSelectedReceipt = null;
 
 function uhMoney(value) {
-    return `PHP ${Number(value || 0).toFixed(2)}`;
+    return window.IbemsFormat?.money(value) || `PHP ${Number(value || 0).toFixed(2)}`;
 }
 
 function uhDateTime(value) {
-    return new Date(value).toLocaleString();
+    return window.IbemsFormat?.dateTime(value) || new Date(value).toLocaleString();
 }
 
 function uhEscape(value) {

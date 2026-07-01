@@ -28,7 +28,7 @@ function invEscape(value) {
 }
 
 function invMoney(value) {
-    return `PHP ${Number(value || 0).toFixed(2)}`;
+    return window.IbemsFormat?.money(value) || `PHP ${Number(value || 0).toFixed(2)}`;
 }
 
 function invSkuExists(sku, excludeProductId = 0) {
@@ -54,14 +54,7 @@ function invBarcodeExists(barcode, excludeProductId = 0) {
 }
 
 function invFormatDateTime(value) {
-    const date = new Date(String(value || "").replace(" ", "T"));
-    if (Number.isNaN(date.getTime())) return value || "-";
-    return date.toLocaleString([], {
-        month: "short",
-        day: "numeric",
-        hour: "numeric",
-        minute: "2-digit",
-    });
+    return window.IbemsFormat?.shortDateTime(value) || value || "-";
 }
 
 function invStockState(product) {

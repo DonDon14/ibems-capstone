@@ -4,7 +4,7 @@ let uvViewingUserId = null;
 let uvQuickFilter = "all";
 
 function aMoney(value) {
-    return `PHP ${Number(value || 0).toFixed(2)}`;
+    return window.IbemsFormat?.money(value) || `PHP ${Number(value || 0).toFixed(2)}`;
 }
 
 function aEscape(value) {
