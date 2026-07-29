@@ -16,8 +16,15 @@ class ProductModel extends Model
         'store_id',
         'sku',
         'name',
+        'variant_label',
+        'category',
+        'supplier',
+        'image_url',
+        'barcode',
         'price',
         'stock_qty',
+        'low_stock_threshold',
+        'location_bin',
         'is_active',
         'updated_at',
     ];
@@ -30,6 +37,7 @@ class ProductModel extends Model
         'store_id'  => 'integer',
         'price'     => 'float',
         'stock_qty' => 'integer',
+        'low_stock_threshold' => 'integer',
         'is_active' => 'boolean',
     ];
 
@@ -65,6 +73,21 @@ class ProductModel extends Model
         return $this->set('stock_qty', 'stock_qty - ' . $qty, false)
                     ->where('id', $productId)
                     ->update();
+    }
+
+    public function deductStockIfAvailable(int $productId, int $qty): bool
+    {
+        if ($qty <= 0) {
+            return false;
+        }
+
+        $builder = $this->builder();
+        $builder->set('stock_qty', 'stock_qty - ' . $qty, false)
+            ->where('id', $productId)
+            ->where('stock_qty >=', $qty)
+            ->update();
+
+        return $this->db->affectedRows() > 0;
     }
 
     public function addStock(int $productId, int $qty): bool

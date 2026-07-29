@@ -34,7 +34,7 @@ class CreateUsersTable extends Migration
             ],
             'role' => [
                 'type' => 'ENUM',
-                'constraint' => ['USER','STORE_SYSTEM','ACCOUNTING_OFFICE','ADMIN'],
+                'constraint' => ['USER','STORE_SYSTEM','STORE_SUPERVISOR','ACCOUNTING_OFFICE','ADMIN'],
             ],
             'user_type' => [
                 'type' => 'ENUM',

@@ -1,0 +1,31 @@
+{
+  "name": "ibems",
+  "version": "1.0.0",
+  "description": "CodeIgniter is a PHP full-stack web framework that is light, fast, flexible and secure. More information can be found at the [official site](https://codeigniter.com).",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "scripts": {
+    "build:tailwind": "npx @tailwindcss/cli -i ./resources/css/tailwind.css -o ./public/assets/css/tailwind.css --minify",
+    "watch:tailwind": "npx @tailwindcss/cli -i ./resources/css/tailwind.css -o ./public/assets/css/tailwind.css --watch",
+    "test": "php vendor/bin/phpunit --do-not-cache-result"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DonDon14/ibems-capstone.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/DonDon14/ibems-capstone/issues"
+  },
+  "homepage": "https://github.com/DonDon14/ibems-capstone#readme",
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.2.4",
+    "tailwindcss": "^4.2.4"
+  }
+}

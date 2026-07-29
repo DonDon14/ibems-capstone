@@ -11,11 +11,11 @@ class AuthController extends Controller
     {
         $request = $this->request->getJSON(true) ?? $this->request->getPost();
 
-        $email    = $request['email'] ?? null;
+        $email    = strtolower(trim((string) ($request['email'] ?? '')));
         $password = $request['password'] ?? null;
 
         if (!$email || !$password) {
-            return $this->response->setJSON([
+            return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
                 'message' => 'Email and password required'
             ]);
@@ -26,23 +26,32 @@ class AuthController extends Controller
         $user = $userModel->getActiveUserByEmail($email);
 
         if (!$user) {
-            return $this->response->setJSON([
+            return $this->response->setStatusCode(401)->setJSON([
                 'status' => 'error',
-                'message' => 'User not found'
+                'message' => 'Invalid email or password'
             ]);
         }
 
         if (!password_verify($password, $user['password_hash'])) {
-            return $this->response->setJSON([
+            return $this->response->setStatusCode(401)->setJSON([
                 'status' => 'error',
-                'message' => 'Invalid password'
+                'message' => 'Invalid email or password'
             ]);
         }
+
+        session()->regenerate(true);
+
+        $roles = $userModel->getEffectiveRoles($user);
+        $roles = array_values(array_filter(array_unique(array_map('ibems_normalize_role', $roles))));
+        $activeRole = count($roles) === 1 ? $roles[0] : null;
 
         session()->set([
             'user_id'   => $user['id'],
             'name'      => $user['name'],
-            'role'      => $user['role'],
+            'email'     => $user['email'],
+            'role'      => $activeRole,
+            'available_roles' => $roles,
+            'profile_image_url' => $user['profile_image_url'] ?? null,
             'logged_in' => true
         ]);
 
@@ -52,8 +61,11 @@ class AuthController extends Controller
             'user' => [
                 'id'   => $user['id'],
                 'name' => $user['name'],
-                'role' => $user['role']
-            ]
+                'role' => $activeRole,
+                'roles' => $roles,
+                'requires_role_selection' => count($roles) > 1 && $activeRole === null,
+                'redirect_to' => $activeRole ? ibems_role_landing_path($activeRole) : site_url('auth/select-role'),
+            ],
         ]);
     }
 
@@ -61,40 +73,77 @@ class AuthController extends Controller
     {
         session()->destroy();
 
-        return $this->response->setJSON([
-            'status' => 'success',
-            'message' => 'Logged out'
-        ]);
+        return redirect()->to('/login');
     }
 
     public function me()
     {
         if (!session()->get('logged_in')) {
-            return $this->response->setJSON([
+            return $this->response->setStatusCode(401)->setJSON([
                 'status' => 'error',
                 'message' => 'Not authenticated'
             ]);
         }
+
+        ibems_refresh_session_roles();
 
         return $this->response->setJSON([
             'status' => 'success',
             'user' => [
                 'user_id' => session()->get('user_id'),
                 'name'    => session()->get('name'),
-                'role'    => session()->get('role')
+                'role'    => session()->get('role'),
+                'roles'   => array_values((array) (session()->get('available_roles') ?? [])),
             ]
         ]);
     }
-    
-    public function testLogin()
+
+    public function selectRolePage()
     {
-        $data = [
-            'email' => 'faculty@test.com',
-            'password' => '123456'
-        ];
+        if (!session()->get('logged_in')) {
+            return redirect()->to('/login');
+        }
 
-        $this->request->setGlobal('post', $data);
+        ibems_refresh_session_roles();
+        $availableRoles = ibems_available_roles();
+        if ($availableRoles === []) {
+            session()->destroy();
+            return redirect()->to('/login');
+        }
 
-        return $this->login();
+        if (count($availableRoles) === 1 && ibems_current_role() !== null) {
+            return redirect()->to(ibems_role_landing_path($availableRoles[0]));
+        }
+
+        return view('auth/select_role');
+    }
+
+    public function selectRole()
+    {
+        if (!session()->get('logged_in')) {
+            return $this->response->setStatusCode(401)->setJSON([
+                'status' => 'error',
+                'message' => 'Not authenticated',
+            ]);
+        }
+
+        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $role = strtoupper(trim((string) ($request['role'] ?? '')));
+        $available = ibems_available_roles();
+
+        if ($role === '' || !in_array($role, $available, true)) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Invalid role selection.',
+            ]);
+        }
+
+        session()->set('role', $role);
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'role' => $role,
+            'redirect_to' => ibems_role_landing_path($role),
+        ]);
     }
 }

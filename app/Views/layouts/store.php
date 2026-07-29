@@ -1,51 +1,29 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Store System</title>
-    <style>
-        body {
-            font-family: Arial, sans-serif;
-            margin: 0;
-            padding: 0;
-        }
+<?php
+$name = (string) (session()->get('name') ?? 'Store User');
+$email = (string) (session()->get('email') ?? '');
+$role = (string) (session()->get('role') ?? 'STORE_SYSTEM');
+$profileImageUrl = (string) (session()->get('profile_image_url') ?? '');
+$initials = ibems_initials($name, 'SU');
+$availableRoles = ibems_available_roles();
 
-        header {
-            background: #222;
-            color: white;
-            padding: 15px 20px;
-        }
+$storeModel = new \App\Models\StoreModel();
+$stores = $storeModel->getAccessibleStores((int) session()->get('user_id'), $role);
+$activeStore = $stores[0] ?? null;
+$storeName = (string) ($activeStore['store_name'] ?? 'Store Portal');
 
-        nav {
-            background: #f4f4f4;
-            padding: 10px 20px;
-        }
+$pageTitle = 'Store System';
+$portalTitle = $storeName;
+$portalSubtitle = 'School Store Operations';
+$footerText = 'USTP IBEMS Store System';
+$profileDetail = $role . ($email !== '' ? ' | ' . $email : '');
+$navigation = [
+    ['path' => 'store/dashboard', 'label' => 'Dashboard', 'icon' => 'bi bi-speedometer2'],
+    ['path' => 'store/pos', 'label' => 'POS', 'icon' => 'bi bi-cart3'],
+    ['path' => 'store/inventory', 'label' => 'Inventory', 'icon' => 'bi bi-box-seam'],
+    ['path' => 'store/reports', 'label' => 'Reports', 'icon' => 'bi bi-bar-chart-line'],
+    ['path' => 'store/history', 'label' => 'History', 'icon' => 'bi bi-clock-history'],
+    ['path' => 'store/staff-records', 'label' => 'Employee Records', 'icon' => 'bi bi-person-vcard'],
+    ['path' => 'store/settings', 'label' => 'Settings', 'icon' => 'bi bi-gear'],
+];
 
-        nav a {
-            margin-right: 15px;
-            text-decoration: none;
-            color: #333;
-            font-weight: bold;
-        }
-
-        .container {
-            padding: 20px;
-        }
-    </style>
-</head>
-<body>
-
-<header>
-    <h2>IBEMS - Store System</h2>
-</header>
-
-<nav>
-    <a href="/store/pos">POS</a>
-    <a href="/auth/logout">Logout</a>
-</nav>
-
-<div class="container">
-    <?= $this->renderSection('content') ?>
-</div>
-
-</body>
-</html>
+include APPPATH . 'Views/components/portal_shell.php';

@@ -15,6 +15,7 @@ class StoreModel extends Model
     protected $allowedFields = [
         'store_name',
         'officer_id',
+        'logo_url',
         'is_active',
         'created_at',
     ];
@@ -24,7 +25,7 @@ class StoreModel extends Model
 
     protected array $casts = [
         'id'         => 'integer',
-        'officer_id' => 'integer',
+        'officer_id' => '?integer',
         'is_active'  => 'boolean',
     ];
 
@@ -40,5 +41,48 @@ class StoreModel extends Model
     {
         return $this->where('officer_id', $officerId)
                     ->first();
+    }
+
+    public function getAccessibleStores(int $userId, string $role): array
+    {
+        $builder = $this->where('is_active', 1);
+
+        if ($role === 'STORE_SYSTEM') {
+            $builder->where('officer_id', $userId);
+        } elseif ($role === 'STORE_SUPERVISOR') {
+            $storeIds = (new StoreSupervisorModel())->getStoreIdsBySupervisor($userId);
+            if ($storeIds === []) {
+                return [];
+            }
+            $builder->whereIn('id', $storeIds);
+        } elseif ($role !== 'ADMIN') {
+            return [];
+        }
+
+        return $builder->orderBy('store_name', 'ASC')->findAll();
+    }
+
+    public function canUserAccessStore(int $userId, string $role, int $storeId): bool
+    {
+        $builder = $this->where('id', $storeId)->where('is_active', 1);
+
+        if ($role === 'STORE_SYSTEM') {
+            $builder->where('officer_id', $userId);
+        } elseif ($role === 'STORE_SUPERVISOR') {
+            if ($userId <= 0) {
+                return false;
+            }
+            $assigned = (new StoreSupervisorModel())
+                ->where('store_id', $storeId)
+                ->where('user_id', $userId)
+                ->countAllResults();
+            if ($assigned <= 0) {
+                return false;
+            }
+        } elseif ($role !== 'ADMIN') {
+            return false;
+        }
+
+        return $builder->countAllResults() > 0;
     }
 }

@@ -16,9 +16,22 @@ class InventoryMovementModel extends Model
         'store_id',
         'type',
         'qty',
+        'unit_cost',
+        'total_cost',
+        'expected_profit',
         'reason',
         'txn_id',
         'created_at',
+    ];
+
+    protected array $casts = [
+        'id' => 'integer',
+        'product_id' => 'integer',
+        'store_id' => 'integer',
+        'qty' => 'integer',
+        'unit_cost' => '?float',
+        'total_cost' => '?float',
+        'expected_profit' => '?float',
     ];
 
     protected $useTimestamps = false;

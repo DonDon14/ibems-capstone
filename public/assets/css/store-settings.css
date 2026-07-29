@@ -1,0 +1,94 @@
+.settings-shell {
+    display: grid;
+    gap: 1rem;
+}
+
+.settings-top h3 {
+    margin: 0 0 0.25rem;
+    color: #003366;
+}
+
+.settings-top p {
+    margin: 0;
+    color: #516a8f;
+}
+
+.settings-card {
+    border: 1px solid #c9d5e3;
+    border-radius: 14px;
+    background: #fff;
+    padding: 1rem;
+}
+
+.settings-card h4 {
+    margin: 0 0 0.75rem;
+    color: #003366;
+}
+
+.settings-note {
+    margin: 0 0 0.75rem;
+    color: #64748b;
+    font-size: 0.86rem;
+}
+
+.category-add-row {
+    display: grid;
+    grid-template-columns: minmax(260px, 420px) 170px;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    align-items: center;
+}
+
+.settings-add-row {
+    display: grid;
+    grid-template-columns: minmax(180px, 260px) minmax(180px, 260px) minmax(220px, 1fr) 170px;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+    align-items: center;
+}
+
+.settings-add-row input,
+.category-add-row input,
+.category-edit-name {
+    width: 100%;
+    min-height: 42px;
+    border: 1px solid #c7d5e4;
+    border-radius: 8px;
+    background: #fff;
+    padding: 10px 14px;
+    line-height: 1.35;
+    box-shadow: none;
+}
+
+.settings-add-row input:focus,
+.category-add-row input:focus,
+.category-edit-name:focus {
+    border-color: #2563eb;
+    outline: 2px solid rgba(37, 99, 235, 0.18);
+    outline-offset: 1px;
+}
+
+.settings-table-wrap {
+    border: 1px solid #c9d5e3;
+    border-radius: 10px;
+    overflow: auto;
+}
+
+.category-action-cell {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.settings-result {
+    margin: 0.75rem 0 0;
+    min-height: 20px;
+    color: #166534;
+}
+
+@media (max-width: 768px) {
+    .category-add-row,
+    .settings-add-row {
+        grid-template-columns: 1fr;
+    }
+}

@@ -14,12 +14,25 @@ class PageController extends BaseController
 
     public function login()
     {
+        if (session()->get('logged_in')) {
+            $role = ibems_current_role();
+            if ($role !== null) {
+                return redirect()->to(ibems_role_landing_path($role));
+            }
+
+            if (count(ibems_available_roles()) > 1) {
+                return redirect()->to('/auth/select-role');
+            }
+        }
+
         return view('auth/login');
     }
 
     public function dashboard()
     {
-        return view('dashboard');
+        $role = ibems_current_role();
+
+        return redirect()->to(ibems_role_landing_path($role));
     }
 
     public function userDashboard()

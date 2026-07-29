@@ -1,0 +1,192 @@
+<?php
+
+namespace App\Controllers;
+
+use App\Models\StoreSupervisorModel;
+use App\Models\StoreModel;
+use Config\Database;
+
+class StoreAdminController extends AdminController
+{
+    public function dashboard()
+    {
+        return view('store-admin/dashboard');
+    }
+
+    public function dashboardData()
+    {
+        $db = Database::connect();
+        $actorId = (int) session()->get('user_id');
+        $storeIds = (new StoreSupervisorModel())->getStoreIdsBySupervisor($actorId);
+        $emptyPayload = [
+            'status' => 'success',
+            'summary' => [
+                'assigned_store_count' => 0,
+                'active_store_count' => 0,
+                'open_day_count' => 0,
+                'pending_review_count' => 0,
+                'pending_shortage_total' => 0,
+                'today_sales_total' => 0,
+            ],
+            'stores' => [],
+            'pending_reviews' => [],
+        ];
+
+        if ($storeIds === []) {
+            return $this->response->setJSON($emptyPayload);
+        }
+
+        $stores = $db->table('stores s')
+            ->select('s.id, s.store_name, s.logo_url, s.is_active, u.name AS officer_name, u.email AS officer_email')
+            ->join('users u', 'u.id = s.officer_id', 'left')
+            ->whereIn('s.id', $storeIds)
+            ->orderBy('s.store_name', 'ASC')
+            ->get()
+            ->getResultArray();
+
+        $todayStart = date('Y-m-d 00:00:00');
+        $todayEnd = date('Y-m-d 23:59:59');
+        $todayRows = $db->table('transactions')
+            ->select('store_id, COUNT(*) AS txn_count, COALESCE(SUM(amount), 0) AS sales_total')
+            ->whereIn('store_id', $storeIds)
+            ->where('created_at >=', $todayStart)
+            ->where('created_at <=', $todayEnd)
+            ->groupBy('store_id')
+            ->get()
+            ->getResultArray();
+        $todayByStore = [];
+        foreach ($todayRows as $row) {
+            $todayByStore[(int) ($row['store_id'] ?? 0)] = [
+                'txn_count' => (int) ($row['txn_count'] ?? 0),
+                'sales_total' => (float) ($row['sales_total'] ?? 0),
+            ];
+        }
+
+        $latestSessionsByStore = [];
+        $pendingRows = [];
+        if ($db->tableExists('store_day_sessions')) {
+            $sessionRows = $db->table('store_day_sessions sds')
+                ->select('sds.id, sds.store_id, sds.business_date, sds.status, sds.expected_cash, sds.expected_ecash, sds.counted_cash, sds.counted_ecash, sds.variance_cash, sds.variance_ecash, sds.variance_status, sds.review_status, sds.closed_at, sds.accountability_amount, s.store_name, closer.name AS closed_by_name')
+                ->join('stores s', 's.id = sds.store_id', 'left')
+                ->join('users closer', 'closer.id = sds.closed_by', 'left')
+                ->whereIn('sds.store_id', $storeIds)
+                ->orderBy('sds.business_date', 'DESC')
+                ->orderBy('sds.id', 'DESC')
+                ->get()
+                ->getResultArray();
+
+            foreach ($sessionRows as $row) {
+                $storeId = (int) ($row['store_id'] ?? 0);
+                if ($storeId > 0 && !isset($latestSessionsByStore[$storeId])) {
+                    $latestSessionsByStore[$storeId] = $row;
+                }
+                $reviewStatus = (string) ($row['review_status'] ?? 'not_required');
+                if ((string) ($row['status'] ?? '') === 'closed' && $reviewStatus !== 'not_required' && !in_array($reviewStatus, ['approved', 'waived', 'corrected'], true)) {
+                    $pendingRows[] = $row;
+                }
+            }
+        }
+
+        $activeStoreCount = 0;
+        $openDayCount = 0;
+        $todaySalesTotal = 0.0;
+        $storePayload = [];
+        foreach ($stores as $store) {
+            $storeId = (int) ($store['id'] ?? 0);
+            $isActive = (int) ($store['is_active'] ?? 0) === 1;
+            $session = $latestSessionsByStore[$storeId] ?? null;
+            $today = $todayByStore[$storeId] ?? ['txn_count' => 0, 'sales_total' => 0.0];
+            $todaySalesTotal += (float) $today['sales_total'];
+            if ($isActive) {
+                $activeStoreCount++;
+            }
+            if ($session && (string) ($session['status'] ?? '') === 'open') {
+                $openDayCount++;
+            }
+
+            $storePayload[] = [
+                'id' => $storeId,
+                'store_name' => (string) ($store['store_name'] ?? ''),
+                'logo_url' => $store['logo_url'] ?? null,
+                'is_active' => $isActive,
+                'officer_name' => $store['officer_name'] ?: 'No assigned officer',
+                'officer_email' => $store['officer_email'] ?? null,
+                'today_txn_count' => (int) $today['txn_count'],
+                'today_sales_total' => (float) $today['sales_total'],
+                'day_status' => $session ? (string) ($session['status'] ?? '') : 'not_started',
+                'business_date' => $session['business_date'] ?? null,
+                'review_status' => $session ? (string) ($session['review_status'] ?? 'not_required') : 'not_required',
+                'variance_status' => $session ? (string) ($session['variance_status'] ?? 'balanced') : 'balanced',
+            ];
+        }
+
+        $pendingShortageTotal = 0.0;
+        $pendingReviews = array_map(static function (array $row) use (&$pendingShortageTotal): array {
+            $varianceCash = (float) ($row['variance_cash'] ?? 0);
+            $varianceEcash = (float) ($row['variance_ecash'] ?? 0);
+            $shortageAmount = round(max(0, -$varianceCash) + max(0, -$varianceEcash), 2);
+            $pendingShortageTotal += $shortageAmount;
+
+            return [
+                'id' => (int) ($row['id'] ?? 0),
+                'store_id' => (int) ($row['store_id'] ?? 0),
+                'store_name' => (string) ($row['store_name'] ?? 'Store'),
+                'business_date' => (string) ($row['business_date'] ?? ''),
+                'closed_at' => $row['closed_at'] ?? null,
+                'closed_by_name' => $row['closed_by_name'] ?: 'Unknown',
+                'expected_cash' => (float) ($row['expected_cash'] ?? 0),
+                'expected_ecash' => (float) ($row['expected_ecash'] ?? 0),
+                'counted_cash' => $row['counted_cash'] !== null ? (float) $row['counted_cash'] : null,
+                'counted_ecash' => $row['counted_ecash'] !== null ? (float) $row['counted_ecash'] : null,
+                'variance_cash' => $row['variance_cash'] !== null ? (float) $row['variance_cash'] : null,
+                'variance_ecash' => $row['variance_ecash'] !== null ? (float) $row['variance_ecash'] : null,
+                'variance_status' => (string) ($row['variance_status'] ?? 'balanced'),
+                'review_status' => (string) ($row['review_status'] ?? 'pending'),
+                'shortage_amount' => $shortageAmount,
+            ];
+        }, $pendingRows);
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'summary' => [
+                'assigned_store_count' => count($stores),
+                'active_store_count' => $activeStoreCount,
+                'open_day_count' => $openDayCount,
+                'pending_review_count' => count($pendingReviews),
+                'pending_shortage_total' => $pendingShortageTotal,
+                'today_sales_total' => $todaySalesTotal,
+            ],
+            'stores' => $storePayload,
+            'pending_reviews' => $pendingReviews,
+        ]);
+    }
+
+    public function stores()
+    {
+        return view('store-admin/stores');
+    }
+
+    public function storesData()
+    {
+        return parent::storesData();
+    }
+
+    public function storeDetails(int $storeId)
+    {
+        if ($storeId <= 0 || !(new StoreModel())->canUserAccessStore((int) session()->get('user_id'), 'STORE_SUPERVISOR', $storeId)) {
+            return redirect()->to('/store-admin/stores');
+        }
+
+        return view('store-admin/store-details', ['storeId' => $storeId]);
+    }
+
+    public function storeDetailsData(int $storeId)
+    {
+        return parent::storeDetailsData($storeId);
+    }
+
+    public function reviewStoreDayVariance(int $sessionId)
+    {
+        return parent::reviewStoreDayVariance($sessionId);
+    }
+}

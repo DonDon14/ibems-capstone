@@ -17,9 +17,11 @@ class UserModel extends Model
         'name',
         'email',
         'password_hash',
+        'debt_pin_hash',
         'role',
         'user_type',
         'qr_token',
+        'profile_image_url',
         'base_salary',
         'is_active',
         'created_at',
@@ -48,5 +50,34 @@ class UserModel extends Model
         return $this->where('qr_token', $qrToken)
                     ->where('is_active', 1)
                     ->first();
+    }
+
+    public function getActiveUserById(int $userId): ?array
+    {
+        return $this->where('id', $userId)
+                    ->where('is_active', 1)
+                    ->first();
+    }
+
+    public function getEffectiveRoles(array $user): array
+    {
+        $userId = (int) ($user['id'] ?? 0);
+        $roles = [];
+
+        if ($userId > 0) {
+            $userRoleModel = new UserRoleModel();
+            $roles = $userRoleModel->getRolesByUserId($userId);
+        }
+
+        $legacyRole = strtoupper(trim((string) ($user['role'] ?? '')));
+        if ($legacyRole !== '' && !in_array($legacyRole, $roles, true)) {
+            $roles[] = $legacyRole;
+        }
+
+        if ($roles === []) {
+            $roles[] = 'USER';
+        }
+
+        return array_values(array_unique($roles));
     }
 }
