@@ -141,7 +141,9 @@ Debt purchases require the debtor to set their own debt authorization PIN first.
 4. Log in as a Store user.
 5. In POS, choose Debt payment, select the debtor, enter their PIN, then complete checkout.
 
-The PIN is stored only as a hash. Store and admin users cannot view it.
+The PIN is stored only as a hash. Store and admin users cannot view it. Five
+failed attempts within 15 minutes lock debt PIN authorization for 15 minutes
+across all store terminals. Security events are recorded without the PIN.
 
 ## Frontend Assets
 

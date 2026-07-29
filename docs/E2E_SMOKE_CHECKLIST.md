@@ -44,6 +44,8 @@ Use this checklist after migrations, seeded data changes, or broad UI/backend ed
 - [ ] Log back in as store staff.
 - [ ] Select the same faculty/staff user for debt payment in POS.
 - [ ] Confirm the projected debt and remaining credit preview is shown.
+- [ ] Enter an incorrect PIN five times and confirm debt authorization locks for
+  15 minutes without creating a transaction.
 - [ ] Enter the user's PIN and complete the debt transaction.
 - [ ] Log in as the user.
 - [ ] Confirm User Dashboard debt status, current debt, credit limit, available credit, and recent transaction update.

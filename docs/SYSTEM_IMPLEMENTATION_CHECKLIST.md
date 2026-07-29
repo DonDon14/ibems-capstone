@@ -125,6 +125,8 @@ Use this file as the durable work tracker when the chat context is compressed. U
    - [x] Add backward-compatible `deduction_periods`, `deduction_batches`, and
      `deduction_batch_items` foundation with configurable date ranges and
      pending/confirmed/carryover result fields.
+   - [x] Persist shared debt PIN attempt state, lock after five failed attempts
+     in 15 minutes, audit authorization outcomes, and reset after success.
    - [ ] Add Accounting endpoints and UI for period preparation.
    - [ ] Move balance reduction from batch preparation to confirmed result.
 2. Run instructor demo smoke test in the browser:
