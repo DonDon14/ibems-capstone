@@ -15,6 +15,37 @@ use Config\Database;
 
 class AccountingController extends Controller
 {
+    public function deductionWorkflowData()
+    {
+        $db = Database::connect();
+        $batchId = max(0, (int) ($this->request->getGet('batch_id') ?? 0));
+        $periods = $db->table('deduction_periods dp')
+            ->select('dp.*, db.id AS batch_id, db.status AS batch_status, db.total_accounts, db.total_requested, db.total_confirmed, db.total_carryover')
+            ->join('deduction_batches db', 'db.period_id = dp.id', 'left')
+            ->orderBy('dp.date_start', 'DESC')
+            ->orderBy('dp.id', 'DESC')
+            ->get()
+            ->getResultArray();
+
+        $items = [];
+        if ($batchId > 0) {
+            $items = $db->table('deduction_batch_items dbi')
+                ->select('dbi.*, u.employee_id, u.name, u.email, u.user_type, b.current_debt')
+                ->join('users u', 'u.id = dbi.user_id', 'inner')
+                ->join('balances b', 'b.user_id = dbi.user_id', 'left')
+                ->where('dbi.batch_id', $batchId)
+                ->orderBy('u.name', 'ASC')
+                ->get()
+                ->getResultArray();
+        }
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'periods' => $periods,
+            'items' => $items,
+        ]);
+    }
+
     public function createDeductionPeriod()
     {
         $request = $this->request->getJSON(true) ?? $this->request->getPost();

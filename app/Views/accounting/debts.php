@@ -41,8 +41,8 @@
             </div>
             <div class="acct-flow-item">
                 <span>4</span>
-                <strong>Run Salary Deduction</strong>
-                <p>Accounting deducts the remaining valid employee debt through a settlement batch.</p>
+                <strong>Prepare and Confirm Deductions</strong>
+                <p>Accounting prepares requests first, then records official payroll results. Only confirmed amounts reduce debt.</p>
             </div>
         </div>
     </article>
@@ -64,7 +64,8 @@
                 <button id="acct-refresh-btn" class="history-action alt inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="button"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
             </div>
             <div class="action-group action-group-tools flex flex-wrap gap-2">
-                <button id="open-settlement-run" class="history-action inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-blue-700" type="button"><i class="bi bi-calendar2-check"></i> Run Salary Deduction</button>
+                <button id="open-deduction-workflow" class="history-action inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-blue-700" type="button"><i class="bi bi-diagram-3"></i> Deduction Workflow</button>
+                <button id="open-settlement-run" class="history-action inline-flex h-10 items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 text-sm font-semibold text-amber-800 transition hover:bg-amber-100" type="button"><i class="bi bi-clock-history"></i> Legacy Monthly Run</button>
                 <button id="open-deduction-mode" class="history-action inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="button"><i class="bi bi-cash-coin"></i> Manual Payroll Deduction</button>
                 <button id="open-import-csv" class="history-action inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="button"><i class="bi bi-file-earmark-arrow-up"></i> Import HR CSV</button>
             </div>
@@ -301,6 +302,95 @@
                     <tr><td colspan="6">Loading details...</td></tr>
                 </tbody>
             </table>
+        </div>
+    </div>
+</div>
+
+<div id="deduction-workflow-modal" class="acct-modal is-hidden">
+    <div class="acct-modal-card max-h-[94vh] w-[min(1380px,97vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+        <div class="acct-modal-head">
+            <div>
+                <h4 class="text-lg font-bold text-slate-900">Payroll Deduction Workflow</h4>
+                <p class="mt-1 text-sm text-slate-500">Prepare requests first. Employee debt changes only after an official payroll result is confirmed.</p>
+            </div>
+            <button id="close-deduction-workflow" type="button" class="acct-modal-close" aria-label="Close deduction workflow"></button>
+        </div>
+
+        <div class="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
+            <div class="space-y-4">
+                <section class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <h5 class="text-sm font-bold text-slate-900">1. Create deduction period</h5>
+                    <div class="mt-3 grid gap-3">
+                        <label class="field">
+                            <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Period code</span>
+                            <input id="workflow-period-code" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" maxlength="40" placeholder="2026-08-A">
+                        </label>
+                        <label class="field">
+                            <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Label</span>
+                            <input id="workflow-period-label" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" maxlength="120" placeholder="August 1-15, 2026">
+                        </label>
+                        <label class="field">
+                            <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Frequency</span>
+                            <select id="workflow-period-frequency" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm">
+                                <option value="semi_monthly">Semi-monthly</option>
+                                <option value="monthly">Monthly</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </label>
+                        <div class="grid gap-3">
+                            <label class="field">
+                                <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Start date</span>
+                                <input id="workflow-period-start" type="date" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" placeholder="Select start date">
+                            </label>
+                            <label class="field">
+                                <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">End date</span>
+                                <input id="workflow-period-end" type="date" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" placeholder="Select end date">
+                            </label>
+                        </div>
+                        <button id="workflow-create-period" type="button" class="inline-flex h-10 items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700">Create period</button>
+                    </div>
+                </section>
+
+                <section class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+                    <strong class="block">Workflow safeguard</strong>
+                    <p class="mt-1">Prepared means sent for processing—not deducted. Only a confirmed payroll reference may reduce the balance.</p>
+                </section>
+            </div>
+
+            <div class="space-y-4">
+                <section class="rounded-xl border border-slate-200 bg-white p-4">
+                    <div class="flex flex-wrap items-end gap-3">
+                        <label class="field min-w-[260px] grow">
+                            <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Deduction period</span>
+                            <select id="workflow-period-select" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm">
+                                <option value="">Select a period</option>
+                            </select>
+                        </label>
+                        <button id="workflow-refresh" type="button" class="inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"><i class="bi bi-arrow-clockwise mr-2"></i>Refresh</button>
+                    </div>
+                    <div id="workflow-period-summary" class="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">Choose or create a deduction period.</div>
+                </section>
+
+                <section id="workflow-prepare-section" class="rounded-xl border border-slate-200 bg-white p-4">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <h5 class="text-sm font-bold text-slate-900">2. Prepare employee requests</h5>
+                            <p class="text-sm text-slate-500">Select employees and enter the requested payroll amount.</p>
+                        </div>
+                        <button id="workflow-prepare-batch" type="button" class="inline-flex h-10 items-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:bg-slate-300">Prepare batch</button>
+                    </div>
+                    <div id="workflow-candidates" class="mt-3 max-h-72 space-y-2 overflow-auto"></div>
+                </section>
+
+                <section id="workflow-results-section" class="hidden rounded-xl border border-slate-200 bg-white p-4">
+                    <div>
+                        <h5 class="text-sm font-bold text-slate-900">3. Confirm official payroll results</h5>
+                        <p class="text-sm text-slate-500">Use the amount actually deducted and the official payroll reference.</p>
+                    </div>
+                    <div id="workflow-results" class="mt-3 space-y-3"></div>
+                </section>
+                <p id="workflow-message" class="text-sm font-semibold" role="status"></p>
+            </div>
         </div>
     </div>
 </div>

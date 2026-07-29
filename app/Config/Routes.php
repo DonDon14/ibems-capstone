@@ -109,6 +109,7 @@ $routes->get('accounting/debts/data', 'AccountingController::debtsData', ['filte
 $routes->get('accounting/debts/profile', 'AccountingController::debtProfile', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
 $routes->get('accounting/debts/history', 'AccountingController::debtHistory', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
 $routes->get('accounting/debts/daily-summary', 'AccountingController::dailySummary', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
+$routes->get('accounting/deduction-workflow', 'AccountingController::deductionWorkflowData', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
 $routes->post('accounting/deduction-periods', 'AccountingController::createDeductionPeriod', ['filter' => 'role:ACCOUNTING_OFFICE']);
 $routes->post('accounting/deduction-batches', 'AccountingController::prepareDeductionBatch', ['filter' => 'role:ACCOUNTING_OFFICE']);
 $routes->post('accounting/deduction-batch-items/(:num)/confirm', 'AccountingController::confirmDeductionResult/$1', ['filter' => 'role:ACCOUNTING_OFFICE']);
