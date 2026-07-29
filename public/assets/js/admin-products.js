@@ -50,6 +50,29 @@ function apSetOptions(selectId, placeholder, rows, valueKey, labelKey) {
     }
 }
 
+function apProductFallback() {
+    return '<span class="ap-product-fallback"><i class="bi bi-image" aria-hidden="true"></i></span>';
+}
+
+function apProductImage(url, name, imageClass = "ap-product-img") {
+    const safeName = apEscape(name || "Product");
+    const safeUrl = apEscape(url || "");
+    if (!safeUrl) {
+        return apProductFallback();
+    }
+
+    return `<span class="ap-product-thumb-wrap"><img class="${imageClass}" src="${safeUrl}" alt="${safeName}"></span>`;
+}
+
+document.addEventListener("error", (event) => {
+    const target = event.target;
+    if (!(target instanceof HTMLImageElement) || !target.closest(".ap-product-thumb-wrap")) {
+        return;
+    }
+
+    target.closest(".ap-product-thumb-wrap").outerHTML = apProductFallback();
+}, true);
+
 function apRenderFilters(data) {
     apStores = Array.isArray(data.stores) ? data.stores : [];
     apSetOptions("ap-store-filter", "All Stores", apStores, "id", "store_name");
@@ -79,9 +102,7 @@ function apRenderTable(rows) {
     body.innerHTML = list.map((row) => {
         const stockStatus = row.stock_status || "healthy";
         const variant = row.variant_label ? `<small>${apEscape(row.variant_label)}</small>` : "";
-        const image = row.image_url
-            ? `<img class="ap-product-img" src="${apEscape(row.image_url)}" alt="${apEscape(row.name || "Product")}">`
-            : `<span class="ap-product-fallback">${apEscape(String(row.name || "P").charAt(0).toUpperCase())}</span>`;
+        const image = apProductImage(row.image_url, row.name);
         return `
             <tr class="ap-row" data-product-id="${Number(row.id)}" tabindex="0" title="View product snapshot">
                 <td>
@@ -180,7 +201,7 @@ function apOpenSnapshot(productId) {
     const content = document.getElementById("ap-view-content");
     content.innerHTML = `
         <div class="ap-detail-hero">
-            ${row.image_url ? `<img src="${apEscape(row.image_url)}" alt="${apEscape(row.name || "Product")}">` : `<span>${apEscape(String(row.name || "P").charAt(0).toUpperCase())}</span>`}
+            ${apProductImage(row.image_url, row.name, "ap-detail-img")}
             <div>
                 <h5>${apEscape(row.name || "Product")}</h5>
                 <p>${apEscape(row.store_name || "Store")} | ${apEscape(row.category || "General")}</p>

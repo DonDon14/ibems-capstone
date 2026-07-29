@@ -44,6 +44,16 @@
             </div>
         </div>
 
+        <div class="debt-payment-card">
+            <div>
+                <strong><i class="bi bi-cash-coin"></i> Debt Payment</strong>
+                <small>Record direct payment toward an employee&apos;s existing debt.</small>
+            </div>
+            <button id="open-debt-payment-modal" type="button" class="scan-btn">
+                <i class="bi bi-plus-circle"></i> Record Payment
+            </button>
+        </div>
+
         <div class="scan-quick-wrap">
             <label for="scan-code-input"><i class="bi bi-upc-scan"></i> Scan QR/Barcode</label>
             <div class="scan-quick-row">
@@ -174,24 +184,70 @@
     </div>
 </div>
 
+<div id="debt-payment-modal" class="receipt-modal is-hidden">
+    <div class="receipt-card confirm-card debt-payment-modal-card">
+        <div class="receipt-head">
+            <h3><i class="bi bi-cash-coin"></i> Direct Debt Payment</h3>
+            <button id="debt-payment-close" type="button" class="receipt-close">&times;</button>
+        </div>
+        <p class="scanner-status">Use this only when the debtor pays the store directly. It reduces their existing debt and records cash/e-cash in the store day.</p>
+        <div class="payment-wrap">
+            <label for="debt-payment-search">Debtor (Faculty/Staff)</label>
+            <div class="debt-search-wrap">
+                <input id="debt-payment-search" type="search" placeholder="Search by name, email, or employee ID">
+                <div id="debt-payment-suggestions" class="debt-suggestions is-hidden"></div>
+            </div>
+        </div>
+        <div id="debt-payment-profile" class="debt-payment-profile is-hidden"></div>
+        <div class="debt-payment-grid">
+            <div class="payment-wrap">
+                <label for="debt-payment-amount">Payment Amount</label>
+                <input id="debt-payment-amount" type="number" min="0" step="0.01" placeholder="0.00">
+            </div>
+            <div class="payment-wrap">
+                <label for="debt-payment-channel">Channel</label>
+                <select id="debt-payment-channel">
+                    <option value="cash">Cash</option>
+                    <option value="ecash">E-Cash / Bank / Wallet</option>
+                </select>
+            </div>
+        </div>
+        <div class="payment-wrap">
+            <label for="debt-payment-reference">Receipt / Reference No. (optional)</label>
+            <input id="debt-payment-reference" type="text" placeholder="Official receipt, GCash ref, deposit slip">
+        </div>
+        <div class="payment-wrap">
+            <label for="debt-payment-remarks">Remarks (optional)</label>
+            <input id="debt-payment-remarks" type="text" placeholder="e.g. Paid directly at Main Campus Store">
+        </div>
+        <p id="debt-payment-result" class="result-msg"></p>
+        <div class="confirm-actions">
+            <button id="debt-payment-cancel" type="button" class="scan-btn">Cancel</button>
+            <button id="debt-payment-save" type="button" class="primary-btn"><i class="bi bi-check2-circle"></i> Record Payment</button>
+        </div>
+    </div>
+</div>
+
 <div id="opening-balance-modal" class="receipt-modal is-hidden">
-    <div class="receipt-card confirm-card">
+    <div class="receipt-card confirm-card opening-balance-card">
         <div class="receipt-head">
             <h3 id="opening-balance-title"><i class="bi bi-safe2"></i> Open Store Day</h3>
             <button id="opening-balance-close" type="button" class="receipt-close">&times;</button>
         </div>
         <p id="opening-balance-description" class="scanner-status">Enter today&apos;s starting cash and e-cash before accepting POS transactions.</p>
-        <div class="payment-wrap">
-            <label id="opening-balance-label" for="opening-balance-input">Opening Cash</label>
-            <input id="opening-balance-input" type="number" min="0" step="0.01" value="0">
-        </div>
-        <div class="payment-wrap">
-            <label for="opening-ecash-input">Opening E-Cash</label>
-            <input id="opening-ecash-input" type="number" min="0" step="0.01" value="0">
-        </div>
-        <div class="payment-wrap">
-            <label for="opening-balance-note">Note (optional)</label>
-            <input id="opening-balance-note" type="text" placeholder="e.g. Start of day float">
+        <div class="opening-balance-fields">
+            <div class="payment-wrap">
+                <label id="opening-balance-label" for="opening-balance-input">Opening Cash</label>
+                <input id="opening-balance-input" type="number" min="0" step="0.01" value="0">
+            </div>
+            <div class="payment-wrap">
+                <label for="opening-ecash-input">Opening E-Cash</label>
+                <input id="opening-ecash-input" type="number" min="0" step="0.01" value="0">
+            </div>
+            <div class="payment-wrap">
+                <label for="opening-balance-note">Note (optional)</label>
+                <input id="opening-balance-note" type="text" placeholder="e.g. Start of day float">
+            </div>
         </div>
         <p id="opening-balance-result" class="result-msg"></p>
         <div class="confirm-actions">
@@ -202,23 +258,28 @@
 </div>
 
 <div id="store-day-close-modal" class="receipt-modal is-hidden">
-    <div class="receipt-card confirm-card">
+    <div class="receipt-card confirm-card store-day-close-card">
         <div class="receipt-head">
             <h3><i class="bi bi-door-closed"></i> Close Store Day</h3>
             <button id="store-day-close-x" type="button" class="receipt-close">&times;</button>
         </div>
-        <p id="store-day-close-summary" class="scanner-status">Review expected cash and enter counted totals.</p>
-        <div class="payment-wrap">
-            <label for="closing-cash-input">Counted Cash</label>
-            <input id="closing-cash-input" type="number" min="0" step="0.01" value="0">
-        </div>
-        <div class="payment-wrap">
-            <label for="closing-ecash-input">Counted E-Cash</label>
-            <input id="closing-ecash-input" type="number" min="0" step="0.01" value="0">
-        </div>
-        <div class="payment-wrap">
-            <label for="closing-note-input">Closing Note (optional)</label>
-            <input id="closing-note-input" type="text" placeholder="e.g. Cash count verified">
+        <p id="store-day-close-summary" class="scanner-status store-day-close-summary">Review expected cash and enter counted totals.</p>
+        <div id="store-day-close-reconcile" class="store-day-close-reconcile"></div>
+        <div class="store-day-close-fields">
+            <div class="payment-wrap">
+                <label for="closing-cash-input">Counted Cash</label>
+                <input id="closing-cash-input" type="number" min="0" step="0.01" value="0">
+                <small id="closing-cash-variance" class="closing-variance">Variance PHP 0.00</small>
+            </div>
+            <div class="payment-wrap">
+                <label for="closing-ecash-input">Counted E-Cash</label>
+                <input id="closing-ecash-input" type="number" min="0" step="0.01" value="0">
+                <small id="closing-ecash-variance" class="closing-variance">Variance PHP 0.00</small>
+            </div>
+            <div class="payment-wrap">
+                <label id="closing-note-label" for="closing-note-input">Closing Note (optional)</label>
+                <input id="closing-note-input" type="text" placeholder="e.g. Cash count verified">
+            </div>
         </div>
         <p id="store-day-close-result" class="result-msg"></p>
         <div class="confirm-actions">

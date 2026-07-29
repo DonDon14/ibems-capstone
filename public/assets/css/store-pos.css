@@ -64,18 +64,21 @@
 
 .debt-search-wrap #debt-customer-search {
     width: 100%;
-    padding-right: 46px;
+    padding: 10px 62px 10px 16px;
     height: 44px;
+    border: 1px solid #c7d5e4;
     border-radius: 10px;
+    background: #fff;
+    line-height: 1.35;
 }
 
 .debt-scan-btn {
     position: absolute;
-    right: 6px;
+    right: 9px;
     top: 50%;
     transform: translateY(-50%);
-    width: 34px;
-    height: 34px;
+    width: 32px;
+    height: 32px;
     border: 1px solid #3b82f6;
     border-radius: 8px;
     background: #fff;
@@ -134,6 +137,90 @@
 
 .debt-suggestion-item:hover {
     background: #f8fafc;
+}
+
+.debt-payment-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    border: 1px solid #d8e2ee;
+    border-radius: 10px;
+    padding: 12px;
+    margin: 12px 0;
+    background: #fff;
+}
+
+.debt-payment-card strong,
+.debt-payment-card small {
+    display: block;
+}
+
+.debt-payment-card strong {
+    color: #082f63;
+    font-size: 0.94rem;
+}
+
+.debt-payment-card small {
+    margin-top: 2px;
+    color: #64748b;
+    font-size: 0.78rem;
+}
+
+.debt-payment-modal-card {
+    max-width: 620px;
+}
+
+.debt-payment-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(160px, 0.55fr);
+    gap: 12px;
+}
+
+.debt-payment-profile {
+    display: grid;
+    grid-template-columns: 1.4fr repeat(2, minmax(120px, 0.7fr));
+    gap: 10px;
+    align-items: center;
+    border: 1px solid #d8e2ee;
+    border-radius: 10px;
+    padding: 12px;
+    background: #f8fbff;
+}
+
+.debt-payment-profile.is-hidden {
+    display: none;
+}
+
+.debt-payment-profile strong,
+.debt-payment-profile small,
+.debt-payment-profile span {
+    display: block;
+}
+
+.debt-payment-profile span,
+.debt-payment-profile small {
+    color: #64748b;
+    font-size: 0.78rem;
+}
+
+.debt-payment-profile strong {
+    color: #0f172a;
+    font-size: 0.92rem;
+}
+
+#debt-payment-amount,
+#debt-payment-channel,
+#debt-payment-reference,
+#debt-payment-remarks,
+#debt-payment-search {
+    width: 100%;
+    min-height: 42px;
+    border: 1px solid #c7d5e4;
+    border-radius: 8px;
+    padding: 10px 14px;
+    background: #fff;
+    line-height: 1.35;
 }
 
 .search-wrap {
@@ -1102,6 +1189,186 @@
     max-width: 760px;
 }
 
+.store-day-close-card {
+    max-width: 680px;
+    padding: 20px;
+}
+
+.opening-balance-card {
+    max-width: 540px;
+    padding: 20px;
+}
+
+.opening-balance-card .scanner-status {
+    margin: 4px 0 14px;
+    color: #334155;
+    line-height: 1.45;
+}
+
+.opening-balance-fields {
+    display: grid;
+    gap: 14px;
+}
+
+.opening-balance-card .payment-wrap {
+    gap: 6px;
+    margin: 0;
+}
+
+.opening-balance-card .payment-wrap label {
+    color: #475569;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+#opening-balance-input,
+#opening-ecash-input,
+#opening-balance-note {
+    width: 100%;
+    min-height: 44px;
+    border: 1px solid #c7d5e4;
+    border-radius: 8px;
+    padding: 10px 14px;
+    background: #fff;
+    color: #0f172a;
+    line-height: 1.35;
+}
+
+#opening-balance-input:focus,
+#opening-ecash-input:focus,
+#opening-balance-note:focus {
+    outline: 3px solid rgba(37, 99, 235, 0.18);
+    border-color: #2563eb;
+}
+
+.opening-balance-card .confirm-actions {
+    margin-top: 22px;
+}
+
+.store-day-close-summary {
+    margin: 4px 0 14px;
+    color: #334155;
+    line-height: 1.45;
+}
+
+.store-day-close-fields {
+    display: grid;
+    gap: 14px;
+}
+
+.store-day-close-reconcile {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin: 14px 0 16px;
+}
+
+.close-reconcile-section {
+    border: 1px solid #d8e2ee;
+    border-radius: 8px;
+    background: #f8fbff;
+    padding: 12px;
+}
+
+.close-reconcile-section h4 {
+    margin: 0 0 8px;
+    color: #082f63;
+    font-size: 0.86rem;
+}
+
+.close-reconcile-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 5px 0;
+    border-bottom: 1px solid #e5edf6;
+    color: #334155;
+    font-size: 0.82rem;
+}
+
+.close-reconcile-row:last-child {
+    border-bottom: 0;
+}
+
+.close-reconcile-row strong {
+    color: #0f172a;
+    white-space: nowrap;
+}
+
+.close-reconcile-row.is-muted span,
+.close-reconcile-row.is-muted strong {
+    color: #64748b;
+}
+
+.close-reconcile-row.is-total {
+    margin-top: 4px;
+    padding-top: 8px;
+    border-top: 1px solid #c7d5e4;
+    font-weight: 800;
+}
+
+.close-reconcile-row.is-grand {
+    margin-top: 6px;
+    padding-top: 9px;
+    border-top: 2px solid #c7d5e4;
+    font-weight: 900;
+}
+
+.closing-variance {
+    display: block;
+    margin-top: 4px;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.closing-variance.is-balanced {
+    color: #047857;
+}
+
+.closing-variance.is-over {
+    color: #1d4ed8;
+}
+
+.closing-variance.is-short {
+    color: #b91c1c;
+}
+
+.store-day-close-card .payment-wrap {
+    gap: 6px;
+    margin: 0;
+}
+
+.store-day-close-card .payment-wrap label {
+    color: #475569;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+#closing-cash-input,
+#closing-ecash-input,
+#closing-note-input {
+    width: 100%;
+    min-height: 44px;
+    border: 1px solid #c7d5e4;
+    border-radius: 8px;
+    padding: 10px 14px;
+    background: #fff;
+    color: #0f172a;
+    line-height: 1.35;
+}
+
+#closing-cash-input:focus,
+#closing-ecash-input:focus,
+#closing-note-input:focus {
+    border-color: #2563eb;
+    outline: 2px solid rgba(37, 99, 235, 0.14);
+}
+
+.store-day-close-card .confirm-actions {
+    margin-top: 22px;
+}
+
 .confirm-summary-hero {
     display: flex;
     align-items: center;
@@ -1296,6 +1563,18 @@
     .receipt-meta-grid,
     .confirm-meta-grid {
         grid-template-columns: 1fr;
+    }
+
+    .debt-payment-card,
+    .debt-payment-grid,
+    .debt-payment-profile,
+    .store-day-close-reconcile {
+        grid-template-columns: 1fr;
+    }
+
+    .debt-payment-card {
+        align-items: stretch;
+        flex-direction: column;
     }
 }
 

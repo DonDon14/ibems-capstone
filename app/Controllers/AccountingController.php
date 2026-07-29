@@ -323,11 +323,26 @@ class AccountingController extends Controller
             $row += $this->buildDebtStatus($creditLimit, $currentDebt);
             return $row;
         }, $rows);
+        $advancePayments = $this->getAccountingCashbookRows(['store_repayment'], 100);
+        $operatorAccountabilities = $this->getAccountingCashbookRows(['operator_shortage'], 100);
+        $employeeDebtTotal = array_reduce($data, static fn(float $sum, array $row): float => $sum + (float) ($row['current_debt'] ?? 0), 0.0);
+        $advanceTotal = array_reduce($advancePayments, static fn(float $sum, array $row): float => $sum + (float) ($row['amount'] ?? 0), 0.0);
+        $accountabilityTotal = array_reduce($operatorAccountabilities, static fn(float $sum, array $row): float => $sum + (float) ($row['amount'] ?? 0), 0.0);
 
         return $this->response->setJSON([
             'status' => 'success',
             'count' => count($data),
             'data' => $data,
+            'summary' => [
+                'employee_debt_accounts' => count(array_filter($data, static fn(array $row): bool => (float) ($row['current_debt'] ?? 0) > 0)),
+                'employee_debt_total' => $employeeDebtTotal,
+                'advance_payment_count' => count($advancePayments),
+                'advance_payment_total' => $advanceTotal,
+                'operator_accountability_count' => count($operatorAccountabilities),
+                'operator_accountability_total' => $accountabilityTotal,
+            ],
+            'advance_payments' => $advancePayments,
+            'operator_accountabilities' => $operatorAccountabilities,
         ]);
     }
 
@@ -391,6 +406,7 @@ class AccountingController extends Controller
                 'ACCOUNTING_DEDUCT_DEBT',
                 'ACCOUNTING_DEDUCT_FULL_DEBT',
                 'ACCOUNTING_UPDATE_CREDIT_LIMIT',
+                'STORE_DEBT_REPAYMENT',
             ])
             ->orderBy('al.id', 'DESC')
             ->limit($limit)
@@ -537,6 +553,17 @@ class AccountingController extends Controller
         $request = $this->request->getJSON(true) ?? $this->request->getPost();
         $runMonth = trim((string) ($request['run_month'] ?? date('Y-m')));
         $notes = trim((string) ($request['notes'] ?? ''));
+        $selectedUserIds = [];
+        if (array_key_exists('selected_user_ids', $request)) {
+            $rawSelected = is_array($request['selected_user_ids']) ? $request['selected_user_ids'] : [];
+            $selectedUserIds = array_values(array_unique(array_filter(array_map('intval', $rawSelected), static fn (int $id): bool => $id > 0)));
+            if ($selectedUserIds === []) {
+                return $this->response->setStatusCode(400)->setJSON([
+                    'status' => 'error',
+                    'message' => 'Select at least one employee before confirming deduction.',
+                ]);
+            }
+        }
         $actorId = (int) session()->get('user_id');
 
         if (!preg_match('/^\d{4}\-(0[1-9]|1[0-2])$/', $runMonth)) {
@@ -560,12 +587,18 @@ class AccountingController extends Controller
             ]);
         }
 
-        $rows = $db->table('balances b')
+        $settlementBuilder = $db->table('balances b')
             ->select('u.id AS user_id, u.base_salary, b.current_debt')
             ->join('users u', 'u.id = b.user_id', 'inner')
             ->where('u.is_active', 1)
             ->whereIn('u.user_type', ['faculty', 'staff'])
-            ->where('b.current_debt >', 0)
+            ->where('b.current_debt >', 0);
+
+        if ($selectedUserIds !== []) {
+            $settlementBuilder->whereIn('u.id', $selectedUserIds);
+        }
+
+        $rows = $settlementBuilder
             ->get()
             ->getResultArray();
 
@@ -594,7 +627,14 @@ class AccountingController extends Controller
         if ($processRows === []) {
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
-                'message' => 'No processable debt accounts found for settlement.',
+            'message' => 'No processable debt accounts found for settlement.',
+            ]);
+        }
+
+        if ($selectedUserIds !== [] && count($processRows) !== count($selectedUserIds)) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'One or more selected employees no longer have a processable debt. Refresh the preview and try again.',
             ]);
         }
 
@@ -1294,7 +1334,6 @@ class AccountingController extends Controller
 
         $currentDebt = (float) $balance['current_debt'];
         $creditLimit = (float) $balance['credit_limit'];
-        $creditLimit = (float) $balance['credit_limit'];
         if ($currentDebt <= 0) {
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
@@ -1557,5 +1596,60 @@ class AccountingController extends Controller
             'debt_status_tone' => 'info',
             'debt_ratio' => $ratio,
         ];
+    }
+
+    private function getAccountingCashbookRows(array $entryTypes, int $limit = 100): array
+    {
+        if ($entryTypes === []) {
+            return [];
+        }
+
+        $db = Database::connect();
+        if (!$db->tableExists('debt_cashbook_entries')) {
+            return [];
+        }
+
+        $rows = $db->table('debt_cashbook_entries dce')
+            ->select('dce.id, dce.user_id, dce.entry_type, dce.direction, dce.amount, dce.debt_before, dce.debt_after, dce.reference_type, dce.reference_id, dce.remarks, dce.meta_json, dce.created_at, u.employee_id, u.name, u.email, u.user_type, actor.name AS actor_name')
+            ->join('users u', 'u.id = dce.user_id', 'left')
+            ->join('users actor', 'actor.id = dce.actor_id', 'left')
+            ->whereIn('dce.entry_type', $entryTypes)
+            ->orderBy('dce.id', 'DESC')
+            ->limit(max(1, min(300, $limit)))
+            ->get()
+            ->getResultArray();
+
+        return array_map(static function (array $row): array {
+            $meta = [];
+            if (!empty($row['meta_json'])) {
+                $decoded = json_decode((string) $row['meta_json'], true);
+                if (is_array($decoded)) {
+                    $meta = $decoded;
+                }
+            }
+
+            return [
+                'id' => (int) ($row['id'] ?? 0),
+                'user_id' => (int) ($row['user_id'] ?? 0),
+                'employee_id' => $row['employee_id'] ?? null,
+                'name' => $row['name'] ?: 'Unknown',
+                'email' => $row['email'] ?? null,
+                'user_type' => $row['user_type'] ?? null,
+                'entry_type' => (string) ($row['entry_type'] ?? ''),
+                'direction' => (string) ($row['direction'] ?? ''),
+                'amount' => (float) ($row['amount'] ?? 0),
+                'debt_before' => (float) ($row['debt_before'] ?? 0),
+                'debt_after' => (float) ($row['debt_after'] ?? 0),
+                'reference_type' => $row['reference_type'] ?? null,
+                'reference_id' => $row['reference_id'] !== null ? (int) $row['reference_id'] : null,
+                'remarks' => $row['remarks'] ?? null,
+                'actor_name' => $row['actor_name'] ?: 'System',
+                'created_at' => $row['created_at'] ?? null,
+                'meta' => $meta,
+                'store_name' => $meta['store_name'] ?? null,
+                'channel' => $meta['channel'] ?? null,
+                'business_date' => $meta['business_date'] ?? null,
+            ];
+        }, $rows);
     }
 }

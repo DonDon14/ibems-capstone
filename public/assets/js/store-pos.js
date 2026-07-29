@@ -10,6 +10,8 @@ let debtCustomers = [];
 let selectedDebtCustomerId = null;
 let selectedDebtCustomer = null;
 let selectedDebtPin = "";
+let repaymentCustomers = [];
+let selectedRepaymentCustomer = null;
 let isSubmitting = false;
 let lastReceipt = null;
 let lastCardAddAt = 0;
@@ -439,6 +441,93 @@ function setStoreDayCloseResult(message, type) {
     }
 }
 
+function closeDayValue(key) {
+    return Number(currentDaySession?.[key] || 0);
+}
+
+function closeDayOtherCashIn() {
+    return Math.max(0, closeDayValue("cash_in") - closeDayValue("cash_debt_payments"));
+}
+
+function closeDayOtherEcashIn() {
+    return Math.max(0, closeDayValue("ecash_in") - closeDayValue("ecash_debt_payments"));
+}
+
+function closeDayReconcileRow(label, value, className = "") {
+    const safeClass = className ? ` ${className}` : "";
+    return `<div class="close-reconcile-row${safeClass}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(formatMoney(value))}</strong></div>`;
+}
+
+function renderStoreDayCloseReconciliation() {
+    const wrap = document.getElementById("store-day-close-reconcile");
+    if (!wrap || !currentDaySession) return;
+
+    const expectedCash = closeDayValue("expected_cash_on_hand") || closeDayValue("expected_cash");
+    const expectedEcash = closeDayValue("expected_ecash_on_hand") || closeDayValue("expected_ecash");
+    const expectedTotal = expectedCash + expectedEcash;
+    const collectedCash = closeDayValue("cash_sales") + closeDayValue("cash_debt_payments");
+    const collectedEcash = closeDayValue("ecash_sales") + closeDayValue("ecash_debt_payments");
+
+    wrap.innerHTML = `
+        <section class="close-reconcile-section">
+            <h4>Sales and Collections</h4>
+            ${closeDayReconcileRow("Cash product sales", closeDayValue("cash_sales"))}
+            ${closeDayReconcileRow("E-cash product sales", closeDayValue("ecash_sales"))}
+            ${closeDayReconcileRow("Debt sales (not collected)", closeDayValue("debt_sales"), "is-muted")}
+            ${closeDayReconcileRow("Cash debt payments", closeDayValue("cash_debt_payments"))}
+            ${closeDayReconcileRow("E-cash debt payments", closeDayValue("ecash_debt_payments"))}
+        </section>
+        <section class="close-reconcile-section">
+            <h4>Expected Money</h4>
+            ${closeDayReconcileRow("Opening cash", closeDayValue("opening_cash"))}
+            ${closeDayReconcileRow("Cash collected", collectedCash)}
+            ${closeDayReconcileRow("Other cash in", closeDayOtherCashIn())}
+            ${closeDayReconcileRow("Cash out", -closeDayValue("cash_out"), "is-muted")}
+            ${closeDayReconcileRow("Expected cash", expectedCash, "is-total")}
+            ${closeDayReconcileRow("Opening e-cash", closeDayValue("opening_ecash"))}
+            ${closeDayReconcileRow("E-cash collected", collectedEcash)}
+            ${closeDayReconcileRow("Other e-cash in", closeDayOtherEcashIn())}
+            ${closeDayReconcileRow("E-cash out", -closeDayValue("ecash_out"), "is-muted")}
+            ${closeDayReconcileRow("Expected e-cash", expectedEcash, "is-total")}
+            ${closeDayReconcileRow("Expected total", expectedTotal, "is-grand")}
+        </section>
+    `;
+}
+
+function updateStoreDayCloseVariance() {
+    const expectedCash = closeDayValue("expected_cash_on_hand") || closeDayValue("expected_cash");
+    const expectedEcash = closeDayValue("expected_ecash_on_hand") || closeDayValue("expected_ecash");
+    const countedCash = Number(document.getElementById("closing-cash-input")?.value || 0);
+    const countedEcash = Number(document.getElementById("closing-ecash-input")?.value || 0);
+    const cashVariance = countedCash - expectedCash;
+    const ecashVariance = countedEcash - expectedEcash;
+    const cashEl = document.getElementById("closing-cash-variance");
+    const ecashEl = document.getElementById("closing-ecash-variance");
+
+    [
+        [cashEl, cashVariance],
+        [ecashEl, ecashVariance],
+    ].forEach(([el, variance]) => {
+        if (!el) return;
+        const label = variance < -0.005 ? "Shortage" : variance > 0.005 ? "Overage" : "Balanced";
+        el.textContent = `${label} ${formatMoney(Math.abs(variance))}`;
+        el.classList.toggle("is-balanced", Math.abs(variance) < 0.005);
+        el.classList.toggle("is-over", variance > 0.005);
+        el.classList.toggle("is-short", variance < -0.005);
+    });
+
+    const noteLabel = document.getElementById("closing-note-label");
+    const noteInput = document.getElementById("closing-note-input");
+    const hasVariance = Math.abs(cashVariance) >= 0.005 || Math.abs(ecashVariance) >= 0.005;
+    if (noteLabel) {
+        noteLabel.textContent = hasVariance ? "Closing Note (required for variance)" : "Closing Note (optional)";
+    }
+    if (noteInput) {
+        noteInput.required = hasVariance;
+        noteInput.placeholder = hasVariance ? "Explain shortage/overage before closing" : "e.g. Cash count verified";
+    }
+}
+
 function openStoreDayCloseModal() {
     const modal = document.getElementById("store-day-close-modal");
     const summary = document.getElementById("store-day-close-summary");
@@ -450,9 +539,12 @@ function openStoreDayCloseModal() {
     document.getElementById("closing-ecash-input").value = expectedEcash.toFixed(2);
     document.getElementById("closing-note-input").value = "";
     if (summary) {
-        summary.textContent = `Expected cash ${formatMoney(expectedCash)} | expected e-cash ${formatMoney(expectedEcash)}. Enter counted totals to calculate variance.`;
+        summary.textContent = "Expected totals are calculated from opening balance, sales, direct debt payments, and cash movements. Enter the actual counted cash/e-cash to record any variance.";
     }
+    renderStoreDayCloseReconciliation();
+    updateStoreDayCloseVariance();
     setStoreDayCloseResult("", "ok");
+    modal.classList.remove("is-hidden");
     modal.style.display = "grid";
 }
 
@@ -460,6 +552,7 @@ function closeStoreDayCloseModal() {
     const modal = document.getElementById("store-day-close-modal");
     if (!modal) return;
     modal.style.display = "none";
+    modal.classList.add("is-hidden");
 }
 
 async function saveStoreDayClose() {
@@ -472,6 +565,15 @@ async function saveStoreDayClose() {
 
     if (countedCash < 0 || countedEcash < 0) {
         setStoreDayCloseResult("Counted cash and e-cash must be 0 or greater.", "error");
+        return;
+    }
+
+    const expectedCash = closeDayValue("expected_cash_on_hand") || closeDayValue("expected_cash");
+    const expectedEcash = closeDayValue("expected_ecash_on_hand") || closeDayValue("expected_ecash");
+    const hasVariance = Math.abs(countedCash - expectedCash) >= 0.005 || Math.abs(countedEcash - expectedEcash) >= 0.005;
+    if (hasVariance && note === "") {
+        setStoreDayCloseResult("Enter a closing note explaining the shortage or overage before closing.", "error");
+        document.getElementById("closing-note-input").focus();
         return;
     }
 
@@ -503,7 +605,9 @@ async function saveStoreDayClose() {
 
         const varianceCash = Number(data.session?.variance_cash || 0);
         const varianceEcash = Number(data.session?.variance_ecash || 0);
-        setResult(`Store day closed. Variance: cash ${formatMoney(varianceCash)}, e-cash ${formatMoney(varianceEcash)}.`, "ok");
+        const reviewStatus = String(data.session?.review_status || "not_required");
+        const reviewText = reviewStatus === "pending" ? " Flagged for review." : "";
+        setResult(`Store day closed. Variance: cash ${formatMoney(varianceCash)}, e-cash ${formatMoney(varianceEcash)}.${reviewText}`, "ok");
     } catch (error) {
         setStoreDayCloseResult(error.message || "Failed to close store day.", "error");
     } finally {
@@ -1271,6 +1375,194 @@ async function loadDebtCustomers(query = "") {
     }
 }
 
+function setDebtPaymentResult(message = "", type = "") {
+    const result = document.getElementById("debt-payment-result");
+    if (!result) return;
+    result.textContent = message;
+    result.className = `result-msg ${type === "error" ? "error" : type === "ok" ? "ok" : ""}`.trim();
+}
+
+function renderDebtPaymentSuggestions() {
+    const box = document.getElementById("debt-payment-suggestions");
+    const input = document.getElementById("debt-payment-search");
+    if (!box || !input) return;
+
+    const query = String(input.value || "").trim().toLowerCase();
+    const list = repaymentCustomers.filter((customer) => Number(customer.current_debt || 0) > 0);
+    if (!query || list.length === 0) {
+        box.innerHTML = "";
+        box.style.display = "none";
+        return;
+    }
+
+    box.innerHTML = list.slice(0, 8).map((customer) => {
+        const category = String(customer.user_type || "");
+        const categoryLabel = category ? category.charAt(0).toUpperCase() + category.slice(1).toLowerCase() : "N/A";
+        return `
+            <button type="button" class="debt-suggestion-item" data-repayment-user-id="${customer.id}">
+                <span class="name">${escapeHtml(customer.name)}</span>
+                <span class="meta">${escapeHtml(customer.employee_id || customer.email)} | ${escapeHtml(categoryLabel)} | Debt ${escapeHtml(formatMoney(customer.current_debt || 0))}</span>
+            </button>
+        `;
+    }).join("");
+    box.style.display = "block";
+}
+
+async function loadDebtPaymentCustomers(query = "") {
+    try {
+        const data = await requestJson(
+            `/store/debt-customers?q=${encodeURIComponent(query)}`,
+            {},
+            "Unable to load debt customers."
+        );
+        repaymentCustomers = Array.isArray(data.customers) ? data.customers : [];
+        renderDebtPaymentSuggestions();
+    } catch (error) {
+        repaymentCustomers = [];
+        renderDebtPaymentSuggestions();
+        setDebtPaymentResult(error.message || "Unable to load debt customers.", "error");
+    }
+}
+
+function renderDebtPaymentProfile() {
+    const profile = document.getElementById("debt-payment-profile");
+    if (!profile) return;
+
+    if (!selectedRepaymentCustomer) {
+        profile.classList.add("is-hidden");
+        profile.innerHTML = "";
+        return;
+    }
+
+    const debt = Number(selectedRepaymentCustomer.current_debt || 0);
+    const credit = Number(selectedRepaymentCustomer.credit_limit || 0);
+    profile.classList.remove("is-hidden");
+    profile.innerHTML = `
+        <div>
+            <strong>${escapeHtml(selectedRepaymentCustomer.name || "Debtor")}</strong>
+            <small>${escapeHtml(selectedRepaymentCustomer.employee_id || selectedRepaymentCustomer.email || "-")}</small>
+        </div>
+        <div>
+            <span>Current Debt</span>
+            <strong>${escapeHtml(formatMoney(debt))}</strong>
+        </div>
+        <div>
+            <span>Credit Limit</span>
+            <strong>${escapeHtml(formatMoney(credit))}</strong>
+        </div>
+    `;
+}
+
+function resetDebtPaymentModal() {
+    selectedRepaymentCustomer = null;
+    repaymentCustomers = [];
+    ["debt-payment-search", "debt-payment-amount", "debt-payment-reference", "debt-payment-remarks"].forEach((id) => {
+        const el = document.getElementById(id);
+        if (el) el.value = "";
+    });
+    const channel = document.getElementById("debt-payment-channel");
+    if (channel) channel.value = "cash";
+    const suggestions = document.getElementById("debt-payment-suggestions");
+    if (suggestions) {
+        suggestions.innerHTML = "";
+        suggestions.style.display = "none";
+    }
+    renderDebtPaymentProfile();
+    setDebtPaymentResult("");
+}
+
+function openDebtPaymentModal() {
+    if (!activeStoreId) {
+        setResult("No active store selected.", "error");
+        return;
+    }
+
+    if (!openingBalanceReady) {
+        setResult("Open today's store day before recording debt payments.", "error");
+        openOpeningBalanceModal();
+        return;
+    }
+
+    resetDebtPaymentModal();
+    const modal = document.getElementById("debt-payment-modal");
+    const input = document.getElementById("debt-payment-search");
+    if (modal) modal.style.display = "grid";
+    loadDebtPaymentCustomers("").catch(() => setDebtPaymentResult("Unable to load debt customers.", "error"));
+    setTimeout(() => input?.focus(), 30);
+}
+
+function closeDebtPaymentModal() {
+    const modal = document.getElementById("debt-payment-modal");
+    if (modal) modal.style.display = "none";
+}
+
+async function submitDebtPayment() {
+    if (!selectedRepaymentCustomer) {
+        setDebtPaymentResult("Select a debtor before recording payment.", "error");
+        return;
+    }
+
+    const amount = Number(document.getElementById("debt-payment-amount")?.value || 0);
+    const currentDebt = Number(selectedRepaymentCustomer.current_debt || 0);
+    if (amount <= 0) {
+        setDebtPaymentResult("Payment amount must be greater than 0.", "error");
+        return;
+    }
+    if (amount > currentDebt) {
+        setDebtPaymentResult("Payment cannot exceed current debt.", "error");
+        return;
+    }
+
+    const saveBtn = document.getElementById("debt-payment-save");
+    const payload = {
+        store_id: activeStoreId,
+        user_id: Number(selectedRepaymentCustomer.id),
+        amount,
+        channel: document.getElementById("debt-payment-channel")?.value || "cash",
+        reference_no: document.getElementById("debt-payment-reference")?.value || "",
+        remarks: document.getElementById("debt-payment-remarks")?.value || "",
+    };
+
+    try {
+        if (saveBtn) {
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Recording...';
+        }
+        const data = await requestJson(
+            "/store/debt-repayments/create",
+            {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            },
+            "Unable to record debt payment."
+        );
+
+        if (!data || data.status !== "success") {
+            throw new Error(data?.message || "Unable to record debt payment.");
+        }
+
+        const payment = data.payment || {};
+        setResult(
+            `Debt payment recorded for ${payment.debtor_name || selectedRepaymentCustomer.name}. New debt: ${formatMoney(payment.new_debt || 0)}.`,
+            "ok"
+        );
+        showToast("Debt payment recorded.", "success");
+        selectedRepaymentCustomer.current_debt = Number(payment.new_debt || 0);
+        renderDebtPaymentProfile();
+        await loadOpeningBalanceStatus();
+        await loadDebtCustomers();
+        closeDebtPaymentModal();
+    } catch (error) {
+        setDebtPaymentResult(error.message || "Unable to record debt payment.", "error");
+    } finally {
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Record Payment';
+        }
+    }
+}
+
 function updateDebtCustomerVisibility() {
     const paymentMethod = document.getElementById("payment-method").value;
     const wrap = document.getElementById("debt-customer-wrap");
@@ -1944,6 +2236,38 @@ document.getElementById("debt-customer-suggestions").addEventListener("click", (
     setResult(`Debt customer selected: ${picked.name}`, "ok");
 });
 
+document.getElementById("open-debt-payment-modal").addEventListener("click", openDebtPaymentModal);
+document.getElementById("debt-payment-close").addEventListener("click", closeDebtPaymentModal);
+document.getElementById("debt-payment-cancel").addEventListener("click", closeDebtPaymentModal);
+document.getElementById("debt-payment-modal").addEventListener("click", (event) => {
+    if (event.target.id === "debt-payment-modal") {
+        closeDebtPaymentModal();
+    }
+});
+document.getElementById("debt-payment-search").addEventListener("input", async (event) => {
+    selectedRepaymentCustomer = null;
+    renderDebtPaymentProfile();
+    await loadDebtPaymentCustomers(event.target.value || "");
+});
+document.getElementById("debt-payment-suggestions").addEventListener("click", (event) => {
+    const btn = event.target.closest("[data-repayment-user-id]");
+    if (!btn) return;
+
+    const userId = Number(btn.getAttribute("data-repayment-user-id") || 0);
+    const picked = repaymentCustomers.find((customer) => Number(customer.id) === userId);
+    if (!picked) return;
+
+    selectedRepaymentCustomer = picked;
+    document.getElementById("debt-payment-search").value = picked.name;
+    document.getElementById("debt-payment-suggestions").style.display = "none";
+    document.getElementById("debt-payment-amount").value = Number(picked.current_debt || 0).toFixed(2);
+    renderDebtPaymentProfile();
+    setDebtPaymentResult("");
+});
+document.getElementById("debt-payment-save").addEventListener("click", () => {
+    submitDebtPayment().catch((error) => setDebtPaymentResult(error.message || "Unable to record debt payment.", "error"));
+});
+
 document.getElementById("debt-pin-input").addEventListener("input", (event) => {
     event.target.value = String(event.target.value || "").replace(/\D/g, "").slice(0, 6);
     const result = document.getElementById("debt-pin-modal-result");
@@ -1973,6 +2297,8 @@ document.addEventListener("click", (event) => {
     if (event.target.closest(".debt-search-wrap")) return;
     const box = document.getElementById("debt-customer-suggestions");
     if (box) box.style.display = "none";
+    const paymentBox = document.getElementById("debt-payment-suggestions");
+    if (paymentBox) paymentBox.style.display = "none";
 });
 
 document.addEventListener("click", (event) => {
@@ -2051,20 +2377,28 @@ document.getElementById("store-day-close-x").addEventListener("click", closeStor
 document.getElementById("store-day-close-cancel").addEventListener("click", closeStoreDayCloseModal);
 document.getElementById("store-day-close-save").addEventListener("click", saveStoreDayClose);
 document.getElementById("store-day-close-modal").addEventListener("click", (event) => {
-    if (event.target.id === "store-day-close-modal") {
-        closeStoreDayCloseModal();
+    if (event.target === event.currentTarget) {
+        event.preventDefault();
     }
+});
+document.getElementById("store-day-close-modal").addEventListener("pointerdown", (event) => {
+    if (event.target === event.currentTarget) {
+        event.preventDefault();
+    }
+});
+document.querySelector("#store-day-close-modal .store-day-close-card")?.addEventListener("click", (event) => {
+    event.stopPropagation();
 });
 document.getElementById("closing-cash-input").addEventListener("keydown", (event) => {
     if (event.key !== "Enter") return;
     event.preventDefault();
-    saveStoreDayClose();
 });
+document.getElementById("closing-cash-input").addEventListener("input", updateStoreDayCloseVariance);
 document.getElementById("closing-ecash-input").addEventListener("keydown", (event) => {
     if (event.key !== "Enter") return;
     event.preventDefault();
-    saveStoreDayClose();
 });
+document.getElementById("closing-ecash-input").addEventListener("input", updateStoreDayCloseVariance);
 
 (async () => {
     try {

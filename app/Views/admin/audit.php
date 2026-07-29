@@ -6,10 +6,12 @@
 
 <?= $this->section('content') ?>
 <section class="admin-overview-shell space-y-5">
-    <div class="admin-overview-head">
-        <h3 class="text-3xl font-bold tracking-tight text-slate-900">Audit Log</h3>
-        <p class="mt-1 text-base text-slate-600">Review critical system actions across admin, store, accounting, POS, settlement, and user security flows.</p>
-    </div>
+    <?= view('components/page_header', [
+        'eyebrow' => 'System accountability',
+        'title' => 'Audit log',
+        'description' => 'Review critical actions across administration, stores, accounting, POS, settlements, and account security.',
+        'icon' => 'bi bi-journal-text',
+    ]) ?>
 
     <div class="summary-grid grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <?= view('components/stat_card', ['title' => 'Total Events', 'value' => '0', 'valueId' => 'audit-total-events', 'icon' => 'bi bi-journal-text', 'tone' => 'finance']) ?>
@@ -20,20 +22,47 @@
 
     <div class="overview-filter audit-filter-panel rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div class="audit-filter-main">
-            <input id="audit-search" type="search" placeholder="Search action, actor, entity, or payload">
-            <select id="audit-action-filter">
-                <option value="">All Actions</option>
-            </select>
-            <select id="audit-entity-filter">
-                <option value="">All Entities</option>
-            </select>
-            <input id="audit-date-from" type="date" aria-label="Date from">
-            <input id="audit-date-to" type="date" aria-label="Date to">
-            <select id="audit-limit">
-                <option value="50">50 rows</option>
-                <option value="100" selected>100 rows</option>
-                <option value="200">200 rows</option>
-            </select>
+            <?= view('components/form_field', [
+                'id' => 'audit-search',
+                'label' => 'Search',
+                'type' => 'search',
+                'value' => '',
+                'placeholder' => 'Action, actor, entity, or payload',
+            ]) ?>
+            <label class="ui-field" for="audit-action-filter">
+                <span>Action</span>
+                <select id="audit-action-filter">
+                    <option value="">All Actions</option>
+                </select>
+            </label>
+            <label class="ui-field" for="audit-entity-filter">
+                <span>Entity</span>
+                <select id="audit-entity-filter">
+                    <option value="">All Entities</option>
+                </select>
+            </label>
+            <?= view('components/form_field', [
+                'id' => 'audit-date-from',
+                'label' => 'From',
+                'type' => 'date',
+                'value' => '',
+                'placeholder' => 'Select start date',
+            ]) ?>
+            <?= view('components/form_field', [
+                'id' => 'audit-date-to',
+                'label' => 'To',
+                'type' => 'date',
+                'value' => '',
+                'placeholder' => 'Select end date',
+            ]) ?>
+            <label class="ui-field" for="audit-limit">
+                <span>Rows</span>
+                <select id="audit-limit">
+                    <option value="50">50 rows</option>
+                    <option value="100" selected>100 rows</option>
+                    <option value="200">200 rows</option>
+                </select>
+            </label>
         </div>
         <div class="audit-filter-actions">
             <button id="audit-search-btn" class="primary-btn" type="button"><i class="bi bi-search"></i> Search</button>
@@ -56,17 +85,25 @@
                 </tr>
             </thead>
             <tbody id="audit-body">
-                <tr><td colspan="5">Loading...</td></tr>
+                <?= view('components/data_state', [
+                    'tag' => 'tr',
+                    'colspan' => 5,
+                    'type' => 'loading',
+                    'message' => 'Loading audit records...',
+                ]) ?>
             </tbody>
         </table>
     </div>
 </section>
 
-<div id="audit-view-modal" class="admin-modal is-hidden">
+<div id="audit-view-modal" class="admin-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="audit-view-title">
     <div class="admin-modal-card max-h-[92vh] w-[min(840px,95vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
         <div class="admin-modal-head">
-            <h4 class="text-lg font-bold text-slate-900">Audit Event</h4>
-            <button id="audit-view-close" type="button" class="admin-modal-close">x</button>
+            <div>
+                <span class="modal-eyebrow">Event details</span>
+                <h4 id="audit-view-title" class="text-lg font-bold text-slate-900">Audit Event</h4>
+            </div>
+            <button id="audit-view-close" type="button" class="admin-modal-close" aria-label="Close audit event">x</button>
         </div>
         <div id="audit-view-content" class="audit-detail-grid"></div>
     </div>

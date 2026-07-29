@@ -9,6 +9,7 @@ function setStatus(message, type) {
 function roleLabel(role) {
     const key = String(role || "").toUpperCase();
     if (key === "STORE_SYSTEM") return "Store Officer";
+    if (key === "STORE_SUPERVISOR") return "Store Supervisor";
     if (key === "ACCOUNTING_OFFICE") return "Accounting Office";
     if (key === "ADMIN") return "Admin";
     if (key === "USER") return "User";
@@ -18,6 +19,7 @@ function roleLabel(role) {
 function targetPathByRole(role) {
     const key = String(role || "").toUpperCase();
     if (key === "STORE_SYSTEM") return "/store/dashboard";
+    if (key === "STORE_SUPERVISOR") return "/store-admin/dashboard";
     if (key === "ACCOUNTING_OFFICE") return "/accounting/dashboard";
     if (key === "ADMIN") return "/admin/dashboard";
     if (key === "USER") return "/user/dashboard";

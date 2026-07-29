@@ -598,6 +598,42 @@ textarea:focus {
     box-shadow: 0 0 0 3px rgba(0, 51, 102, 0.14);
 }
 
+/* Shared search/filter controls used across Store, Accounting, and Admin pages. */
+:is(.search-wrap, .debt-search-wrap, .staff-search-wrap, .acct-search-wrap, .uv-search-wrap) {
+    position: relative;
+    min-width: min(260px, 100%);
+}
+
+:is(.search-wrap, .debt-search-wrap, .staff-search-wrap, .acct-search-wrap, .uv-search-wrap) input[type="search"],
+.overview-filter input[type="search"] {
+    width: 100%;
+    min-height: 44px;
+    border: 1px solid #c7d5e4;
+    border-radius: 8px;
+    background: #fff;
+    color: #223247;
+    padding: 10px 14px;
+    line-height: 1.35;
+    box-shadow: none;
+}
+
+:is(.staff-search-wrap, .acct-search-wrap, .uv-search-wrap) input[type="search"] {
+    padding-left: 42px;
+}
+
+:is(.staff-search-wrap, .acct-search-wrap, .uv-search-wrap) > i {
+    left: 14px;
+    color: #64748b;
+}
+
+:is(.staff-filter-panel, .acct-filters-redesign, .uv-filter-panel, .ap-filter-panel, .audit-filter-panel) {
+    border: 1px solid #d8e2ee;
+    border-radius: 8px;
+    background: #fff;
+    padding: 12px;
+    box-shadow: none;
+}
+
 /* Unified button system (backward compatible with existing classes) */
 .btn,
 .primary-btn,
@@ -1812,5 +1848,73 @@ body .app-modal .app-modal-actions {
     .action-quick-links a:hover .quick-link-arrow,
     .action-quick-links a:focus-visible .quick-link-arrow {
         transform: none;
+    }
+}
+
+/* Shared loading, empty, error, and success presentation. */
+.data-state {
+    display: flex;
+    min-height: 88px;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    width: 100%;
+    padding: 20px;
+    border: 1px dashed var(--line-soft);
+    border-radius: 12px;
+    background: var(--surface-soft);
+    color: var(--text-soft);
+    text-align: left;
+}
+
+.data-state > i {
+    flex: 0 0 auto;
+    font-size: 1.35rem;
+}
+
+.data-state strong,
+.data-state small {
+    display: block;
+}
+
+.data-state strong {
+    color: var(--text-main);
+    font-size: 0.95rem;
+}
+
+.data-state small {
+    margin-top: 2px;
+    color: var(--text-soft);
+}
+
+.data-state--loading > i {
+    animation: data-state-spin 0.9s linear infinite;
+}
+
+.data-state--error {
+    border-color: #fecaca;
+    background: #fff1f2;
+    color: #be123c;
+}
+
+.data-state--success {
+    border-color: #bbf7d0;
+    background: #f0fdf4;
+    color: #15803d;
+}
+
+.data-state-row > td {
+    padding: 12px;
+}
+
+@keyframes data-state-spin {
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .data-state--loading > i {
+        animation: none;
     }
 }

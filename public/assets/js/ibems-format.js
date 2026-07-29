@@ -39,10 +39,21 @@
         return parsed.toLocaleDateString("en-PH", options);
     }
 
+    function identifierLabel(value) {
+        return String(value ?? "")
+            .trim()
+            .replace(/[_-]+/g, " ")
+            .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
+            .replace(/\s+/g, " ")
+            .toLowerCase()
+            .replace(/\b\w/g, (letter) => letter.toUpperCase());
+    }
+
     window.IbemsFormat = {
         money,
         dateTime,
         shortDateTime,
         date,
+        identifierLabel,
     };
 }());

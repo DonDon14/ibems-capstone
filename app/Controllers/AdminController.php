@@ -8,8 +8,10 @@ use App\Models\InventoryMovementModel;
 use App\Models\ProductModel;
 use App\Models\StoreModel;
 use App\Models\StoreCategoryModel;
+use App\Models\StoreSupervisorModel;
 use App\Models\UserModel;
 use App\Models\UserRoleModel;
+use App\Models\DebtCashbookEntryModel;
 use CodeIgniter\Controller;
 use Config\Database;
 
@@ -1050,7 +1052,7 @@ class AdminController extends Controller
             ]);
         }
 
-        $allowedRoles = ['USER', 'STORE_SYSTEM', 'ACCOUNTING_OFFICE', 'ADMIN'];
+        $allowedRoles = ['USER', 'STORE_SYSTEM', 'STORE_SUPERVISOR', 'ACCOUNTING_OFFICE', 'ADMIN'];
         $allowedTypes = ['faculty', 'staff', 'student'];
         $roles = $this->sanitizeRoles($roles, ['USER']);
         foreach ($roles as $selectedRole) {
@@ -1171,7 +1173,7 @@ class AdminController extends Controller
             ]);
         }
 
-        $allowedRoles = ['USER', 'STORE_SYSTEM', 'ACCOUNTING_OFFICE', 'ADMIN'];
+        $allowedRoles = ['USER', 'STORE_SYSTEM', 'STORE_SUPERVISOR', 'ACCOUNTING_OFFICE', 'ADMIN'];
         $allowedTypes = ['faculty', 'staff', 'student'];
         $roles = $this->sanitizeRoles($roles, ['USER']);
         foreach ($roles as $selectedRole) {
@@ -1313,7 +1315,7 @@ class AdminController extends Controller
         $balanceModel = new BalanceModel();
         $auditLogModel = new AuditLogModel();
 
-        $allowedRoles = ['USER', 'STORE_SYSTEM', 'ACCOUNTING_OFFICE', 'ADMIN'];
+        $allowedRoles = ['USER', 'STORE_SYSTEM', 'STORE_SUPERVISOR', 'ACCOUNTING_OFFICE', 'ADMIN'];
         $allowedTypes = ['faculty', 'staff', 'student'];
         $total = 0;
         $created = 0;
@@ -1438,7 +1440,9 @@ class AdminController extends Controller
 
     public function stores()
     {
-        return view('admin/stores');
+        return view('admin/stores', [
+            'canManageStores' => ibems_current_role() === 'ADMIN',
+        ]);
     }
 
     public function storesData()
@@ -1449,6 +1453,18 @@ class AdminController extends Controller
         $query = $db->table('stores s')
             ->select('s.id, s.store_name, s.logo_url, s.is_active, s.created_at, s.officer_id, u.name AS officer_name, u.email AS officer_email')
             ->join('users u', 'u.id = s.officer_id', 'left');
+        $role = ibems_current_role();
+        $actorId = (int) session()->get('user_id');
+        if ($role === 'STORE_SUPERVISOR') {
+            $storeIds = (new StoreSupervisorModel())->getStoreIdsBySupervisor($actorId);
+            if ($storeIds === []) {
+                return $this->response->setJSON([
+                    'status' => 'success',
+                    'data' => [],
+                ]);
+            }
+            $query->whereIn('s.id', $storeIds);
+        }
 
         if ($q !== '') {
             $query->groupStart()
@@ -1466,16 +1482,25 @@ class AdminController extends Controller
         }
 
         $rows = $query->orderBy('s.store_name', 'ASC')->get()->getResultArray();
+        $supervisorsMap = $this->buildStoreSupervisorsMap(array_map(static fn(array $row): int => (int) ($row['id'] ?? 0), $rows));
 
         return $this->response->setJSON([
             'status' => 'success',
-            'data' => $rows,
+            'data' => array_map(static function (array $row) use ($supervisorsMap): array {
+                $storeId = (int) ($row['id'] ?? 0);
+                $row['supervisors'] = $supervisorsMap[$storeId] ?? [];
+                $row['supervisor_ids'] = array_map(static fn(array $supervisor): int => (int) ($supervisor['id'] ?? 0), $row['supervisors']);
+                return $row;
+            }, $rows),
         ]);
     }
 
     public function storeDetails(int $storeId)
     {
         if ($storeId <= 0) {
+            return redirect()->to('/admin/stores');
+        }
+        if (!$this->canAccessStoreForAdminArea($storeId)) {
             return redirect()->to('/admin/stores');
         }
 
@@ -1488,6 +1513,12 @@ class AdminController extends Controller
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
                 'message' => 'Invalid store id.',
+            ]);
+        }
+        if (!$this->canAccessStoreForAdminArea($storeId)) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'You cannot access this store.',
             ]);
         }
 
@@ -1538,9 +1569,11 @@ class AdminController extends Controller
         $daySession = null;
         if ($db->tableExists('store_day_sessions')) {
             $daySession = $db->table('store_day_sessions sds')
-                ->select('sds.business_date, sds.status, sds.opening_cash, sds.opening_ecash, sds.opened_at, sds.closed_at, opener.name AS opened_by_name, closer.name AS closed_by_name')
+                ->select('sds.id, sds.business_date, sds.status, sds.opening_cash, sds.opening_ecash, sds.expected_cash, sds.expected_ecash, sds.counted_cash, sds.counted_ecash, sds.variance_cash, sds.variance_ecash, sds.variance_status, sds.review_status, sds.review_note, sds.reviewed_at, sds.accountability_user_id, sds.accountability_amount, sds.closing_note, sds.opened_at, sds.closed_at, opener.name AS opened_by_name, closer.id AS closed_by_id, closer.name AS closed_by_name, reviewer.name AS reviewed_by_name, accountable.name AS accountability_user_name')
                 ->join('users opener', 'opener.id = sds.opened_by', 'left')
                 ->join('users closer', 'closer.id = sds.closed_by', 'left')
+                ->join('users reviewer', 'reviewer.id = sds.reviewed_by', 'left')
+                ->join('users accountable', 'accountable.id = sds.accountability_user_id', 'left')
                 ->where('sds.store_id', $storeId)
                 ->orderBy('sds.business_date', 'DESC')
                 ->orderBy('sds.id', 'DESC')
@@ -1557,6 +1590,21 @@ class AdminController extends Controller
             ->limit(20)
             ->get()
             ->getResultArray();
+
+        $assignedOfficers = [
+            [
+                'name' => $store['officer_name'] ?: 'No assigned officer',
+                'email' => $store['officer_email'] ?: null,
+                'role' => 'Primary Store Officer',
+            ],
+        ];
+        foreach ($this->getStoreSupervisors((int) $store['id']) as $supervisor) {
+            $assignedOfficers[] = [
+                'name' => $supervisor['name'] ?? 'Store Supervisor',
+                'email' => $supervisor['email'] ?? null,
+                'role' => 'Store Supervisor',
+            ];
+        }
 
         return $this->response->setJSON([
             'status' => 'success',
@@ -1582,22 +1630,33 @@ class AdminController extends Controller
                 'today_debt_sales_total' => (float) ($todaySummary['debt_sales_total'] ?? 0),
             ],
             'day_session' => $daySession ? [
+                'id' => (int) ($daySession['id'] ?? 0),
                 'business_date' => (string) ($daySession['business_date'] ?? ''),
                 'status' => (string) ($daySession['status'] ?? ''),
                 'opening_cash' => (float) ($daySession['opening_cash'] ?? 0),
                 'opening_ecash' => (float) ($daySession['opening_ecash'] ?? 0),
+                'expected_cash' => (float) ($daySession['expected_cash'] ?? 0),
+                'expected_ecash' => (float) ($daySession['expected_ecash'] ?? 0),
+                'counted_cash' => $daySession['counted_cash'] !== null ? (float) $daySession['counted_cash'] : null,
+                'counted_ecash' => $daySession['counted_ecash'] !== null ? (float) $daySession['counted_ecash'] : null,
+                'variance_cash' => $daySession['variance_cash'] !== null ? (float) $daySession['variance_cash'] : null,
+                'variance_ecash' => $daySession['variance_ecash'] !== null ? (float) $daySession['variance_ecash'] : null,
+                'variance_status' => (string) ($daySession['variance_status'] ?? 'balanced'),
+                'review_status' => (string) ($daySession['review_status'] ?? 'not_required'),
+                'review_note' => $daySession['review_note'] ?? null,
+                'reviewed_at' => $daySession['reviewed_at'] ?? null,
+                'reviewed_by_name' => $daySession['reviewed_by_name'] ?? null,
+                'accountability_user_id' => $daySession['accountability_user_id'] !== null ? (int) $daySession['accountability_user_id'] : null,
+                'accountability_user_name' => $daySession['accountability_user_name'] ?? null,
+                'accountability_amount' => (float) ($daySession['accountability_amount'] ?? 0),
+                'closing_note' => $daySession['closing_note'] ?? null,
                 'opened_at' => $daySession['opened_at'] ?? null,
                 'closed_at' => $daySession['closed_at'] ?? null,
                 'opened_by_name' => $daySession['opened_by_name'] ?: null,
+                'closed_by_id' => $daySession['closed_by_id'] !== null ? (int) $daySession['closed_by_id'] : null,
                 'closed_by_name' => $daySession['closed_by_name'] ?: null,
             ] : null,
-            'officers' => [
-                [
-                    'name' => $store['officer_name'] ?: 'No assigned officer',
-                    'email' => $store['officer_email'] ?: null,
-                    'role' => 'Primary Store Officer',
-                ],
-            ],
+            'officers' => $assignedOfficers,
             'inventory' => array_map(static function (array $row): array {
                 return [
                     'id' => (int) $row['id'],
@@ -1618,6 +1677,207 @@ class AdminController extends Controller
                     'customer_name' => $row['customer_name'] ?: 'Walk-in',
                 ];
             }, $recentTransactions),
+        ]);
+    }
+
+    public function reviewStoreDayVariance(int $sessionId)
+    {
+        if ($sessionId <= 0) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Invalid store day session.',
+            ]);
+        }
+
+        $request = $this->getRequestData();
+        $action = strtolower(trim((string) ($request['action'] ?? '')));
+        $reviewNote = trim((string) ($request['review_note'] ?? ''));
+        $allowedActions = ['approve_shortage', 'waive', 'corrected', 'needs_investigation'];
+        if (!in_array($action, $allowedActions, true)) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Invalid review action.',
+            ]);
+        }
+        if ($reviewNote === '') {
+            return $this->response->setStatusCode(422)->setJSON([
+                'status' => 'error',
+                'message' => 'Review note is required.',
+            ]);
+        }
+
+        $db = Database::connect();
+        if (!$db->tableExists('store_day_sessions')) {
+            return $this->response->setStatusCode(404)->setJSON([
+                'status' => 'error',
+                'message' => 'Store day sessions are not available.',
+            ]);
+        }
+
+        $session = $db->table('store_day_sessions sds')
+            ->select('sds.*, s.store_name, closer.name AS closed_by_name')
+            ->join('stores s', 's.id = sds.store_id', 'left')
+            ->join('users closer', 'closer.id = sds.closed_by', 'left')
+            ->where('sds.id', $sessionId)
+            ->get()
+            ->getRowArray();
+
+        if (!$session) {
+            return $this->response->setStatusCode(404)->setJSON([
+                'status' => 'error',
+                'message' => 'Store day session not found.',
+            ]);
+        }
+        if (!$this->canAccessStoreForAdminArea((int) ($session['store_id'] ?? 0))) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'You cannot review this store day.',
+            ]);
+        }
+        if ((string) ($session['status'] ?? '') !== 'closed') {
+            return $this->response->setStatusCode(409)->setJSON([
+                'status' => 'error',
+                'message' => 'Only closed store days can be reviewed.',
+            ]);
+        }
+        if ((string) ($session['review_status'] ?? 'not_required') === 'not_required') {
+            return $this->response->setStatusCode(409)->setJSON([
+                'status' => 'error',
+                'message' => 'This store day has no variance requiring review.',
+            ]);
+        }
+        if (in_array((string) ($session['review_status'] ?? ''), ['approved', 'waived', 'corrected'], true)) {
+            return $this->response->setStatusCode(409)->setJSON([
+                'status' => 'error',
+                'message' => 'This variance has already been finalized.',
+            ]);
+        }
+
+        $actorId = (int) session()->get('user_id');
+        $now = date('Y-m-d H:i:s');
+        $varianceCash = (float) ($session['variance_cash'] ?? 0);
+        $varianceEcash = (float) ($session['variance_ecash'] ?? 0);
+        $shortageAmount = round(max(0, -$varianceCash) + max(0, -$varianceEcash), 2);
+        $statusMap = [
+            'approve_shortage' => 'approved',
+            'waive' => 'waived',
+            'corrected' => 'corrected',
+            'needs_investigation' => 'needs_investigation',
+        ];
+        $newReviewStatus = $statusMap[$action];
+        $accountabilityUserId = null;
+        $accountabilityAmount = 0.0;
+
+        if ($action === 'approve_shortage') {
+            if ((string) ($session['variance_status'] ?? '') !== 'shortage' || $shortageAmount <= 0) {
+                return $this->response->setStatusCode(422)->setJSON([
+                    'status' => 'error',
+                    'message' => 'Only shortage variances can be approved as operator accountability.',
+                ]);
+            }
+            $accountabilityUserId = (int) ($session['closed_by'] ?? 0);
+            if ($accountabilityUserId <= 0) {
+                return $this->response->setStatusCode(422)->setJSON([
+                    'status' => 'error',
+                    'message' => 'No closing operator is attached to this store day.',
+                ]);
+            }
+            $accountabilityAmount = $shortageAmount;
+        }
+
+        $db->transStart();
+
+        if ($action === 'approve_shortage') {
+            $balanceModel = new BalanceModel();
+            $balance = $balanceModel->where('user_id', $accountabilityUserId)->first();
+            if (!$balance) {
+                $balanceModel->insert([
+                    'user_id' => $accountabilityUserId,
+                    'credit_limit' => 0,
+                    'current_debt' => 0,
+                    'updated_at' => $now,
+                ]);
+                $balance = $balanceModel->find($accountabilityUserId);
+            }
+
+            $debtBefore = (float) ($balance['current_debt'] ?? 0);
+            $creditLimit = (float) ($balance['credit_limit'] ?? 0);
+            $debtAfter = round($debtBefore + $shortageAmount, 2);
+            $balanceModel->update($accountabilityUserId, [
+                'current_debt' => $debtAfter,
+                'updated_at' => $now,
+            ]);
+
+            (new DebtCashbookEntryModel())->insert([
+                'user_id' => $accountabilityUserId,
+                'entry_type' => 'operator_shortage',
+                'direction' => 'debit',
+                'amount' => $shortageAmount,
+                'debt_before' => $debtBefore,
+                'debt_after' => $debtAfter,
+                'credit_limit_snapshot' => $creditLimit,
+                'available_credit_snapshot' => max(0, $creditLimit - $debtAfter),
+                'reference_type' => 'store_day_session',
+                'reference_id' => $sessionId,
+                'actor_id' => $actorId > 0 ? $actorId : null,
+                'remarks' => 'Approved store day cash shortage. ' . $reviewNote,
+                'meta_json' => json_encode([
+                    'store_id' => (int) ($session['store_id'] ?? 0),
+                    'store_name' => (string) ($session['store_name'] ?? ''),
+                    'business_date' => (string) ($session['business_date'] ?? ''),
+                    'variance_cash' => $varianceCash,
+                    'variance_ecash' => $varianceEcash,
+                    'source' => 'store_variance_review',
+                ]),
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+        }
+
+        $db->table('store_day_sessions')
+            ->where('id', $sessionId)
+            ->update([
+                'review_status' => $newReviewStatus,
+                'reviewed_by' => $actorId > 0 ? $actorId : null,
+                'reviewed_at' => $now,
+                'review_note' => $reviewNote,
+                'accountability_user_id' => $accountabilityUserId,
+                'accountability_amount' => $accountabilityAmount,
+                'updated_at' => $now,
+            ]);
+
+        (new AuditLogModel())->insert([
+            'actor_id' => $actorId > 0 ? $actorId : null,
+            'action' => $action === 'approve_shortage' ? 'ADMIN_APPROVE_STORE_SHORTAGE' : 'ADMIN_REVIEW_STORE_VARIANCE',
+            'entity' => 'store_day_sessions',
+            'entity_id' => $sessionId,
+            'payload_json' => json_encode([
+                'review_action' => $action,
+                'review_status' => $newReviewStatus,
+                'store_id' => (int) ($session['store_id'] ?? 0),
+                'store_name' => (string) ($session['store_name'] ?? ''),
+                'business_date' => (string) ($session['business_date'] ?? ''),
+                'variance_cash' => $varianceCash,
+                'variance_ecash' => $varianceEcash,
+                'accountability_user_id' => $accountabilityUserId,
+                'accountability_amount' => $accountabilityAmount,
+            ]),
+            'created_at' => $now,
+        ]);
+
+        $db->transComplete();
+        if (!$db->transStatus()) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'status' => 'error',
+                'message' => 'Failed to review store day variance.',
+            ]);
+        }
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'review_status' => $newReviewStatus,
+            'accountability_user_id' => $accountabilityUserId,
+            'accountability_amount' => $accountabilityAmount,
         ]);
     }
 
@@ -1664,6 +1924,7 @@ class AdminController extends Controller
         $actorId = (int) session()->get('user_id');
         $storeName = trim((string) ($request['store_name'] ?? ''));
         $officerId = (int) ($request['officer_id'] ?? 0);
+        $supervisorIds = $this->extractIntegerList($request['supervisor_ids'] ?? []);
         $logoUrl = trim((string) ($request['logo_url'] ?? ''));
 
         if ($storeName === '') {
@@ -1695,6 +1956,14 @@ class AdminController extends Controller
                 ]);
             }
         }
+        try {
+            $supervisorIds = $this->validateStoreSupervisors($supervisorIds, $userModel);
+        } catch (\RuntimeException $e) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => $e->getMessage(),
+            ]);
+        }
 
         try {
             $logoUrl = $this->resolveStoreLogoUrl($logoUrl, null);
@@ -1718,6 +1987,12 @@ class AdminController extends Controller
         if ($storeId && $officerId > 0) {
             $this->addRoleToUser($officerId, 'STORE_SYSTEM', $userModel);
         }
+        if ($storeId) {
+            (new StoreSupervisorModel())->syncStoreSupervisors((int) $storeId, $supervisorIds);
+            foreach ($supervisorIds as $supervisorId) {
+                $this->addRoleToUser($supervisorId, 'STORE_SUPERVISOR', $userModel);
+            }
+        }
 
         $auditLogModel->insert([
             'actor_id' => $actorId,
@@ -1727,6 +2002,7 @@ class AdminController extends Controller
             'payload_json' => json_encode([
                 'store_name' => $storeName,
                 'officer_id' => $officerId > 0 ? $officerId : null,
+                'supervisor_ids' => $supervisorIds,
                 'logo_url' => $logoUrl,
             ]),
             'created_at' => date('Y-m-d H:i:s'),
@@ -1753,6 +2029,7 @@ class AdminController extends Controller
         $storeId = (int) ($request['store_id'] ?? 0);
         $storeName = trim((string) ($request['store_name'] ?? ''));
         $officerId = (int) ($request['officer_id'] ?? 0);
+        $supervisorIds = $this->extractIntegerList($request['supervisor_ids'] ?? []);
         $logoUrl = trim((string) ($request['logo_url'] ?? ''));
 
         $isActive = isset($request['is_active']) ? (int) $request['is_active'] : null;
@@ -1800,6 +2077,15 @@ class AdminController extends Controller
                 ]);
             }
         }
+        $previousSupervisorIds = (new StoreSupervisorModel())->getSupervisorIdsByStore($storeId);
+        try {
+            $supervisorIds = $this->validateStoreSupervisors($supervisorIds, $userModel);
+        } catch (\RuntimeException $e) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => $e->getMessage(),
+            ]);
+        }
 
         try {
             $logoUrl = $this->resolveStoreLogoUrl($logoUrl, $store['logo_url'] ?? null);
@@ -1828,6 +2114,16 @@ class AdminController extends Controller
         if ($officerId > 0) {
             $this->addRoleToUser($officerId, 'STORE_SYSTEM', $userModel);
         }
+        (new StoreSupervisorModel())->syncStoreSupervisors($storeId, $supervisorIds);
+        foreach ($supervisorIds as $supervisorId) {
+            $this->addRoleToUser($supervisorId, 'STORE_SUPERVISOR', $userModel);
+        }
+        foreach (array_diff($previousSupervisorIds, $supervisorIds) as $previousSupervisorId) {
+            $assignedCount = $db->table('store_supervisors')->where('user_id', (int) $previousSupervisorId)->countAllResults();
+            if ($assignedCount === 0) {
+                $this->removeRoleFromUser((int) $previousSupervisorId, 'STORE_SUPERVISOR', $userModel);
+            }
+        }
 
         if ($previousOfficerId > 0 && $previousOfficerId !== $officerId) {
             $assignedCount = $db->table('stores')->where('officer_id', $previousOfficerId)->countAllResults();
@@ -1845,12 +2141,14 @@ class AdminController extends Controller
                 'before' => [
                     'store_name' => $store['store_name'],
                     'officer_id' => (int) $store['officer_id'],
+                    'supervisor_ids' => $previousSupervisorIds,
                     'logo_url' => $store['logo_url'] ?? null,
                     'is_active' => (int) ($store['is_active'] ?? 0),
                 ],
                 'after' => [
                     'store_name' => $storeName,
                     'officer_id' => $officerId > 0 ? $officerId : null,
+                    'supervisor_ids' => $supervisorIds,
                     'logo_url' => $logoUrl !== '' ? $logoUrl : null,
                     'is_active' => $isActive !== null ? $isActive : (int) ($store['is_active'] ?? 0),
                 ],
@@ -2076,6 +2374,107 @@ class AdminController extends Controller
         return array_values(array_unique(array_map(static fn($role): string => strtoupper(trim((string) $role)), $fallback)));
     }
 
+    private function extractIntegerList(mixed $value): array
+    {
+        if (is_string($value)) {
+            $value = preg_split('/[,\s|;]+/', $value) ?: [];
+        }
+        if (!is_array($value)) {
+            return [];
+        }
+
+        return array_values(array_unique(array_filter(array_map('intval', $value), static fn(int $id): bool => $id > 0)));
+    }
+
+    private function validateStoreSupervisors(array $supervisorIds, UserModel $userModel): array
+    {
+        $validIds = [];
+        foreach ($supervisorIds as $supervisorId) {
+            $supervisor = $userModel->find((int) $supervisorId);
+            if (!$supervisor || !(bool) ($supervisor['is_active'] ?? false) || !in_array($supervisor['user_type'], ['faculty', 'staff'], true)) {
+                throw new \RuntimeException('Invalid store supervisor. Only active faculty/staff can be assigned.');
+            }
+            $validIds[] = (int) $supervisorId;
+        }
+
+        return array_values(array_unique($validIds));
+    }
+
+    private function canAccessStoreForAdminArea(int $storeId): bool
+    {
+        $role = ibems_current_role();
+        if ($role === 'ADMIN') {
+            return true;
+        }
+        if ($role !== 'STORE_SUPERVISOR') {
+            return false;
+        }
+
+        return (new StoreModel())->canUserAccessStore((int) session()->get('user_id'), $role, $storeId);
+    }
+
+    private function getStoreSupervisors(int $storeId): array
+    {
+        if ($storeId <= 0) {
+            return [];
+        }
+
+        $db = Database::connect();
+        if (!$db->tableExists('store_supervisors')) {
+            return [];
+        }
+
+        return $db->table('store_supervisors ss')
+            ->select('u.id, u.name, u.email, u.employee_id')
+            ->join('users u', 'u.id = ss.user_id', 'inner')
+            ->where('ss.store_id', $storeId)
+            ->where('u.is_active', 1)
+            ->orderBy('u.name', 'ASC')
+            ->get()
+            ->getResultArray();
+    }
+
+    private function buildStoreSupervisorsMap(array $storeIds): array
+    {
+        $storeIds = array_values(array_unique(array_filter(array_map('intval', $storeIds), static fn(int $id): bool => $id > 0)));
+        if ($storeIds === []) {
+            return [];
+        }
+
+        $db = Database::connect();
+        if (!$db->tableExists('store_supervisors')) {
+            return [];
+        }
+
+        $rows = $db->table('store_supervisors ss')
+            ->select('ss.store_id, u.id, u.name, u.email, u.employee_id')
+            ->join('users u', 'u.id = ss.user_id', 'inner')
+            ->whereIn('ss.store_id', $storeIds)
+            ->where('u.is_active', 1)
+            ->orderBy('u.name', 'ASC')
+            ->get()
+            ->getResultArray();
+
+        $map = [];
+        foreach ($rows as $row) {
+            $storeId = (int) ($row['store_id'] ?? 0);
+            if ($storeId <= 0) {
+                continue;
+            }
+            if (!isset($map[$storeId])) {
+                $map[$storeId] = [];
+            }
+            $map[$storeId][] = [
+                'id' => (int) ($row['id'] ?? 0),
+                'name' => (string) ($row['name'] ?? ''),
+                'email' => (string) ($row['email'] ?? ''),
+                'employee_id' => $row['employee_id'] ?? null,
+            ];
+        }
+
+        return $map;
+    }
+
     private function formatAuditAction(string $action): string
     {
         $value = str_replace('_', ' ', trim($action));
@@ -2108,7 +2507,7 @@ class AdminController extends Controller
 
     private function pickPrimaryRole(array $roles): string
     {
-        $priority = ['ADMIN', 'ACCOUNTING_OFFICE', 'STORE_SYSTEM', 'USER'];
+        $priority = ['ADMIN', 'ACCOUNTING_OFFICE', 'STORE_SUPERVISOR', 'STORE_SYSTEM', 'USER'];
         foreach ($priority as $preferred) {
             if (in_array($preferred, $roles, true)) {
                 return $preferred;

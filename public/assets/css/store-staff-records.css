@@ -43,8 +43,8 @@
 .staff-card {
     background: #fff;
     border: 1px solid #dbe3ea;
-    border-radius: 12px;
-    padding: 14px;
+    border-radius: 8px;
+    padding: 16px;
 }
 
 .staff-card h4 {
@@ -65,15 +65,17 @@
     grid-template-columns: 1fr auto;
     gap: 12px;
     align-items: center;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 250, 255, 0.94));
-    border: 1px solid #d8e2ee;
-    border-radius: 14px;
-    padding: 12px;
-    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.07);
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+    margin-bottom: 12px;
 }
 
 .staff-filter-main {
     min-width: 0;
+    display: block;
 }
 
 .staff-filter-actions {
@@ -104,25 +106,34 @@
 
 .staff-search-wrap {
     position: relative;
+    min-width: 260px;
 }
 
 .staff-search-icon {
     position: absolute;
-    left: 12px;
+    left: 14px;
     top: 50%;
     transform: translateY(-50%);
     color: #64748b;
+    pointer-events: none;
 }
 
 .staff-search-wrap input {
     width: 100%;
-    padding-left: 36px;
-    padding-right: 44px;
+    min-height: 44px;
+    border: 1px solid #c7d5e4;
+    border-radius: 8px;
+    background: #fff;
+    padding-left: 42px;
+    padding-right: 54px;
+    font-size: 0.92rem;
+    line-height: 1.35;
+    box-shadow: none;
 }
 
 .staff-scan-btn {
     position: absolute;
-    right: 6px;
+    right: 8px;
     top: 50%;
     transform: translateY(-50%);
     width: 32px;
@@ -149,6 +160,16 @@
 
 .table-wrap {
     overflow: auto;
+}
+
+.staff-record-list-wrap {
+    overflow: visible;
+}
+
+.staff-scope-note {
+    margin: -2px 0 10px;
+    color: #516a8f;
+    font-size: 0.88rem;
 }
 
 .sr-row-clickable {

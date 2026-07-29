@@ -11,10 +11,46 @@ use App\Models\StoreCashMovementModel;
 use App\Models\StoreDaySessionModel;
 use App\Models\InventoryMovementModel;
 use App\Models\AuditLogModel;
+use App\Models\BalanceModel;
+use App\Models\DebtCashbookEntryModel;
+use App\Services\StoreAccessService;
 use Config\Database;
 
 class StoreController extends BaseController
 {
+    private function addDebtCashbookEntry(
+        int $userId,
+        string $entryType,
+        float $amount,
+        float $debtBefore,
+        float $debtAfter,
+        float $creditLimit,
+        ?int $actorId = null,
+        ?string $remarks = null,
+        ?string $referenceType = null,
+        ?int $referenceId = null,
+        array $meta = []
+    ): void {
+        $cashbookModel = new DebtCashbookEntryModel();
+        $cashbookModel->insert([
+            'user_id' => $userId,
+            'entry_type' => $entryType,
+            'direction' => $debtAfter >= $debtBefore ? 'debit' : 'credit',
+            'amount' => abs($amount),
+            'debt_before' => $debtBefore,
+            'debt_after' => $debtAfter,
+            'credit_limit_snapshot' => $creditLimit,
+            'available_credit_snapshot' => max(0, $creditLimit - $debtAfter),
+            'reference_type' => $referenceType,
+            'reference_id' => $referenceId,
+            'actor_id' => $actorId,
+            'remarks' => $remarks,
+            'meta_json' => $meta !== [] ? json_encode($meta) : null,
+            'created_at' => date('Y-m-d H:i:s'),
+            'updated_at' => date('Y-m-d H:i:s'),
+        ]);
+    }
+
     public function dashboard()
     {
         $role = (string) session()->get('role');
@@ -800,6 +836,24 @@ class StoreController extends BaseController
         $expected = $this->calculateStoreSessionExpected((int) $store['id'], $session);
         $expectedCash = (float) ($expected['expected_cash_on_hand'] ?? 0);
         $expectedEcash = (float) ($expected['expected_ecash_on_hand'] ?? 0);
+        $varianceCash = round($countedCash - $expectedCash, 2);
+        $varianceEcash = round($countedEcash - $expectedEcash, 2);
+        $totalVariance = round($varianceCash + $varianceEcash, 2);
+        $varianceStatus = 'balanced';
+        if ($totalVariance < 0) {
+            $varianceStatus = 'shortage';
+        } elseif ($totalVariance > 0) {
+            $varianceStatus = 'overage';
+        }
+        $reviewStatus = $varianceStatus === 'balanced' ? 'not_required' : 'pending';
+
+        if ($reviewStatus === 'pending' && $note === '') {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Closing note is required when there is a cash or e-cash variance.',
+            ]);
+        }
+
         $actorId = (int) session()->get('user_id');
         $now = date('Y-m-d H:i:s');
 
@@ -809,8 +863,10 @@ class StoreController extends BaseController
             'expected_ecash' => $expectedEcash,
             'counted_cash' => $countedCash,
             'counted_ecash' => $countedEcash,
-            'variance_cash' => $countedCash - $expectedCash,
-            'variance_ecash' => $countedEcash - $expectedEcash,
+            'variance_cash' => $varianceCash,
+            'variance_ecash' => $varianceEcash,
+            'variance_status' => $varianceStatus,
+            'review_status' => $reviewStatus,
             'closing_note' => $note !== '' ? $note : null,
             'closed_by' => $actorId > 0 ? $actorId : null,
             'closed_at' => $now,
@@ -833,8 +889,11 @@ class StoreController extends BaseController
                 'expected_ecash' => $expectedEcash,
                 'counted_cash' => $countedCash,
                 'counted_ecash' => $countedEcash,
-                'variance_cash' => $countedCash - $expectedCash,
-                'variance_ecash' => $countedEcash - $expectedEcash,
+                'variance_cash' => $varianceCash,
+                'variance_ecash' => $varianceEcash,
+                'variance_status' => $varianceStatus,
+                'review_status' => $reviewStatus,
+                'note' => $note,
             ]),
             'created_at' => $now,
         ]);
@@ -1172,6 +1231,189 @@ class StoreController extends BaseController
                 'movement_type' => $movementType,
                 'amount' => $amount,
                 'reason' => $reason,
+            ],
+        ]);
+    }
+
+    public function createDebtRepayment()
+    {
+        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $storeId = (int) ($request['store_id'] ?? 0);
+        $debtorId = (int) ($request['user_id'] ?? 0);
+        $amount = round((float) ($request['amount'] ?? 0), 2);
+        $channel = strtolower(trim((string) ($request['channel'] ?? 'cash')));
+        $referenceNo = trim((string) ($request['reference_no'] ?? ''));
+        $remarks = trim((string) ($request['remarks'] ?? ''));
+        $businessDate = date('Y-m-d');
+
+        if ($debtorId <= 0) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Select a debtor before recording payment.',
+            ]);
+        }
+
+        if ($amount <= 0) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Payment amount must be greater than 0.',
+            ]);
+        }
+
+        if (!in_array($channel, ['cash', 'ecash'], true)) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Payment channel must be cash or e-cash.',
+            ]);
+        }
+
+        $store = $this->resolveAccessibleStore($storeId);
+        if (!$store) {
+            return $this->response->setStatusCode(403)->setJSON([
+                'status' => 'error',
+                'message' => 'You cannot access this store.',
+            ]);
+        }
+
+        $sessionModel = new StoreDaySessionModel();
+        $daySession = $sessionModel->getByStoreAndDate((int) $store['id'], $businessDate);
+        if (!$daySession || (string) ($daySession['status'] ?? '') !== 'open') {
+            return $this->response->setStatusCode(409)->setJSON([
+                'status' => 'error',
+                'message' => 'Open today\'s store day before recording debt payments.',
+            ]);
+        }
+
+        $db = Database::connect();
+        $debtor = $db->table('users u')
+            ->select('u.id, u.employee_id, u.name, u.email, u.user_type, u.is_active, b.credit_limit, b.current_debt')
+            ->join('balances b', 'b.user_id = u.id', 'inner')
+            ->where('u.id', $debtorId)
+            ->where('u.is_active', 1)
+            ->whereIn('u.user_type', ['faculty', 'staff'])
+            ->get()
+            ->getRowArray();
+
+        if (!$debtor) {
+            return $this->response->setStatusCode(404)->setJSON([
+                'status' => 'error',
+                'message' => 'Active faculty/staff debtor not found.',
+            ]);
+        }
+
+        $currentDebt = round((float) ($debtor['current_debt'] ?? 0), 2);
+        $creditLimit = round((float) ($debtor['credit_limit'] ?? 0), 2);
+        if ($currentDebt <= 0) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'This debtor has no outstanding debt.',
+            ]);
+        }
+
+        if ($amount > $currentDebt) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Payment cannot exceed the current debt.',
+            ]);
+        }
+
+        $newDebt = round($currentDebt - $amount, 2);
+        $actorId = (int) session()->get('user_id');
+        $now = date('Y-m-d H:i:s');
+        $reasonParts = [
+            'Debt repayment',
+            (string) ($debtor['employee_id'] ?? ''),
+            (string) ($debtor['name'] ?? ''),
+        ];
+        if ($referenceNo !== '') {
+            $reasonParts[] = 'Ref: ' . $referenceNo;
+        }
+        $reason = trim(implode(' | ', array_filter($reasonParts, static fn ($part) => trim($part) !== '')));
+
+        $balanceModel = new BalanceModel();
+        $cashMovementModel = new StoreCashMovementModel();
+        $auditLogModel = new AuditLogModel();
+
+        $db->transStart();
+
+        $balanceModel->update($debtorId, [
+            'current_debt' => $newDebt,
+            'updated_at' => $now,
+        ]);
+
+        $movementId = $cashMovementModel->insert([
+            'store_id' => (int) $store['id'],
+            'business_date' => $businessDate,
+            'channel' => $channel,
+            'movement_type' => 'cash_in',
+            'amount' => $amount,
+            'reason' => $reason,
+            'created_by' => $actorId > 0 ? $actorId : null,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $this->addDebtCashbookEntry(
+            $debtorId,
+            'store_repayment',
+            $amount,
+            $currentDebt,
+            $newDebt,
+            $creditLimit,
+            $actorId > 0 ? $actorId : null,
+            $remarks !== '' ? $remarks : $reason,
+            'store_cash_movement',
+            $movementId ? (int) $movementId : null,
+            [
+                'source' => 'store_direct_repayment',
+                'store_id' => (int) $store['id'],
+                'store_name' => (string) ($store['store_name'] ?? 'Store'),
+                'channel' => $channel,
+                'reference_no' => $referenceNo,
+            ]
+        );
+
+        $auditLogModel->insert([
+            'actor_id' => $actorId > 0 ? $actorId : null,
+            'action' => 'STORE_DEBT_REPAYMENT',
+            'entity' => 'balances',
+            'entity_id' => $debtorId,
+            'payload_json' => json_encode([
+                'store_id' => (int) $store['id'],
+                'user_id' => $debtorId,
+                'previous_debt' => $currentDebt,
+                'paid_amount' => $amount,
+                'new_debt' => $newDebt,
+                'channel' => $channel,
+                'reference_no' => $referenceNo,
+                'cash_movement_id' => $movementId ? (int) $movementId : null,
+            ]),
+            'created_at' => $now,
+        ]);
+
+        $db->transComplete();
+
+        if (!$db->transStatus() || !$movementId) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'status' => 'error',
+                'message' => 'Failed to record debt payment.',
+            ]);
+        }
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'payment' => [
+                'movement_id' => (int) $movementId,
+                'store_id' => (int) $store['id'],
+                'user_id' => $debtorId,
+                'debtor_name' => (string) ($debtor['name'] ?? ''),
+                'employee_id' => (string) ($debtor['employee_id'] ?? ''),
+                'channel' => $channel,
+                'amount' => $amount,
+                'previous_debt' => $currentDebt,
+                'new_debt' => $newDebt,
+                'reference_no' => $referenceNo,
+                'created_at' => $now,
             ],
         ]);
     }
@@ -2431,12 +2673,16 @@ class StoreController extends BaseController
             'counted_ecash' => ($session['counted_ecash'] ?? null) !== null ? (float) $session['counted_ecash'] : null,
             'variance_cash' => ($session['variance_cash'] ?? null) !== null ? (float) $session['variance_cash'] : null,
             'variance_ecash' => ($session['variance_ecash'] ?? null) !== null ? (float) $session['variance_ecash'] : null,
+            'variance_status' => (string) ($session['variance_status'] ?? 'balanced'),
+            'review_status' => (string) ($session['review_status'] ?? 'not_required'),
             'closing_note' => (string) ($session['closing_note'] ?? ''),
             'closed_by' => $closedBy !== null ? (int) $closedBy : null,
             'closed_at' => (string) ($session['closed_at'] ?? ''),
             'cash_sales' => (float) ($expected['cash_sales'] ?? 0),
             'ecash_sales' => (float) ($expected['ecash_sales'] ?? 0),
             'debt_sales' => (float) ($expected['debt_sales'] ?? 0),
+            'cash_debt_payments' => (float) ($expected['cash_debt_payments'] ?? 0),
+            'ecash_debt_payments' => (float) ($expected['ecash_debt_payments'] ?? 0),
             'cash_in' => (float) ($expected['cash_in'] ?? 0),
             'cash_out' => (float) ($expected['cash_out'] ?? 0),
             'ecash_in' => (float) ($expected['ecash_in'] ?? 0),
@@ -2454,6 +2700,8 @@ class StoreController extends BaseController
                 'cash_sales' => 0.0,
                 'ecash_sales' => 0.0,
                 'debt_sales' => 0.0,
+                'cash_debt_payments' => 0.0,
+                'ecash_debt_payments' => 0.0,
                 'cash_in' => 0.0,
                 'cash_out' => 0.0,
                 'ecash_in' => 0.0,
@@ -2494,10 +2742,9 @@ class StoreController extends BaseController
         }
 
         $movementRows = $db->table('store_cash_movements')
-            ->select('channel, movement_type, COALESCE(SUM(amount), 0) AS total_amount')
+            ->select('channel, movement_type, amount, reason')
             ->where('store_id', $storeId)
             ->where('business_date', $businessDate)
-            ->groupBy('channel, movement_type')
             ->get()
             ->getResultArray();
 
@@ -2505,15 +2752,21 @@ class StoreController extends BaseController
         $cashOut = 0.0;
         $ecashIn = 0.0;
         $ecashOut = 0.0;
+        $cashDebtPayments = 0.0;
+        $ecashDebtPayments = 0.0;
         foreach ($movementRows as $row) {
             $channel = strtolower((string) ($row['channel'] ?? 'cash'));
             $type = strtolower((string) ($row['movement_type'] ?? 'cash_in'));
-            $amount = (float) ($row['total_amount'] ?? 0);
+            $amount = (float) ($row['amount'] ?? 0);
+            $isDebtPayment = stripos((string) ($row['reason'] ?? ''), 'Debt repayment') === 0;
             if ($channel === 'ecash') {
                 if ($type === 'cash_out') {
                     $ecashOut += $amount;
                 } else {
                     $ecashIn += $amount;
+                    if ($isDebtPayment) {
+                        $ecashDebtPayments += $amount;
+                    }
                 }
                 continue;
             }
@@ -2522,6 +2775,9 @@ class StoreController extends BaseController
                 $cashOut += $amount;
             } else {
                 $cashIn += $amount;
+                if ($isDebtPayment) {
+                    $cashDebtPayments += $amount;
+                }
             }
         }
 
@@ -2532,6 +2788,8 @@ class StoreController extends BaseController
             'cash_sales' => $cashSales,
             'ecash_sales' => $ecashSales,
             'debt_sales' => $debtSales,
+            'cash_debt_payments' => $cashDebtPayments,
+            'ecash_debt_payments' => $ecashDebtPayments,
             'cash_in' => $cashIn,
             'cash_out' => $cashOut,
             'ecash_in' => $ecashIn,
@@ -2544,33 +2802,11 @@ class StoreController extends BaseController
 
     private function resolveAccessibleStore(int $requestedStoreId = 0): ?array
     {
-        $userId = (int) session()->get('user_id');
-        $role = (string) session()->get('role');
-        $storeModel = new StoreModel();
-        $stores = $storeModel->getAccessibleStores($userId, $role);
-        if ($stores === []) {
-            return null;
-        }
-
-        $storeId = $requestedStoreId > 0 ? $requestedStoreId : (int) ($stores[0]['id'] ?? 0);
-        if ($storeId <= 0) {
-            return null;
-        }
-
-        if (!$storeModel->canUserAccessStore($userId, $role, $storeId)) {
-            return null;
-        }
-
-        foreach ($stores as $store) {
-            if ((int) ($store['id'] ?? 0) === $storeId) {
-                return $store;
-            }
-        }
-
-        return [
-            'id' => $storeId,
-            'store_name' => 'Store',
-        ];
+        return (new StoreAccessService())->resolve(
+            (int) session()->get('user_id'),
+            (string) session()->get('role'),
+            $requestedStoreId
+        );
     }
 
     private function resolveProductImageUrl(string $inputUrl, ?string $currentUrl): ?string

@@ -23,6 +23,8 @@ function uhEntryLabel(value) {
     if (key === "manual_deduction") return "Manual Deduction";
     if (key === "full_deduction") return "Full Deduction";
     if (key === "salary_deduction") return "Salary Deduction";
+    if (key === "store_repayment") return "Store Payment";
+    if (key === "operator_shortage") return "Store Shortage";
     return key.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
 }
 

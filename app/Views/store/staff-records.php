@@ -1,33 +1,38 @@
 <?= $this->extend('layouts/store') ?>
 
+<?= $this->section('styles') ?>
+<link rel="stylesheet" href="<?= base_url('assets/css/store-staff-records.css') ?>">
+<?= $this->endSection() ?>
+
 <?= $this->section('content') ?>
 <section class="staff-shell space-y-5">
     <div class="staff-head">
         <div>
             <h3 class="text-3xl font-bold tracking-tight text-slate-900">Employee Records</h3>
-            <p class="mt-1 text-base text-slate-600">Search employee debt records and employee transaction records.</p>
+            <p class="mt-1 text-base text-slate-600">Review overall employee debt balances and this store's employee transactions.</p>
         </div>
     </div>
 
-    <article class="staff-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <h4 class="text-lg font-bold text-slate-900">Debt Records</h4>
-        <div class="staff-filters staff-filter-panel mb-3 grid items-center gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm md:grid-cols-[1fr_auto]">
-            <div class="staff-filter-main flex flex-wrap items-end gap-3">
-                <div class="staff-search-wrap relative min-w-[260px] grow">
-                    <i class="bi bi-search staff-search-icon pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true"></i>
-                    <input id="debt-search" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-12 text-sm text-slate-700 outline-none transition focus:border-blue-300 focus:bg-white" type="search" placeholder="Search name, ID, office...">
-                    <button id="debt-search-scan-btn" type="button" class="staff-scan-btn absolute right-1 top-1/2 inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 transition hover:bg-slate-50" title="Scan employee QR/ID">
+    <article class="staff-card">
+        <h4 class="text-lg font-bold text-slate-900">Overall Debt Balances</h4>
+        <div class="staff-filters staff-filter-panel">
+            <div class="staff-filter-main">
+                <div class="staff-search-wrap">
+                    <i class="bi bi-search staff-search-icon" aria-hidden="true"></i>
+                    <input id="debt-search" type="search" placeholder="Search name, ID, office...">
+                    <button id="debt-search-scan-btn" type="button" class="staff-scan-btn" title="Scan employee QR/ID">
                         <i class="bi bi-qr-code-scan"></i>
                     </button>
                 </div>
             </div>
-            <div class="staff-filter-actions flex flex-wrap gap-2">
-                <button id="debt-search-btn" class="history-action alt inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="button"><i class="bi bi-search"></i> Search</button>
+            <div class="staff-filter-actions">
+                <button id="debt-search-btn" class="history-action alt" type="button"><i class="bi bi-search"></i> Search</button>
             </div>
         </div>
+        <p class="staff-scope-note">Debt figures are the employee's total balance across all stores. Click an employee to view transactions from the current store only.</p>
         <p id="staff-count-text" class="staff-count-text text-sm text-slate-500">Showing 0 records</p>
 
-        <div class="table-wrap table-standard-wrap rounded-2xl border border-slate-200 bg-white p-2">
+        <div class="staff-record-list-wrap">
             <div id="debt-body" class="staff-record-list grid gap-2">
                 <div class="staff-empty rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">Loading debt records...</div>
             </div>
@@ -40,7 +45,7 @@
 <div id="staff-employee-modal" class="receipt-modal is-hidden">
     <div class="receipt-card staff-employee-card max-h-[92vh] w-[min(1200px,96vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
         <div class="receipt-head">
-            <h3 class="text-lg font-bold text-slate-900">Employee Transactions</h3>
+            <h3 id="staff-employee-title" class="text-lg font-bold text-slate-900">Employee Transactions</h3>
             <button id="staff-employee-close" type="button" class="receipt-close">x</button>
         </div>
 

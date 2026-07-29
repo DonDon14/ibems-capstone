@@ -17,7 +17,7 @@ $routes->post('auth/select-role', 'AuthController::selectRole');
 $routes->post('pos/transactions', 'PosController::createTransaction', ['filter' => 'role:STORE_SYSTEM']);
 
 $routes->get('login', 'PageController::login');
-$routes->get('dashboard', 'PageController::dashboard', ['filter' => 'role:ADMIN,STORE_SYSTEM,ACCOUNTING_OFFICE']);
+$routes->get('dashboard', 'PageController::dashboard', ['filter' => 'role:ADMIN,STORE_SYSTEM,STORE_SUPERVISOR,ACCOUNTING_OFFICE']);
 
 $routes->get('admin/dashboard', 'AdminController::dashboard', ['filter' => 'role:ADMIN']);
 $routes->get('admin/dashboard/data', 'AdminController::dashboardData', ['filter' => 'role:ADMIN']);
@@ -38,10 +38,20 @@ $routes->get('admin/stores', 'AdminController::stores', ['filter' => 'role:ADMIN
 $routes->get('admin/stores/data', 'AdminController::storesData', ['filter' => 'role:ADMIN']);
 $routes->get('admin/stores/(:num)', 'AdminController::storeDetails/$1', ['filter' => 'role:ADMIN']);
 $routes->get('admin/stores/(:num)/data', 'AdminController::storeDetailsData/$1', ['filter' => 'role:ADMIN']);
+$routes->post('admin/store-day-sessions/(:num)/review', 'AdminController::reviewStoreDayVariance/$1', ['filter' => 'role:ADMIN']);
 $routes->get('admin/stores/officers', 'AdminController::officers', ['filter' => 'role:ADMIN']);
 $routes->post('admin/stores/create', 'AdminController::createStore', ['filter' => 'role:ADMIN']);
 $routes->post('admin/stores/update', 'AdminController::updateStore', ['filter' => 'role:ADMIN']);
 $routes->post('admin/stores/toggle-status', 'AdminController::toggleStoreStatus', ['filter' => 'role:ADMIN']);
+
+$routes->get('store-admin', 'StoreAdminController::dashboard', ['filter' => 'role:STORE_SUPERVISOR']);
+$routes->get('store-admin/dashboard', 'StoreAdminController::dashboard', ['filter' => 'role:STORE_SUPERVISOR']);
+$routes->get('store-admin/dashboard/data', 'StoreAdminController::dashboardData', ['filter' => 'role:STORE_SUPERVISOR']);
+$routes->get('store-admin/stores', 'StoreAdminController::stores', ['filter' => 'role:STORE_SUPERVISOR']);
+$routes->get('store-admin/stores/data', 'StoreAdminController::storesData', ['filter' => 'role:STORE_SUPERVISOR']);
+$routes->get('store-admin/stores/(:num)', 'StoreAdminController::storeDetails/$1', ['filter' => 'role:STORE_SUPERVISOR']);
+$routes->get('store-admin/stores/(:num)/data', 'StoreAdminController::storeDetailsData/$1', ['filter' => 'role:STORE_SUPERVISOR']);
+$routes->post('store-admin/store-day-sessions/(:num)/review', 'StoreAdminController::reviewStoreDayVariance/$1', ['filter' => 'role:STORE_SUPERVISOR']);
 
 $routes->get('store/pos', 'StoreController::pos', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
 $routes->get('store/dashboard', 'StoreController::dashboard', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
@@ -68,6 +78,7 @@ $routes->post('store/opening-balance/set', 'StoreController::setOpeningBalance',
 $routes->post('store/opening-balance/reset', 'StoreController::resetOpeningBalance', ['filter' => 'role:ADMIN']);
 $routes->get('store/cash-movements', 'StoreController::cashMovements', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
 $routes->post('store/cash-movements/create', 'StoreController::createCashMovement', ['filter' => 'role:STORE_SYSTEM']);
+$routes->post('store/debt-repayments/create', 'StoreController::createDebtRepayment', ['filter' => 'role:STORE_SYSTEM']);
 $routes->get('store/reports/summary', 'StoreController::reportSummary', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
 $routes->get('store/debt-customers', 'StoreController::debtCustomers', ['filter' => 'role:STORE_SYSTEM,ADMIN']);
 $routes->get('store/transactions', 'StoreController::transactions', ['filter' => 'role:STORE_SYSTEM,ADMIN']);

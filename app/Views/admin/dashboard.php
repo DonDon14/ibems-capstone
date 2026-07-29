@@ -2,10 +2,12 @@
 
 <?= $this->section('content') ?>
 <section class="dashboard-shell">
-    <div class="dashboard-title">
-        <h3>Admin Dashboard</h3>
-        <p>School-wide operations snapshot and quick controls.</p>
-    </div>
+    <?= view('components/page_header', [
+        'eyebrow' => 'Administration',
+        'title' => 'Operations overview',
+        'description' => 'Monitor stores, people, debt exposure, and operational exceptions.',
+        'icon' => 'bi bi-grid-1x2',
+    ]) ?>
 
     <div class="dashboard-grid">
         <?= view('components/stat_card', ['title' => 'Total Stores', 'value' => '0', 'valueId' => 'ad-total-stores', 'icon' => 'bi bi-shop-window', 'tone' => 'finance']) ?>

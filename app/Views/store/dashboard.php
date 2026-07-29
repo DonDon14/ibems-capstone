@@ -19,10 +19,12 @@
     };
 ?>
 <section class="dashboard-shell">
-    <div class="dashboard-title">
-        <h3>Store Dashboard</h3>
-        <p><?= esc($storeName) ?> operations snapshot and daily starting point.</p>
-    </div>
+    <?= view('components/page_header', [
+        'eyebrow' => 'Store operations',
+        'title' => 'Today at ' . $storeName,
+        'description' => 'Open the store day, watch live sales, and handle stock priorities.',
+        'icon' => 'bi bi-shop-window',
+    ]) ?>
 
     <div class="dashboard-grid">
         <?= view('components/stat_card', ['title' => 'Today Sales', 'value' => ibems_money($summary['today_sales'] ?? 0), 'icon' => 'bi bi-cash-coin', 'tone' => 'sales']) ?>

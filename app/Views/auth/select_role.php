@@ -11,7 +11,7 @@
     <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.css') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/auth-login.css') ?>">
 </head>
-<body>
+<body class="auth-modern">
 <?php $ustpLogoUrl = base_url('assets/images/ustp_claveria_logo.jpg'); ?>
     <main class="auth-shell">
         <section class="auth-panel auth-panel-form">

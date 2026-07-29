@@ -196,6 +196,11 @@ async function srLoadStores() {
     srStoreId = Number(data.default_store_id || data.stores[0].id);
 }
 
+function srActiveStoreName() {
+    const store = srStores.find((row) => Number(row.id) === Number(srStoreId));
+    return String(store?.store_name || "current store");
+}
+
 function srRenderDebts(rows) {
     const body = document.getElementById("debt-body");
     const countText = document.getElementById("staff-count-text");
@@ -227,7 +232,7 @@ function srRenderDebts(rows) {
             </div>
             <div class="staff-finance flex flex-wrap items-center justify-end gap-4">
                 <div class="staff-fin-kv grid gap-0.5">
-                    <span class="text-xs text-slate-500">Current Debt</span>
+                    <span class="text-xs text-slate-500">Overall Debt</span>
                     <strong class="text-sm font-semibold ${Number(row.current_debt || 0) > 0 ? "staff-money-debt text-rose-600" : "text-slate-900"}">${srEscape(srMoney(row.current_debt))}</strong>
                     <div class="table-debt-bar"><i style="width:${Math.min(100, (Number(row.current_debt || 0) / Math.max(1, Number(row.credit_limit || 0))) * 100)}%"></i></div>
                 </div>
@@ -236,7 +241,7 @@ function srRenderDebts(rows) {
                     <strong class="text-sm font-semibold text-slate-900">${srEscape(srMoney(row.credit_limit))}</strong>
                 </div>
                 <div class="staff-fin-kv grid gap-0.5">
-                    <span class="text-xs text-slate-500">Available Credit</span>
+                    <span class="text-xs text-slate-500">Overall Available Credit</span>
                     <strong class="text-sm font-semibold text-slate-900">${srEscape(srMoney(row.available_credit))}</strong>
                 </div>
             </div>
@@ -308,9 +313,12 @@ async function srLoadStaffTransactions() {
 
 function srOpenEmployeeModal(employee) {
     srSelectedEmployee = employee;
+    const title = document.getElementById("staff-employee-title");
+    if (title) title.textContent = `Transactions in ${srActiveStoreName()}`;
     document.getElementById("staff-employee-summary").innerHTML = `
         <div><strong>Employee:</strong> ${srEscape(employee.name)}</div>
         <div><strong>Employee ID:</strong> ${srEscape(employee.employeeId || "-")} | <strong>Email:</strong> ${srEscape(employee.email || "-")} | <strong>Category:</strong> ${srEscape(srCategory(employee.userType))}</div>
+        <div><strong>Scope:</strong> Showing transactions recorded in ${srEscape(srActiveStoreName())}. Debt balance above is overall across stores.</div>
     `;
     document.getElementById("staff-employee-modal").style.display = "grid";
 }

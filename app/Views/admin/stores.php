@@ -5,13 +5,16 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
-<section class="admin-stores-shell">
+<?php $canManageStores = (bool) ($canManageStores ?? false); ?>
+<section class="admin-stores-shell" data-can-manage-stores="<?= $canManageStores ? '1' : '0' ?>">
     <div class="admin-stores-head">
         <div>
-            <h3>Store Management</h3>
-            <p>Create stores, assign officers, and manage store status.</p>
+            <h3><?= $canManageStores ? 'Store Management' : 'Assigned Stores' ?></h3>
+            <p><?= $canManageStores ? 'Create stores, assign officers, and manage store status.' : 'Review store-day variances for stores assigned to you.' ?></p>
         </div>
-        <button id="open-store-modal" class="primary-btn" type="button">+ Add Store</button>
+        <?php if ($canManageStores): ?>
+            <button id="open-store-modal" class="primary-btn" type="button">+ Add Store</button>
+        <?php endif; ?>
     </div>
 
     <div class="admin-stores-filters">
@@ -62,6 +65,18 @@
                 <input id="store-officer-id" type="hidden">
                 <div id="store-officer-suggestions" class="officer-suggestions is-hidden"></div>
                 <small id="store-officer-help" class="field-help">Stores can be created first and assigned to an officer later.</small>
+            </div>
+            <div class="field">
+                <label for="store-supervisor-search">Store Supervisors</label>
+                <div class="officer-picker-row">
+                    <input id="store-supervisor-search" type="search" placeholder="Optional: type name, email, or employee ID">
+                    <button id="clear-store-supervisor-search" type="button" class="field-icon-btn" title="Clear supervisor search">
+                        <i class="bi bi-x-lg"></i>
+                    </button>
+                </div>
+                <div id="store-supervisor-selected" class="supervisor-selected-list"></div>
+                <div id="store-supervisor-suggestions" class="officer-suggestions is-hidden"></div>
+                <small class="field-help">Supervisors can review store-day shortages for this store only.</small>
             </div>
             <div class="field" id="store-logo-upload-wrap">
                 <label for="store-logo-file">Store Logo</label>

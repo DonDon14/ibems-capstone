@@ -4,6 +4,11 @@ let editingStoreId = null;
 let lastOfficerSearchQuery = "";
 let editingCurrentLogoUrl = "";
 let logoInputMode = "upload";
+let selectedSupervisorIds = [];
+const storeShell = document.querySelector(".admin-stores-shell");
+const canManageStores = storeShell?.getAttribute("data-can-manage-stores") === "1";
+const storesDataUrl = storeShell?.getAttribute("data-stores-data-url") || "/admin/stores/data";
+const storeDetailPrefix = (storeShell?.getAttribute("data-store-detail-prefix") || "/admin/stores").replace(/\/$/, "");
 
 function sEscape(value) {
     return String(value ?? "")
@@ -48,6 +53,17 @@ function getOfficerMatches(query) {
     );
 }
 
+function getSupervisorMatches(query) {
+    const q = String(query || "").trim().toLowerCase();
+    if (q === "") return [];
+    return officersData.filter((officer) => {
+        if (selectedSupervisorIds.includes(Number(officer.id))) return false;
+        return [officer.name, officer.email, officer.employee_id, officer.user_type, officer.role]
+            .filter(Boolean)
+            .some((value) => String(value).toLowerCase().includes(q));
+    });
+}
+
 function renderOfficerSuggestions(query) {
     const box = document.getElementById("store-officer-suggestions");
     const matches = getOfficerMatches(query);
@@ -70,6 +86,48 @@ function renderOfficerSuggestions(query) {
             <button class="officer-suggestion-item ${isAssignedElsewhere ? "is-disabled" : ""}" type="button" data-officer-pick="${officer.id}" ${isAssignedElsewhere ? "disabled" : ""}>
                 <span>${employee}${sEscape(officer.name)} (${sEscape(officer.email)})</span>
                 <small>${sEscape(role)} / ${sEscape(type)} - ${sEscape(assignmentText)}</small>
+            </button>
+        `;
+    }).join("");
+    box.style.display = "grid";
+}
+
+function renderSelectedSupervisors() {
+    const wrap = document.getElementById("store-supervisor-selected");
+    if (!wrap) return;
+    if (selectedSupervisorIds.length === 0) {
+        wrap.innerHTML = '<span class="supervisor-empty">No supervisors assigned.</span>';
+        return;
+    }
+
+    wrap.innerHTML = selectedSupervisorIds.map((supervisorId) => {
+        const supervisor = findOfficerById(supervisorId);
+        const label = supervisor ? `${supervisor.name} (${supervisor.email})` : `User #${supervisorId}`;
+        return `
+            <span class="supervisor-chip">
+                ${sEscape(label)}
+                <button type="button" data-remove-supervisor="${supervisorId}" title="Remove supervisor"><i class="bi bi-x"></i></button>
+            </span>
+        `;
+    }).join("");
+}
+
+function renderSupervisorSuggestions(query) {
+    const box = document.getElementById("store-supervisor-suggestions");
+    if (!box) return;
+    const matches = getSupervisorMatches(query);
+    if (matches.length === 0) {
+        box.style.display = "none";
+        box.innerHTML = "";
+        return;
+    }
+
+    box.innerHTML = matches.map((officer) => {
+        const roles = Array.isArray(officer.roles) && officer.roles.length ? officer.roles : [officer.role];
+        return `
+            <button class="officer-suggestion-item" type="button" data-supervisor-pick="${officer.id}">
+                <span>${sEscape(officer.employee_id ? `${officer.employee_id} - ` : "")}${sEscape(officer.name)} (${sEscape(officer.email)})</span>
+                <small>${sEscape(roles.map(formatRoleLabel).join(", "))} / ${sEscape(formatTypeLabel(officer.user_type))}</small>
             </button>
         `;
     }).join("");
@@ -103,17 +161,18 @@ function renderStores(rows) {
             : `<div class="store-logo-fallback">${sEscape(initials || "S")}</div>`;
         const isActive = Number(row.is_active) === 1;
         return `
-            <a href="/admin/stores/${row.id}" class="store-card">
+            <a href="${sEscape(storeDetailPrefix)}/${row.id}" class="store-card">
                 <div class="store-card-logo">${logo}</div>
                 <div class="store-card-meta">
                     <strong>${sEscape(row.store_name)}</strong>
                     <span class="status-badge ${isActive ? "active" : "inactive"}">${isActive ? "Active" : "Inactive"}</span>
                     <small>${sEscape(row.officer_name || "No assigned officer")}</small><br>
                     ${row.officer_email ? `<small>${sEscape(row.officer_email)}</small><br>` : ""}
+                    ${Array.isArray(row.supervisors) && row.supervisors.length ? `<small>Supervisor: ${sEscape(row.supervisors.map((supervisor) => supervisor.name).join(", "))}</small><br>` : ""}
                     <small>${row.created_at ? sEscape(sDateTime(row.created_at)) : "-"}</small>
                 </div>
                 <div class="store-card-right">
-                    <button class="card-action-btn" type="button" data-edit-store="${row.id}"><i class="bi bi-pencil"></i> Edit</button>
+                    ${canManageStores ? `<button class="card-action-btn" type="button" data-edit-store="${row.id}"><i class="bi bi-pencil"></i> Edit</button>` : ""}
                 </div>
             </a>
         `;
@@ -136,7 +195,7 @@ async function loadStores() {
     if (q) params.set("q", q);
     if (status) params.set("status", status);
 
-    const response = await fetch(`/admin/stores/data?${params.toString()}`);
+    const response = await fetch(`${storesDataUrl}?${params.toString()}`);
     const data = await response.json();
     if (!data || data.status !== "success") {
         storesData = [];
@@ -151,6 +210,7 @@ async function loadStores() {
 }
 
 function openStoreModal(mode, store) {
+    if (!canManageStores) return;
     editingStoreId = mode === "edit" ? Number(store.id) : null;
     document.getElementById("store-modal-title").textContent = mode === "edit" ? "Edit Store" : "Add Store";
     document.getElementById("store-name").value = mode === "edit" ? store.store_name || "" : "";
@@ -170,6 +230,13 @@ function openStoreModal(mode, store) {
     }
     document.getElementById("store-officer-suggestions").style.display = "none";
     document.getElementById("store-officer-suggestions").innerHTML = "";
+    selectedSupervisorIds = mode === "edit" && Array.isArray(store.supervisor_ids)
+        ? store.supervisor_ids.map(Number).filter(Boolean)
+        : [];
+    document.getElementById("store-supervisor-search").value = "";
+    document.getElementById("store-supervisor-suggestions").style.display = "none";
+    document.getElementById("store-supervisor-suggestions").innerHTML = "";
+    renderSelectedSupervisors();
     lastOfficerSearchQuery = "";
     if (editingCurrentLogoUrl && /^https?:\/\//i.test(editingCurrentLogoUrl)) {
         logoInputMode = "url";
@@ -184,11 +251,14 @@ function openStoreModal(mode, store) {
 function closeStoreModal() {
     editingStoreId = null;
     editingCurrentLogoUrl = "";
+    selectedSupervisorIds = [];
     document.getElementById("store-officer-suggestions").style.display = "none";
+    document.getElementById("store-supervisor-suggestions").style.display = "none";
     document.getElementById("store-modal").style.display = "none";
 }
 
 async function saveStore() {
+    if (!canManageStores) return;
     const name = (document.getElementById("store-name").value || "").trim();
     const officerId = Number(document.getElementById("store-officer-id").value || 0);
     const logoUrlInput = (document.getElementById("store-logo-url").value || "").trim();
@@ -212,6 +282,7 @@ async function saveStore() {
 
     formData.append("store_name", name);
     formData.append("officer_id", String(officerId));
+    selectedSupervisorIds.forEach((supervisorId) => formData.append("supervisor_ids[]", String(supervisorId)));
     formData.append("logo_url", logoUrl);
     if (logoInputMode === "upload" && logoFile) {
         formData.append("logo_file", logoFile);
@@ -256,37 +327,37 @@ document.getElementById("store-refresh-btn").addEventListener("click", async () 
 });
 document.getElementById("store-status-filter").addEventListener("change", loadStores);
 
-document.getElementById("open-store-modal").addEventListener("click", () => openStoreModal("create"));
-document.getElementById("close-store-modal").addEventListener("click", closeStoreModal);
-document.getElementById("store-modal").addEventListener("click", (event) => {
+document.getElementById("open-store-modal")?.addEventListener("click", () => openStoreModal("create"));
+document.getElementById("close-store-modal")?.addEventListener("click", closeStoreModal);
+document.getElementById("store-modal")?.addEventListener("click", (event) => {
     if (event.target.id === "store-modal") closeStoreModal();
 });
-document.getElementById("store-save-btn").addEventListener("click", saveStore);
-document.getElementById("store-logo-toggle").addEventListener("click", () => {
+document.getElementById("store-save-btn")?.addEventListener("click", saveStore);
+document.getElementById("store-logo-toggle")?.addEventListener("click", () => {
     logoInputMode = "url";
     toggleLogoSourceUI();
     document.getElementById("store-logo-url").focus();
 });
-document.getElementById("store-logo-toggle-url").addEventListener("click", () => {
+document.getElementById("store-logo-toggle-url")?.addEventListener("click", () => {
     logoInputMode = "upload";
     toggleLogoSourceUI();
     document.getElementById("store-logo-file").focus();
 });
-document.getElementById("store-officer-search").addEventListener("input", (event) => {
+document.getElementById("store-officer-search")?.addEventListener("input", (event) => {
     const query = event.target.value || "";
     lastOfficerSearchQuery = query;
     document.getElementById("store-officer-id").value = "";
     renderOfficerSuggestions(query);
 });
-document.getElementById("clear-store-officer").addEventListener("click", () => {
+document.getElementById("clear-store-officer")?.addEventListener("click", () => {
     document.getElementById("store-officer-search").value = "";
     document.getElementById("store-officer-id").value = "";
     document.getElementById("store-officer-suggestions").style.display = "none";
 });
-document.getElementById("store-officer-search").addEventListener("focus", (event) => {
+document.getElementById("store-officer-search")?.addEventListener("focus", (event) => {
     renderOfficerSuggestions(event.target.value || "");
 });
-document.getElementById("store-officer-suggestions").addEventListener("click", (event) => {
+document.getElementById("store-officer-suggestions")?.addEventListener("click", (event) => {
     const item = event.target.closest("[data-officer-pick]");
     if (!item || item.disabled) return;
     const officerId = Number(item.getAttribute("data-officer-pick") || 0);
@@ -298,6 +369,34 @@ document.getElementById("store-officer-suggestions").addEventListener("click", (
     document.getElementById("store-officer-search").value = `${picked.name} (${picked.email})`;
     document.getElementById("store-officer-id").value = String(officerId);
     document.getElementById("store-officer-suggestions").style.display = "none";
+});
+document.getElementById("store-supervisor-search")?.addEventListener("input", (event) => {
+    renderSupervisorSuggestions(event.target.value || "");
+});
+document.getElementById("store-supervisor-search")?.addEventListener("focus", (event) => {
+    renderSupervisorSuggestions(event.target.value || "");
+});
+document.getElementById("clear-store-supervisor-search")?.addEventListener("click", () => {
+    document.getElementById("store-supervisor-search").value = "";
+    document.getElementById("store-supervisor-suggestions").style.display = "none";
+});
+document.getElementById("store-supervisor-suggestions")?.addEventListener("click", (event) => {
+    const item = event.target.closest("[data-supervisor-pick]");
+    if (!item) return;
+    const supervisorId = Number(item.getAttribute("data-supervisor-pick") || 0);
+    if (!supervisorId || selectedSupervisorIds.includes(supervisorId)) return;
+
+    selectedSupervisorIds.push(supervisorId);
+    document.getElementById("store-supervisor-search").value = "";
+    document.getElementById("store-supervisor-suggestions").style.display = "none";
+    renderSelectedSupervisors();
+});
+document.getElementById("store-supervisor-selected")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-remove-supervisor]");
+    if (!button) return;
+    const supervisorId = Number(button.getAttribute("data-remove-supervisor") || 0);
+    selectedSupervisorIds = selectedSupervisorIds.filter((id) => id !== supervisorId);
+    renderSelectedSupervisors();
 });
 
 document.getElementById("stores-gallery").addEventListener("click", async (event) => {
@@ -316,11 +415,17 @@ document.addEventListener("click", (event) => {
         const suggestionBox = document.getElementById("store-officer-suggestions");
         if (suggestionBox) suggestionBox.style.display = "none";
     }
+    if (!event.target.closest("#store-supervisor-search") && !event.target.closest("#store-supervisor-suggestions")) {
+        const suggestionBox = document.getElementById("store-supervisor-suggestions");
+        if (suggestionBox) suggestionBox.style.display = "none";
+    }
 });
 
 (async () => {
     try {
-        await loadOfficers();
+        if (canManageStores) {
+            await loadOfficers();
+        }
         await loadStores();
     } catch (error) {
         setStoresResult(error.message || "Failed to initialize store management.", "error");

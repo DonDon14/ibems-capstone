@@ -100,4 +100,34 @@
     window.addEventListener("resize", () => {
         applyResponsiveState();
     });
+
+    const modalSelectors = [
+        ".admin-modal",
+        ".acct-modal",
+        ".inv-modal",
+        ".receipt-modal",
+        ".app-modal",
+    ].join(",");
+
+    document.querySelectorAll(modalSelectors).forEach((modal) => {
+        modal.setAttribute("role", modal.getAttribute("role") || "dialog");
+        modal.setAttribute("aria-modal", "true");
+
+        const closeButton = modal.querySelector(
+            ".admin-modal-close, .acct-modal-close, .inv-modal-close, .app-modal-close, .receipt-close, [data-modal-close]"
+        );
+        if (closeButton && !closeButton.getAttribute("aria-label")) {
+            closeButton.setAttribute("aria-label", "Close dialog");
+        }
+
+        const heading = modal.querySelector("h1, h2, h3, h4");
+        if (heading) {
+            if (!heading.id) {
+                heading.id = `${modal.id || "dialog"}-title`;
+            }
+            if (!modal.getAttribute("aria-labelledby")) {
+                modal.setAttribute("aria-labelledby", heading.id);
+            }
+        }
+    });
 })();

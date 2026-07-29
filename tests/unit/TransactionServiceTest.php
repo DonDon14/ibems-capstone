@@ -192,6 +192,140 @@ final class TransactionServiceTest extends CIUnitTestCase
         $this->assertSame(75.0, (float) ($balance['current_debt'] ?? 0));
     }
 
+    public function testDebtPaymentUpdatesBalanceCashbookStockAndAuditAtomically(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+
+        $this->seedStore($now);
+        $this->seedOpenStoreDay($now);
+        $this->seedPaymentMethod('debt', true, $now);
+        $this->seedProduct(101, 5, 50, $now);
+        $this->seedDebtCustomer(501, 'faculty', 500, 75, '1234', $now);
+
+        $result = (new TransactionService())->createTransaction([
+            'store_id' => 1,
+            'payment_method' => 'debt',
+            'customer_user_id' => 501,
+            'debt_pin' => '1234',
+            'items' => [
+                ['product_id' => 101, 'qty' => 2],
+            ],
+        ], 7, 'STORE_SYSTEM');
+
+        $this->assertSame('success', $result['status']);
+        $this->assertSame(100.0, (float) $result['total_amount']);
+
+        $balance = $db->table('balances')->where('user_id', 501)->get()->getRowArray();
+        $this->assertSame(175.0, (float) ($balance['current_debt'] ?? 0));
+
+        $cashbook = $db->table('debt_cashbook_entries')
+            ->where('user_id', 501)
+            ->where('entry_type', 'debt_purchase')
+            ->get()
+            ->getRowArray();
+        $this->assertNotNull($cashbook);
+        $this->assertSame('debit', $cashbook['direction'] ?? null);
+        $this->assertSame(75.0, (float) ($cashbook['debt_before'] ?? 0));
+        $this->assertSame(175.0, (float) ($cashbook['debt_after'] ?? 0));
+        $this->assertSame(325.0, (float) ($cashbook['available_credit_snapshot'] ?? 0));
+
+        $product = $db->table('products')->where('id', 101)->get()->getRowArray();
+        $this->assertSame(3, (int) ($product['stock_qty'] ?? 0));
+        $this->assertSame(1, $db->table('transactions')->countAllResults());
+        $this->assertSame(1, $db->table('audit_logs')->where('action', 'CREATE_TRANSACTION')->countAllResults());
+    }
+
+    public function testInvalidDebtPinWritesSecurityAuditWithoutCreatingSale(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+
+        $this->seedStore($now);
+        $this->seedOpenStoreDay($now);
+        $this->seedPaymentMethod('debt', true, $now);
+        $this->seedProduct(101, 5, 50, $now);
+        $this->seedDebtCustomer(501, 'staff', 500, 25, '1234', $now);
+
+        $result = (new TransactionService())->createTransaction([
+            'store_id' => 1,
+            'payment_method' => 'debt',
+            'customer_user_id' => 501,
+            'debt_pin' => '9999',
+            'items' => [
+                ['product_id' => 101, 'qty' => 1],
+            ],
+        ], 7, 'STORE_SYSTEM');
+
+        $this->assertSame('error', $result['status']);
+        $this->assertSame('Invalid debt PIN.', $result['message']);
+        $this->assertSame(0, $db->table('transactions')->countAllResults());
+        $this->assertSame(1, $db->table('audit_logs')->where('action', 'FAILED_DEBT_PIN')->countAllResults());
+
+        $product = $db->table('products')->where('id', 101)->get()->getRowArray();
+        $balance = $db->table('balances')->where('user_id', 501)->get()->getRowArray();
+        $this->assertSame(5, (int) ($product['stock_qty'] ?? 0));
+        $this->assertSame(25.0, (float) ($balance['current_debt'] ?? 0));
+    }
+
+    public function testDuplicateProductLinesAreAggregatedBeforeStockDeduction(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+
+        $this->seedStore($now);
+        $this->seedOpenStoreDay($now);
+        $this->seedPaymentMethod('cash', true, $now);
+        $this->seedProduct(101, 5, 20, $now);
+
+        $result = (new TransactionService())->createTransaction([
+            'store_id' => 1,
+            'payment_method' => 'cash',
+            'customer_type' => 'walk_in',
+            'items' => [
+                ['product_id' => 101, 'qty' => 1],
+                ['product_id' => 101, 'qty' => 2],
+            ],
+        ], 7, 'STORE_SYSTEM');
+
+        $this->assertSame('success', $result['status']);
+        $this->assertSame(60.0, (float) $result['total_amount']);
+        $this->assertSame(1, $db->table('transaction_items')->countAllResults());
+
+        $item = $db->table('transaction_items')->get()->getRowArray();
+        $product = $db->table('products')->where('id', 101)->get()->getRowArray();
+        $this->assertSame(3, (int) ($item['qty'] ?? 0));
+        $this->assertSame(2, (int) ($product['stock_qty'] ?? 0));
+    }
+
+    public function testStoreOfficerCannotCreateTransactionForAnotherOfficersStore(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+
+        $this->seedStore($now);
+        $this->seedOpenStoreDay($now);
+        $this->seedPaymentMethod('cash', true, $now);
+        $this->seedProduct(101, 5, 20, $now);
+
+        $result = (new TransactionService())->createTransaction([
+            'store_id' => 1,
+            'payment_method' => 'cash',
+            'customer_type' => 'walk_in',
+            'items' => [
+                ['product_id' => 101, 'qty' => 1],
+            ],
+        ], 99, 'STORE_SYSTEM');
+
+        $this->assertSame('error', $result['status']);
+        $this->assertSame(403, $result['code'] ?? null);
+        $this->assertSame('You cannot create transactions for this store.', $result['message']);
+        $this->assertSame(0, $db->table('transactions')->countAllResults());
+
+        $product = $db->table('products')->where('id', 101)->get()->getRowArray();
+        $this->assertSame(5, (int) ($product['stock_qty'] ?? 0));
+    }
+
     private function seedStore(string $now): void
     {
         Database::connect()->table('stores')->insert([

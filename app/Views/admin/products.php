@@ -6,10 +6,12 @@
 
 <?= $this->section('content') ?>
 <section class="admin-overview-shell space-y-5">
-    <div class="admin-overview-head">
-        <h3 class="text-3xl font-bold tracking-tight text-slate-900">Product Oversight</h3>
-        <p class="mt-1 text-base text-slate-600">Inspect product availability, stock risk, supplier, and bin/location across all stores.</p>
-    </div>
+    <?= view('components/page_header', [
+        'eyebrow' => 'Catalog intelligence',
+        'title' => 'Product oversight',
+        'description' => 'Inspect availability, stock risk, suppliers, and storage locations across every store.',
+        'icon' => 'bi bi-box-seam',
+    ]) ?>
 
     <div class="summary-grid grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <?= view('components/stat_card', ['title' => 'Visible Products', 'value' => '0', 'valueId' => 'ap-visible-products', 'icon' => 'bi bi-box-seam', 'tone' => 'finance']) ?>
@@ -65,7 +67,12 @@
                 </tr>
             </thead>
             <tbody id="ap-body">
-                <tr><td colspan="8">Loading...</td></tr>
+                <?= view('components/data_state', [
+                    'tag' => 'tr',
+                    'colspan' => 8,
+                    'type' => 'loading',
+                    'message' => 'Loading products...',
+                ]) ?>
             </tbody>
         </table>
     </div>

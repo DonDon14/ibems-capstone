@@ -742,11 +742,15 @@ function invIsCreateFormDirty() {
     return JSON.stringify(current) !== JSON.stringify(invCreateSnapshot);
 }
 
-function invRequestCloseProductModal() {
+async function invRequestCloseProductModal() {
     if (invIsCreatingProduct) return;
 
     if (invIsCreateFormDirty()) {
-        const confirmed = window.confirm("Discard unsaved product changes?");
+        const confirmed = await window.IbemsDialog.confirm("Your unsaved product details will be lost.", {
+            title: "Discard product changes?",
+            confirmLabel: "Discard changes",
+            tone: "danger",
+        });
         if (!confirmed) return;
     }
 

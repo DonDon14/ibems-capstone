@@ -28,11 +28,11 @@
     grid-template-columns: 1fr auto;
     gap: 12px;
     align-items: center;
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(247, 250, 255, 0.94));
+    background: #fff;
     border: 1px solid #d8e2ee;
-    border-radius: 14px;
+    border-radius: 8px;
     padding: 12px;
-    box-shadow: 0 10px 22px rgba(15, 23, 42, 0.07);
+    box-shadow: none;
 }
 
 .acct-filters-main {
@@ -58,8 +58,8 @@
 .acct-search-wrap input {
     width: 100%;
     border: 1px solid #c7d5e4;
-    border-radius: 12px;
-    padding: 10px 12px 10px 36px;
+    border-radius: 8px;
+    padding: 10px 14px 10px 42px;
     background: #fff;
 }
 
@@ -164,6 +164,71 @@
     gap: 10px;
 }
 
+.acct-flow-panel {
+    box-shadow: 0 7px 16px rgba(15, 23, 42, 0.06);
+}
+
+.acct-section-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.acct-section-head h4 {
+    margin: 0;
+    color: #003366;
+    font-size: 1rem;
+    font-weight: 800;
+}
+
+.acct-section-head p {
+    margin: 4px 0 0;
+    color: #52677f;
+    font-size: 0.9rem;
+    line-height: 1.45;
+}
+
+.acct-flow-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.acct-flow-item {
+    border: 1px solid #d8e2ee;
+    border-radius: 8px;
+    background: #f8fbff;
+    padding: 12px;
+}
+
+.acct-flow-item span {
+    display: inline-grid;
+    place-items: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    background: #0b5ea8;
+    color: #fff;
+    font-size: 0.78rem;
+    font-weight: 900;
+}
+
+.acct-flow-item strong {
+    display: block;
+    margin-top: 8px;
+    color: #0b3f73;
+    font-size: 0.92rem;
+}
+
+.acct-flow-item p {
+    margin: 5px 0 0;
+    color: #52677f;
+    font-size: 0.84rem;
+    line-height: 1.4;
+}
+
 .summary-card {
     background: #fff;
     border: 1px solid #dbe3ea;
@@ -215,6 +280,54 @@
 .acct-record-list {
     display: grid;
     gap: 8px;
+}
+
+.acct-tabs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.acct-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 40px;
+    border: 1px solid #c7d5e4;
+    border-radius: 8px;
+    background: #fff;
+    color: #334155;
+    padding: 0 12px;
+    font-size: 0.88rem;
+    font-weight: 800;
+    cursor: pointer;
+}
+
+.acct-tab:hover {
+    background: #f8fbff;
+    border-color: #9fb9d4;
+}
+
+.acct-tab.is-active {
+    background: #0b5ea8;
+    border-color: #0b5ea8;
+    color: #fff;
+}
+
+.acct-tab span {
+    display: inline-grid;
+    place-items: center;
+    min-width: 24px;
+    min-height: 22px;
+    border-radius: 999px;
+    padding: 0 7px;
+    background: rgba(15, 23, 42, 0.08);
+    font-size: 0.76rem;
+}
+
+.acct-tab.is-active span {
+    background: rgba(255, 255, 255, 0.2);
 }
 
 .acct-debt-status {
@@ -355,6 +468,10 @@
 
 .acct-money-debt {
     color: #dc2626;
+}
+
+.acct-cashbook-row .acct-avatar i {
+    line-height: 1;
 }
 
 .acct-chip {
@@ -706,6 +823,50 @@
     margin-bottom: 10px;
 }
 
+.settlement-preview-tools {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 12px 0 10px;
+}
+
+.settlement-preview-count {
+    margin: 0;
+    color: #52677f;
+    font-size: 0.86rem;
+    white-space: nowrap;
+}
+
+.settlement-confirm-summary {
+    line-height: 1.45;
+    margin-bottom: 12px;
+}
+
+.settlement-select-all {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin: 0 0 10px;
+    color: #334155;
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.settlement-select-all input,
+.settlement-confirm-check {
+    width: 16px;
+    height: 16px;
+    accent-color: #0b5ea8;
+}
+
+.settlement-confirm-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 14px;
+}
+
 .import-guide p {
     margin: 0 0 6px;
     color: #334155;
@@ -745,6 +906,10 @@
     .acct-summary {
         grid-template-columns: repeat(2, minmax(0, 1fr));
     }
+
+    .acct-flow-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
 }
 
 @media (max-width: 900px) {
@@ -775,6 +940,29 @@
 
     .acct-summary {
         grid-template-columns: 1fr;
+    }
+
+    .acct-flow-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .acct-tabs {
+        flex-direction: column;
+    }
+
+    .settlement-preview-tools,
+    .settlement-confirm-actions {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .settlement-preview-count {
+        white-space: normal;
+    }
+
+    .acct-tab {
+        width: 100%;
+        justify-content: space-between;
     }
 
     .acct-record-row {

@@ -137,7 +137,13 @@ async function updateCategory(categoryId) {
     const current = settingsCategories.find((row) => Number(row.id) === Number(categoryId));
     if (!current) return;
 
-    const next = window.prompt("Update category name:", current.name || "");
+    const next = await window.IbemsDialog.prompt("Change the category name used by products in this store.", {
+        title: "Update category",
+        inputLabel: "Category name",
+        defaultValue: current.name || "",
+        required: true,
+        confirmLabel: "Update category",
+    });
     if (next === null) return;
     const name = String(next || "").trim();
     if (!name) {
@@ -167,7 +173,11 @@ async function deleteCategory(categoryId) {
     const current = settingsCategories.find((row) => Number(row.id) === Number(categoryId));
     if (!current) return;
 
-    const confirmed = window.confirm(`Delete category "${current.name}"? Products in this category will move to General.`);
+    const confirmed = await window.IbemsDialog.confirm(`Products in “${current.name}” will move to General.`, {
+        title: "Delete category?",
+        confirmLabel: "Delete category",
+        tone: "danger",
+    });
     if (!confirmed) return;
 
     const response = await fetch("/store/categories/delete", {
@@ -227,7 +237,13 @@ async function updatePaymentMethod(methodId) {
     const current = settingsPaymentMethods.find((row) => Number(row.id) === Number(methodId));
     if (!current) return;
 
-    const nextLabel = window.prompt("Update payment method label:", current.label || "");
+    const nextLabel = await window.IbemsDialog.prompt("Change the label shown to store officers and customers.", {
+        title: "Update payment method",
+        inputLabel: "Payment method label",
+        defaultValue: current.label || "",
+        required: true,
+        confirmLabel: "Continue",
+    });
     if (nextLabel === null) return;
     const label = String(nextLabel || "").trim();
     if (!label) {
@@ -235,7 +251,13 @@ async function updatePaymentMethod(methodId) {
         return;
     }
 
-    const nextIcon = window.prompt("Update Bootstrap icon class (optional):", current.icon_class || "");
+    const nextIcon = await window.IbemsDialog.prompt("Optionally provide a Bootstrap Icons class.", {
+        title: "Payment method icon",
+        inputLabel: "Icon class",
+        defaultValue: current.icon_class || "",
+        placeholder: "Example: bi bi-wallet2",
+        confirmLabel: "Update payment method",
+    });
     if (nextIcon === null) return;
     const iconClass = String(nextIcon || "").trim();
 
@@ -262,7 +284,11 @@ async function deletePaymentMethod(methodId) {
     const current = settingsPaymentMethods.find((row) => Number(row.id) === Number(methodId));
     if (!current) return;
 
-    const confirmed = window.confirm(`Delete payment method "${current.label}"?`);
+    const confirmed = await window.IbemsDialog.confirm(`The “${current.label}” payment option will no longer be available.`, {
+        title: "Delete payment method?",
+        confirmLabel: "Delete payment method",
+        tone: "danger",
+    });
     if (!confirmed) return;
 
     const response = await fetch("/store/payment-methods/delete", {

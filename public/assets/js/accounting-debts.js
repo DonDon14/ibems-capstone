@@ -1,9 +1,15 @@
 let acctRows = [];
+let acctAdvanceRows = [];
+let acctOperatorRows = [];
+let acctDataSummary = null;
+let activeAcctTab = "employee-debts";
 let modeFilteredRows = [];
 let modeSelectedUserId = null;
 let employeeModalUserId = null;
 let employeeModalProfile = null;
 let settlementPreview = null;
+let settlementPreviewQuery = "";
+let settlementSelectedUserIds = new Set();
 let settlementRunsCache = [];
 let importCsvPreviewReady = false;
 let activeSettlementDetails = null;
@@ -59,9 +65,12 @@ function setAcctResult(message, type) {
 
 function renderSummary(rows) {
     const list = Array.isArray(rows) ? rows : [];
-    const totalDebt = list.reduce((sum, row) => sum + Number(row.current_debt || 0), 0);
+    const totalDebt = acctDataSummary ? Number(acctDataSummary.employee_debt_total || 0) : list.reduce((sum, row) => sum + Number(row.current_debt || 0), 0);
     document.getElementById("acct-count").textContent = String(list.length);
     document.getElementById("acct-total-debt").textContent = aMoney(totalDebt);
+    document.getElementById("acct-tab-employee-count").textContent = String(acctDataSummary?.employee_debt_accounts ?? list.filter((row) => Number(row.current_debt || 0) > 0).length);
+    document.getElementById("acct-tab-advance-count").textContent = String(acctDataSummary?.advance_payment_count ?? acctAdvanceRows.length);
+    document.getElementById("acct-tab-operator-count").textContent = String(acctDataSummary?.operator_accountability_count ?? acctOperatorRows.length);
 }
 
 function renderSettlementSummary(summary) {
@@ -74,12 +83,33 @@ function renderSettlementSummary(summary) {
 
 function renderSettlementPreviewRows(rows) {
     const body = document.getElementById("settlement-preview-body");
-    if (!Array.isArray(rows) || rows.length === 0) {
-        body.innerHTML = '<tr><td colspan="6">No settlement candidates.</td></tr>';
+    const countText = document.getElementById("settlement-preview-count");
+    const sourceRows = Array.isArray(rows) ? rows : [];
+    const query = settlementPreviewQuery.trim().toLowerCase();
+    const list = query
+        ? sourceRows.filter((row) => {
+            const haystack = `${row.name || ""} ${row.employee_id || ""} ${row.category || ""}`.toLowerCase();
+            return haystack.includes(query);
+        })
+        : sourceRows;
+
+    if (countText) {
+        countText.textContent = sourceRows.length > 0
+            ? `Showing ${list.length} of ${sourceRows.length} previewed employees.`
+            : "Preview the batch to show employees for deduction.";
+    }
+
+    if (sourceRows.length === 0) {
+        body.innerHTML = '<tr><td colspan="6">No payroll deduction candidates.</td></tr>';
         return;
     }
 
-    body.innerHTML = rows.map((row) => `
+    if (list.length === 0) {
+        body.innerHTML = '<tr><td colspan="6">No employees match this search.</td></tr>';
+        return;
+    }
+
+    body.innerHTML = list.map((row) => `
         <tr>
             <td>${aEscape(row.name)}<br><small>${aEscape(row.employee_id || "-")}</small></td>
             <td>${aEscape(aCategory(row.category))}</td>
@@ -91,11 +121,20 @@ function renderSettlementPreviewRows(rows) {
     `).join("");
 }
 
+function getProcessableSettlementRows() {
+    const rows = Array.isArray(settlementPreview?.accounts) ? settlementPreview.accounts : [];
+    return rows.filter((row) => Number(row.deductible_amount || 0) > 0);
+}
+
+function getSelectedSettlementRows() {
+    return getProcessableSettlementRows().filter((row) => settlementSelectedUserIds.has(Number(row.user_id)));
+}
+
 function renderSettlementRuns(rows) {
     settlementRunsCache = Array.isArray(rows) ? rows : [];
     const wrap = document.getElementById("settlement-runs-list");
     if (settlementRunsCache.length === 0) {
-        wrap.innerHTML = "No previous settlement runs.";
+        wrap.innerHTML = "No previous salary deduction batches.";
         syncSettlementApplyState();
         return;
     }
@@ -110,7 +149,7 @@ function renderSettlementRuns(rows) {
                     <span>${aEscape(aDateTime(row.run_at))}</span>
                 </div>
                 <div class="h-body mt-1 text-sm text-slate-700">
-                    Processed: ${aEscape(String(row.total_accounts || 0))} accounts |
+                    Payroll accounts: ${aEscape(String(row.total_accounts || 0))} |
                     Debt Before: ${aEscape(aMoney(row.total_debt_before || 0))} |
                     Deducted: ${aEscape(aMoney(deducted))}
                 </div>
@@ -143,11 +182,11 @@ function syncSettlementApplyState() {
     const existingView = document.getElementById("settlement-existing-run-view");
 
     button.disabled = !hasProcessable || alreadyApplied;
-    button.textContent = alreadyApplied ? "Already Applied" : "Apply Run";
+    button.textContent = alreadyApplied ? "Already Applied" : "Review & Confirm";
 
     if (alreadyApplied) {
         existingWrap.classList.remove("hidden");
-        existingText.textContent = `Settlement for ${runMonthLabel} already applied.`;
+        existingText.textContent = `Salary deduction batch for ${runMonthLabel} already applied.`;
         existingView.dataset.settleRun = String(existingRun.id);
     } else {
         existingWrap.classList.add("hidden");
@@ -166,7 +205,7 @@ async function openSettlementRunDetails(runId) {
     if (exportBtn) exportBtn.disabled = true;
     if (printBtn) printBtn.disabled = true;
     modal.style.display = "grid";
-    head.innerHTML = "Loading settlement run details...";
+    head.innerHTML = "Loading salary deduction batch details...";
     body.innerHTML = '<tr><td colspan="6">Loading details...</td></tr>';
     document.getElementById("settle-details-count").textContent = "0";
     document.getElementById("settle-details-deducted").textContent = aMoney(0);
@@ -176,7 +215,7 @@ async function openSettlementRunDetails(runId) {
         const response = await fetch(`/accounting/settlement/runs/${Number(runId)}`);
         const data = await response.json();
         if (!data || data.status !== "success") {
-            head.innerHTML = '<div class="mode-profile-empty">Failed to load run details.</div>';
+            head.innerHTML = '<div class="mode-profile-empty">Failed to load salary deduction batch details.</div>';
             body.innerHTML = '<tr><td colspan="6">No details available.</td></tr>';
             return;
         }
@@ -201,7 +240,7 @@ async function openSettlementRunDetails(runId) {
 
         const rows = Array.isArray(data.items) ? data.items : [];
         if (rows.length === 0) {
-            body.innerHTML = '<tr><td colspan="6">No settled accounts found for this run.</td></tr>';
+            body.innerHTML = '<tr><td colspan="6">No deducted accounts found for this batch.</td></tr>';
             return;
         }
 
@@ -216,7 +255,7 @@ async function openSettlementRunDetails(runId) {
             </tr>
         `).join("");
     } catch (error) {
-        head.innerHTML = '<div class="mode-profile-empty">Failed to load run details.</div>';
+        head.innerHTML = '<div class="mode-profile-empty">Failed to load salary deduction batch details.</div>';
         body.innerHTML = '<tr><td colspan="6">No details available.</td></tr>';
     }
 }
@@ -259,7 +298,7 @@ function exportSettlementDetailsCsv() {
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `settlement-run-${String(run.run_month || "export")}.csv`;
+    link.download = `salary-deduction-batch-${String(run.run_month || "export")}.csv`;
     document.body.appendChild(link);
     link.click();
     link.remove();
@@ -282,7 +321,7 @@ function printSettlementDetails() {
         <!doctype html>
         <html>
         <head>
-            <title>Settlement Run ${aEscape(run.run_month || "")}</title>
+            <title>Salary Deduction Batch ${aEscape(run.run_month || "")}</title>
             <style>
                 body { font-family: Arial, sans-serif; color: #0f172a; margin: 24px; }
                 h1 { margin: 0 0 4px; font-size: 22px; }
@@ -297,7 +336,7 @@ function printSettlementDetails() {
             </style>
         </head>
         <body>
-            <h1>Settlement Run Summary</h1>
+            <h1>Salary Deduction Batch Summary</h1>
             <div class="meta">
                 Month: ${aEscape(run.run_month || "-")}<br>
                 Run At: ${aEscape(aDateTime(run.run_at || new Date().toISOString()))}<br>
@@ -387,6 +426,83 @@ function renderRows(rows) {
     renderSummary(rows);
 }
 
+function renderCashbookRows(rows, type) {
+    const body = document.getElementById("acct-body");
+    const countText = document.getElementById("acct-count-text");
+    const list = Array.isArray(rows) ? rows : [];
+    const isAdvance = type === "advance";
+    const title = isAdvance ? "Direct payment received" : "Store operator shortage";
+    const emptyText = isAdvance
+        ? "No direct store payments recorded yet."
+        : "No approved store operator shortages recorded yet.";
+
+    if (list.length === 0) {
+        body.innerHTML = `<div class="acct-empty rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">${emptyText}</div>`;
+        if (countText) countText.textContent = "Showing 0 records";
+        renderSummary(acctRows);
+        return;
+    }
+
+    if (countText) countText.textContent = `Showing ${list.length} ${isAdvance ? "direct payments" : "store operator shortages"}`;
+
+    body.innerHTML = list.map((row) => {
+        const store = row.store_name || row.meta?.store_name || "-";
+        const channel = row.channel ? ` | ${aCategory(row.channel)}` : "";
+        return `
+            <article class="acct-record-row acct-cashbook-row flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
+                <div class="acct-person flex min-w-0 items-center gap-3">
+                    <div class="acct-avatar inline-flex h-11 w-11 flex-none items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-sm font-bold ${isAdvance ? "text-emerald-700" : "text-rose-700"}">
+                        <i class="bi ${isAdvance ? "bi-wallet2" : "bi-exclamation-octagon"}"></i>
+                    </div>
+                    <div class="acct-person-meta min-w-0">
+                        <div class="acct-name-line flex flex-wrap items-center gap-2">
+                            <strong class="text-base font-bold text-slate-900">${aEscape(row.name)}</strong>
+                            <span class="table-chip acct-chip">${aEscape(title)}</span>
+                            <span class="acct-debt-status is-${isAdvance ? "success" : "danger"}">${aEscape(isAdvance ? "Debt Reduced" : "Needs Accounting Follow-up")}</span>
+                        </div>
+                        <div class="acct-subline truncate text-sm text-slate-500">${aEscape(row.employee_id || "-")} | ${aEscape(row.email || "-")}</div>
+                        <div class="acct-subline truncate text-sm text-slate-500">${aEscape(store)}${aEscape(channel)} | ${aEscape(aDateTime(row.created_at))}</div>
+                    </div>
+                </div>
+                <div class="acct-finance flex flex-wrap items-center justify-end gap-4">
+                    <div class="acct-fin-kv grid gap-0.5">
+                        <span class="text-xs text-slate-500">${isAdvance ? "Payment Amount" : "Shortage Amount"}</span>
+                        <strong class="text-sm font-semibold ${isAdvance ? "text-emerald-700" : "text-rose-600"}">${aEscape(aMoney(row.amount))}</strong>
+                    </div>
+                    <div class="acct-fin-kv grid gap-0.5">
+                        <span class="text-xs text-slate-500">Debt Before</span>
+                        <strong class="text-sm font-semibold text-slate-900">${aEscape(aMoney(row.debt_before))}</strong>
+                    </div>
+                    <div class="acct-fin-kv grid gap-0.5">
+                        <span class="text-xs text-slate-500">Debt After</span>
+                        <strong class="text-sm font-semibold text-slate-900">${aEscape(aMoney(row.debt_after))}</strong>
+                    </div>
+                </div>
+            </article>
+        `;
+    }).join("");
+
+    renderSummary(acctRows);
+}
+
+function renderActiveAccountingTab() {
+    document.querySelectorAll("[data-acct-tab]").forEach((button) => {
+        const isActive = button.getAttribute("data-acct-tab") === activeAcctTab;
+        button.classList.toggle("is-active", isActive);
+        button.setAttribute("aria-selected", isActive ? "true" : "false");
+    });
+
+    if (activeAcctTab === "advance-payments") {
+        renderCashbookRows(acctAdvanceRows, "advance");
+        return;
+    }
+    if (activeAcctTab === "operator-accountabilities") {
+        renderCashbookRows(acctOperatorRows, "operator");
+        return;
+    }
+    renderRows(getMainFilteredRows());
+}
+
 async function loadDailySummary() {
     const response = await fetch("/accounting/debts/daily-summary");
     const data = await response.json();
@@ -415,8 +531,7 @@ function getMainFilteredRows() {
 }
 
 function applyMainFiltersAndRender() {
-    const rows = getMainFilteredRows();
-    renderRows(rows);
+    renderActiveAccountingTab();
     setAcctResult("", "ok");
 }
 
@@ -428,12 +543,18 @@ async function loadData() {
 
     if (!data || data.status !== "success") {
         acctRows = [];
+        acctAdvanceRows = [];
+        acctOperatorRows = [];
+        acctDataSummary = null;
         renderRows([]);
         setAcctResult(data?.message || "Unable to load debt records.", "error");
         return;
     }
 
     acctRows = Array.isArray(data.data) ? data.data : [];
+    acctAdvanceRows = Array.isArray(data.advance_payments) ? data.advance_payments : [];
+    acctOperatorRows = Array.isArray(data.operator_accountabilities) ? data.operator_accountabilities : [];
+    acctDataSummary = data.summary || null;
     applyMainFiltersAndRender();
     renderModeResults();
     await loadDailySummary();
@@ -452,9 +573,11 @@ async function loadSettlementRuns() {
 
 function openSettlementModal() {
     settlementPreview = null;
+    settlementPreviewQuery = "";
     document.getElementById("settlement-run-modal").style.display = "grid";
     document.getElementById("settlement-run-month").value = new Date().toISOString().slice(0, 7);
     document.getElementById("settlement-notes").value = "";
+    document.getElementById("settlement-preview-search").value = "";
     renderSettlementSummary(null);
     renderSettlementPreviewRows([]);
     syncSettlementApplyState();
@@ -466,6 +589,8 @@ function openSettlementModal() {
 function closeSettlementModal() {
     document.getElementById("settlement-run-modal").style.display = "none";
     settlementPreview = null;
+    settlementPreviewQuery = "";
+    closeSettlementConfirmModal();
 }
 
 async function previewSettlementRun() {
@@ -478,7 +603,7 @@ async function previewSettlementRun() {
     const response = await fetch(`/accounting/settlement/preview?run_month=${encodeURIComponent(runMonth)}`);
     const data = await response.json();
     if (!data || data.status !== "success") {
-        setAcctResult(data?.message || "Failed to preview settlement run.", "error");
+        setAcctResult(data?.message || "Failed to preview salary deduction batch.", "error");
         settlementPreview = null;
         document.getElementById("settlement-apply-btn").disabled = true;
         renderSettlementSummary(null);
@@ -492,14 +617,18 @@ async function previewSettlementRun() {
     syncSettlementApplyState();
 
     if (hasSettlementRunForMonth(runMonth)) {
-        setAcctResult(`Settlement for ${runMonth} already exists. Open it from "Recent Settlement Runs".`, "error");
+        setAcctResult(`Salary deduction batch for ${runMonth} already exists. Open it from the recent batch list.`, "error");
         return;
     }
 
-    setAcctResult("Settlement preview ready.", "ok");
+    setAcctResult("Salary deduction preview ready.", "ok");
 }
 
-async function applySettlementRun() {
+function applySettlementRun() {
+    openSettlementConfirmModal();
+}
+
+async function confirmSettlementRunApply() {
     if (!settlementPreview) {
         setAcctResult("Please run preview first.", "error");
         return;
@@ -507,12 +636,13 @@ async function applySettlementRun() {
 
     const runMonth = (document.getElementById("settlement-run-month").value || "").trim();
     const notes = (document.getElementById("settlement-notes").value || "").trim();
-
-    if (!window.confirm(`Apply settlement run for ${runMonth}?`)) {
+    const selectedUserIds = Array.from(settlementSelectedUserIds);
+    if (selectedUserIds.length === 0) {
+        setAcctResult("Confirm at least one employee before applying deduction.", "error");
         return;
     }
 
-    const button = document.getElementById("settlement-apply-btn");
+    const button = document.getElementById("confirm-settlement-apply");
     button.disabled = true;
     const oldText = button.textContent;
     button.textContent = "Applying...";
@@ -524,25 +654,28 @@ async function applySettlementRun() {
             body: JSON.stringify({
                 run_month: runMonth,
                 notes,
+                selected_user_ids: selectedUserIds,
             }),
         });
         const data = await response.json();
         if (!data || data.status !== "success") {
-            setAcctResult(data?.message || "Failed to apply settlement run.", "error");
+            setAcctResult(data?.message || "Failed to apply salary deduction batch.", "error");
             return;
         }
 
         setAcctResult(
-            `Settlement run applied (${data.run_month}). Processed: ${data.total_accounts}, Deducted: ${aMoney(data.total_deducted)}.`,
+            `Salary deduction batch applied (${data.run_month}). Processed: ${data.total_accounts}, Deducted: ${aMoney(data.total_deducted)}.`,
             "ok"
         );
         await loadData();
         await loadSettlementRuns();
+        closeSettlementConfirmModal();
         closeSettlementModal();
     } catch (error) {
-        setAcctResult("Settlement run request failed.", "error");
+        setAcctResult("Salary deduction batch request failed.", "error");
     } finally {
         button.textContent = oldText;
+        button.disabled = false;
         syncSettlementApplyState();
     }
 }
@@ -590,6 +723,8 @@ function buildHistoryHtml(rows) {
         let detail = "";
         if (row.action === "ACCOUNTING_DEDUCT_DEBT" || row.action === "ACCOUNTING_DEDUCT_FULL_DEBT") {
             detail = `Deducted ${aMoney(payload.deducted_amount)} (Debt: ${aMoney(payload.previous_debt)} -> ${aMoney(payload.new_debt)})`;
+        } else if (row.action === "STORE_DEBT_REPAYMENT") {
+            detail = `Store payment ${aMoney(payload.paid_amount)} (Debt: ${aMoney(payload.previous_debt)} -> ${aMoney(payload.new_debt)})`;
         } else if (row.action === "ACCOUNTING_UPDATE_CREDIT_LIMIT") {
             detail = `Credit Limit: ${aMoney(payload.previous_credit_limit)} -> ${aMoney(payload.new_credit_limit)}`;
         } else {
@@ -836,6 +971,64 @@ async function previewImportCsv() {
     }
 }
 
+function openSettlementConfirmModal() {
+    if (!settlementPreview) {
+        setAcctResult("Please preview deductions first.", "error");
+        return;
+    }
+
+    const runMonth = (document.getElementById("settlement-run-month").value || "").trim();
+    const rows = getProcessableSettlementRows();
+    if (rows.length === 0) {
+        setAcctResult("No employees have deductible balances in this preview.", "error");
+        return;
+    }
+
+    settlementSelectedUserIds = new Set(rows.map((row) => Number(row.user_id)));
+    document.getElementById("settlement-confirm-select-all").checked = true;
+    document.getElementById("settlement-confirm-modal").dataset.runMonth = runMonth;
+    renderSettlementConfirmRows();
+    document.getElementById("settlement-confirm-modal").style.display = "grid";
+}
+
+function renderSettlementConfirmRows() {
+    const rows = getProcessableSettlementRows();
+    const selectedRows = getSelectedSettlementRows();
+    const runMonth = document.getElementById("settlement-confirm-modal").dataset.runMonth || "";
+    const totalDeducted = selectedRows.reduce((sum, row) => sum + Number(row.deductible_amount || 0), 0);
+    const summary = document.getElementById("settlement-confirm-summary");
+    const body = document.getElementById("settlement-confirm-body");
+    summary.innerHTML = `
+        <strong>${aEscape(runMonth || "Selected month")}</strong> salary deduction batch will deduct
+        <strong>${aEscape(aMoney(totalDeducted))}</strong> from
+        <strong>${aEscape(String(selectedRows.length))}</strong> selected employee${selectedRows.length === 1 ? "" : "s"}.
+        Confirm each employee below before applying.
+    `;
+    document.getElementById("confirm-settlement-apply").disabled = selectedRows.length === 0;
+    body.innerHTML = rows.map((row) => `
+        <tr>
+            <td>
+                <input class="settlement-confirm-check" type="checkbox" data-settle-user="${aEscape(row.user_id)}" ${settlementSelectedUserIds.has(Number(row.user_id)) ? "checked" : ""} aria-label="Confirm deduction for ${aEscape(row.name || "employee")}">
+            </td>
+            <td>${aEscape(row.name || "-")}<br><small>${aEscape(row.employee_id || "-")}</small></td>
+            <td>${aEscape(aCategory(row.category))}</td>
+            <td>${aEscape(aMoney(row.current_debt || 0))}</td>
+            <td><strong>${aEscape(aMoney(row.deductible_amount || 0))}</strong></td>
+            <td>${aEscape(aMoney(row.new_debt || 0))}</td>
+        </tr>
+    `).join("");
+
+    const selectAll = document.getElementById("settlement-confirm-select-all");
+    selectAll.checked = rows.length > 0 && selectedRows.length === rows.length;
+    selectAll.indeterminate = selectedRows.length > 0 && selectedRows.length < rows.length;
+}
+
+function closeSettlementConfirmModal() {
+    document.getElementById("settlement-confirm-modal").style.display = "none";
+    settlementSelectedUserIds = new Set();
+    delete document.getElementById("settlement-confirm-modal").dataset.runMonth;
+}
+
 async function submitImportCsv() {
     const fileInput = document.getElementById("import-csv-file");
     const resultEl = document.getElementById("import-csv-result");
@@ -895,6 +1088,13 @@ document.getElementById("acct-debt-only").addEventListener("change", () => {
     applyMainFiltersAndRender();
 });
 
+document.querySelectorAll("[data-acct-tab]").forEach((button) => {
+    button.addEventListener("click", () => {
+        activeAcctTab = button.getAttribute("data-acct-tab") || "employee-debts";
+        renderActiveAccountingTab();
+    });
+});
+
 document.getElementById("acct-body").addEventListener("click", async (event) => {
     const row = event.target.closest("[data-row-user]");
     if (row) {
@@ -932,6 +1132,35 @@ document.getElementById("import-csv-file").addEventListener("change", () => {
 });
 document.getElementById("settlement-preview-btn").addEventListener("click", previewSettlementRun);
 document.getElementById("settlement-apply-btn").addEventListener("click", applySettlementRun);
+document.getElementById("settlement-preview-search").addEventListener("input", (event) => {
+    settlementPreviewQuery = event.target.value || "";
+    renderSettlementPreviewRows(Array.isArray(settlementPreview?.accounts) ? settlementPreview.accounts : []);
+});
+document.getElementById("close-settlement-confirm").addEventListener("click", closeSettlementConfirmModal);
+document.getElementById("cancel-settlement-confirm").addEventListener("click", closeSettlementConfirmModal);
+document.getElementById("confirm-settlement-apply").addEventListener("click", confirmSettlementRunApply);
+document.getElementById("settlement-confirm-select-all").addEventListener("change", (event) => {
+    const rows = getProcessableSettlementRows();
+    settlementSelectedUserIds = event.target.checked
+        ? new Set(rows.map((row) => Number(row.user_id)))
+        : new Set();
+    renderSettlementConfirmRows();
+});
+document.getElementById("settlement-confirm-body").addEventListener("change", (event) => {
+    const checkbox = event.target.closest("[data-settle-user]");
+    if (!checkbox) return;
+    const userId = Number(checkbox.dataset.settleUser || 0);
+    if (userId <= 0) return;
+    if (checkbox.checked) {
+        settlementSelectedUserIds.add(userId);
+    } else {
+        settlementSelectedUserIds.delete(userId);
+    }
+    renderSettlementConfirmRows();
+});
+document.getElementById("settlement-confirm-modal").addEventListener("click", (event) => {
+    if (event.target.id === "settlement-confirm-modal") closeSettlementConfirmModal();
+});
 document.getElementById("close-settlement-run-details").addEventListener("click", closeSettlementRunDetails);
 document.getElementById("settlement-details-export").addEventListener("click", exportSettlementDetailsCsv);
 document.getElementById("settlement-details-print").addEventListener("click", printSettlementDetails);
@@ -965,7 +1194,11 @@ document.getElementById("mode-cancel-manual").addEventListener("click", () => {
 
 document.getElementById("mode-deduct-full").addEventListener("click", async () => {
     if (!modeSelectedUserId) return;
-    if (!window.confirm("Confirm full debt deduction for selected person?")) return;
+    if (!await window.IbemsDialog.confirm("This will deduct the selected person’s full outstanding debt.", {
+        title: "Apply full debt deduction?",
+        confirmLabel: "Apply deduction",
+        tone: "danger",
+    })) return;
 
     const data = await applyFullDeduction(modeSelectedUserId, "Full debt deduction");
     if (!data || data.status !== "success") {
@@ -990,7 +1223,11 @@ document.getElementById("mode-apply-manual").addEventListener("click", async () 
         setAcctResult("Deduction amount must be greater than 0.", "error");
         return;
     }
-    if (!window.confirm(`Confirm manual deduction of ${aMoney(amount)}?`)) return;
+    if (!await window.IbemsDialog.confirm(`Apply a manual deduction of ${aMoney(amount)}?`, {
+        title: "Confirm manual deduction",
+        confirmLabel: "Apply deduction",
+        tone: "danger",
+    })) return;
 
     const data = await applyDeduction(modeSelectedUserId, amount, reason);
     if (!data || data.status !== "success") {
@@ -1030,7 +1267,10 @@ document.getElementById("employee-limit-save").addEventListener("click", async (
         return;
     }
 
-    if (!window.confirm(`Confirm credit limit update to ${aMoney(value)}?`)) return;
+    if (!await window.IbemsDialog.confirm(`Set this person’s credit limit to ${aMoney(value)}?`, {
+        title: "Update credit limit?",
+        confirmLabel: "Update limit",
+    })) return;
 
     const data = await updateCreditLimit(employeeModalUserId, value, reason);
     if (!data || data.status !== "success") {

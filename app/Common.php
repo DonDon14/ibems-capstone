@@ -26,6 +26,7 @@ if (! function_exists('ibems_role_landing_path')) {
     {
         return match (ibems_normalize_role($role)) {
             'ADMIN' => '/admin/dashboard',
+            'STORE_SUPERVISOR' => '/store-admin/dashboard',
             'STORE_SYSTEM' => '/store/dashboard',
             'ACCOUNTING_OFFICE' => '/accounting/dashboard',
             'USER' => '/user/dashboard',

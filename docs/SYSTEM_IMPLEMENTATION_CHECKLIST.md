@@ -1,6 +1,6 @@
 # IBEMS System Implementation Checklist
 
-Last updated: 2026-07-01
+Last updated: 2026-07-02
 Active project path: `D:\xampp\htdocs\ibems-tailwind-test`
 
 Use this file as the durable work tracker when the chat context is compressed. Update each checkbox as work is completed, and add short notes under the relevant module instead of relying only on chat history.
@@ -8,7 +8,7 @@ Use this file as the durable work tracker when the chat context is compressed. U
 ## Current Baseline
 
 - [x] Active project confirmed as `D:\xampp\htdocs\ibems-tailwind-test`.
-- [x] Role-based portals exist for Admin, Store, Accounting, and User.
+- [x] Role-based portals exist for Admin, Store, Store Admin, Accounting, and User.
 - [x] Login redirects to the correct role flow and Dashboard-first behavior was corrected.
 - [x] Multi-role role switcher exists and is visible in portal headers.
 - [x] Store Dashboard quick access and Store Start Work actions use the improved animated action UI.
@@ -38,6 +38,9 @@ Use this file as the durable work tracker when the chat context is compressed. U
 - [x] POS: Add empty/error/loading states for payment method load failures.
 - [x] Store History: Verify transaction details and receipt links use the same receipt data contract as POS.
 - [x] Store Reports: Verify sales, stock-in cost, projected profit, payment breakdown, and cash movement summaries reconcile after test transactions.
+- [x] Store Daily Operations: Close-day modal now separates expected sales, counted cash/e-cash, variance, and review status.
+- [x] Store Daily Operations: Approved shortages create operator accountability entries for accounting follow-up.
+- [x] POS: Added direct debt repayment so debtors can pay the store in advance using cash or e-cash.
 
 ## Phase 2 - Accounting Workflow
 
@@ -48,6 +51,8 @@ Use this file as the durable work tracker when the chat context is compressed. U
 - [x] Accounting Settlement: Add export/print summary for settlement runs.
 - [x] Accounting Dashboard: Align KPI cards with real debt cashbook and settlement data.
 - [x] Accounting Dashboard: Add alerts for over-limit users, stale debts, and failed imports.
+- [x] Accounting Debts: Split the confusing combined view into Employee Debts, Advance Payments, and Operator Accountabilities.
+- [x] Accounting Debts: Show clear workflow explanation for salary deduction, direct store repayment, and operator shortage follow-up.
 
 ## Phase 3 - Admin Workflow
 
@@ -58,6 +63,16 @@ Use this file as the durable work tracker when the chat context is compressed. U
 - [x] Admin User Management: Ensure record-click and explicit actions are not redundant or confusing.
 - [x] Admin Products: Converted admin product management into a read-only oversight view; Store Inventory remains the operational product management surface.
 - [x] Admin Audit: Add an admin-facing audit log screen for product changes, stock adjustments, POS transactions, settlement runs, and user edits.
+- [x] Admin Stores: Added store supervisor assignment support for store-level administrators.
+
+## Phase 3A - Store Admin Portal
+
+- [x] Add `STORE_SUPERVISOR` role support and store assignment storage.
+- [x] Add Store Admin layout, dashboard, assigned-store list, and store detail views.
+- [x] Route Store Admin users to `/store-admin/dashboard`.
+- [x] Show pending close-day variance reviews for assigned stores.
+- [x] Allow Store Admin to approve close-day variance reviews and create accountability records for shortages.
+- [x] Add local demo seeder for a Store Admin account assigned to Main Campus Store.
 
 ## Phase 4 - User Portal
 
@@ -81,11 +96,11 @@ Use this file as the durable work tracker when the chat context is compressed. U
 ## Phase 6 - Usability And Polish
 
 - [ ] Standardize loading, empty, error, success, and confirmation patterns across Admin, Store, Accounting, and User pages.
-- [ ] Standardize table controls: search, filters, reset, pagination or result count.
-- [ ] Standardize modal layout and close/discard behavior.
+- [x] Standardize table/search controls in recently touched Store, Accounting, Store Admin, and Admin Products screens.
+- [x] Standardize modal layout for Store open-day and close-day workflows.
 - [ ] Review mobile responsiveness for Store POS, Inventory, Accounting Debts, and Admin User Management.
 - [ ] Add keyboard-friendly actions for POS scanning, cart controls, modal confirmation, and table search.
-- [ ] Replace remaining unclear labels, placeholder copy, and redundant controls.
+- [x] Replace unclear Accounting Debts labels with role-specific sections and explanation copy.
 
 ## Phase 7 - Release Hygiene
 
@@ -99,18 +114,16 @@ Use this file as the durable work tracker when the chat context is compressed. U
 
 ## Recommended Next Work Order
 
-1. Finish Store workflow validation:
-   - POS stock preflight refresh.
-   - Debt checkout projected-credit confirmation.
-   - Store History/Reports reconciliation check.
-2. Move to Accounting:
-   - Debt list/profile flow.
-   - CSV import preview validation.
-   - Settlement run summary/export.
-3. Move to Admin:
-   - Store details operational snapshot.
-   - User Management action clarity.
-   - Audit log viewer.
-4. Move to User:
-   - Debt status clarity.
-   - Transaction history and receipt consistency.
+1. Run instructor demo smoke test in the browser:
+   - Login for Admin, Store, Store Admin, Accounting, and User.
+   - Open Store day, perform POS sale, perform direct debt repayment, close Store day, approve variance when needed.
+   - Confirm Accounting tabs show employee debts, advance payments, and operator accountabilities.
+2. Polish remaining responsive layouts:
+   - Store POS.
+   - Accounting Debts.
+   - Store Admin Dashboard.
+   - Admin Products.
+3. Decide final salary-deduction handling for operator accountabilities:
+   - Current system records the accountability.
+   - A payroll export or deduction posting workflow is still the next business step.
+4. Commit current scope after validation and instructor-ready doc review.

@@ -33,6 +33,7 @@
                     <option value="">All Roles</option>
                     <option value="ADMIN">Admin</option>
                     <option value="ACCOUNTING_OFFICE">Accounting Office</option>
+                    <option value="STORE_SUPERVISOR">Store Supervisor</option>
                     <option value="STORE_SYSTEM">Store System</option>
                     <option value="USER">User</option>
                 </select>
@@ -81,6 +82,7 @@
                 <div class="role-check-grid grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
                     <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-e-roles" value="USER"> User</label>
                     <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-e-roles" value="STORE_SYSTEM"> Store System</label>
+                    <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-e-roles" value="STORE_SUPERVISOR"> Store Supervisor</label>
                     <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-e-roles" value="ACCOUNTING_OFFICE"> Accounting Office</label>
                     <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-e-roles" value="ADMIN"> Admin</label>
                 </div>
@@ -147,6 +149,7 @@
                 <div class="role-check-grid grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
                     <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-a-roles" value="USER" checked> User</label>
                     <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-a-roles" value="STORE_SYSTEM"> Store System</label>
+                    <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-a-roles" value="STORE_SUPERVISOR"> Store Supervisor</label>
                     <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-a-roles" value="ACCOUNTING_OFFICE"> Accounting Office</label>
                     <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-a-roles" value="ADMIN"> Admin</label>
                 </div>

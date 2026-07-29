@@ -20,11 +20,15 @@ function auditSetResult(message, type) {
     el.style.color = type === "error" ? "#b91c1c" : "#166534";
 }
 
+function auditLabel(value) {
+    return window.IbemsFormat?.identifierLabel(value) || String(value ?? "").replace(/[_-]+/g, " ");
+}
+
 function auditSetOptions(selectId, placeholder, values) {
     const select = document.getElementById(selectId);
     const current = select.value;
     select.innerHTML = [`<option value="">${auditEscape(placeholder)}</option>`]
-        .concat((Array.isArray(values) ? values : []).map((value) => `<option value="${auditEscape(value)}">${auditEscape(value)}</option>`))
+        .concat((Array.isArray(values) ? values : []).map((value) => `<option value="${auditEscape(value)}">${auditEscape(auditLabel(value))}</option>`))
         .join("");
     if (current && select.querySelector(`option[value="${CSS.escape(current)}"]`)) {
         select.value = current;
@@ -54,14 +58,13 @@ function auditRenderRows(rows) {
             <td><span class="audit-date">${auditEscape(auditDateTime(row.created_at))}</span></td>
             <td>
                 <strong>${auditEscape(row.action_label || row.action || "-")}</strong>
-                <small>${auditEscape(row.action || "")}</small>
             </td>
             <td>
                 <strong>${auditEscape(row.actor_name || "System")}</strong>
                 <small>${auditEscape(row.actor_email || "")}</small>
             </td>
             <td>
-                <strong>${auditEscape(row.entity || "-")}</strong>
+                <strong>${auditEscape(auditLabel(row.entity) || "-")}</strong>
                 <small>${row.entity_id ? `#${Number(row.entity_id)}` : "-"}</small>
             </td>
             <td>${auditEscape(row.payload_summary || "-")}</td>
@@ -78,6 +81,11 @@ async function auditLoad() {
     const dateTo = (document.getElementById("audit-date-to").value || "").trim();
     const limit = (document.getElementById("audit-limit").value || "100").trim();
 
+    if (dateFrom && dateTo && dateFrom > dateTo) {
+        auditSetResult("The start date must be on or before the end date.", "error");
+        return;
+    }
+
     if (q) params.set("q", q);
     if (action) params.set("action", action);
     if (entity) params.set("entity", entity);
@@ -85,22 +93,25 @@ async function auditLoad() {
     if (dateTo) params.set("date_to", dateTo);
     params.set("limit", limit);
 
-    const response = await fetch(`/admin/audit/data?${params.toString()}`);
-    const data = await response.json();
-    if (!data || data.status !== "success") {
+    try {
+        const response = await fetch(`/admin/audit/data?${params.toString()}`);
+        const data = await response.json();
+        if (!response.ok || !data || data.status !== "success") {
+            throw new Error(data?.message || "Unable to load audit events.");
+        }
+
+        auditRows = Array.isArray(data.data) ? data.data : [];
+        auditSetOptions("audit-action-filter", "All Actions", data.actions || []);
+        auditSetOptions("audit-entity-filter", "All Entities", data.entities || []);
+        auditRenderSummary(data.summary || {});
+        auditRenderRows(auditRows);
+        auditSetResult("", "ok");
+    } catch (error) {
         auditRows = [];
         auditRenderRows([]);
         auditRenderSummary({});
-        auditSetResult(data?.message || "Unable to load audit events.", "error");
-        return;
+        auditSetResult(error instanceof Error ? error.message : "Unable to load audit events.", "error");
     }
-
-    auditRows = Array.isArray(data.data) ? data.data : [];
-    auditSetOptions("audit-action-filter", "All Actions", data.actions || []);
-    auditSetOptions("audit-entity-filter", "All Entities", data.entities || []);
-    auditRenderSummary(data.summary || {});
-    auditRenderRows(auditRows);
-    auditSetResult("", "ok");
 }
 
 function auditDetailItem(label, value) {
@@ -134,7 +145,7 @@ function auditOpenDetail(auditId) {
             ${auditDetailItem("Action", row.action_label || row.action)}
             ${auditDetailItem("Raw Action", row.action)}
             ${auditDetailItem("Actor", `${row.actor_name || "System"}${row.actor_email ? ` (${row.actor_email})` : ""}`)}
-            ${auditDetailItem("Entity", `${row.entity || "-"}${row.entity_id ? ` #${row.entity_id}` : ""}`)}
+            ${auditDetailItem("Entity", `${auditLabel(row.entity) || "-"}${row.entity_id ? ` #${row.entity_id}` : ""}`)}
             ${auditDetailItem("Event ID", String(row.id))}
         </div>
         <div class="audit-payload-block">
@@ -178,6 +189,12 @@ document.getElementById("audit-body").addEventListener("keydown", (event) => {
 document.getElementById("audit-view-close").addEventListener("click", auditCloseModal);
 document.getElementById("audit-view-modal").addEventListener("click", (event) => {
     if (event.target.id === "audit-view-modal") auditCloseModal();
+});
+document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !document.getElementById("audit-view-modal").classList.contains("is-hidden")) {
+        auditCloseModal();
+        document.getElementById("audit-view-close").focus();
+    }
 });
 
 auditLoad();

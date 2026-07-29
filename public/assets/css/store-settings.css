@@ -47,12 +47,25 @@
     align-items: center;
 }
 
-.settings-add-row input {
+.settings-add-row input,
+.category-add-row input,
+.category-edit-name {
     width: 100%;
+    min-height: 42px;
+    border: 1px solid #c7d5e4;
+    border-radius: 8px;
+    background: #fff;
+    padding: 10px 14px;
+    line-height: 1.35;
+    box-shadow: none;
 }
 
-.category-add-row input {
-    width: 100%;
+.settings-add-row input:focus,
+.category-add-row input:focus,
+.category-edit-name:focus {
+    border-color: #2563eb;
+    outline: 2px solid rgba(37, 99, 235, 0.18);
+    outline-offset: 1px;
 }
 
 .settings-table-wrap {
@@ -65,10 +78,6 @@
     display: flex;
     gap: 0.5rem;
     align-items: center;
-}
-
-.category-edit-name {
-    width: 100%;
 }
 
 .settings-result {

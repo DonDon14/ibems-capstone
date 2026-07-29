@@ -49,6 +49,12 @@ class StoreModel extends Model
 
         if ($role === 'STORE_SYSTEM') {
             $builder->where('officer_id', $userId);
+        } elseif ($role === 'STORE_SUPERVISOR') {
+            $storeIds = (new StoreSupervisorModel())->getStoreIdsBySupervisor($userId);
+            if ($storeIds === []) {
+                return [];
+            }
+            $builder->whereIn('id', $storeIds);
         } elseif ($role !== 'ADMIN') {
             return [];
         }
@@ -62,6 +68,17 @@ class StoreModel extends Model
 
         if ($role === 'STORE_SYSTEM') {
             $builder->where('officer_id', $userId);
+        } elseif ($role === 'STORE_SUPERVISOR') {
+            if ($userId <= 0) {
+                return false;
+            }
+            $assigned = (new StoreSupervisorModel())
+                ->where('store_id', $storeId)
+                ->where('user_id', $userId)
+                ->countAllResults();
+            if ($assigned <= 0) {
+                return false;
+            }
         } elseif ($role !== 'ADMIN') {
             return false;
         }

@@ -24,6 +24,46 @@ function sdInitials(text) {
         .join("") || "PR";
 }
 
+function sdReviewLabel(value) {
+    const labels = {
+        not_required: "No Review Needed",
+        pending: "Pending Review",
+        approved: "Approved",
+        waived: "Waived",
+        corrected: "Corrected",
+        needs_investigation: "Needs Investigation",
+    };
+    return labels[String(value || "not_required")] || "Review";
+}
+
+function sdVarianceStatusLabel(value) {
+    const labels = {
+        balanced: "Balanced",
+        shortage: "Shortage",
+        overage: "Overage",
+    };
+    return labels[String(value || "balanced")] || "Variance";
+}
+
+function sdShortageAmount(session) {
+    return Math.max(0, -Number(session?.variance_cash || 0)) + Math.max(0, -Number(session?.variance_ecash || 0));
+}
+
+function sdVarianceClass(value) {
+    const status = String(value || "balanced");
+    if (status === "shortage") return "is-danger";
+    if (status === "overage") return "is-warning";
+    return "is-success";
+}
+
+function sdReviewClass(value) {
+    const status = String(value || "not_required");
+    if (status === "pending" || status === "needs_investigation") return "is-warning";
+    if (status === "approved") return "is-danger";
+    if (status === "waived" || status === "corrected") return "is-success";
+    return "is-muted";
+}
+
 function sdRenderDaySession(session) {
     const wrap = document.getElementById("sd-day-session");
     if (!wrap) return;
@@ -36,6 +76,59 @@ function sdRenderDaySession(session) {
     const status = String(session.status || "").toUpperCase() || "UNKNOWN";
     const openedBy = session.opened_by_name || "Unknown";
     const closedBy = session.closed_by_name || "-";
+    const isClosed = String(session.status || "") === "closed";
+    const varianceStatus = String(session.variance_status || "balanced");
+    const reviewStatus = String(session.review_status || "not_required");
+    const shortageAmount = sdShortageAmount(session);
+    const accountabilityName = session.accountability_user_name || closedBy;
+    const canReview = isClosed && reviewStatus !== "not_required" && !["approved", "waived", "corrected"].includes(reviewStatus);
+    const reviewActions = canReview ? `
+        <div class="variance-actions">
+            ${varianceStatus === "shortage" ? `<button type="button" class="admin-action-btn danger" data-variance-action="approve_shortage" data-session-id="${Number(session.id || 0)}">Approve Shortage</button>` : ""}
+            <button type="button" class="admin-action-btn" data-variance-action="waive" data-session-id="${Number(session.id || 0)}">Waive</button>
+            <button type="button" class="admin-action-btn" data-variance-action="corrected" data-session-id="${Number(session.id || 0)}">Corrected</button>
+            <button type="button" class="admin-action-btn" data-variance-action="needs_investigation" data-session-id="${Number(session.id || 0)}">Investigate</button>
+        </div>
+    ` : "";
+    const reviewCopy = canReview && varianceStatus === "shortage"
+        ? `<div class="variance-note">Approving assigns ${sdEscape(sdMoney(shortageAmount))} to ${sdEscape(accountabilityName)} as operator accountability.</div>`
+        : "";
+    const closedSummary = isClosed ? `
+        <div class="variance-grid">
+            <div>
+                <span>Expected Cash</span>
+                <strong>${sdEscape(sdMoney(session.expected_cash || 0))}</strong>
+            </div>
+            <div>
+                <span>Counted Cash</span>
+                <strong>${sdEscape(sdMoney(session.counted_cash || 0))}</strong>
+            </div>
+            <div>
+                <span>Cash Variance</span>
+                <strong class="${Number(session.variance_cash || 0) < 0 ? "text-danger" : ""}">${sdEscape(sdMoney(session.variance_cash || 0))}</strong>
+            </div>
+            <div>
+                <span>Expected E-Cash</span>
+                <strong>${sdEscape(sdMoney(session.expected_ecash || 0))}</strong>
+            </div>
+            <div>
+                <span>Counted E-Cash</span>
+                <strong>${sdEscape(sdMoney(session.counted_ecash || 0))}</strong>
+            </div>
+            <div>
+                <span>E-Cash Variance</span>
+                <strong class="${Number(session.variance_ecash || 0) < 0 ? "text-danger" : ""}">${sdEscape(sdMoney(session.variance_ecash || 0))}</strong>
+            </div>
+        </div>
+        <div class="variance-status-row">
+            <span class="variance-pill ${sdVarianceClass(varianceStatus)}">${sdEscape(sdVarianceStatusLabel(varianceStatus))}</span>
+            <span class="variance-pill ${sdReviewClass(reviewStatus)}">${sdEscape(sdReviewLabel(reviewStatus))}</span>
+        </div>
+        ${session.review_note ? `<div class="variance-note">Review note: ${sdEscape(session.review_note)}</div>` : ""}
+        ${Number(session.accountability_amount || 0) > 0 ? `<div class="variance-note">Accountability: ${sdEscape(sdMoney(session.accountability_amount))} assigned to ${sdEscape(accountabilityName)}.</div>` : ""}
+        ${reviewCopy}
+        ${reviewActions}
+    ` : "";
     wrap.innerHTML = `
         <div class="stack-item">
             <div class="stack-item-head">
@@ -51,8 +144,43 @@ function sdRenderDaySession(session) {
             <div class="stack-meta">
                 Closed by ${sdEscape(closedBy)}${session.closed_at ? ` at ${sdEscape(sdDateTime(session.closed_at))}` : ""}
             </div>
+            ${closedSummary}
         </div>
     `;
+}
+
+async function sdReviewVariance(sessionId, action) {
+    const actionLabels = {
+        approve_shortage: "Approve shortage",
+        waive: "Waive variance",
+        corrected: "Mark corrected",
+        needs_investigation: "Mark for investigation",
+    };
+    const note = await window.IbemsDialog.prompt("Enter a review note for this variance decision.", {
+        title: actionLabels[action] || "Review variance",
+        inputLabel: "Review note",
+        placeholder: "Explain the decision",
+        required: true,
+        confirmLabel: "Save review",
+    });
+    if (note === null) return;
+
+    const root = document.querySelector("[data-store-id]");
+    const reviewUrlPrefix = (root?.getAttribute("data-review-url-prefix") || "/admin/store-day-sessions").replace(/\/$/, "");
+    const response = await fetch(`${reviewUrlPrefix}/${Number(sessionId)}/review`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, review_note: note.trim() }),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.status !== "success") {
+        await window.IbemsDialog.alert(data.message || "Failed to review variance.", {
+            title: "Review not saved",
+            tone: "danger",
+        });
+        return;
+    }
+    await loadStoreDetails();
 }
 
 function sdRenderOfficers(officers) {
@@ -82,7 +210,8 @@ async function loadStoreDetails() {
     const storeId = Number(root.getAttribute("data-store-id") || 0);
     if (!storeId) return;
 
-    const response = await fetch(`/admin/stores/${storeId}/data`);
+    const detailsUrl = root.getAttribute("data-details-url") || `/admin/stores/${storeId}/data`;
+    const response = await fetch(detailsUrl);
     const data = await response.json();
     if (!data || data.status !== "success") return;
 
@@ -91,7 +220,7 @@ async function loadStoreDetails() {
 
     document.getElementById("sd-store-name").textContent = sdEscape(store.store_name || "Store Details");
     document.getElementById("sd-store-meta").textContent =
-        `${store.officer_name || "No officer"} • ${store.is_active ? "Active" : "Inactive"}`;
+        `${store.officer_name || "No officer"} | ${store.is_active ? "Active" : "Inactive"}`;
     document.getElementById("sd-txn-count").textContent = String(summary.txn_count || 0);
     document.getElementById("sd-sales-total").textContent = sdMoney(summary.sales_total || 0);
     document.getElementById("sd-product-count").textContent = String(summary.product_count || 0);
@@ -144,5 +273,12 @@ async function loadStoreDetails() {
         `).join("");
     }
 }
+
+document.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-variance-action]");
+    if (!button) return;
+    event.preventDefault();
+    sdReviewVariance(button.getAttribute("data-session-id"), button.getAttribute("data-variance-action"));
+});
 
 loadStoreDetails();
