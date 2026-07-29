@@ -27,7 +27,7 @@ jobs:
         with:
           php-version: "8.4"
           extensions: dom, intl, mbstring, mysqli, sqlite3, xml, xmlwriter
-          coverage: none
+          coverage: pcov
           tools: composer:v2
 
       - name: Cache Composer downloads
