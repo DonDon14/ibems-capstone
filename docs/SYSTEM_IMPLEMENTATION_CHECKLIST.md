@@ -127,8 +127,11 @@ Use this file as the durable work tracker when the chat context is compressed. U
      pending/confirmed/carryover result fields.
    - [x] Persist shared debt PIN attempt state, lock after five failed attempts
      in 15 minutes, audit authorization outcomes, and reset after success.
-   - [ ] Add Accounting endpoints and UI for period preparation.
-   - [ ] Move balance reduction from batch preparation to confirmed result.
+   - [ ] Add Accounting UI for period preparation and result confirmation.
+   - [x] Add Accounting endpoints for configurable period creation, batch
+     preparation, and idempotent result confirmation.
+   - [x] Reduce debt only by the confirmed result and retain the unresolved
+     employee balance as traceable carryover.
 2. Run instructor demo smoke test in the browser:
    - Login for Admin, Store, Store Admin, Accounting, and User.
    - Open Store day, perform POS sale, perform direct debt repayment, close Store day, approve variance when needed.

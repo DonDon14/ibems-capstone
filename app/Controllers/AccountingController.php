@@ -8,11 +8,52 @@ use App\Models\SalaryImportBatchModel;
 use App\Models\SalaryImportRowModel;
 use App\Models\UserModel;
 use App\Models\DebtCashbookEntryModel;
+use App\Services\DeductionBatchService;
+use App\Services\DeductionPeriodService;
 use CodeIgniter\Controller;
 use Config\Database;
 
 class AccountingController extends Controller
 {
+    public function createDeductionPeriod()
+    {
+        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $result = (new DeductionPeriodService())->create($request, (int) session()->get('user_id'));
+
+        return $this->response
+            ->setStatusCode((int) ($result['code'] ?? 400))
+            ->setJSON($result);
+    }
+
+    public function prepareDeductionBatch()
+    {
+        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $result = (new DeductionBatchService())->prepare(
+            (int) ($request['period_id'] ?? 0),
+            is_array($request['requests'] ?? null) ? $request['requests'] : [],
+            (int) session()->get('user_id'),
+            isset($request['notes']) ? (string) $request['notes'] : null
+        );
+
+        return $this->response
+            ->setStatusCode((int) ($result['code'] ?? 400))
+            ->setJSON($result);
+    }
+
+    public function confirmDeductionResult(int $itemId)
+    {
+        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $result = (new DeductionBatchService())->confirmResult(
+            $itemId,
+            $request,
+            (int) session()->get('user_id')
+        );
+
+        return $this->response
+            ->setStatusCode((int) ($result['code'] ?? 400))
+            ->setJSON($result);
+    }
+
     private function addDebtCashbookEntry(
         int $userId,
         string $entryType,
