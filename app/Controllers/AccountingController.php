@@ -10,11 +10,74 @@ use App\Models\UserModel;
 use App\Models\DebtCashbookEntryModel;
 use App\Services\DeductionBatchService;
 use App\Services\DeductionPeriodService;
+use App\Services\DebtInvestigationService;
 use CodeIgniter\Controller;
 use Config\Database;
 
 class AccountingController extends Controller
 {
+    public function debtInvestigationsData()
+    {
+        $db = Database::connect();
+        $userId = max(0, (int) ($this->request->getGet('user_id') ?? 0));
+        $investigations = $db->table('debt_investigations di')
+            ->select('di.*, u.employee_id, u.name, t.client_txn_id, opener.name AS opened_by_name, recommender.name AS recommended_by_name, approver.name AS approved_by_name')
+            ->join('users u', 'u.id = di.user_id', 'inner')
+            ->join('transactions t', 't.id = di.transaction_id', 'left')
+            ->join('users opener', 'opener.id = di.opened_by', 'left')
+            ->join('users recommender', 'recommender.id = di.recommended_by', 'left')
+            ->join('users approver', 'approver.id = di.approved_by', 'left')
+            ->orderBy('di.id', 'DESC')
+            ->limit(100)
+            ->get()
+            ->getResultArray();
+        $transactions = [];
+        if ($userId > 0) {
+            $transactions = $db->table('transactions')
+                ->select('id, client_txn_id, amount, store_id, created_at')
+                ->where('user_id', $userId)
+                ->where('payment_method', 'debt')
+                ->orderBy('id', 'DESC')
+                ->limit(100)
+                ->get()
+                ->getResultArray();
+        }
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'investigations' => $investigations,
+            'transactions' => $transactions,
+        ]);
+    }
+
+    public function openDebtInvestigation()
+    {
+        $result = (new DebtInvestigationService())->open(
+            $this->request->getJSON(true) ?? $this->request->getPost(),
+            (int) session()->get('user_id')
+        );
+        return $this->response->setStatusCode((int) ($result['code'] ?? 400))->setJSON($result);
+    }
+
+    public function recommendDebtInvestigation(int $investigationId)
+    {
+        $result = (new DebtInvestigationService())->recommend(
+            $investigationId,
+            $this->request->getJSON(true) ?? $this->request->getPost(),
+            (int) session()->get('user_id')
+        );
+        return $this->response->setStatusCode((int) ($result['code'] ?? 400))->setJSON($result);
+    }
+
+    public function approveDebtInvestigation(int $investigationId)
+    {
+        $result = (new DebtInvestigationService())->approveAndPost(
+            $investigationId,
+            (int) session()->get('user_id')
+        );
+        return $this->response->setStatusCode((int) ($result['code'] ?? 400))->setJSON($result);
+    }
+
     public function deductionWorkflowData()
     {
         $db = Database::connect();

@@ -1288,6 +1288,171 @@ async function confirmWorkflowResult(button) {
     }
 }
 
+function setInvestigationMessage(message, type = "ok") {
+    const element = document.getElementById("investigation-message");
+    element.textContent = message || "";
+    element.className = `mt-3 text-sm font-semibold ${type === "error" ? "text-red-700" : "text-emerald-700"}`;
+}
+
+function investigationLabel(value) {
+    return aCategory(String(value || "").replace(/_/g, " "));
+}
+
+function renderInvestigations(rows) {
+    const container = document.getElementById("investigation-list");
+    const modal = document.getElementById("debt-investigations-modal");
+    const currentRole = modal.dataset.currentRole || "";
+    const currentUser = Number(modal.dataset.currentUser || 0);
+    if (!rows.length) {
+        container.innerHTML = '<div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">No debt investigations have been opened.</div>';
+        return;
+    }
+
+    container.innerHTML = rows.map((row) => {
+        const status = String(row.status || "open");
+        const canRecommend = ["open", "investigating"].includes(status);
+        const canApprove = status === "recommended" && currentRole === "ACCOUNTING_OFFICE" && Number(row.recommended_by || 0) !== currentUser;
+        return `
+            <article class="rounded-xl border border-slate-200 bg-slate-50 p-4" data-investigation-id="${aEscape(row.id)}">
+                <div class="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                        <strong class="block text-sm text-slate-900">#${aEscape(row.id)} · ${aEscape(row.name || "Employee")}</strong>
+                        <small class="text-slate-500">${aEscape(row.employee_id || "-")} · ${aEscape(investigationLabel(row.issue_type))} · ${aEscape(row.client_txn_id || "General balance")}</small>
+                    </div>
+                    <span class="acct-debt-status ${status === "closed" ? "is-success" : status === "recommended" ? "is-warning" : "is-info"}">${aEscape(investigationLabel(status))}</span>
+                </div>
+                <p class="mt-2 text-sm text-slate-700">${aEscape(row.summary || "")}</p>
+                ${row.findings ? `<div class="mt-2 rounded-lg border border-slate-200 bg-white p-2 text-sm text-slate-600"><strong>Findings:</strong> ${aEscape(row.findings)}</div>` : ""}
+                ${canRecommend ? `
+                    <div class="mt-3 grid gap-2">
+                        <textarea class="investigation-findings min-h-20 rounded-xl border border-slate-200 bg-white p-3 text-sm" placeholder="Document findings (minimum 10 characters)"></textarea>
+                        <textarea class="investigation-result-evidence min-h-16 rounded-xl border border-slate-200 bg-white p-3 text-sm" placeholder="Evidence reviewed"></textarea>
+                        <div class="grid gap-2 md:grid-cols-[220px_170px_auto]">
+                            <select class="investigation-action h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm" aria-label="Recommended action">
+                                <option value="no_change">No financial change</option>
+                                <option value="partial_reversal">Partial reversal</option>
+                                <option value="full_reversal">Full reversal</option>
+                            </select>
+                            <input class="investigation-amount h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm" type="number" min="0" step="0.01" value="0.00" aria-label="Recommended reversal amount">
+                            <button type="button" class="investigation-recommend inline-flex h-10 items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700">Submit recommendation</button>
+                        </div>
+                    </div>
+                ` : ""}
+                ${status === "recommended" ? `
+                    <div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                        <strong>${aEscape(investigationLabel(row.recommended_action))} · ${aEscape(aMoney(row.recommended_amount || 0))}</strong>
+                        <p class="mt-1">Recommended by ${aEscape(row.recommended_by_name || "Unknown")}.</p>
+                        ${canApprove
+                            ? '<button type="button" class="investigation-approve mt-2 inline-flex h-10 items-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700">Approve and post correction</button>'
+                            : '<p class="mt-2 font-semibold">Awaiting approval by a different Accounting user.</p>'}
+                    </div>
+                ` : ""}
+                ${status === "closed" ? `<div class="mt-2 text-sm text-emerald-700">Closed by ${aEscape(row.approved_by_name || "Accounting")} · Posted reversal ${aEscape(aMoney(row.recommended_amount || 0))}</div>` : ""}
+            </article>
+        `;
+    }).join("");
+}
+
+async function loadInvestigationTransactions(userId) {
+    const select = document.getElementById("investigation-transaction");
+    select.innerHTML = '<option value="">General balance investigation</option>';
+    if (!userId) return;
+    const response = await fetch(`/accounting/debt-investigations?user_id=${encodeURIComponent(userId)}`);
+    const data = await response.json();
+    if (!data || data.status !== "success") return;
+    select.innerHTML += (data.transactions || []).map((row) =>
+        `<option value="${aEscape(row.id)}">${aEscape(row.client_txn_id)} · ${aEscape(aMoney(row.amount))} · ${aEscape(aDateTime(row.created_at))}</option>`
+    ).join("");
+}
+
+async function loadInvestigations() {
+    const response = await fetch("/accounting/debt-investigations");
+    const data = await response.json();
+    if (!data || data.status !== "success") {
+        setInvestigationMessage(data?.message || "Unable to load investigations.", "error");
+        return;
+    }
+    renderInvestigations(Array.isArray(data.investigations) ? data.investigations : []);
+}
+
+async function openInvestigationsModal() {
+    const modal = document.getElementById("debt-investigations-modal");
+    modal.style.display = "grid";
+    const userSelect = document.getElementById("investigation-user");
+    userSelect.innerHTML = '<option value="">Select employee</option>' + acctRows.map((row) =>
+        `<option value="${aEscape(row.user_id)}">${aEscape(row.name)} · ${aEscape(row.employee_id || "-")} · ${aEscape(aMoney(row.current_debt || 0))}</option>`
+    ).join("");
+    setInvestigationMessage("");
+    await loadInvestigations();
+}
+
+function closeInvestigationsModal() {
+    document.getElementById("debt-investigations-modal").style.display = "none";
+}
+
+async function openInvestigation() {
+    const response = await fetch("/accounting/debt-investigations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            user_id: Number(document.getElementById("investigation-user").value || 0),
+            transaction_id: Number(document.getElementById("investigation-transaction").value || 0),
+            issue_type: document.getElementById("investigation-issue").value,
+            summary: document.getElementById("investigation-summary").value.trim(),
+            evidence_summary: document.getElementById("investigation-evidence").value.trim(),
+        }),
+    });
+    const data = await response.json();
+    if (!data || data.status !== "success") {
+        setInvestigationMessage(data?.message || "Failed to open investigation.", "error");
+        return;
+    }
+    document.getElementById("investigation-summary").value = "";
+    document.getElementById("investigation-evidence").value = "";
+    setInvestigationMessage("Investigation opened. Financial records remain unchanged.");
+    await loadInvestigations();
+}
+
+async function recommendInvestigation(button) {
+    const row = button.closest("[data-investigation-id]");
+    const id = Number(row?.dataset.investigationId || 0);
+    const response = await fetch(`/accounting/debt-investigations/${id}/recommend`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            findings: row.querySelector(".investigation-findings").value.trim(),
+            evidence_summary: row.querySelector(".investigation-result-evidence").value.trim(),
+            recommended_action: row.querySelector(".investigation-action").value,
+            recommended_amount: Number(row.querySelector(".investigation-amount").value || 0),
+        }),
+    });
+    const data = await response.json();
+    if (!data || data.status !== "success") {
+        setInvestigationMessage(data?.message || "Failed to submit recommendation.", "error");
+        return;
+    }
+    setInvestigationMessage("Recommendation submitted for independent Accounting approval.");
+    await loadInvestigations();
+}
+
+async function approveInvestigation(button) {
+    const row = button.closest("[data-investigation-id]");
+    const id = Number(row?.dataset.investigationId || 0);
+    const response = await fetch(`/accounting/debt-investigations/${id}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+    });
+    const data = await response.json();
+    if (!data || data.status !== "success") {
+        setInvestigationMessage(data?.message || "Failed to approve correction.", "error");
+        return;
+    }
+    setInvestigationMessage(`Correction posted. Employee debt changed from ${aMoney(data.debt_before)} to ${aMoney(data.debt_after)}.`);
+    await loadData();
+    await loadInvestigations();
+}
+
 document.getElementById("acct-search").addEventListener("input", () => {
     applyMainFiltersAndRender();
 });
@@ -1312,10 +1477,12 @@ document.getElementById("acct-body").addEventListener("click", async (event) => 
 
 document.getElementById("open-deduction-mode").addEventListener("click", openMode);
 document.getElementById("open-deduction-workflow").addEventListener("click", openDeductionWorkflow);
+document.getElementById("open-debt-investigations").addEventListener("click", openInvestigationsModal);
 document.getElementById("open-settlement-run").addEventListener("click", openSettlementModal);
 document.getElementById("open-import-csv").addEventListener("click", openImportModal);
 document.getElementById("close-deduction-mode").addEventListener("click", closeMode);
 document.getElementById("close-deduction-workflow").addEventListener("click", closeDeductionWorkflow);
+document.getElementById("close-debt-investigations").addEventListener("click", closeInvestigationsModal);
 document.getElementById("close-settlement-run").addEventListener("click", closeSettlementModal);
 document.getElementById("close-import-csv").addEventListener("click", closeImportModal);
 document.getElementById("deduction-mode-modal").addEventListener("click", (event) => {
@@ -1323,6 +1490,23 @@ document.getElementById("deduction-mode-modal").addEventListener("click", (event
 });
 document.getElementById("deduction-workflow-modal").addEventListener("click", (event) => {
     if (event.target.id === "deduction-workflow-modal") closeDeductionWorkflow();
+});
+document.getElementById("debt-investigations-modal").addEventListener("click", (event) => {
+    if (event.target.id === "debt-investigations-modal") closeInvestigationsModal();
+});
+document.getElementById("investigation-user").addEventListener("change", (event) => {
+    loadInvestigationTransactions(Number(event.target.value || 0));
+});
+document.getElementById("investigation-open").addEventListener("click", openInvestigation);
+document.getElementById("investigation-refresh").addEventListener("click", loadInvestigations);
+document.getElementById("investigation-list").addEventListener("click", (event) => {
+    const recommendButton = event.target.closest(".investigation-recommend");
+    if (recommendButton) {
+        recommendInvestigation(recommendButton);
+        return;
+    }
+    const approveButton = event.target.closest(".investigation-approve");
+    if (approveButton) approveInvestigation(approveButton);
 });
 document.getElementById("workflow-create-period").addEventListener("click", createWorkflowPeriod);
 document.getElementById("workflow-refresh").addEventListener("click", () => loadDeductionWorkflow());

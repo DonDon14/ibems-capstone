@@ -1390,7 +1390,8 @@ body .app-modal .app-modal-card {
     box-shadow: 0 22px 46px rgba(15, 23, 42, 0.24);
 }
 
-body #deduction-workflow-modal .acct-modal-card {
+body #deduction-workflow-modal .acct-modal-card,
+body #debt-investigations-modal .acct-modal-card {
     width: min(1180px, 100%);
     overflow-x: hidden;
 }

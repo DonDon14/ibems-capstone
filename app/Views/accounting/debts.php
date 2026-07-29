@@ -65,6 +65,7 @@
             </div>
             <div class="action-group action-group-tools flex flex-wrap gap-2">
                 <button id="open-deduction-workflow" class="history-action inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-blue-700" type="button"><i class="bi bi-diagram-3"></i> Deduction Workflow</button>
+                <button id="open-debt-investigations" class="history-action inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="button"><i class="bi bi-shield-check"></i> Investigations</button>
                 <button id="open-settlement-run" class="history-action inline-flex h-10 items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 text-sm font-semibold text-amber-800 transition hover:bg-amber-100" type="button"><i class="bi bi-clock-history"></i> Legacy Monthly Run</button>
                 <button id="open-deduction-mode" class="history-action inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="button"><i class="bi bi-cash-coin"></i> Manual Payroll Deduction</button>
                 <button id="open-import-csv" class="history-action inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="button"><i class="bi bi-file-earmark-arrow-up"></i> Import HR CSV</button>
@@ -392,6 +393,63 @@
                 <p id="workflow-message" class="text-sm font-semibold" role="status"></p>
             </div>
         </div>
+    </div>
+</div>
+
+<div id="debt-investigations-modal" class="acct-modal is-hidden" data-current-role="<?= esc((string) session()->get('role')) ?>" data-current-user="<?= (int) session()->get('user_id') ?>">
+    <div class="acct-modal-card max-h-[94vh] w-[min(1180px,97vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+        <div class="acct-modal-head">
+            <div>
+                <h4 class="text-lg font-bold text-slate-900">Debt Investigations and Corrections</h4>
+                <p class="mt-1 text-sm text-slate-500">Investigations preserve original transactions. Approved corrections are posted as linked ledger reversals.</p>
+            </div>
+            <button id="close-debt-investigations" type="button" class="acct-modal-close" aria-label="Close debt investigations"></button>
+        </div>
+        <div class="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
+            <section class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <h5 class="text-sm font-bold text-slate-900">Open investigation</h5>
+                <div class="mt-3 grid gap-3">
+                    <label>
+                        <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Employee</span>
+                        <select id="investigation-user" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"><option value="">Select employee</option></select>
+                    </label>
+                    <label>
+                        <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Debt transaction</span>
+                        <select id="investigation-transaction" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"><option value="">General balance investigation</option></select>
+                    </label>
+                    <label>
+                        <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Issue type</span>
+                        <select id="investigation-issue" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm">
+                            <option value="incorrect_amount">Incorrect amount</option>
+                            <option value="unauthorized_purchase">Unauthorized purchase</option>
+                            <option value="duplicate_charge">Duplicate charge</option>
+                            <option value="wrong_employee">Wrong employee</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Issue summary</span>
+                        <textarea id="investigation-summary" class="min-h-24 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm" placeholder="Describe what was reported and why it requires investigation."></textarea>
+                    </label>
+                    <label>
+                        <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Initial evidence</span>
+                        <textarea id="investigation-evidence" class="min-h-20 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm" placeholder="Receipt, statement, store-day record, or other evidence."></textarea>
+                    </label>
+                    <button id="investigation-open" type="button" class="inline-flex h-10 items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700">Open investigation</button>
+                </div>
+            </section>
+            <section class="rounded-xl border border-slate-200 bg-white p-4">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h5 class="text-sm font-bold text-slate-900">Investigation queue</h5>
+                        <p class="text-sm text-slate-500">A different Accounting user must approve a recommended correction.</p>
+                    </div>
+                    <button id="investigation-refresh" type="button" class="inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"><i class="bi bi-arrow-clockwise mr-2"></i>Refresh</button>
+                </div>
+                <div id="investigation-list" class="mt-3 max-h-[68vh] space-y-3 overflow-auto"></div>
+            </section>
+        </div>
+        <p id="investigation-message" class="mt-3 text-sm font-semibold" role="status"></p>
     </div>
 </div>
 

@@ -48,6 +48,7 @@ class IbemsSmoke extends BaseCommand
             'store_cash_movements',
             'debt_cashbook_entries',
             'debt_pin_security',
+            'debt_investigations',
             'settlement_runs',
             'deduction_periods',
             'deduction_batches',

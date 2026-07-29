@@ -132,6 +132,8 @@ Use this file as the durable work tracker when the chat context is compressed. U
      preparation, and idempotent result confirmation.
    - [x] Reduce debt only by the confirmed result and retain the unresolved
      employee balance as traceable carryover.
+   - [x] Add append-only debt investigations with documented evidence,
+     independent Accounting approval, and linked ledger reversals.
 2. Run instructor demo smoke test in the browser:
    - Login for Admin, Store, Store Admin, Accounting, and User.
    - Open Store day, perform POS sale, perform direct debt repayment, close Store day, approve variance when needed.
