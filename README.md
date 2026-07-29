@@ -1,5 +1,7 @@
 # IBEMS Capstone
 
+[![CI](https://github.com/DonDon14/ibems-capstone/actions/workflows/ci.yml/badge.svg)](https://github.com/DonDon14/ibems-capstone/actions/workflows/ci.yml)
+
 Integrated Business Enterprise Management System for school store operations, POS transactions, inventory, debt monitoring, accounting settlement, and role-based portals.
 
 ## Current Local Setup
@@ -165,6 +167,19 @@ npm run watch:tailwind
 
 ## Useful Checks
 
+Run the complete automated test suite:
+
+```powershell
+npm.cmd test
+```
+
+Build Tailwind and verify the generated asset has no uncommitted differences:
+
+```powershell
+npm.cmd run build:tailwind
+git diff --exit-code -- public/assets/css/tailwind.css
+```
+
 Run PHP syntax checks on changed PHP files:
 
 ```powershell
@@ -201,8 +216,10 @@ GitHub repository:
 https://github.com/DonDon14/ibems-capstone
 ```
 
-Current working branch used for the advanced local version:
+Default integration branch:
 
 ```text
-tailwind-2026-migration
+main
 ```
+
+Feature work should be developed on a separate branch and merged through a pull request after CI passes.
