@@ -37,6 +37,7 @@ final class DeductionBatchServiceTest extends CIUnitTestCase
         $this->seedEmployee(501, 'staff', 600);
         $service = new DeductionBatchService();
         $prepared = $service->prepare(1, [['user_id' => 501, 'requested_amount' => 250]], 900);
+        $service->submit((int) $prepared['batch']['id'], 900);
         $itemId = (int) Database::connect()->table('deduction_batch_items')->get()->getRow()->id;
 
         $result = $service->confirmResult($itemId, [
@@ -60,7 +61,8 @@ final class DeductionBatchServiceTest extends CIUnitTestCase
     {
         $this->seedEmployee(501, 'faculty', 300);
         $service = new DeductionBatchService();
-        $service->prepare(1, [['user_id' => 501, 'requested_amount' => 200]], 900);
+        $prepared = $service->prepare(1, [['user_id' => 501, 'requested_amount' => 200]], 900);
+        $service->submit((int) $prepared['batch']['id'], 900);
         $itemId = (int) Database::connect()->table('deduction_batch_items')->get()->getRow()->id;
 
         $invalid = $service->confirmResult($itemId, [
@@ -83,7 +85,8 @@ final class DeductionBatchServiceTest extends CIUnitTestCase
     {
         $this->seedEmployee(501, 'staff', 200);
         $service = new DeductionBatchService();
-        $service->prepare(1, [['user_id' => 501, 'requested_amount' => 150]], 900);
+        $prepared = $service->prepare(1, [['user_id' => 501, 'requested_amount' => 150]], 900);
+        $service->submit((int) $prepared['batch']['id'], 900);
         $itemId = (int) Database::connect()->table('deduction_batch_items')->get()->getRow()->id;
         $payload = ['confirmed_amount' => 150, 'result_reference' => 'PAYROLL-IDEMPOTENT-501'];
 
@@ -94,6 +97,37 @@ final class DeductionBatchServiceTest extends CIUnitTestCase
         $this->assertTrue($second['idempotent'] ?? false);
         $this->assertSame(50.0, (float) Database::connect()->table('balances')->where('user_id', 501)->get()->getRow()->current_debt);
         $this->assertSame(1, Database::connect()->table('debt_cashbook_entries')->countAllResults());
+    }
+
+    public function testBatchMustBeSubmittedReconciledAndIndependentlyFinalized(): void
+    {
+        $this->seedEmployee(501, 'faculty', 200);
+        $service = new DeductionBatchService();
+        $prepared = $service->prepare(1, [['user_id' => 501, 'requested_amount' => 100]], 900);
+        $batchId = (int) $prepared['batch']['id'];
+        $itemId = (int) Database::connect()->table('deduction_batch_items')->get()->getRow()->id;
+
+        $tooEarly = $service->confirmResult($itemId, [
+            'confirmed_amount' => 100, 'result_reference' => 'PAYROLL-LIFECYCLE-501',
+        ], 900);
+        $this->assertSame(409, $tooEarly['code']);
+
+        $submitted = $service->submit($batchId, 900);
+        $confirmed = $service->confirmResult($itemId, [
+            'confirmed_amount' => 100, 'result_reference' => 'PAYROLL-LIFECYCLE-501',
+        ], 900);
+        $reconciled = $service->reconcile($batchId, 900);
+        $selfFinalize = $service->finalize($batchId, 900);
+        $finalized = $service->finalize($batchId, 901);
+
+        $this->assertSame('submitted', $submitted['batch']['status']);
+        $this->assertSame('success', $confirmed['status']);
+        $this->assertSame('reconciled', $reconciled['batch']['status']);
+        $this->assertSame(403, $selfFinalize['code']);
+        $this->assertSame('finalized', $finalized['batch']['status']);
+        $period = Database::connect()->table('deduction_periods')->where('id', 1)->get()->getRowArray();
+        $this->assertSame('finalized', $period['status']);
+        $this->assertSame(901, (int) $period['finalized_by']);
     }
 
     private function seedEmployee(int $userId, string $type, float $debt): void
@@ -112,7 +146,7 @@ final class DeductionBatchServiceTest extends CIUnitTestCase
         }
         $db->query('CREATE TABLE ' . $tn('users') . ' (id INTEGER PRIMARY KEY, user_type TEXT, is_active INTEGER)');
         $db->query('CREATE TABLE ' . $tn('balances') . ' (user_id INTEGER PRIMARY KEY, credit_limit REAL, current_debt REAL, updated_at TEXT)');
-        $db->query('CREATE TABLE ' . $tn('deduction_periods') . ' (id INTEGER PRIMARY KEY, status TEXT)');
+        $db->query('CREATE TABLE ' . $tn('deduction_periods') . ' (id INTEGER PRIMARY KEY, status TEXT, reviewed_by INTEGER, submitted_by INTEGER, confirmed_by INTEGER, finalized_by INTEGER, reviewed_at TEXT, submitted_at TEXT, confirmed_at TEXT, finalized_at TEXT, updated_at TEXT)');
         $db->query('CREATE TABLE ' . $tn('deduction_batches') . ' (id INTEGER PRIMARY KEY AUTOINCREMENT, period_id INTEGER UNIQUE, status TEXT, total_accounts INTEGER, total_requested REAL, total_confirmed REAL, total_carryover REAL, legacy_settlement_run_id INTEGER, notes TEXT, created_by INTEGER, created_at TEXT, updated_at TEXT)');
         $db->query('CREATE TABLE ' . $tn('deduction_batch_items') . ' (id INTEGER PRIMARY KEY AUTOINCREMENT, batch_id INTEGER, user_id INTEGER, debt_snapshot REAL, requested_amount REAL, confirmed_amount REAL, carryover_amount REAL, result_status TEXT, reason_code TEXT, result_reference TEXT, result_notes TEXT, confirmed_by INTEGER, confirmed_at TEXT, created_at TEXT, updated_at TEXT)');
         $db->query('CREATE TABLE ' . $tn('audit_logs') . ' (id INTEGER PRIMARY KEY AUTOINCREMENT, actor_id INTEGER, action TEXT, entity TEXT, entity_id INTEGER, payload_json TEXT, created_at TEXT)');

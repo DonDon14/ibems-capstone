@@ -66,8 +66,8 @@
             <div class="action-group action-group-tools flex flex-wrap gap-2">
                 <button id="open-deduction-workflow" class="history-action inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-blue-700" type="button"><i class="bi bi-diagram-3"></i> Deduction Workflow</button>
                 <button id="open-debt-investigations" class="history-action inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="button"><i class="bi bi-shield-check"></i> Investigations</button>
-                <button id="open-settlement-run" class="history-action inline-flex h-10 items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-4 text-sm font-semibold text-amber-800 transition hover:bg-amber-100" type="button"><i class="bi bi-clock-history"></i> Legacy Monthly Run</button>
-                <button id="open-deduction-mode" class="history-action inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="button"><i class="bi bi-cash-coin"></i> Manual Payroll Deduction</button>
+                <button id="open-settlement-run" class="history-action inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="button"><i class="bi bi-clock-history"></i> Legacy History</button>
+                <button id="open-deduction-mode" class="hidden" type="button" tabindex="-1" aria-hidden="true">Retired manual deduction</button>
                 <button id="open-import-csv" class="history-action inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="button"><i class="bi bi-file-earmark-arrow-up"></i> Import HR CSV</button>
             </div>
         </div>
@@ -167,11 +167,15 @@
 <div id="settlement-run-modal" class="acct-modal is-hidden">
     <div class="acct-modal-card max-h-[92vh] w-[min(1320px,96vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
         <div class="acct-modal-head">
-            <h4 class="text-lg font-bold text-slate-900">Run Salary Deduction Batch</h4>
-            <button id="close-settlement-run" type="button" class="acct-modal-close">x</button>
+            <h4 class="text-lg font-bold text-slate-900">Legacy Monthly Deduction History</h4>
+            <button id="close-settlement-run" type="button" class="acct-modal-close" aria-label="Close legacy deduction history"></button>
         </div>
 
-        <div class="settlement-controls flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+        <div class="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            This workflow is read-only. Create and process all new deductions through <strong>Deduction Workflow</strong>.
+        </div>
+
+        <div class="settlement-controls hidden flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
             <div class="field">
                 <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500" for="settlement-run-month">Run Month</label>
                 <input id="settlement-run-month" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700" type="month">
@@ -188,14 +192,14 @@
             <button id="settlement-existing-run-view" type="button" class="history-action inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">View Existing Batch</button>
         </div>
 
-        <div class="acct-summary settlement-summary mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div class="acct-summary settlement-summary mt-3 hidden gap-3 md:grid-cols-2 xl:grid-cols-4">
             <?= view('components/stat_card', ['title' => 'Candidates', 'value' => '0', 'valueId' => 'settle-candidate-count', 'icon' => 'bi bi-people', 'tone' => 'users']) ?>
             <?= view('components/stat_card', ['title' => 'Processable', 'value' => '0', 'valueId' => 'settle-processable-count', 'icon' => 'bi bi-check2-circle', 'tone' => 'sales']) ?>
             <?= view('components/stat_card', ['title' => 'Total Debt Before', 'value' => 'PHP 0.00', 'valueId' => 'settle-total-before', 'icon' => 'bi bi-cash-stack', 'tone' => 'debt']) ?>
             <?= view('components/stat_card', ['title' => 'Total Deducted', 'value' => 'PHP 0.00', 'valueId' => 'settle-total-deducted', 'icon' => 'bi bi-cash-coin', 'tone' => 'finance']) ?>
         </div>
 
-        <div class="settlement-preview-tools">
+        <div class="settlement-preview-tools hidden">
             <div class="acct-search-wrap relative min-w-[260px] grow">
                 <i class="bi bi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true"></i>
                 <input id="settlement-preview-search" class="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm text-slate-700 outline-none transition focus:border-blue-300" type="search" placeholder="Search employee, ID, or category in this preview">
@@ -203,7 +207,7 @@
             <p id="settlement-preview-count" class="settlement-preview-count">Preview the batch to show employees for deduction.</p>
         </div>
 
-        <div class="acct-table-wrap table-standard-wrap">
+        <div class="acct-table-wrap table-standard-wrap hidden">
             <table class="table table-standard">
                 <thead>
                     <tr>
@@ -307,7 +311,7 @@
     </div>
 </div>
 
-<div id="deduction-workflow-modal" class="acct-modal is-hidden">
+<div id="deduction-workflow-modal" class="acct-modal is-hidden" data-current-role="<?= esc((string) session()->get('role')) ?>" data-current-user="<?= (int) session()->get('user_id') ?>">
     <div class="acct-modal-card max-h-[94vh] w-[min(1380px,97vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
         <div class="acct-modal-head">
             <div>
@@ -384,9 +388,12 @@
                 </section>
 
                 <section id="workflow-results-section" class="hidden rounded-xl border border-slate-200 bg-white p-4">
-                    <div>
-                        <h5 class="text-sm font-bold text-slate-900">3. Confirm official payroll results</h5>
-                        <p class="text-sm text-slate-500">Use the amount actually deducted and the official payroll reference.</p>
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h5 class="text-sm font-bold text-slate-900">3. Process and finalize payroll results</h5>
+                            <p class="text-sm text-slate-500">Submit the prepared batch, confirm official results, reconcile totals, then finalize independently.</p>
+                        </div>
+                        <div id="workflow-batch-actions"></div>
                     </div>
                     <div id="workflow-results" class="mt-3 space-y-3"></div>
                 </section>

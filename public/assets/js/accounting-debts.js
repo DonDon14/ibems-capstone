@@ -1106,10 +1106,28 @@ function workflowStatusLabel(value) {
     return aCategory(String(value || "pending").replace(/_/g, " "));
 }
 
-function renderWorkflowResults(items) {
+function renderWorkflowResults(items, batchStatus, batchCreatedBy) {
     const section = document.getElementById("workflow-results-section");
     const container = document.getElementById("workflow-results");
+    const actions = document.getElementById("workflow-batch-actions");
+    const workflowModal = document.getElementById("deduction-workflow-modal");
+    const currentRole = workflowModal.dataset.currentRole || "";
+    const currentUser = Number(workflowModal.dataset.currentUser || 0);
+    const canConfirm = ["submitted", "partially_processed"].includes(String(batchStatus || ""));
     section.classList.remove("hidden");
+    if (batchStatus === "prepared") {
+        actions.innerHTML = '<button type="button" data-workflow-batch-action="submit" class="inline-flex h-10 items-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700">Submit for payroll processing</button>';
+    } else if (batchStatus === "processed") {
+        actions.innerHTML = '<button type="button" data-workflow-batch-action="reconcile" class="inline-flex h-10 items-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700">Reconcile batch totals</button>';
+    } else if (batchStatus === "reconciled") {
+        actions.innerHTML = currentRole === "ACCOUNTING_OFFICE" && Number(batchCreatedBy || 0) !== currentUser
+            ? '<button type="button" data-workflow-batch-action="finalize" class="inline-flex h-10 items-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700">Finalize period</button>'
+            : '<span class="inline-flex rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">Awaiting a different Accounting user for finalization</span>';
+    } else if (batchStatus === "finalized") {
+        actions.innerHTML = '<span class="inline-flex rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">Finalized and locked</span>';
+    } else {
+        actions.innerHTML = '<span class="inline-flex rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800">Record each official payroll result below</span>';
+    }
     if (!items.length) {
         container.innerHTML = '<div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-500">No batch items found.</div>';
         return;
@@ -1126,7 +1144,7 @@ function renderWorkflowResults(items) {
                     </div>
                     <span class="acct-debt-status ${pending ? "is-info" : "is-success"}">${aEscape(workflowStatusLabel(item.result_status))}</span>
                 </div>
-                ${pending ? `
+                ${pending && canConfirm ? `
                     <div class="mt-3 grid gap-2 md:grid-cols-[150px_210px_minmax(200px,1fr)_auto]">
                         <input class="workflow-confirmed-amount h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm" type="number" min="0" max="${aEscape(item.requested_amount || 0)}" step="0.01" value="${aEscape(Number(item.requested_amount || 0).toFixed(2))}" aria-label="Confirmed amount">
                         <select class="workflow-reason h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm" aria-label="Result reason">
@@ -1140,6 +1158,8 @@ function renderWorkflowResults(items) {
                         <input class="workflow-reference h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm" maxlength="120" placeholder="Official payroll reference" aria-label="Official payroll reference">
                         <button type="button" class="workflow-confirm-result inline-flex h-10 items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700">Confirm</button>
                     </div>
+                ` : pending ? `
+                    <div class="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-2 text-sm text-blue-800">Submit this prepared batch before recording results.</div>
                 ` : `
                     <div class="mt-2 text-sm text-slate-600">Confirmed ${aEscape(aMoney(item.confirmed_amount || 0))} · Carryover ${aEscape(aMoney(item.carryover_amount || 0))} · Reference ${aEscape(item.result_reference || "-")}</div>
                 `}
@@ -1185,9 +1205,9 @@ async function loadDeductionWorkflow(preferredPeriodId = null) {
         if (!query || Number(selected.batch_id) !== Number(selectedBefore?.batch_id)) {
             const detailResponse = await fetch(`/accounting/deduction-workflow?batch_id=${encodeURIComponent(selected.batch_id)}`);
             const detail = await detailResponse.json();
-            renderWorkflowResults(Array.isArray(detail.items) ? detail.items : []);
+            renderWorkflowResults(Array.isArray(detail.items) ? detail.items : [], selected.batch_status, selected.batch_created_by);
         } else {
-            renderWorkflowResults(Array.isArray(data.items) ? data.items : []);
+            renderWorkflowResults(Array.isArray(data.items) ? data.items : [], selected.batch_status, selected.batch_created_by);
         }
     } else {
         resultsSection.classList.add("hidden");
@@ -1286,6 +1306,29 @@ async function confirmWorkflowResult(button) {
     } finally {
         button.disabled = false;
     }
+}
+
+async function advanceWorkflowBatch(action) {
+    const periodId = Number(document.getElementById("workflow-period-select").value || 0);
+    const period = deductionWorkflowPeriods.find((row) => Number(row.id) === periodId);
+    if (!period?.batch_id || !["submit", "reconcile", "finalize"].includes(action)) return;
+    const response = await fetch(`/accounting/deduction-batches/${Number(period.batch_id)}/${action}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+    });
+    const data = await response.json();
+    if (!data || data.status !== "success") {
+        setWorkflowMessage(data?.message || `Failed to ${action} deduction batch.`, "error");
+        return;
+    }
+    const messages = {
+        submit: "Batch submitted. Official payroll results may now be recorded.",
+        reconcile: "Batch totals reconciled. It now requires independent finalization.",
+        finalize: "Deduction period finalized and locked.",
+    };
+    setWorkflowMessage(messages[action]);
+    await loadDeductionWorkflow(periodId);
 }
 
 function setInvestigationMessage(message, type = "ok") {
@@ -1517,6 +1560,10 @@ document.getElementById("workflow-prepare-batch").addEventListener("click", prep
 document.getElementById("workflow-results").addEventListener("click", (event) => {
     const button = event.target.closest(".workflow-confirm-result");
     if (button) confirmWorkflowResult(button);
+});
+document.getElementById("workflow-batch-actions").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-workflow-batch-action]");
+    if (button) advanceWorkflowBatch(button.dataset.workflowBatchAction || "");
 });
 document.getElementById("settlement-run-modal").addEventListener("click", (event) => {
     if (event.target.id === "settlement-run-modal") closeSettlementModal();

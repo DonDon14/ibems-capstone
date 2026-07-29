@@ -134,6 +134,10 @@ Use this file as the durable work tracker when the chat context is compressed. U
      employee balance as traceable carryover.
    - [x] Add append-only debt investigations with documented evidence,
      independent Accounting approval, and linked ledger reversals.
+   - [x] Require prepare, submit, confirm, reconcile, and independent finalize
+     states for deduction batches.
+   - [x] Retire production routes for one-click settlement and manual Accounting
+     deductions while preserving legacy history as read-only.
 2. Run instructor demo smoke test in the browser:
    - Login for Admin, Store, Store Admin, Accounting, and User.
    - Open Store day, perform POS sale, perform direct debt repayment, close Store day, approve variance when needed.

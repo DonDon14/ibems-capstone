@@ -152,6 +152,11 @@ class DeductionBatchService
                 : $this->error('This deduction result was already confirmed with different values.', 409);
         }
 
+        $batch = (new DeductionBatchModel())->find((int) $item['batch_id']);
+        if (!$batch || !in_array((string) ($batch['status'] ?? ''), ['submitted', 'partially_processed'], true)) {
+            return $this->error('Submit the deduction batch before confirming payroll results.', 409);
+        }
+
         $requestedAmount = round((float) ($item['requested_amount'] ?? 0), 2);
         if ($confirmedAmount > $requestedAmount) {
             return $this->error('Confirmed amount cannot exceed the requested amount.');
@@ -233,7 +238,20 @@ class DeductionBatchService
                 'result_status' => $resultStatus,
                 'result_reference' => $reference,
             ]);
-            $this->refreshBatchTotals((int) $item['batch_id'], $now);
+            $batchStatus = $this->refreshBatchTotals((int) $item['batch_id'], $now);
+            if ($batchStatus === 'processed') {
+                (new DeductionPeriodModel())->update((int) $batch['period_id'], [
+                    'status' => 'processed',
+                    'confirmed_by' => $actorId > 0 ? $actorId : null,
+                    'confirmed_at' => $now,
+                    'updated_at' => $now,
+                ]);
+            } else {
+                (new DeductionPeriodModel())->update((int) $batch['period_id'], [
+                    'status' => 'partially_processed',
+                    'updated_at' => $now,
+                ]);
+            }
             $db->transCommit();
 
             return [
@@ -251,7 +269,93 @@ class DeductionBatchService
         }
     }
 
-    private function refreshBatchTotals(int $batchId, string $now): void
+    public function submit(int $batchId, int $actorId): array
+    {
+        $batchModel = new DeductionBatchModel();
+        $batch = $batchModel->find($batchId);
+        if (!$batch || ($batch['status'] ?? '') !== 'prepared') {
+            return $this->error('Only a prepared deduction batch may be submitted.', 409);
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $batchModel->update($batchId, ['status' => 'submitted', 'updated_at' => $now]);
+        (new DeductionPeriodModel())->update((int) $batch['period_id'], [
+            'status' => 'submitted',
+            'reviewed_by' => $actorId > 0 ? $actorId : null,
+            'submitted_by' => $actorId > 0 ? $actorId : null,
+            'reviewed_at' => $now,
+            'submitted_at' => $now,
+            'updated_at' => $now,
+        ]);
+        $this->audit('ACCOUNTING_SUBMIT_DEDUCTION_BATCH', 'deduction_batches', $batchId, $actorId, [
+            'period_id' => (int) $batch['period_id'],
+            'total_accounts' => (int) ($batch['total_accounts'] ?? 0),
+            'total_requested' => (float) ($batch['total_requested'] ?? 0),
+        ]);
+
+        return ['status' => 'success', 'code' => 200, 'batch' => $batchModel->find($batchId)];
+    }
+
+    public function reconcile(int $batchId, int $actorId): array
+    {
+        $batchModel = new DeductionBatchModel();
+        $batch = $batchModel->find($batchId);
+        if (!$batch || ($batch['status'] ?? '') !== 'processed') {
+            return $this->error('Resolve every deduction result before reconciliation.', 409);
+        }
+
+        $db = Database::connect();
+        $totals = $db->table('deduction_batch_items')
+            ->selectSum('confirmed_amount', 'confirmed')
+            ->selectSum('carryover_amount', 'carryover')
+            ->where('batch_id', $batchId)
+            ->get()
+            ->getRowArray();
+        if (round((float) ($totals['confirmed'] ?? 0), 2) !== round((float) ($batch['total_confirmed'] ?? 0), 2)
+            || round((float) ($totals['carryover'] ?? 0), 2) !== round((float) ($batch['total_carryover'] ?? 0), 2)) {
+            return $this->error('Batch totals do not reconcile with employee results.', 409);
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $batchModel->update($batchId, ['status' => 'reconciled', 'updated_at' => $now]);
+        (new DeductionPeriodModel())->update((int) $batch['period_id'], ['status' => 'reconciled', 'updated_at' => $now]);
+        $this->audit('ACCOUNTING_RECONCILE_DEDUCTION_BATCH', 'deduction_batches', $batchId, $actorId, [
+            'total_confirmed' => (float) ($batch['total_confirmed'] ?? 0),
+            'total_carryover' => (float) ($batch['total_carryover'] ?? 0),
+        ]);
+
+        return ['status' => 'success', 'code' => 200, 'batch' => $batchModel->find($batchId)];
+    }
+
+    public function finalize(int $batchId, int $actorId): array
+    {
+        $batchModel = new DeductionBatchModel();
+        $batch = $batchModel->find($batchId);
+        if (!$batch || ($batch['status'] ?? '') !== 'reconciled') {
+            return $this->error('Only a reconciled deduction batch may be finalized.', 409);
+        }
+        if ((int) ($batch['created_by'] ?? 0) === $actorId) {
+            return $this->error('A different Accounting user must finalize this deduction period.', 403);
+        }
+
+        $now = date('Y-m-d H:i:s');
+        $batchModel->update($batchId, ['status' => 'finalized', 'updated_at' => $now]);
+        (new DeductionPeriodModel())->update((int) $batch['period_id'], [
+            'status' => 'finalized',
+            'finalized_by' => $actorId > 0 ? $actorId : null,
+            'finalized_at' => $now,
+            'updated_at' => $now,
+        ]);
+        $this->audit('ACCOUNTING_FINALIZE_DEDUCTION_BATCH', 'deduction_batches', $batchId, $actorId, [
+            'period_id' => (int) $batch['period_id'],
+            'total_confirmed' => (float) ($batch['total_confirmed'] ?? 0),
+            'total_carryover' => (float) ($batch['total_carryover'] ?? 0),
+        ]);
+
+        return ['status' => 'success', 'code' => 200, 'batch' => $batchModel->find($batchId)];
+    }
+
+    private function refreshBatchTotals(int $batchId, string $now): string
     {
         $db = Database::connect();
         $totals = $db->table('deduction_batch_items')
@@ -262,12 +366,15 @@ class DeductionBatchService
             ->get()
             ->getRowArray();
 
+        $status = (int) ($totals['pending_count'] ?? 0) > 0 ? 'partially_processed' : 'processed';
         (new DeductionBatchModel())->update($batchId, [
-            'status' => (int) ($totals['pending_count'] ?? 0) > 0 ? 'partially_processed' : 'processed',
+            'status' => $status,
             'total_confirmed' => (float) ($totals['confirmed'] ?? 0),
             'total_carryover' => (float) ($totals['carryover'] ?? 0),
             'updated_at' => $now,
         ]);
+
+        return $status;
     }
 
     private function audit(string $action, string $entity, int $entityId, int $actorId, array $payload): void

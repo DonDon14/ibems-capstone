@@ -83,7 +83,7 @@ class AccountingController extends Controller
         $db = Database::connect();
         $batchId = max(0, (int) ($this->request->getGet('batch_id') ?? 0));
         $periods = $db->table('deduction_periods dp')
-            ->select('dp.*, db.id AS batch_id, db.status AS batch_status, db.total_accounts, db.total_requested, db.total_confirmed, db.total_carryover')
+            ->select('dp.*, db.id AS batch_id, db.status AS batch_status, db.total_accounts, db.total_requested, db.total_confirmed, db.total_carryover, db.created_by AS batch_created_by')
             ->join('deduction_batches db', 'db.period_id = dp.id', 'left')
             ->orderBy('dp.date_start', 'DESC')
             ->orderBy('dp.id', 'DESC')
@@ -146,6 +146,24 @@ class AccountingController extends Controller
         return $this->response
             ->setStatusCode((int) ($result['code'] ?? 400))
             ->setJSON($result);
+    }
+
+    public function submitDeductionBatch(int $batchId)
+    {
+        $result = (new DeductionBatchService())->submit($batchId, (int) session()->get('user_id'));
+        return $this->response->setStatusCode((int) ($result['code'] ?? 400))->setJSON($result);
+    }
+
+    public function reconcileDeductionBatch(int $batchId)
+    {
+        $result = (new DeductionBatchService())->reconcile($batchId, (int) session()->get('user_id'));
+        return $this->response->setStatusCode((int) ($result['code'] ?? 400))->setJSON($result);
+    }
+
+    public function finalizeDeductionBatch(int $batchId)
+    {
+        $result = (new DeductionBatchService())->finalize($batchId, (int) session()->get('user_id'));
+        return $this->response->setStatusCode((int) ($result['code'] ?? 400))->setJSON($result);
     }
 
     private function addDebtCashbookEntry(

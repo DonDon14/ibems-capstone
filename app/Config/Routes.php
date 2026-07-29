@@ -116,13 +116,13 @@ $routes->post('accounting/debt-investigations/(:num)/recommend', 'AccountingCont
 $routes->post('accounting/debt-investigations/(:num)/approve', 'AccountingController::approveDebtInvestigation/$1', ['filter' => 'role:ACCOUNTING_OFFICE']);
 $routes->post('accounting/deduction-periods', 'AccountingController::createDeductionPeriod', ['filter' => 'role:ACCOUNTING_OFFICE']);
 $routes->post('accounting/deduction-batches', 'AccountingController::prepareDeductionBatch', ['filter' => 'role:ACCOUNTING_OFFICE']);
+$routes->post('accounting/deduction-batches/(:num)/submit', 'AccountingController::submitDeductionBatch/$1', ['filter' => 'role:ACCOUNTING_OFFICE']);
+$routes->post('accounting/deduction-batches/(:num)/reconcile', 'AccountingController::reconcileDeductionBatch/$1', ['filter' => 'role:ACCOUNTING_OFFICE']);
+$routes->post('accounting/deduction-batches/(:num)/finalize', 'AccountingController::finalizeDeductionBatch/$1', ['filter' => 'role:ACCOUNTING_OFFICE']);
 $routes->post('accounting/deduction-batch-items/(:num)/confirm', 'AccountingController::confirmDeductionResult/$1', ['filter' => 'role:ACCOUNTING_OFFICE']);
 $routes->get('accounting/settlement/preview', 'AccountingController::settlementPreview', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
-$routes->post('accounting/settlement/apply', 'AccountingController::applySettlementRun', ['filter' => 'role:ACCOUNTING_OFFICE']);
 $routes->get('accounting/settlement/runs', 'AccountingController::settlementRuns', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
 $routes->get('accounting/settlement/runs/(:num)', 'AccountingController::settlementRunDetails/$1', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
 $routes->post('accounting/debts/preview-csv', 'AccountingController::previewImportCsv', ['filter' => 'role:ACCOUNTING_OFFICE,ADMIN']);
 $routes->post('accounting/debts/import-csv', 'AccountingController::importCsv', ['filter' => 'role:ACCOUNTING_OFFICE']);
-$routes->post('accounting/debts/deduct', 'AccountingController::deductDebt', ['filter' => 'role:ACCOUNTING_OFFICE']);
-$routes->post('accounting/debts/deduct-full', 'AccountingController::deductFullDebt', ['filter' => 'role:ACCOUNTING_OFFICE']);
 $routes->post('accounting/debts/credit-limit', 'AccountingController::updateCreditLimit', ['filter' => 'role:ACCOUNTING_OFFICE']);

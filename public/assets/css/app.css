@@ -1396,6 +1396,10 @@ body #debt-investigations-modal .acct-modal-card {
     overflow-x: hidden;
 }
 
+body #settlement-run-modal .acct-modal-card {
+    overflow-x: hidden;
+}
+
 body .admin-modal .admin-modal-head,
 body .acct-modal .acct-modal-head,
 body .inv-modal .inv-modal-head,
