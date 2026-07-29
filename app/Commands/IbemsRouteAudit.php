@@ -36,6 +36,7 @@ class IbemsRouteAudit extends BaseCommand
         $publicWriteWhitelist = [
             'auth/login',
             'auth/select-role',
+            'auth/logout',
         ];
 
         foreach ($lines as $idx => $line) {

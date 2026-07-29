@@ -51,7 +51,7 @@ jobs:
 
       - name: Prepare writable runtime directories
         run: |
-          mkdir -p writable/cache writable/debugbar writable/logs writable/session writable/uploads
+          mkdir -p writable/cache writable/debugbar writable/logs writable/session writable/uploads public/uploads
           mkdir -p build/logs
           chmod -R u+rwX writable build
 

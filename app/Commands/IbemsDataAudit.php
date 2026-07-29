@@ -135,17 +135,36 @@ class IbemsDataAudit extends BaseCommand
         }
 
         // 4) Store mapping integrity
-        $storesWithoutOfficer = (int) $db->query(
+        $invalidStoreOfficers = (int) $db->query(
             'SELECT COUNT(*) AS c
              FROM stores s
              LEFT JOIN users u ON u.id = s.officer_id
-             WHERE s.officer_id IS NULL OR u.id IS NULL'
+             WHERE s.officer_id IS NOT NULL AND u.id IS NULL'
         )->getRow('c');
-        if ($storesWithoutOfficer > 0) {
-            CLI::write("[FAIL] stores with missing/invalid officer mapping: {$storesWithoutOfficer}", 'red');
+        if ($invalidStoreOfficers > 0) {
+            CLI::write("[FAIL] stores with invalid officer mapping: {$invalidStoreOfficers}", 'red');
             $errors++;
         } else {
-            CLI::write('[OK] every store has a valid officer mapping', 'green');
+            CLI::write('[OK] all assigned store officers reference valid users', 'green');
+        }
+
+        $orphanSupervisorMappings = $db->tableExists('store_supervisors')
+            ? (int) $db->query(
+                'SELECT COUNT(*) AS c
+                 FROM store_supervisors ss
+                 LEFT JOIN stores s ON s.id = ss.store_id
+                 LEFT JOIN users u ON u.id = ss.user_id
+                 WHERE s.id IS NULL OR u.id IS NULL'
+            )->getRow('c')
+            : -1;
+        if ($orphanSupervisorMappings < 0) {
+            CLI::write('[FAIL] store_supervisors table is missing', 'red');
+            $errors++;
+        } elseif ($orphanSupervisorMappings > 0) {
+            CLI::write("[FAIL] orphaned store supervisor mappings: {$orphanSupervisorMappings}", 'red');
+            $errors++;
+        } else {
+            CLI::write('[OK] all store supervisor mappings are valid', 'green');
         }
 
         $orphanPayments = (int) $db->query(

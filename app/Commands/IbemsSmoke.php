@@ -35,6 +35,8 @@ class IbemsSmoke extends BaseCommand
             'users',
             'user_roles',
             'stores',
+            'store_supervisors',
+            'store_day_sessions',
             'balances',
             'products',
             'transactions',
