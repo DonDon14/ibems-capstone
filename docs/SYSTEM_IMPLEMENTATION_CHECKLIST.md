@@ -122,6 +122,11 @@ Use this file as the durable work tracker when the chat context is compressed. U
    - Confirmed partial deductions and automatic unresolved-balance carryover.
    - Investigation plus Accounting-approved reversal for corrections.
    - See `docs/DEBT_POLICY_AND_IMPLEMENTATION_PLAN.md`.
+   - [x] Add backward-compatible `deduction_periods`, `deduction_batches`, and
+     `deduction_batch_items` foundation with configurable date ranges and
+     pending/confirmed/carryover result fields.
+   - [ ] Add Accounting endpoints and UI for period preparation.
+   - [ ] Move balance reduction from batch preparation to confirmed result.
 2. Run instructor demo smoke test in the browser:
    - Login for Admin, Store, Store Admin, Accounting, and User.
    - Open Store day, perform POS sale, perform direct debt repayment, close Store day, approve variance when needed.
