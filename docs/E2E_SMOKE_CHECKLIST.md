@@ -60,6 +60,8 @@ Use this checklist after migrations, seeded data changes, or broad UI/backend ed
   recommending user cannot approve their own correction.
 - [ ] Approve the recommendation as a different Accounting user and confirm a
   linked reversal reduces debt without changing or deleting the original sale.
+- [ ] Use `accounting.supervisor@ibems.local` for independent correction
+  approval and deduction-period finalization.
 - [ ] Open the user debt profile/history.
 - [ ] Apply a partial deduction and confirm the debt cashbook updates.
 - [ ] Apply a full deduction or settlement preview/apply flow for the selected month.

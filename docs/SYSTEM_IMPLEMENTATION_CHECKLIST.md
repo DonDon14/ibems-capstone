@@ -1,6 +1,6 @@
 # IBEMS System Implementation Checklist
 
-Last updated: 2026-07-02
+Last updated: 2026-07-30
 Active project path: `D:\xampp\htdocs\ibems-tailwind-test`
 
 Use this file as the durable work tracker when the chat context is compressed. Update each checkbox as work is completed, and add short notes under the relevant module instead of relying only on chat history.
@@ -95,22 +95,22 @@ Use this file as the durable work tracker when the chat context is compressed. U
 
 ## Phase 6 - Usability And Polish
 
-- [ ] Standardize loading, empty, error, success, and confirmation patterns across Admin, Store, Accounting, and User pages.
+- [x] Standardize loading, empty, error, success, and confirmation patterns across Admin, Store, Accounting, and User pages.
 - [x] Standardize table/search controls in recently touched Store, Accounting, Store Admin, and Admin Products screens.
 - [x] Standardize modal layout for Store open-day and close-day workflows.
-- [ ] Review mobile responsiveness for Store POS, Inventory, Accounting Debts, and Admin User Management.
-- [ ] Add keyboard-friendly actions for POS scanning, cart controls, modal confirmation, and table search.
+- [x] Review responsive behavior for Store POS, Inventory, Accounting Debts, and Admin User Management.
+- [x] Add keyboard-friendly actions for POS scanning, cart controls, modal confirmation, shared dropdowns/dates, and table search.
 - [x] Replace unclear Accounting Debts labels with role-specific sections and explanation copy.
 
 ## Phase 7 - Release Hygiene
 
-- [ ] Run `php -l` on changed PHP files before every handoff.
-- [ ] Run `node --check` on changed JS files before every handoff.
-- [ ] Run `php spark migrate` after adding migrations.
-- [ ] Run a browser smoke test on `http://localhost:8080` after major UI changes.
-- [ ] Update this checklist after each completed implementation.
-- [ ] Keep unrelated user changes intact; do not revert dirty files unless explicitly requested.
-- [ ] Before pushing to GitHub, review `git status --short`, summarize changed scope, then commit intentionally.
+- [x] Run `php -l` on changed PHP files before every handoff.
+- [x] Run `node --check` on changed JS files before every handoff.
+- [x] Run `php spark migrate` after adding migrations.
+- [x] Run browser smoke tests on `http://localhost:8080` after major UI changes.
+- [x] Update this checklist after each completed implementation.
+- [x] Keep unrelated user changes intact; do not revert dirty files unless explicitly requested.
+- [x] Before publishing, review `git status --short`, summarize changed scope, and commit intentionally.
 
 ## Recommended Next Work Order
 

@@ -2477,6 +2477,24 @@ class AdminController extends Controller
 
     private function formatAuditAction(string $action): string
     {
+        $labels = [
+            'ACCOUNTING_PREPARE_DEDUCTION_BATCH' => 'Prepared deduction batch',
+            'ACCOUNTING_SUBMIT_DEDUCTION_BATCH' => 'Submitted deduction batch',
+            'ACCOUNTING_CONFIRM_DEDUCTION_RESULT' => 'Confirmed payroll deduction result',
+            'ACCOUNTING_RECONCILE_DEDUCTION_BATCH' => 'Reconciled deduction batch',
+            'ACCOUNTING_FINALIZE_DEDUCTION_BATCH' => 'Finalized deduction period',
+            'OPEN_DEBT_INVESTIGATION' => 'Opened debt investigation',
+            'RECOMMEND_DEBT_INVESTIGATION' => 'Recommended debt correction',
+            'APPROVE_AND_POST_DEBT_REVERSAL' => 'Approved and posted debt correction',
+            'DEBT_PIN_AUTHORIZED' => 'Authorized debt purchase PIN',
+            'FAILED_DEBT_PIN' => 'Failed debt purchase PIN',
+            'DEBT_PIN_LOCKED' => 'Locked debt purchase PIN',
+            'BLOCKED_DEBT_PIN' => 'Blocked locked debt purchase PIN attempt',
+        ];
+        if (isset($labels[$action])) {
+            return $labels[$action];
+        }
+
         $value = str_replace('_', ' ', trim($action));
         $value = strtolower($value);
 

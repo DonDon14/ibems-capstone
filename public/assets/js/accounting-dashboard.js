@@ -16,16 +16,30 @@ let acdTrendChart = null;
 function acdRenderTrend(rows) {
     const canvas = document.getElementById("acd-trend-chart");
     if (!canvas || typeof window.Chart === "undefined") return;
+    const wrap = canvas.parentElement;
+    wrap?.querySelector(".acd-trend-empty")?.remove();
 
     if (acdTrendChart) {
         acdTrendChart.destroy();
         acdTrendChart = null;
     }
 
-    if (!Array.isArray(rows) || rows.length === 0) return;
+    if (!Array.isArray(rows) || rows.length === 0) {
+        canvas.hidden = true;
+        return;
+    }
 
     const labels = rows.map((row) => String(row.date || "").slice(5));
     const amounts = rows.map((row) => Number(row.amount || 0));
+    if (!amounts.some((amount) => amount > 0)) {
+        canvas.hidden = true;
+        const empty = document.createElement("div");
+        empty.className = "acd-trend-empty mini-bar-empty";
+        empty.textContent = "No confirmed payroll deductions in the last 7 days.";
+        wrap?.appendChild(empty);
+        return;
+    }
+    canvas.hidden = false;
 
     acdTrendChart = new window.Chart(canvas, {
         type: "bar",
@@ -192,11 +206,11 @@ async function acdLoad() {
         if (overLimitEl) overLimitEl.textContent = String(Number(summary.over_limit_count || 0));
 
         if (lastSettlementEl) {
-            if (summary.last_settlement_month) {
-                const runAt = summary.last_settlement_at ? ` (${summary.last_settlement_at})` : "";
-                lastSettlementEl.textContent = `Last settlement: ${summary.last_settlement_month}${runAt}`;
+            if (summary.last_deduction_period) {
+                const status = String(summary.last_deduction_status || "").replace(/_/g, " ");
+                lastSettlementEl.textContent = `Latest deduction period: ${summary.last_deduction_period} · ${status || "draft"}`;
             } else {
-                lastSettlementEl.textContent = "Last settlement: No settlement run yet";
+                lastSettlementEl.textContent = "Latest deduction period: None created yet";
             }
         }
 
@@ -210,7 +224,7 @@ async function acdLoad() {
         if (totalDebtEl) totalDebtEl.textContent = "PHP 0.00";
         if (todayDeductedEl) todayDeductedEl.textContent = "PHP 0.00";
         if (overLimitEl) overLimitEl.textContent = "0";
-        if (lastSettlementEl) lastSettlementEl.textContent = "Last settlement: unavailable";
+        if (lastSettlementEl) lastSettlementEl.textContent = "Latest deduction period: unavailable";
         acdRenderTrend([]);
         acdRenderActivity([]);
         acdRenderTopDebt([]);

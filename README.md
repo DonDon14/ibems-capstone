@@ -118,6 +118,7 @@ Primary seeded accounts:
 | --- | --- | --- |
 | Admin | `admin@ibems.local` | `123456` |
 | Accounting | `accounting@ibems.local` | `123456` |
+| Accounting Supervisor | `accounting.supervisor@ibems.local` | `123456` |
 | Store - Main | `store.main@ibems.local` | `123456` |
 | Store - Tech | `store.tech@ibems.local` | `123456` |
 | User - Faculty | `maria.santos@ibems.local` | `123456` |

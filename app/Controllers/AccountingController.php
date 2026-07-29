@@ -221,6 +221,7 @@ class AccountingController extends Controller
         $todayCashbook = $db->table('debt_cashbook_entries')
             ->select('COUNT(*) AS entry_count, COALESCE(SUM(amount), 0) AS total_amount')
             ->where('direction', 'credit')
+            ->whereIn('entry_type', ['confirmed_salary_deduction', 'salary_deduction', 'manual_deduction', 'full_deduction'])
             ->where('created_at >=', $todayStart)
             ->where('created_at <=', $todayEnd)
             ->get()
@@ -229,10 +230,9 @@ class AccountingController extends Controller
         $todayDeductionCount = (int) ($todayCashbook['entry_count'] ?? 0);
         $todayDeductionAmount = (float) ($todayCashbook['total_amount'] ?? 0);
 
-        $lastRun = $db->table('settlement_runs sr')
-            ->select('sr.id, sr.run_month, sr.run_at, sr.total_accounts, sr.total_debt_before, u.name AS run_by_name')
-            ->join('users u', 'u.id = sr.run_by', 'left')
-            ->orderBy('sr.id', 'DESC')
+        $lastPeriod = $db->table('deduction_periods')
+            ->select('period_code, label, status, updated_at')
+            ->orderBy('id', 'DESC')
             ->limit(1)
             ->get()
             ->getRowArray();
@@ -295,6 +295,7 @@ class AccountingController extends Controller
         $trendRows = $db->table('debt_cashbook_entries')
             ->select('created_at, amount')
             ->where('direction', 'credit')
+            ->whereIn('entry_type', ['confirmed_salary_deduction', 'salary_deduction', 'manual_deduction', 'full_deduction'])
             ->where('created_at >=', date('Y-m-d 00:00:00', strtotime('-6 day')))
             ->where('created_at <=', date('Y-m-d 23:59:59'))
             ->orderBy('created_at', 'ASC')
@@ -332,6 +333,14 @@ class AccountingController extends Controller
                 'ACCOUNTING_UPDATE_CREDIT_LIMIT',
                 'ACCOUNTING_RUN_SETTLEMENT',
                 'ACCOUNTING_SETTLEMENT_DEDUCT',
+                'ACCOUNTING_PREPARE_DEDUCTION_BATCH',
+                'ACCOUNTING_SUBMIT_DEDUCTION_BATCH',
+                'ACCOUNTING_CONFIRM_DEDUCTION_RESULT',
+                'ACCOUNTING_RECONCILE_DEDUCTION_BATCH',
+                'ACCOUNTING_FINALIZE_DEDUCTION_BATCH',
+                'OPEN_DEBT_INVESTIGATION',
+                'RECOMMEND_DEBT_INVESTIGATION',
+                'APPROVE_AND_POST_DEBT_REVERSAL',
             ])
             ->orderBy('al.id', 'DESC')
             ->limit(10)
@@ -358,6 +367,22 @@ class AccountingController extends Controller
                 $label = 'Ran monthly settlement';
             } elseif ($action === 'ACCOUNTING_SETTLEMENT_DEDUCT') {
                 $label = 'Settlement deduction entry';
+            } elseif ($action === 'ACCOUNTING_PREPARE_DEDUCTION_BATCH') {
+                $label = 'Prepared deduction batch';
+            } elseif ($action === 'ACCOUNTING_SUBMIT_DEDUCTION_BATCH') {
+                $label = 'Submitted deduction batch';
+            } elseif ($action === 'ACCOUNTING_CONFIRM_DEDUCTION_RESULT') {
+                $label = 'Confirmed payroll result';
+            } elseif ($action === 'ACCOUNTING_RECONCILE_DEDUCTION_BATCH') {
+                $label = 'Reconciled deduction batch';
+            } elseif ($action === 'ACCOUNTING_FINALIZE_DEDUCTION_BATCH') {
+                $label = 'Finalized deduction period';
+            } elseif ($action === 'OPEN_DEBT_INVESTIGATION') {
+                $label = 'Opened debt investigation';
+            } elseif ($action === 'RECOMMEND_DEBT_INVESTIGATION') {
+                $label = 'Recommended debt correction';
+            } elseif ($action === 'APPROVE_AND_POST_DEBT_REVERSAL') {
+                $label = 'Approved debt correction';
             }
 
             return [
@@ -365,7 +390,7 @@ class AccountingController extends Controller
                 'label' => $label,
                 'actor_name' => $row['actor_name'] ?: 'Unknown',
                 'target_name' => $row['target_name'] ?: null,
-                'amount' => (float) ($payload['deducted_amount'] ?? 0),
+                'amount' => (float) ($payload['deducted_amount'] ?? $payload['confirmed_amount'] ?? $payload['amount'] ?? 0),
                 'created_at' => $row['created_at'] ?? null,
             ];
         }, $recentActivities);
@@ -379,8 +404,10 @@ class AccountingController extends Controller
                 'today_deduction_count' => $todayDeductionCount,
                 'today_deduction_amount' => $todayDeductionAmount,
                 'over_limit_count' => (int) ($accountsRow['over_limit_count'] ?? 0),
-                'last_settlement_month' => $lastRun['run_month'] ?? null,
-                'last_settlement_at' => $lastRun['run_at'] ?? null,
+                'last_deduction_period' => $lastPeriod['period_code'] ?? null,
+                'last_deduction_label' => $lastPeriod['label'] ?? null,
+                'last_deduction_status' => $lastPeriod['status'] ?? null,
+                'last_deduction_at' => $lastPeriod['updated_at'] ?? null,
             ],
             'top_debt_accounts' => array_map(static function (array $row): array {
                 return [
@@ -596,37 +623,24 @@ class AccountingController extends Controller
         $start = date('Y-m-d 00:00:00');
         $end = date('Y-m-d 23:59:59');
 
-        $rows = $db->table('audit_logs')
-            ->select('action, payload_json')
-            ->whereIn('action', [
-                'ACCOUNTING_DEDUCT_DEBT',
-                'ACCOUNTING_DEDUCT_FULL_DEBT',
+        $summary = $db->table('debt_cashbook_entries')
+            ->select('COUNT(*) AS deduction_count, COALESCE(SUM(amount), 0) AS deducted_amount')
+            ->whereIn('entry_type', [
+                'confirmed_salary_deduction',
+                'salary_deduction',
+                'manual_deduction',
+                'full_deduction',
             ])
             ->where('created_at >=', $start)
             ->where('created_at <=', $end)
             ->get()
-            ->getResultArray();
-
-        $count = 0;
-        $amount = 0.0;
-        foreach ($rows as $row) {
-            $payload = json_decode((string) ($row['payload_json'] ?? ''), true);
-            if (!is_array($payload)) {
-                continue;
-            }
-            $deducted = (float) ($payload['deducted_amount'] ?? 0);
-            if ($deducted <= 0) {
-                continue;
-            }
-            $count++;
-            $amount += $deducted;
-        }
+            ->getRowArray() ?? [];
 
         return $this->response->setJSON([
             'status' => 'success',
             'date' => date('Y-m-d'),
-            'deduction_count' => $count,
-            'deducted_amount' => $amount,
+            'deduction_count' => (int) ($summary['deduction_count'] ?? 0),
+            'deducted_amount' => (float) ($summary['deducted_amount'] ?? 0),
         ]);
     }
 
