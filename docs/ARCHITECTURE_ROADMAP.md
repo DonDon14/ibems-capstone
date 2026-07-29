@@ -15,6 +15,42 @@ This roadmap intentionally favors small, behavior-preserving extractions. Do not
 - Shared CSS covers buttons, tables, filters, metric cards, status pills, and modals.
 - Shared JavaScript covers CSRF, formatting, layout, and receipt behavior.
 - `StoreAccessService` now owns the first extracted active-store resolution boundary used by `StoreController`.
+- University debt policy, configurable deduction periods, partial carryovers,
+  investigation, correction authority, and retention defaults are defined in
+  `docs/DEBT_POLICY_AND_IMPLEMENTATION_PLAN.md`.
+
+## Locked Portal Direction
+
+IBEMS should present four workspaces:
+
+1. System Administration
+2. Store Operations
+3. Accounting and Debt Processing
+4. Employee/Customer
+
+`STORE_SYSTEM` and `STORE_SUPERVISOR` remain distinct permissions but should
+share the Store Operations workspace. Accounting preparation and payroll-result
+confirmation should initially share one workspace with separate permissions.
+Do not create a fifth portal until the university confirms a strict departmental
+boundary.
+- University debt policy, configurable deduction periods, partial carryovers,
+  investigation, correction authority, and retention defaults are defined in
+  `docs/DEBT_POLICY_AND_IMPLEMENTATION_PLAN.md`.
+
+## Locked Portal Direction
+
+IBEMS should present four workspaces:
+
+1. System Administration
+2. Store Operations
+3. Accounting and Debt Processing
+4. Employee/Customer
+
+`STORE_SYSTEM` and `STORE_SUPERVISOR` remain distinct permissions but should
+share the Store Operations workspace. Accounting preparation and payroll-result
+confirmation should initially share one workspace with separate permissions.
+Do not create a fifth portal until the university confirms a strict departmental
+boundary.
 
 ## Priority 1: Controller Boundaries
 
@@ -119,7 +155,8 @@ Add or strengthen:
 - Controller/service unit tests
 - Database-backed transaction tests
 - Route authorization audit coverage
-- A browser smoke test for all five portals
+- A browser smoke test for all four workspaces, including both Store Operator
+  and Store Supervisor permission paths
 - A lightweight convention check for duplicated shell markup and inline scripts/styles
 - Responsive checks for Store POS, Accounting Debts, Store Admin, and Admin Products
 

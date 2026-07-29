@@ -114,16 +114,23 @@ Use this file as the durable work tracker when the chat context is compressed. U
 
 ## Recommended Next Work Order
 
-1. Run instructor demo smoke test in the browser:
+1. Implement the approved debt policy baseline:
+   - Faculty/staff only; students excluded from debt.
+   - Individual Accounting-approved credit limits.
+   - Private hashed PIN with failed-attempt throttling.
+   - Configurable semi-monthly, monthly, and custom deduction periods.
+   - Confirmed partial deductions and automatic unresolved-balance carryover.
+   - Investigation plus Accounting-approved reversal for corrections.
+   - See `docs/DEBT_POLICY_AND_IMPLEMENTATION_PLAN.md`.
+2. Run instructor demo smoke test in the browser:
    - Login for Admin, Store, Store Admin, Accounting, and User.
    - Open Store day, perform POS sale, perform direct debt repayment, close Store day, approve variance when needed.
    - Confirm Accounting tabs show employee debts, advance payments, and operator accountabilities.
-2. Polish remaining responsive layouts:
+3. Polish remaining responsive layouts:
    - Store POS.
    - Accounting Debts.
    - Store Admin Dashboard.
    - Admin Products.
-3. Decide final salary-deduction handling for operator accountabilities:
-   - Current system records the accountability.
-   - A payroll export or deduction posting workflow is still the next business step.
-4. Commit current scope after validation and instructor-ready doc review.
+4. Replace one-step monthly settlement with prepare, submit, confirm, reconcile,
+   and finalize deduction-period states while retaining legacy run readability.
+5. Commit each financial workflow slice only after focused and full validation.
