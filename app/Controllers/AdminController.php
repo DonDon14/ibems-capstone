@@ -383,9 +383,13 @@ class AdminController extends Controller
             ->getResultArray();
 
         $summary = $db->table('audit_logs')
-            ->select('COUNT(*) AS total_events, SUM(CASE WHEN DATE(created_at) = CURDATE() THEN 1 ELSE 0 END) AS today_events, COUNT(DISTINCT actor_id) AS actor_count, COUNT(DISTINCT action) AS action_count')
+            ->select('COUNT(*) AS total_events, COUNT(DISTINCT actor_id) AS actor_count, COUNT(DISTINCT action) AS action_count')
             ->get()
             ->getRowArray() ?? [];
+        $todayEvents = $db->table('audit_logs')
+            ->where('created_at >=', date('Y-m-d 00:00:00'))
+            ->where('created_at <=', date('Y-m-d 23:59:59'))
+            ->countAllResults();
 
         $actions = $db->table('audit_logs')
             ->select('action')
@@ -407,7 +411,7 @@ class AdminController extends Controller
             'status' => 'success',
             'summary' => [
                 'total_events' => (int) ($summary['total_events'] ?? 0),
-                'today_events' => (int) ($summary['today_events'] ?? 0),
+                'today_events' => $todayEvents,
                 'actor_count' => (int) ($summary['actor_count'] ?? 0),
                 'action_count' => (int) ($summary['action_count'] ?? 0),
                 'visible_events' => count($rows),

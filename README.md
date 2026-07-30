@@ -4,6 +4,8 @@
 
 Integrated Business Enterprise Management System for school store operations, POS transactions, inventory, debt monitoring, accounting settlement, and role-based portals.
 
+Database migration guidance: [Supabase Migration Plan](docs/SUPABASE_MIGRATION_PLAN.md).
+
 ## Current Local Setup
 
 Active local project path:
