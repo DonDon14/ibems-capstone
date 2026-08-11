@@ -6,6 +6,11 @@ Integrated Business Enterprise Management System for school store operations, PO
 
 Database migration guidance: [Supabase Migration Plan](docs/SUPABASE_MIGRATION_PLAN.md).
 
+The versioned PostgreSQL staging baseline and verification query are under
+`database/postgresql/`. Use `.env.supabase.example` only as a non-secret
+configuration reference; real credentials belong in the ignored `.env` or a
+deployment secret manager.
+
 ## Current Local Setup
 
 Active local project path:

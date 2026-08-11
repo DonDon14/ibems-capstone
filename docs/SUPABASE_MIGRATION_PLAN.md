@@ -1,6 +1,19 @@
 # Supabase Migration Plan
 
-Date: 2026-07-30
+Date: 2026-08-11
+
+## Staging progress
+
+- Supabase project: `ibems-staging`
+- Project reference: `pukjmscgjtmqvhdncjpo`
+- Region: Southeast Asia (Singapore), `ap-southeast-1`
+- PostgreSQL extensions available locally: `pgsql` and `pdo_pgsql`
+- Baseline source: `database/postgresql/001_ibems_baseline.sql`
+- Baseline applied to staging: `2026-08-11-baseline`
+- Verification result: 26 public tables and matching schema version
+- Data API remains disabled; no application or production data has been imported
+- Remaining connection prerequisite: reset and securely store the database
+  password, then copy the exact session-pooler values from Supabase Connect
 
 ## Decision
 
@@ -17,8 +30,8 @@ the same time.
 - Production-style local development uses MySQL/MariaDB through CodeIgniter's
   `MySQLi` driver.
 - Automated tests use SQLite.
-- The application has no Supabase project reference or credentials.
-- The Supabase organization shown by the project owner currently has no project.
+- The repository contains no Supabase credentials.
+- An empty Supabase staging project and PostgreSQL baseline now exist.
 - Runtime queries mostly use CodeIgniter Query Builder.
 - The audit-log daily count was made database-neutral by replacing MySQL
   `CURDATE()` logic with explicit application date boundaries.
@@ -185,4 +198,3 @@ Supabase is ready for IBEMS only when:
 - Financial reconciliation matches the MySQL source exactly.
 - Backup and rollback restoration are rehearsed.
 - No privileged key is present in browser assets or Git history.
-

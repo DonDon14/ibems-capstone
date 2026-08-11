@@ -40,6 +40,8 @@ $RECYCLE.BIN/
 # Environment Files (IMPORTANT)
 #-------------------------
 .env
+.env.*
+!.env.*.example
 .vagrant
 Vagrantfile
 
