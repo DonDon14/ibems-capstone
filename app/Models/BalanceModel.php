@@ -36,6 +36,19 @@ class BalanceModel extends Model
                     ->first();
     }
 
+    public function getBalanceForUpdate(int $userId): ?array
+    {
+        if ($this->db->DBDriver === 'SQLite3') {
+            return $this->getBalanceByUserId($userId);
+        }
+
+        $sql = $this->builder()
+            ->where('user_id', $userId)
+            ->getCompiledSelect() . ' FOR UPDATE';
+
+        return $this->db->query($sql)->getRowArray() ?: null;
+    }
+
     public function canUseCredit(int $userId, float $amount): bool
     {
         $balance = $this->getBalanceByUserId($userId);

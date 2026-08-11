@@ -143,10 +143,6 @@ class TransactionService
             if (($pinAuthorization['status'] ?? 'error') !== 'success') {
                 return $pinAuthorization;
             }
-            if (!$balanceModel->canUseCredit($customerUserId, $totalAmount)) {
-                return $this->error('Insufficient credit.');
-            }
-            $debtBalanceBefore = $balanceModel->getBalanceByUserId($customerUserId);
         }
 
         $transactionModel = new TransactionModel();
@@ -161,6 +157,19 @@ class TransactionService
         $createdAt = date('Y-m-d H:i:s');
 
         try {
+            if ($paymentMethod === 'debt') {
+                $debtBalanceBefore = $balanceModel->getBalanceForUpdate((int) $customerUserId);
+                if (!$debtBalanceBefore) {
+                    throw new \RuntimeException('Balance record not found.');
+                }
+
+                $availableCredit = (float) $debtBalanceBefore['credit_limit']
+                    - (float) $debtBalanceBefore['current_debt'];
+                if ($availableCredit < $totalAmount) {
+                    throw new \RuntimeException('Insufficient credit.');
+                }
+            }
+
             $txnId = $transactionModel->insert([
                 'client_txn_id' => $clientTxnId,
                 'user_id' => $customerUserId,

@@ -1491,8 +1491,10 @@ class AccountingController extends Controller
         $balanceModel = new BalanceModel();
         $auditLogModel = new AuditLogModel();
 
-        $balance = $balanceModel->getBalanceByUserId($userId);
+        $db->transBegin();
+        $balance = $balanceModel->getBalanceForUpdate($userId);
         if (!$balance) {
+            $db->transRollback();
             return $this->response->setStatusCode(404)->setJSON([
                 'status' => 'error',
                 'message' => 'Balance record not found.',
@@ -1502,6 +1504,7 @@ class AccountingController extends Controller
         $currentDebt = (float) $balance['current_debt'];
         $creditLimit = (float) $balance['credit_limit'];
         if ($currentDebt <= 0) {
+            $db->transRollback();
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
                 'message' => 'This account has no debt.',
@@ -1509,6 +1512,7 @@ class AccountingController extends Controller
         }
 
         if ($amount > $currentDebt) {
+            $db->transRollback();
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
                 'message' => 'Deduction cannot exceed current debt.',
@@ -1516,8 +1520,6 @@ class AccountingController extends Controller
         }
 
         $newDebt = $currentDebt - $amount;
-
-        $db->transStart();
 
         $balanceModel->update($userId, [
             'current_debt' => $newDebt,
@@ -1553,14 +1555,15 @@ class AccountingController extends Controller
             ['source' => 'accounting_manual_deduction']
         );
 
-        $db->transComplete();
-
         if (!$db->transStatus()) {
+            $db->transRollback();
             return $this->response->setStatusCode(500)->setJSON([
                 'status' => 'error',
                 'message' => 'Failed to apply deduction.',
             ]);
         }
+
+        $db->transCommit();
 
         return $this->response->setJSON([
             'status' => 'success',
@@ -1589,8 +1592,10 @@ class AccountingController extends Controller
         $balanceModel = new BalanceModel();
         $auditLogModel = new AuditLogModel();
 
-        $balance = $balanceModel->getBalanceByUserId($userId);
+        $db->transBegin();
+        $balance = $balanceModel->getBalanceForUpdate($userId);
         if (!$balance) {
+            $db->transRollback();
             return $this->response->setStatusCode(404)->setJSON([
                 'status' => 'error',
                 'message' => 'Balance record not found.',
@@ -1600,13 +1605,12 @@ class AccountingController extends Controller
         $currentDebt = (float) $balance['current_debt'];
         $creditLimit = (float) ($balance['credit_limit'] ?? 0);
         if ($currentDebt <= 0) {
+            $db->transRollback();
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
                 'message' => 'This account has no debt.',
             ]);
         }
-
-        $db->transStart();
 
         $balanceModel->update($userId, [
             'current_debt' => 0,
@@ -1642,14 +1646,15 @@ class AccountingController extends Controller
             ['source' => 'accounting_full_deduction']
         );
 
-        $db->transComplete();
-
         if (!$db->transStatus()) {
+            $db->transRollback();
             return $this->response->setStatusCode(500)->setJSON([
                 'status' => 'error',
                 'message' => 'Failed to apply full deduction.',
             ]);
         }
+
+        $db->transCommit();
 
         return $this->response->setJSON([
             'status' => 'success',
@@ -1679,8 +1684,10 @@ class AccountingController extends Controller
         $balanceModel = new BalanceModel();
         $auditLogModel = new AuditLogModel();
 
-        $balance = $balanceModel->getBalanceByUserId($userId);
+        $db->transBegin();
+        $balance = $balanceModel->getBalanceForUpdate($userId);
         if (!$balance) {
+            $db->transRollback();
             return $this->response->setStatusCode(404)->setJSON([
                 'status' => 'error',
                 'message' => 'Balance record not found.',
@@ -1688,8 +1695,6 @@ class AccountingController extends Controller
         }
 
         $previousLimit = (float) $balance['credit_limit'];
-
-        $db->transStart();
 
         $balanceModel->update($userId, [
             'credit_limit' => $creditLimit,
@@ -1710,14 +1715,15 @@ class AccountingController extends Controller
             'created_at' => date('Y-m-d H:i:s'),
         ]);
 
-        $db->transComplete();
-
         if (!$db->transStatus()) {
+            $db->transRollback();
             return $this->response->setStatusCode(500)->setJSON([
                 'status' => 'error',
                 'message' => 'Failed to update credit limit.',
             ]);
         }
+
+        $db->transCommit();
 
         return $this->response->setJSON([
             'status' => 'success',
