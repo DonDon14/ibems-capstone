@@ -11,22 +11,24 @@ Date: 2026-08-11
 - Baseline source: `database/postgresql/001_ibems_baseline.sql`
 - Baseline applied to staging: `2026-08-11-baseline`
 - Verification result: 26 public tables and matching schema version
-- Data API remains disabled; staging contains demo acceptance data only and no
-  production data
+- Data API remains disabled; staging contains only the controlled demo seed and
+  acceptance records, with no production rows
 - Database password reset completed by the project owner
 - IPv4 session pooler: `aws-0-ap-southeast-1.pooler.supabase.com:5432`
 - Session-pooler user: `postgres.pukjmscgjtmqvhdncjpo`
 - Password-prompted staging launcher:
   `database/postgresql/Invoke-IbemsSupabase.ps1`
-- Secure PostgreSQL preflight passed against the IPv4 session pooler
-- Browser acceptance passed for Admin, Accounting, Store Officer, and User
-  portals
-- Concurrent staging rehearsal passed using two server processes: Tech Annex
-  cash transaction `24` (PHP 55.00, product `5` stock `140 -> 139`) overlapped
-  with an Accounting credit-limit write for user `5`; debt remained PHP 95.00
-  and the limit remained PHP 7,000.00
-- Remaining acceptance prerequisites: exact MySQL-to-PostgreSQL financial
-  reconciliation and backup/rollback restoration rehearsal
+- Corrected runtime overrides now identify the application connection as
+  `Postgre / postgres`; secure seed, smoke, auth, data-integrity, and route
+  audits pass against staging
+- Browser acceptance passes for Admin, Accounting, Store Officer, and User
+  portals with populated PostgreSQL-backed metrics and history
+- Concurrent PostgreSQL acceptance passes: Tech Annex cash transaction `4`
+  (PHP 55.00) and an Accounting credit-limit write overlapped successfully;
+  Notebook stock changed `140 -> 139`, while Maria Santos remained at PHP
+  850.00 debt and a PHP 7,000.00 credit limit
+- Remaining acceptance prerequisites: exact sanitized MySQL-to-PostgreSQL
+  financial reconciliation and backup/rollback restoration rehearsal
 
 ## Decision
 
@@ -173,17 +175,18 @@ Keep MySQL read-only and recoverable until the rollback window closes.
 ## Environment shape
 
 Secrets belong in the deployment environment or local ignored `.env`, never in
-Git. The eventual CodeIgniter configuration will use the equivalent of:
+Git. The launcher uses dedicated process-only variables so committed MySQL
+`.env` values cannot override a Supabase session:
 
 ```ini
-database.default.hostname = 'project-pooler-host'
-database.default.database = 'postgres'
-database.default.username = 'project-user'
-database.default.password = 'secret-from-password-manager'
-database.default.DBDriver = 'Postgre'
-database.default.port = 5432
-database.default.schema = 'public'
-database.default.sslmode = 'require'
+IBEMS_DATABASE_HOSTNAME = 'project-pooler-host'
+IBEMS_DATABASE_NAME = 'postgres'
+IBEMS_DATABASE_USERNAME = 'project-user'
+IBEMS_DATABASE_PASSWORD = 'secret-from-password-manager'
+IBEMS_DATABASE_DRIVER = 'Postgre'
+IBEMS_DATABASE_PORT = 5432
+IBEMS_DATABASE_SCHEMA = 'public'
+IBEMS_DATABASE_SSLMODE = 'require'
 ```
 
 The exact host, port, and username must be copied from the selected Supabase
@@ -193,14 +196,15 @@ The staging project now uses the exact IPv4 session-pooler values recorded
 above. Run a password-safe validation from the project root with:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File database\postgresql\Invoke-IbemsSupabase.ps1 -Action preflight
+powershell -ExecutionPolicy Bypass -File database\postgresql\Invoke-IbemsSupabase.ps1 -Action validate -CredentialDialog
 ```
 
-The script prompts securely and never writes the password to a file. To start a
-separate Supabase-backed local server after preflight succeeds:
+The `validate` action prompts once, keeps the password only in process memory,
+and runs seed, preflight, normalized snapshot, and smoke checks. To start a
+detached Supabase-backed local server for browser acceptance:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File database\postgresql\Invoke-IbemsSupabase.ps1 -Action serve -Port 8083
+powershell -ExecutionPolicy Bypass -File database\postgresql\Invoke-IbemsSupabase.ps1 -Action serve-background -Port 8083 -CredentialDialog
 ```
 
 ## Security baseline
@@ -225,3 +229,7 @@ Supabase is ready for IBEMS only when:
 - Financial reconciliation matches the MySQL source exactly.
 - Backup and rollback restoration are rehearsed.
 - No privileged key is present in browser assets or Git history.
+
+Current verified completion: 5 of 7 gates (71%). Financial reconciliation and
+backup/rollback restoration remain deliberately open; no production cutover is
+authorized.

@@ -95,7 +95,7 @@ class StoreTestProductsSeeder extends Seeder
                 'image_url' => null,
                 'price' => $product['price'],
                 'stock_qty' => $product['stock_qty'],
-                'is_active' => 1,
+                'is_active' => true,
                 'updated_at' => $now,
             ]);
         }

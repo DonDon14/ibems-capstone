@@ -26,7 +26,7 @@ class StoreCategoryModel extends Model
     public function getActiveByStore(int $storeId): array
     {
         return $this->where('store_id', $storeId)
-            ->where('is_active', 1)
+            ->where('is_active', true)
             ->orderBy('sort_order', 'ASC')
             ->orderBy('name', 'ASC')
             ->findAll();
@@ -46,7 +46,7 @@ class StoreCategoryModel extends Model
         if ($existing) {
             if ((int) ($existing['is_active'] ?? 0) !== 1) {
                 $this->update((int) $existing['id'], [
-                    'is_active' => 1,
+                    'is_active' => true,
                     'updated_at' => date('Y-m-d H:i:s'),
                 ]);
             }
@@ -57,7 +57,7 @@ class StoreCategoryModel extends Model
             'store_id' => $storeId,
             'name' => $clean,
             'sort_order' => 10,
-            'is_active' => 1,
+            'is_active' => true,
             'created_at' => date('Y-m-d H:i:s'),
             'updated_at' => date('Y-m-d H:i:s'),
         ]);

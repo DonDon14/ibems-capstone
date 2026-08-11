@@ -28,7 +28,7 @@ class AccountingSupervisorDemoSeeder extends Seeder
             'user_type' => 'staff',
             'qr_token' => 'QR-ACC-SUP-001',
             'base_salary' => 45000,
-            'is_active' => 1,
+            'is_active' => true,
         ];
 
         if ($existing) {

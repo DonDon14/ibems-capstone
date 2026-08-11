@@ -205,7 +205,7 @@
                         <div class="stack-item">
                             <div class="stack-item-head">
                                 <strong><?= esc((string) ($store['store_name'] ?? 'Store')) ?></strong>
-                                <span><?= (int) ($store['is_active'] ?? 0) === 1 ? 'Active' : 'Inactive' ?></span>
+                                <span><?= ibems_bool($store['is_active'] ?? false) ? 'Active' : 'Inactive' ?></span>
                             </div>
                             <div class="stack-meta"><?= esc((string) ($store['location'] ?? 'Store access enabled')) ?></div>
                         </div>

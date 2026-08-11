@@ -102,7 +102,7 @@ class StoreController extends BaseController
             $products = $db->table('products')
                 ->select('COUNT(*) AS active_products, COALESCE(SUM(CASE WHEN stock_qty <= COALESCE(low_stock_threshold, 10) THEN 1 ELSE 0 END), 0) AS low_stock')
                 ->where('store_id', $storeId)
-                ->where('is_active', 1)
+                ->where('is_active', true)
                 ->get()
                 ->getRowArray();
 
@@ -212,7 +212,7 @@ class StoreController extends BaseController
             $lowStockProducts = $db->table('products')
                 ->select('id, name, sku, category, stock_qty, low_stock_threshold')
                 ->where('store_id', $storeId)
-                ->where('is_active', 1)
+                ->where('is_active', true)
                 ->where('stock_qty <= COALESCE(low_stock_threshold, 10)', null, false)
                 ->orderBy('stock_qty', 'ASC')
                 ->orderBy('name', 'ASC')
@@ -1289,7 +1289,7 @@ class StoreController extends BaseController
             ->select('u.id, u.employee_id, u.name, u.email, u.user_type, u.is_active, b.credit_limit, b.current_debt')
             ->join('balances b', 'b.user_id = u.id', 'inner')
             ->where('u.id', $debtorId)
-            ->where('u.is_active', 1)
+            ->where('u.is_active', true)
             ->whereIn('u.user_type', ['faculty', 'staff'])
             ->get()
             ->getRowArray();
@@ -1690,7 +1690,7 @@ class StoreController extends BaseController
                     'label' => (string) $row['label'],
                     'icon_class' => (string) ($row['icon_class'] ?? ''),
                     'sort_order' => (int) ($row['sort_order'] ?? 0),
-                    'is_system_reserved' => (int) ($row['is_system_reserved'] ?? 0) === 1,
+                    'is_system_reserved' => ibems_bool($row['is_system_reserved'] ?? false),
                 ];
             }, $methods),
         ]);
@@ -1734,7 +1734,7 @@ class StoreController extends BaseController
             ->first();
 
         if ($existing) {
-            if ((int) ($existing['is_system_reserved'] ?? 0) === 1) {
+            if (ibems_bool($existing['is_system_reserved'] ?? false)) {
                 return $this->response->setStatusCode(400)->setJSON([
                     'status' => 'error',
                     'message' => 'System payment method cannot be recreated.',
@@ -1744,7 +1744,7 @@ class StoreController extends BaseController
             $model->update((int) $existing['id'], [
                 'label' => $label,
                 'icon_class' => $iconClass !== '' ? $iconClass : null,
-                'is_active' => 1,
+                'is_active' => true,
                 'updated_at' => date('Y-m-d H:i:s'),
             ]);
         } else {
@@ -1757,8 +1757,8 @@ class StoreController extends BaseController
                 'label' => $label,
                 'icon_class' => $iconClass !== '' ? $iconClass : null,
                 'sort_order' => $nextSort,
-                'is_active' => 1,
-                'is_system_reserved' => 0,
+                'is_active' => true,
+                'is_system_reserved' => false,
                 'created_at' => date('Y-m-d H:i:s'),
                 'updated_at' => date('Y-m-d H:i:s'),
             ]);
@@ -1849,7 +1849,7 @@ class StoreController extends BaseController
             ]);
         }
 
-        if ((int) ($method['is_system_reserved'] ?? 0) === 1 || (string) $method['code'] === 'debt') {
+        if (ibems_bool($method['is_system_reserved'] ?? false) || (string) $method['code'] === 'debt') {
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
                 'message' => 'This payment method is protected.',
@@ -1857,7 +1857,7 @@ class StoreController extends BaseController
         }
 
         $model->update($methodId, [
-            'is_active' => 0,
+            'is_active' => false,
             'updated_at' => date('Y-m-d H:i:s'),
         ]);
 
@@ -1875,7 +1875,7 @@ class StoreController extends BaseController
         $builder = $db->table('users u')
             ->select('u.id, u.employee_id, u.name, u.email, u.user_type, u.is_active, u.debt_pin_hash, b.credit_limit, b.current_debt')
             ->join('balances b', 'b.user_id = u.id', 'inner')
-            ->where('u.is_active', 1)
+            ->where('u.is_active', true)
             ->whereIn('u.user_type', ['faculty', 'staff'])
             ->orderBy('u.name', 'ASC')
             ->limit($limit);
@@ -2431,7 +2431,7 @@ class StoreController extends BaseController
             'stock_qty' => $initialStock,
             'low_stock_threshold' => $lowStockThreshold,
             'location_bin' => $locationBin !== '' ? $locationBin : null,
-            'is_active' => 1,
+            'is_active' => true,
             'updated_at' => date('Y-m-d H:i:s'),
         ]);
 

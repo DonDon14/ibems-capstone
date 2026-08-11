@@ -196,6 +196,20 @@ class Database extends Config
     {
         parent::__construct();
 
+        $runtimeDriver = getenv('IBEMS_DATABASE_DRIVER');
+        if (ENVIRONMENT !== 'testing' && is_string($runtimeDriver) && $runtimeDriver !== '') {
+            $this->default['hostname'] = (string) getenv('IBEMS_DATABASE_HOSTNAME');
+            $this->default['database'] = (string) getenv('IBEMS_DATABASE_NAME');
+            $this->default['username'] = (string) getenv('IBEMS_DATABASE_USERNAME');
+            $this->default['password'] = (string) getenv('IBEMS_DATABASE_PASSWORD');
+            $this->default['DBDriver'] = $runtimeDriver;
+            $this->default['port'] = (int) getenv('IBEMS_DATABASE_PORT');
+            $this->default['schema'] = (string) (getenv('IBEMS_DATABASE_SCHEMA') ?: 'public');
+            $this->default['sslmode'] = (string) (getenv('IBEMS_DATABASE_SSLMODE') ?: 'require');
+            $this->default['charset'] = $runtimeDriver === 'Postgre' ? 'utf8' : $this->default['charset'];
+            $this->default['DBCollat'] = $runtimeDriver === 'Postgre' ? '' : $this->default['DBCollat'];
+        }
+
         // Ensure that we always set the database group to 'tests' if
         // we are currently running an automated test suite, so that
         // we don't overwrite live data on accident.

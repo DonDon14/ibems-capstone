@@ -211,7 +211,7 @@ class AccountingController extends Controller
         $accountsRow = $db->table('balances b')
             ->select('COUNT(*) AS total_accounts, SUM(b.current_debt) AS total_debt, SUM(CASE WHEN b.current_debt > 0 THEN 1 ELSE 0 END) AS with_debt, SUM(CASE WHEN b.current_debt > b.credit_limit AND b.current_debt > 0 THEN 1 ELSE 0 END) AS over_limit_count')
             ->join('users u', 'u.id = b.user_id', 'inner')
-            ->where('u.is_active', 1)
+            ->where('u.is_active', true)
             ->whereIn('u.user_type', ['faculty', 'staff'])
             ->get()
             ->getRowArray() ?? [];
@@ -240,7 +240,7 @@ class AccountingController extends Controller
         $topDebtAccounts = $db->table('balances b')
             ->select('u.id AS user_id, u.employee_id, u.name, u.email, b.current_debt, b.credit_limit')
             ->join('users u', 'u.id = b.user_id', 'inner')
-            ->where('u.is_active', 1)
+            ->where('u.is_active', true)
             ->whereIn('u.user_type', ['faculty', 'staff'])
             ->where('b.current_debt >', 0)
             ->orderBy('b.current_debt', 'DESC')
@@ -251,7 +251,7 @@ class AccountingController extends Controller
         $overLimitAccounts = $db->table('balances b')
             ->select('u.id AS user_id, u.employee_id, u.name, u.email, b.current_debt, b.credit_limit')
             ->join('users u', 'u.id = b.user_id', 'inner')
-            ->where('u.is_active', 1)
+            ->where('u.is_active', true)
             ->whereIn('u.user_type', ['faculty', 'staff'])
             ->where('b.current_debt > b.credit_limit', null, false)
             ->where('b.current_debt >', 0)
@@ -265,11 +265,11 @@ class AccountingController extends Controller
             ->select('u.id AS user_id, u.employee_id, u.name, u.email, b.current_debt, b.updated_at, MAX(dce.created_at) AS last_cashbook_at')
             ->join('users u', 'u.id = b.user_id', 'inner')
             ->join('debt_cashbook_entries dce', 'dce.user_id = u.id', 'left')
-            ->where('u.is_active', 1)
+            ->where('u.is_active', true)
             ->whereIn('u.user_type', ['faculty', 'staff'])
             ->where('b.current_debt >', 0)
             ->groupBy('u.id, u.employee_id, u.name, u.email, b.current_debt, b.updated_at')
-            ->having('(last_cashbook_at IS NULL OR last_cashbook_at < ' . $db->escape($staleCutoff) . ')', null, false)
+            ->having('(MAX(dce.created_at) IS NULL OR MAX(dce.created_at) < ' . $db->escape($staleCutoff) . ')', null, false)
             ->orderBy('b.current_debt', 'DESC')
             ->limit(5)
             ->get()
@@ -325,7 +325,7 @@ class AccountingController extends Controller
         $recentActivities = $db->table('audit_logs al')
             ->select('al.id, al.action, al.created_at, al.payload_json, actor.name AS actor_name, target.name AS target_name')
             ->join('users actor', 'actor.id = al.actor_id', 'left')
-            ->join('users target', 'target.id = al.entity_id AND al.entity = "balances"', 'left')
+            ->join('users target', "target.id = al.entity_id AND al.entity = 'balances'", 'left', false)
             ->whereIn('al.action', [
                 'ACCOUNTING_IMPORT_HR_CSV',
                 'ACCOUNTING_DEDUCT_DEBT',
@@ -475,7 +475,7 @@ class AccountingController extends Controller
         $query = $db->table('balances b')
             ->select('u.id AS user_id, u.employee_id, u.name, u.email, u.user_type, u.is_active, b.credit_limit, b.current_debt, b.updated_at')
             ->join('users u', 'u.id = b.user_id', 'inner')
-            ->where('u.is_active', 1)
+            ->where('u.is_active', true)
             ->whereIn('u.user_type', ['faculty', 'staff']);
 
         if ($debtOnly) {
@@ -540,7 +540,7 @@ class AccountingController extends Controller
         $row = $db->table('balances b')
             ->select('u.id AS user_id, u.employee_id, u.name, u.email, u.user_type, b.credit_limit, b.current_debt, b.updated_at')
             ->join('users u', 'u.id = b.user_id', 'inner')
-            ->where('u.is_active', 1)
+            ->where('u.is_active', true)
             ->where('u.id', $userId)
             ->get()
             ->getRowArray();
@@ -658,7 +658,7 @@ class AccountingController extends Controller
         $rows = $db->table('balances b')
             ->select('u.id AS user_id, u.employee_id, u.name, u.email, u.user_type, u.base_salary, b.current_debt')
             ->join('users u', 'u.id = b.user_id', 'inner')
-            ->where('u.is_active', 1)
+            ->where('u.is_active', true)
             ->whereIn('u.user_type', ['faculty', 'staff'])
             ->where('b.current_debt >', 0)
             ->orderBy('b.current_debt', 'DESC')
@@ -757,7 +757,7 @@ class AccountingController extends Controller
         $settlementBuilder = $db->table('balances b')
             ->select('u.id AS user_id, u.base_salary, b.current_debt')
             ->join('users u', 'u.id = b.user_id', 'inner')
-            ->where('u.is_active', 1)
+            ->where('u.is_active', true)
             ->whereIn('u.user_type', ['faculty', 'staff'])
             ->where('b.current_debt >', 0);
 
@@ -1199,7 +1199,7 @@ class AccountingController extends Controller
                     'email' => $email,
                     'user_type' => $userType,
                     'base_salary' => $monthlySalary,
-                    'is_active' => 1,
+                    'is_active' => true,
                 ]);
                 $userId = (int) $existingUser['id'];
             } else {
@@ -1215,7 +1215,7 @@ class AccountingController extends Controller
                     'user_type' => $userType,
                     'qr_token' => $qrToken,
                     'base_salary' => $monthlySalary,
-                    'is_active' => 1,
+                    'is_active' => true,
                     'created_at' => date('Y-m-d H:i:s'),
                 ]);
             }

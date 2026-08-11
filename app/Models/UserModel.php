@@ -41,21 +41,21 @@ class UserModel extends Model
     public function getActiveUserByEmail(string $email): ?array
     {
         return $this->where('email', $email)
-                    ->where('is_active', 1)
+                    ->where('is_active', true)
                     ->first();
     }
 
     public function getByQrToken(string $qrToken): ?array
     {
         return $this->where('qr_token', $qrToken)
-                    ->where('is_active', 1)
+                    ->where('is_active', true)
                     ->first();
     }
 
     public function getActiveUserById(int $userId): ?array
     {
         return $this->where('id', $userId)
-                    ->where('is_active', 1)
+                    ->where('is_active', true)
                     ->first();
     }
 

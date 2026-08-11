@@ -31,7 +31,7 @@ class AdminController extends Controller
         $rangeEndTs = $today->format('Y-m-d') . ' 23:59:59';
 
         $storeSummary = $db->table('stores')
-            ->select('COUNT(*) AS total_stores, SUM(CASE WHEN is_active = 1 THEN 1 ELSE 0 END) AS active_stores, SUM(CASE WHEN is_active = 0 THEN 1 ELSE 0 END) AS inactive_stores')
+            ->select('COUNT(*) AS total_stores, SUM(CASE WHEN is_active = TRUE THEN 1 ELSE 0 END) AS active_stores, SUM(CASE WHEN is_active = FALSE THEN 1 ELSE 0 END) AS inactive_stores')
             ->get()
             ->getRowArray();
 
@@ -39,7 +39,7 @@ class AdminController extends Controller
             ->select('COUNT(DISTINCT ur.user_id) AS active_store_officers')
             ->join('users u', 'u.id = ur.user_id', 'inner')
             ->where('ur.role', 'STORE_SYSTEM')
-            ->where('u.is_active', 1)
+            ->where('u.is_active', true)
             ->get()
             ->getRowArray();
 
@@ -47,7 +47,7 @@ class AdminController extends Controller
         if ($activeStoreOfficers <= 0) {
             $fallback = $db->table('users')
                 ->select('COUNT(*) AS active_store_officers')
-                ->where('is_active', 1)
+                ->where('is_active', true)
                 ->where('role', 'STORE_SYSTEM')
                 ->get()
                 ->getRowArray();
@@ -57,21 +57,21 @@ class AdminController extends Controller
         $debtSummary = $db->table('balances b')
             ->select('SUM(CASE WHEN b.current_debt > 0 THEN 1 ELSE 0 END) AS debt_accounts, COALESCE(SUM(b.current_debt), 0) AS total_debt')
             ->join('users u', 'u.id = b.user_id', 'inner')
-            ->where('u.is_active', 1)
+            ->where('u.is_active', true)
             ->get()
             ->getRowArray();
 
         $todayDate = $today->format('Y-m-d');
 
         $productAlerts = $db->table('products')
-            ->select('SUM(CASE WHEN is_active = 1 AND stock_qty <= 0 THEN 1 ELSE 0 END) AS out_of_stock_products, SUM(CASE WHEN is_active = 1 AND stock_qty > 0 AND stock_qty <= COALESCE(low_stock_threshold, 10) THEN 1 ELSE 0 END) AS low_stock_products')
+            ->select('SUM(CASE WHEN is_active = TRUE AND stock_qty <= 0 THEN 1 ELSE 0 END) AS out_of_stock_products, SUM(CASE WHEN is_active = TRUE AND stock_qty > 0 AND stock_qty <= COALESCE(low_stock_threshold, 10) THEN 1 ELSE 0 END) AS low_stock_products')
             ->get()
             ->getRowArray();
 
         $creditAlerts = $db->table('balances b')
             ->select('SUM(CASE WHEN b.current_debt > b.credit_limit THEN 1 ELSE 0 END) AS over_credit_accounts')
             ->join('users u', 'u.id = b.user_id', 'inner')
-            ->where('u.is_active', 1)
+            ->where('u.is_active', true)
             ->get()
             ->getRowArray();
 
@@ -83,9 +83,9 @@ class AdminController extends Controller
         $storesNotOpenRows = [];
         if ($db->tableExists('store_day_sessions')) {
             $sessionSummary = $db->table('stores s')
-                ->select('SUM(CASE WHEN sds.status = "open" THEN 1 ELSE 0 END) AS open_today, SUM(CASE WHEN sds.status = "closed" THEN 1 ELSE 0 END) AS closed_today')
+                ->select("SUM(CASE WHEN sds.status = 'open' THEN 1 ELSE 0 END) AS open_today, SUM(CASE WHEN sds.status = 'closed' THEN 1 ELSE 0 END) AS closed_today", false)
                 ->join('store_day_sessions sds', 'sds.store_id = s.id AND sds.business_date = ' . $db->escape($todayDate), 'left', false)
-                ->where('s.is_active', 1)
+                ->where('s.is_active', true)
                 ->get()
                 ->getRowArray();
 
@@ -100,7 +100,7 @@ class AdminController extends Controller
                 ->select('s.id, s.store_name, u.name AS officer_name')
                 ->join('store_day_sessions sds', 'sds.store_id = s.id AND sds.business_date = ' . $db->escape($todayDate), 'left', false)
                 ->join('users u', 'u.id = s.officer_id', 'left')
-                ->where('s.is_active', 1)
+                ->where('s.is_active', true)
                 ->where('sds.id IS NULL', null, false)
                 ->orderBy('s.store_name', 'ASC')
                 ->limit(5)
@@ -230,7 +230,7 @@ class AdminController extends Controller
         $lowStockRows = $db->table('products p')
             ->select('p.id, p.name, p.sku, p.stock_qty, COALESCE(p.low_stock_threshold, 10) AS threshold_qty, s.store_name')
             ->join('stores s', 's.id = p.store_id', 'inner')
-            ->where('p.is_active', 1)
+            ->where('p.is_active', true)
             ->where('p.stock_qty <= COALESCE(p.low_stock_threshold, 10)', null, false)
             ->orderBy('p.stock_qty', 'ASC')
             ->orderBy('p.name', 'ASC')
@@ -241,7 +241,7 @@ class AdminController extends Controller
         $overCreditRows = $db->table('balances b')
             ->select('u.id, u.employee_id, u.name, b.current_debt, b.credit_limit')
             ->join('users u', 'u.id = b.user_id', 'inner')
-            ->where('u.is_active', 1)
+            ->where('u.is_active', true)
             ->where('b.current_debt > b.credit_limit', null, false)
             ->orderBy('(b.current_debt - b.credit_limit)', 'DESC', false)
             ->limit(5)
@@ -473,7 +473,7 @@ class AdminController extends Controller
             $query->where('p.stock_qty > COALESCE(p.low_stock_threshold, 10)', null, false);
         }
         if (!$includeInactive) {
-            $query->where('p.is_active', 1);
+            $query->where('p.is_active', true);
         }
         if ($q !== '') {
             $query->groupStart()
@@ -494,7 +494,7 @@ class AdminController extends Controller
             ->getResultArray();
 
         $summaryQuery = $db->table('products p')
-            ->select('COUNT(*) AS total_products, SUM(CASE WHEN p.is_active = 1 THEN 1 ELSE 0 END) AS active_products, SUM(CASE WHEN p.is_active = 1 AND p.stock_qty <= 0 THEN 1 ELSE 0 END) AS out_of_stock, SUM(CASE WHEN p.is_active = 1 AND p.stock_qty > 0 AND p.stock_qty <= COALESCE(p.low_stock_threshold, 10) THEN 1 ELSE 0 END) AS low_stock, SUM(CASE WHEN p.is_active = 0 THEN 1 ELSE 0 END) AS inactive_products')
+            ->select('COUNT(*) AS total_products, SUM(CASE WHEN p.is_active = TRUE THEN 1 ELSE 0 END) AS active_products, SUM(CASE WHEN p.is_active = TRUE AND p.stock_qty <= 0 THEN 1 ELSE 0 END) AS out_of_stock, SUM(CASE WHEN p.is_active = TRUE AND p.stock_qty > 0 AND p.stock_qty <= COALESCE(p.low_stock_threshold, 10) THEN 1 ELSE 0 END) AS low_stock, SUM(CASE WHEN p.is_active = FALSE THEN 1 ELSE 0 END) AS inactive_products')
             ->join('stores s', 's.id = p.store_id', 'inner');
         if ($storeId > 0) {
             $summaryQuery->where('p.store_id', $storeId);
@@ -503,7 +503,7 @@ class AdminController extends Controller
 
         $stores = $db->table('stores')
             ->select('id, store_name')
-            ->where('is_active', 1)
+            ->where('is_active', true)
             ->orderBy('store_name', 'ASC')
             ->get()
             ->getResultArray();
@@ -564,7 +564,7 @@ class AdminController extends Controller
                     'stock_qty' => $stockQty,
                     'low_stock_threshold' => $threshold,
                     'stock_status' => $stockStatus,
-                    'is_active' => (bool) ($row['is_active'] ?? false),
+                    'is_active' => ibems_bool($row['is_active'] ?? false),
                     'updated_at' => (string) ($row['updated_at'] ?? ''),
                 ];
             }, $rows),
@@ -672,7 +672,7 @@ class AdminController extends Controller
                     'barcode' => $product['barcode'] ?? null,
                     'image_url' => $product['image_url'] ?? null,
                     'price' => (float) ($product['price'] ?? 0),
-                    'is_active' => (bool) ($product['is_active'] ?? false),
+                    'is_active' => ibems_bool($product['is_active'] ?? false),
                 ],
                 'after' => [
                     'sku' => $sku,
@@ -895,7 +895,7 @@ class AdminController extends Controller
         $topDebts = $db->table('balances b')
             ->select('u.employee_id, u.name, u.email, b.current_debt, b.credit_limit')
             ->join('users u', 'u.id = b.user_id', 'inner')
-            ->where('u.is_active', 1)
+            ->where('u.is_active', true)
             ->where('b.current_debt >', 0)
             ->orderBy('b.current_debt', 'DESC')
             ->limit(25)
@@ -976,7 +976,7 @@ class AdminController extends Controller
                     'role' => $row['role'],
                     'roles' => $rolesMap[$userId] ?? [strtoupper((string) ($row['role'] ?? 'USER'))],
                     'user_type' => $row['user_type'],
-                    'is_active' => (bool) $row['is_active'],
+                    'is_active' => ibems_bool($row['is_active']),
                     'current_debt' => (float) ($row['current_debt'] ?? 0),
                     'credit_limit' => (float) ($row['credit_limit'] ?? 0),
                 ];
@@ -1019,7 +1019,7 @@ class AdminController extends Controller
                 'roles' => $this->resolveUserRoles((int) $row['id'], (string) ($row['role'] ?? 'USER')),
                 'user_type' => $row['user_type'],
                 'base_salary' => (float) ($row['base_salary'] ?? 0),
-                'is_active' => (bool) $row['is_active'],
+                'is_active' => ibems_bool($row['is_active']),
                 'created_at' => $row['created_at'],
                 'current_debt' => (float) ($row['current_debt'] ?? 0),
                 'credit_limit' => (float) ($row['credit_limit'] ?? 0),
@@ -1478,9 +1478,9 @@ class AdminController extends Controller
                 ->groupEnd();
         }
         if ($status === 'active') {
-            $query->where('s.is_active', 1);
+            $query->where('s.is_active', true);
         } elseif ($status === 'inactive') {
-            $query->where('s.is_active', 0);
+            $query->where('s.is_active', false);
         } elseif ($status === 'unassigned') {
             $query->where('s.officer_id IS NULL', null, false);
         }
@@ -1550,7 +1550,7 @@ class AdminController extends Controller
         $todayStart = date('Y-m-d 00:00:00');
         $todayEnd = date('Y-m-d 23:59:59');
         $todaySummary = $db->table('transactions')
-            ->select('COUNT(*) AS txn_count, COALESCE(SUM(amount), 0) AS sales_total, SUM(CASE WHEN payment_method = "debt" THEN 1 ELSE 0 END) AS debt_txn_count, COALESCE(SUM(CASE WHEN payment_method = "debt" THEN amount ELSE 0 END), 0) AS debt_sales_total')
+            ->select("COUNT(*) AS txn_count, COALESCE(SUM(amount), 0) AS sales_total, SUM(CASE WHEN payment_method = 'debt' THEN 1 ELSE 0 END) AS debt_txn_count, COALESCE(SUM(CASE WHEN payment_method = 'debt' THEN amount ELSE 0 END), 0) AS debt_sales_total", false)
             ->where('store_id', $storeId)
             ->where('created_at >=', $todayStart)
             ->where('created_at <=', $todayEnd)
@@ -1565,7 +1565,7 @@ class AdminController extends Controller
             ->getResultArray();
 
         $inventorySummary = $db->table('products p')
-            ->select('COUNT(*) AS product_count, COALESCE(SUM(CASE WHEN p.is_active = 1 THEN 1 ELSE 0 END), 0) AS active_products, COALESCE(SUM(CASE WHEN p.is_active = 1 AND p.stock_qty <= COALESCE(p.low_stock_threshold, 10) THEN 1 ELSE 0 END), 0) AS low_stock_count, COALESCE(SUM(p.stock_qty), 0) AS stock_units')
+            ->select('COUNT(*) AS product_count, COALESCE(SUM(CASE WHEN p.is_active = TRUE THEN 1 ELSE 0 END), 0) AS active_products, COALESCE(SUM(CASE WHEN p.is_active = TRUE AND p.stock_qty <= COALESCE(p.low_stock_threshold, 10) THEN 1 ELSE 0 END), 0) AS low_stock_count, COALESCE(SUM(p.stock_qty), 0) AS stock_units')
             ->where('p.store_id', $storeId)
             ->get()
             ->getRowArray();
@@ -1616,7 +1616,7 @@ class AdminController extends Controller
                 'id' => (int) $store['id'],
                 'store_name' => $store['store_name'],
                 'logo_url' => $store['logo_url'],
-                'is_active' => (int) $store['is_active'] === 1,
+                'is_active' => ibems_bool($store['is_active']),
                 'created_at' => $store['created_at'],
                 'officer_name' => $store['officer_name'],
                 'officer_email' => $store['officer_email'],
@@ -1668,7 +1668,7 @@ class AdminController extends Controller
                     'stock_qty' => (int) ($row['stock_qty'] ?? 0),
                     'price' => (float) ($row['price'] ?? 0),
                     'image_url' => $row['image_url'] ?? null,
-                    'is_active' => (int) ($row['is_active'] ?? 0) === 1,
+                    'is_active' => ibems_bool($row['is_active'] ?? false),
                     'low_stock_threshold' => (int) ($row['low_stock_threshold'] ?? 10),
                 ];
             }, $inventory),
@@ -1892,7 +1892,7 @@ class AdminController extends Controller
         $query = $db->table('users u')
             ->select('u.id, u.employee_id, u.name, u.email, u.role, u.user_type, s.id AS assigned_store_id, s.store_name AS assigned_store_name')
             ->join('stores s', 's.officer_id = u.id', 'left')
-            ->where('u.is_active', 1)
+            ->where('u.is_active', true)
             ->whereIn('u.user_type', ['faculty', 'staff']);
 
         if ($q !== '') {
@@ -1945,7 +1945,7 @@ class AdminController extends Controller
 
         if ($officerId > 0) {
             $officer = $userModel->find($officerId);
-            if (!$officer || !(bool) $officer['is_active'] || !in_array($officer['user_type'], ['faculty', 'staff'], true)) {
+            if (!$officer || !ibems_bool($officer['is_active']) || !in_array($officer['user_type'], ['faculty', 'staff'], true)) {
                 return $this->response->setStatusCode(400)->setJSON([
                     'status' => 'error',
                     'message' => 'Invalid store officer. Only active faculty/staff can be assigned.',
@@ -1984,7 +1984,7 @@ class AdminController extends Controller
             'store_name' => $storeName,
             'officer_id' => $officerId > 0 ? $officerId : null,
             'logo_url' => $logoUrl !== '' ? $logoUrl : null,
-            'is_active' => 1,
+            'is_active' => true,
             'created_at' => date('Y-m-d H:i:s'),
         ]);
 
@@ -2066,7 +2066,7 @@ class AdminController extends Controller
 
         if ($officerId > 0) {
             $officer = $userModel->find($officerId);
-            if (!$officer || !(bool) $officer['is_active'] || !in_array($officer['user_type'], ['faculty', 'staff'], true)) {
+            if (!$officer || !ibems_bool($officer['is_active']) || !in_array($officer['user_type'], ['faculty', 'staff'], true)) {
                 return $this->response->setStatusCode(400)->setJSON([
                     'status' => 'error',
                     'message' => 'Invalid store officer. Only active faculty/staff can be assigned.',
@@ -2395,7 +2395,7 @@ class AdminController extends Controller
         $validIds = [];
         foreach ($supervisorIds as $supervisorId) {
             $supervisor = $userModel->find((int) $supervisorId);
-            if (!$supervisor || !(bool) ($supervisor['is_active'] ?? false) || !in_array($supervisor['user_type'], ['faculty', 'staff'], true)) {
+            if (!$supervisor || !ibems_bool($supervisor['is_active'] ?? false) || !in_array($supervisor['user_type'], ['faculty', 'staff'], true)) {
                 throw new \RuntimeException('Invalid store supervisor. Only active faculty/staff can be assigned.');
             }
             $validIds[] = (int) $supervisorId;
@@ -2432,7 +2432,7 @@ class AdminController extends Controller
             ->select('u.id, u.name, u.email, u.employee_id')
             ->join('users u', 'u.id = ss.user_id', 'inner')
             ->where('ss.store_id', $storeId)
-            ->where('u.is_active', 1)
+            ->where('u.is_active', true)
             ->orderBy('u.name', 'ASC')
             ->get()
             ->getResultArray();
@@ -2454,7 +2454,7 @@ class AdminController extends Controller
             ->select('ss.store_id, u.id, u.name, u.email, u.employee_id')
             ->join('users u', 'u.id = ss.user_id', 'inner')
             ->whereIn('ss.store_id', $storeIds)
-            ->where('u.is_active', 1)
+            ->where('u.is_active', true)
             ->orderBy('u.name', 'ASC')
             ->get()
             ->getResultArray();

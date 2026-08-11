@@ -33,7 +33,7 @@ class StoreAdminDemoSeeder extends Seeder
             'user_type' => 'staff',
             'qr_token' => 'QR-STA-001',
             'base_salary' => 32000,
-            'is_active' => 1,
+            'is_active' => true,
         ];
 
         if ($user) {
