@@ -11,14 +11,22 @@ Date: 2026-08-11
 - Baseline source: `database/postgresql/001_ibems_baseline.sql`
 - Baseline applied to staging: `2026-08-11-baseline`
 - Verification result: 26 public tables and matching schema version
-- Data API remains disabled; no application or production data has been imported
+- Data API remains disabled; staging contains demo acceptance data only and no
+  production data
 - Database password reset completed by the project owner
 - IPv4 session pooler: `aws-0-ap-southeast-1.pooler.supabase.com:5432`
 - Session-pooler user: `postgres.pukjmscgjtmqvhdncjpo`
 - Password-prompted staging launcher:
   `database/postgresql/Invoke-IbemsSupabase.ps1`
-- Remaining acceptance prerequisite: run the staging preflight with the private
-  password, then seed demo data and complete PostgreSQL browser acceptance
+- Secure PostgreSQL preflight passed against the IPv4 session pooler
+- Browser acceptance passed for Admin, Accounting, Store Officer, and User
+  portals
+- Concurrent staging rehearsal passed using two server processes: Tech Annex
+  cash transaction `24` (PHP 55.00, product `5` stock `140 -> 139`) overlapped
+  with an Accounting credit-limit write for user `5`; debt remained PHP 95.00
+  and the limit remained PHP 7,000.00
+- Remaining acceptance prerequisites: exact MySQL-to-PostgreSQL financial
+  reconciliation and backup/rollback restoration rehearsal
 
 ## Decision
 
