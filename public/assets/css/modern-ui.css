@@ -729,7 +729,7 @@ body.ibems-modern {
 }
 
 .ui-date-popup {
-    padding: 1rem;
+    padding: .875rem;
 }
 
 .ui-date-head,
@@ -790,7 +790,7 @@ body.ibems-modern {
 }
 
 .ui-date-weekdays {
-    margin-top: .9rem;
+    margin-top: .7rem;
 }
 
 .ui-date-weekdays span {
@@ -803,7 +803,7 @@ body.ibems-modern {
 }
 
 .ui-date-day {
-    height: 2.25rem;
+    height: 2.125rem;
     color: #334155;
     font-size: .75rem;
     font-weight: 650;
@@ -836,8 +836,8 @@ body.ibems-modern {
 }
 
 .ui-date-actions {
-    margin-top: .85rem;
-    padding-top: .75rem;
+    margin-top: .7rem;
+    padding-top: .625rem;
     border-top: 1px solid #f1f5f9;
 }
 

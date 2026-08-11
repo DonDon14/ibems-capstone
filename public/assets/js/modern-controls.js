@@ -12,11 +12,12 @@
     const positionPopup = (trigger, popup, preferredWidth) => {
         const rect = trigger.getBoundingClientRect();
         const margin = 12;
+        const heightLimit = popup.classList.contains("ui-date-popup") ? 440 : 364;
         const width = Math.min(
             Math.max(rect.width, preferredWidth),
             window.innerWidth - margin * 2
         );
-        const estimatedHeight = Math.min(364, popup.scrollHeight || 320);
+        const estimatedHeight = Math.min(heightLimit, popup.scrollHeight || 320);
         const spaceBelow = window.innerHeight - rect.bottom;
         const openAbove = spaceBelow < estimatedHeight + margin && rect.top > spaceBelow;
 
@@ -28,7 +29,7 @@
         )}px`;
         popup.style.top = openAbove ? "auto" : `${rect.bottom + 6}px`;
         popup.style.bottom = openAbove ? `${window.innerHeight - rect.top + 6}px` : "auto";
-        popup.style.maxHeight = `${Math.max(180, Math.min(364, openAbove ? rect.top - 18 : spaceBelow - 18))}px`;
+        popup.style.maxHeight = `${Math.max(180, Math.min(heightLimit, openAbove ? rect.top - 18 : spaceBelow - 18))}px`;
     };
 
     const emitChange = (control) => {
