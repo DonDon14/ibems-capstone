@@ -1,6 +1,6 @@
 # IBEMS University Debt Policy and Implementation Plan
 
-Status: approved working baseline  
+Status: approved working baseline
 Last updated: 2026-07-30
 
 This document converts the instructor-defined university use case and current
@@ -339,4 +339,3 @@ approval until the university confirms centralized procurement.
 - Loyalty and ecommerce
 - AI credit scoring
 - Automatic salary-based credit-limit decisions
-

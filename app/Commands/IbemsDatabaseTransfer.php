@@ -10,6 +10,9 @@ use Throwable;
 
 class IbemsDatabaseTransfer extends BaseCommand
 {
+    private const STAGING_HOST = 'aws-0-ap-southeast-1.pooler.supabase.com';
+    private const STAGING_USERNAME = 'postgres.pukjmscgjtmqvhdncjpo';
+
     protected $group       = 'IBEMS';
     protected $name        = 'ibems:database-transfer';
     protected $description = 'Export or import a canonical logical database transfer artifact.';
@@ -125,12 +128,7 @@ class IbemsDatabaseTransfer extends BaseCommand
     {
         $db = Database::connect();
         $db->initialize();
-        if ((string) $db->DBDriver !== 'Postgre' || (string) $db->database !== 'postgres') {
-            throw new RuntimeException('Database transfer imports are restricted to PostgreSQL staging.');
-        }
-        if (getenv('IBEMS_ALLOW_STAGING_RESET') !== '1') {
-            throw new RuntimeException('Set IBEMS_ALLOW_STAGING_RESET=1 for an explicit staging import.');
-        }
+        $this->assertStagingImportTarget($db);
         if (! is_file($path)) {
             throw new RuntimeException("Transfer artifact not found: {$path}");
         }
@@ -174,6 +172,21 @@ class IbemsDatabaseTransfer extends BaseCommand
         }
 
         CLI::write(sprintf('Database transfer imported: %d tables into PostgreSQL staging', count($this->tables)), 'green');
+    }
+
+    private function assertStagingImportTarget(object $db): void
+    {
+        $isExactStagingTarget = (string) ($db->DBDriver ?? '') === 'Postgre'
+            && (string) ($db->database ?? '') === 'postgres'
+            && strtolower((string) ($db->hostname ?? '')) === self::STAGING_HOST
+            && (string) ($db->username ?? '') === self::STAGING_USERNAME;
+
+        if (! $isExactStagingTarget) {
+            throw new RuntimeException('Database transfer imports are restricted to the verified Supabase staging project.');
+        }
+        if (getenv('IBEMS_ALLOW_STAGING_RESET') !== '1') {
+            throw new RuntimeException('Set IBEMS_ALLOW_STAGING_RESET=1 for an explicit staging import.');
+        }
     }
 
     private function normalizeRow(string $table, array $row): array

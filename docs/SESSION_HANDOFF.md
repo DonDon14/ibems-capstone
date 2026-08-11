@@ -5,7 +5,7 @@ Last updated: 2026-07-02
 ## Active Project
 
 - Path: `D:\xampp\htdocs\ibems-tailwind-test`
-- Framework: CodeIgniter 4.7.2
+- Framework: CodeIgniter 4.7.4
 - Local URL: `http://localhost:8080`
 - Database: `ibems_tailwind_test`
 - Primary tracker: `docs/SYSTEM_IMPLEMENTATION_CHECKLIST.md`
