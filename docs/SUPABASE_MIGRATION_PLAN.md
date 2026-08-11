@@ -12,8 +12,13 @@ Date: 2026-08-11
 - Baseline applied to staging: `2026-08-11-baseline`
 - Verification result: 26 public tables and matching schema version
 - Data API remains disabled; no application or production data has been imported
-- Remaining connection prerequisite: reset and securely store the database
-  password, then copy the exact session-pooler values from Supabase Connect
+- Database password reset completed by the project owner
+- IPv4 session pooler: `aws-0-ap-southeast-1.pooler.supabase.com:5432`
+- Session-pooler user: `postgres.pukjmscgjtmqvhdncjpo`
+- Password-prompted staging launcher:
+  `database/postgresql/Invoke-IbemsSupabase.ps1`
+- Remaining acceptance prerequisite: run the staging preflight with the private
+  password, then seed demo data and complete PostgreSQL browser acceptance
 
 ## Decision
 
@@ -170,11 +175,25 @@ database.default.password = 'secret-from-password-manager'
 database.default.DBDriver = 'Postgre'
 database.default.port = 5432
 database.default.schema = 'public'
-database.default.encrypt = true
+database.default.sslmode = 'require'
 ```
 
 The exact host, port, and username must be copied from the selected Supabase
 connection mode. They must not be guessed.
+
+The staging project now uses the exact IPv4 session-pooler values recorded
+above. Run a password-safe validation from the project root with:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File database\postgresql\Invoke-IbemsSupabase.ps1 -Action preflight
+```
+
+The script prompts securely and never writes the password to a file. To start a
+separate Supabase-backed local server after preflight succeeds:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File database\postgresql\Invoke-IbemsSupabase.ps1 -Action serve -Port 8083
+```
 
 ## Security baseline
 
