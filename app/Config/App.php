@@ -6,6 +6,16 @@ use CodeIgniter\Config\BaseConfig;
 
 class App extends BaseConfig
 {
+    public function __construct()
+    {
+        parent::__construct();
+
+        $runtimeBaseUrl = getenv('IBEMS_BASE_URL');
+        if (is_string($runtimeBaseUrl) && $runtimeBaseUrl !== '') {
+            $this->baseURL = rtrim($runtimeBaseUrl, '/') . '/';
+        }
+    }
+
     /**
      * --------------------------------------------------------------------------
      * Base Site URL

@@ -29,6 +29,7 @@ if ($CredentialDialog) {
 }
 $passwordPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
 $environmentKeys = @(
+    'IBEMS_BASE_URL',
     'database.default.hostname',
     'database.default.database',
     'database.default.username',
@@ -43,6 +44,7 @@ try {
     $plainPassword = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($passwordPointer)
     Set-Location -LiteralPath $projectRoot
 
+    [Environment]::SetEnvironmentVariable('IBEMS_BASE_URL', "http://localhost:$Port/", 'Process')
     [Environment]::SetEnvironmentVariable('database.default.hostname', 'aws-0-ap-southeast-1.pooler.supabase.com', 'Process')
     [Environment]::SetEnvironmentVariable('database.default.database', 'postgres', 'Process')
     [Environment]::SetEnvironmentVariable('database.default.username', 'postgres.pukjmscgjtmqvhdncjpo', 'Process')
