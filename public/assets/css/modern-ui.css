@@ -1025,6 +1025,18 @@ body.ibems-modern {
     box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
 }
 
+/* Win the legacy `body .*-modal .*-card` cascade without using !important. */
+body.ibems-modern :is(
+    .admin-modal .admin-modal-card,
+    .acct-modal .acct-modal-card,
+    .inv-modal .inv-modal-card,
+    .receipt-modal .receipt-card,
+    .app-modal .app-modal-card
+) {
+    padding: 20px;
+    overflow-x: hidden;
+}
+
 .ibems-modern :is(.admin-modal, .acct-modal, .inv-modal, .receipt-modal, .app-modal) {
     padding: 24px;
     background: rgba(15, 23, 42, 0.48);
@@ -1173,6 +1185,15 @@ body.has-app-dialog {
     background: #fff;
     box-shadow: none;
     font-size: 0;
+}
+
+body.ibems-modern :is(.admin-modal-close, .acct-modal-close, .inv-modal-close, .app-modal-close, .receipt-close) {
+    display: grid;
+    place-items: center;
+    padding: 0;
+    color: transparent;
+    font-size: 0;
+    line-height: 1;
 }
 
 .ibems-modern :is(.admin-modal-close, .acct-modal-close, .inv-modal-close, .app-modal-close, .receipt-close)::before {

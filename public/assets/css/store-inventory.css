@@ -637,6 +637,34 @@
     overflow-x: hidden;
 }
 
+/*
+ * The shared modal standard intentionally supports simple dialogs by making
+ * the whole card scrollable. The create-product dialog has a fixed header and
+ * footer, so its form body must be the only scroll owner. Keep these selectors
+ * scoped and specific enough to win over the shared `body .inv-modal` rules.
+ */
+body.ibems-modern #inventory-product-modal .inv-modal-card {
+    width: min(980px, 100%);
+    max-height: min(90vh, 860px);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    padding: 20px;
+    overflow: hidden;
+}
+
+body.ibems-modern #inventory-product-modal .create-product-layout {
+    min-width: 0;
+    min-height: 0;
+    padding-right: 10px;
+    overflow-x: hidden;
+    overflow-y: auto;
+    scrollbar-gutter: stable;
+}
+
+body.ibems-modern #inventory-product-modal :is(.inv-modal-head, .inv-modal-actions) {
+    min-width: 0;
+}
+
 .projection {
     margin-top: 12px;
     background: #f8fafc;
