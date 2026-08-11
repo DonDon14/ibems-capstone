@@ -41,8 +41,8 @@
             </div>
             <div class="acct-flow-item">
                 <span>4</span>
-                <strong>Run Salary Deduction</strong>
-                <p>Accounting deducts the remaining valid employee debt through a settlement batch.</p>
+                <strong>Prepare and Confirm Deductions</strong>
+                <p>Accounting prepares requests first, then records official payroll results. Only confirmed amounts reduce debt.</p>
             </div>
         </div>
     </article>
@@ -64,8 +64,10 @@
                 <button id="acct-refresh-btn" class="history-action alt inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="button"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
             </div>
             <div class="action-group action-group-tools flex flex-wrap gap-2">
-                <button id="open-settlement-run" class="history-action inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-blue-700" type="button"><i class="bi bi-calendar2-check"></i> Run Salary Deduction</button>
-                <button id="open-deduction-mode" class="history-action inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="button"><i class="bi bi-cash-coin"></i> Manual Payroll Deduction</button>
+                <button id="open-deduction-workflow" class="history-action inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-blue-700" type="button"><i class="bi bi-diagram-3"></i> Deduction Workflow</button>
+                <button id="open-debt-investigations" class="history-action inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="button"><i class="bi bi-shield-check"></i> Investigations</button>
+                <button id="open-settlement-run" class="history-action inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="button"><i class="bi bi-clock-history"></i> Legacy History</button>
+                <button id="open-deduction-mode" class="hidden" type="button" tabindex="-1" aria-hidden="true">Retired manual deduction</button>
                 <button id="open-import-csv" class="history-action inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="button"><i class="bi bi-file-earmark-arrow-up"></i> Import HR CSV</button>
             </div>
         </div>
@@ -165,11 +167,15 @@
 <div id="settlement-run-modal" class="acct-modal is-hidden">
     <div class="acct-modal-card max-h-[92vh] w-[min(1320px,96vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
         <div class="acct-modal-head">
-            <h4 class="text-lg font-bold text-slate-900">Run Salary Deduction Batch</h4>
-            <button id="close-settlement-run" type="button" class="acct-modal-close">x</button>
+            <h4 class="text-lg font-bold text-slate-900">Legacy Monthly Deduction History</h4>
+            <button id="close-settlement-run" type="button" class="acct-modal-close" aria-label="Close legacy deduction history"></button>
         </div>
 
-        <div class="settlement-controls flex flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
+        <div class="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+            This workflow is read-only. Create and process all new deductions through <strong>Deduction Workflow</strong>.
+        </div>
+
+        <div class="settlement-controls hidden flex-wrap items-end gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3">
             <div class="field">
                 <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500" for="settlement-run-month">Run Month</label>
                 <input id="settlement-run-month" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700" type="month">
@@ -186,14 +192,14 @@
             <button id="settlement-existing-run-view" type="button" class="history-action inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">View Existing Batch</button>
         </div>
 
-        <div class="acct-summary settlement-summary mt-3 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div class="acct-summary settlement-summary mt-3 hidden gap-3 md:grid-cols-2 xl:grid-cols-4">
             <?= view('components/stat_card', ['title' => 'Candidates', 'value' => '0', 'valueId' => 'settle-candidate-count', 'icon' => 'bi bi-people', 'tone' => 'users']) ?>
             <?= view('components/stat_card', ['title' => 'Processable', 'value' => '0', 'valueId' => 'settle-processable-count', 'icon' => 'bi bi-check2-circle', 'tone' => 'sales']) ?>
             <?= view('components/stat_card', ['title' => 'Total Debt Before', 'value' => 'PHP 0.00', 'valueId' => 'settle-total-before', 'icon' => 'bi bi-cash-stack', 'tone' => 'debt']) ?>
             <?= view('components/stat_card', ['title' => 'Total Deducted', 'value' => 'PHP 0.00', 'valueId' => 'settle-total-deducted', 'icon' => 'bi bi-cash-coin', 'tone' => 'finance']) ?>
         </div>
 
-        <div class="settlement-preview-tools">
+        <div class="settlement-preview-tools hidden">
             <div class="acct-search-wrap relative min-w-[260px] grow">
                 <i class="bi bi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true"></i>
                 <input id="settlement-preview-search" class="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm text-slate-700 outline-none transition focus:border-blue-300" type="search" placeholder="Search employee, ID, or category in this preview">
@@ -201,7 +207,7 @@
             <p id="settlement-preview-count" class="settlement-preview-count">Preview the batch to show employees for deduction.</p>
         </div>
 
-        <div class="acct-table-wrap table-standard-wrap">
+        <div class="acct-table-wrap table-standard-wrap hidden">
             <table class="table table-standard">
                 <thead>
                     <tr>
@@ -302,6 +308,155 @@
                 </tbody>
             </table>
         </div>
+    </div>
+</div>
+
+<div id="deduction-workflow-modal" class="acct-modal is-hidden" data-current-role="<?= esc((string) session()->get('role')) ?>" data-current-user="<?= (int) session()->get('user_id') ?>">
+    <div class="acct-modal-card max-h-[94vh] w-[min(1380px,97vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+        <div class="acct-modal-head">
+            <div>
+                <h4 class="text-lg font-bold text-slate-900">Payroll Deduction Workflow</h4>
+                <p class="mt-1 text-sm text-slate-500">Prepare requests first. Employee debt changes only after an official payroll result is confirmed.</p>
+            </div>
+            <button id="close-deduction-workflow" type="button" class="acct-modal-close" aria-label="Close deduction workflow"></button>
+        </div>
+
+        <div class="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
+            <div class="space-y-4">
+                <section class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                    <h5 class="text-sm font-bold text-slate-900">1. Create deduction period</h5>
+                    <div class="mt-3 grid gap-3">
+                        <label class="field">
+                            <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Period code</span>
+                            <input id="workflow-period-code" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" maxlength="40" placeholder="2026-08-A">
+                        </label>
+                        <label class="field">
+                            <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Label</span>
+                            <input id="workflow-period-label" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" maxlength="120" placeholder="August 1-15, 2026">
+                        </label>
+                        <label class="field">
+                            <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Frequency</span>
+                            <select id="workflow-period-frequency" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm">
+                                <option value="semi_monthly">Semi-monthly</option>
+                                <option value="monthly">Monthly</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </label>
+                        <div class="grid gap-3">
+                            <label class="field">
+                                <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Start date</span>
+                                <input id="workflow-period-start" type="date" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" placeholder="Select start date">
+                            </label>
+                            <label class="field">
+                                <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">End date</span>
+                                <input id="workflow-period-end" type="date" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" placeholder="Select end date">
+                            </label>
+                        </div>
+                        <button id="workflow-create-period" type="button" class="inline-flex h-10 items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700">Create period</button>
+                    </div>
+                </section>
+
+                <section class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+                    <strong class="block">Workflow safeguard</strong>
+                    <p class="mt-1">Prepared means sent for processing—not deducted. Only a confirmed payroll reference may reduce the balance.</p>
+                </section>
+            </div>
+
+            <div class="space-y-4">
+                <section class="rounded-xl border border-slate-200 bg-white p-4">
+                    <div class="flex flex-wrap items-end gap-3">
+                        <label class="field min-w-[260px] grow">
+                            <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Deduction period</span>
+                            <select id="workflow-period-select" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm">
+                                <option value="">Select a period</option>
+                            </select>
+                        </label>
+                        <button id="workflow-refresh" type="button" class="inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"><i class="bi bi-arrow-clockwise mr-2"></i>Refresh</button>
+                    </div>
+                    <div id="workflow-period-summary" class="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">Choose or create a deduction period.</div>
+                </section>
+
+                <section id="workflow-prepare-section" class="rounded-xl border border-slate-200 bg-white p-4">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                            <h5 class="text-sm font-bold text-slate-900">2. Prepare employee requests</h5>
+                            <p class="text-sm text-slate-500">Select employees and enter the requested payroll amount.</p>
+                        </div>
+                        <button id="workflow-prepare-batch" type="button" class="inline-flex h-10 items-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:bg-slate-300">Prepare batch</button>
+                    </div>
+                    <div id="workflow-candidates" class="mt-3 max-h-72 space-y-2 overflow-auto"></div>
+                </section>
+
+                <section id="workflow-results-section" class="hidden rounded-xl border border-slate-200 bg-white p-4">
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                            <h5 class="text-sm font-bold text-slate-900">3. Process and finalize payroll results</h5>
+                            <p class="text-sm text-slate-500">Submit the prepared batch, confirm official results, reconcile totals, then finalize independently.</p>
+                        </div>
+                        <div id="workflow-batch-actions"></div>
+                    </div>
+                    <div id="workflow-results" class="mt-3 space-y-3"></div>
+                </section>
+                <p id="workflow-message" class="text-sm font-semibold" role="status"></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="debt-investigations-modal" class="acct-modal is-hidden" data-current-role="<?= esc((string) session()->get('role')) ?>" data-current-user="<?= (int) session()->get('user_id') ?>">
+    <div class="acct-modal-card max-h-[94vh] w-[min(1180px,97vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+        <div class="acct-modal-head">
+            <div>
+                <h4 class="text-lg font-bold text-slate-900">Debt Investigations and Corrections</h4>
+                <p class="mt-1 text-sm text-slate-500">Investigations preserve original transactions. Approved corrections are posted as linked ledger reversals.</p>
+            </div>
+            <button id="close-debt-investigations" type="button" class="acct-modal-close" aria-label="Close debt investigations"></button>
+        </div>
+        <div class="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
+            <section class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                <h5 class="text-sm font-bold text-slate-900">Open investigation</h5>
+                <div class="mt-3 grid gap-3">
+                    <label>
+                        <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Employee</span>
+                        <select id="investigation-user" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"><option value="">Select employee</option></select>
+                    </label>
+                    <label>
+                        <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Debt transaction</span>
+                        <select id="investigation-transaction" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"><option value="">General balance investigation</option></select>
+                    </label>
+                    <label>
+                        <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Issue type</span>
+                        <select id="investigation-issue" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm">
+                            <option value="incorrect_amount">Incorrect amount</option>
+                            <option value="unauthorized_purchase">Unauthorized purchase</option>
+                            <option value="duplicate_charge">Duplicate charge</option>
+                            <option value="wrong_employee">Wrong employee</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </label>
+                    <label>
+                        <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Issue summary</span>
+                        <textarea id="investigation-summary" class="min-h-24 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm" placeholder="Describe what was reported and why it requires investigation."></textarea>
+                    </label>
+                    <label>
+                        <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Initial evidence</span>
+                        <textarea id="investigation-evidence" class="min-h-20 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm" placeholder="Receipt, statement, store-day record, or other evidence."></textarea>
+                    </label>
+                    <button id="investigation-open" type="button" class="inline-flex h-10 items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700">Open investigation</button>
+                </div>
+            </section>
+            <section class="rounded-xl border border-slate-200 bg-white p-4">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                        <h5 class="text-sm font-bold text-slate-900">Investigation queue</h5>
+                        <p class="text-sm text-slate-500">A different Accounting user must approve a recommended correction.</p>
+                    </div>
+                    <button id="investigation-refresh" type="button" class="inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"><i class="bi bi-arrow-clockwise mr-2"></i>Refresh</button>
+                </div>
+                <div id="investigation-list" class="mt-3 max-h-[68vh] space-y-3 overflow-auto"></div>
+            </section>
+        </div>
+        <p id="investigation-message" class="mt-3 text-sm font-semibold" role="status"></p>
     </div>
 </div>
 

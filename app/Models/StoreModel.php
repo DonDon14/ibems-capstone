@@ -33,7 +33,7 @@ class StoreModel extends Model
 
     public function getActiveStores(): array
     {
-        return $this->where('is_active', 1)
+        return $this->where('is_active', true)
                     ->findAll();
     }
 
@@ -45,7 +45,7 @@ class StoreModel extends Model
 
     public function getAccessibleStores(int $userId, string $role): array
     {
-        $builder = $this->where('is_active', 1);
+        $builder = $this->where('is_active', true);
 
         if ($role === 'STORE_SYSTEM') {
             $builder->where('officer_id', $userId);
@@ -64,7 +64,7 @@ class StoreModel extends Model
 
     public function canUserAccessStore(int $userId, string $role, int $storeId): bool
     {
-        $builder = $this->where('id', $storeId)->where('is_active', 1);
+        $builder = $this->where('id', $storeId)->where('is_active', true);
 
         if ($role === 'STORE_SYSTEM') {
             $builder->where('officer_id', $userId);

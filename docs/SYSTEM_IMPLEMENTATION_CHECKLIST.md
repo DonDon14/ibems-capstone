@@ -1,6 +1,6 @@
 # IBEMS System Implementation Checklist
 
-Last updated: 2026-07-02
+Last updated: 2026-07-30
 Active project path: `D:\xampp\htdocs\ibems-tailwind-test`
 
 Use this file as the durable work tracker when the chat context is compressed. Update each checkbox as work is completed, and add short notes under the relevant module instead of relying only on chat history.
@@ -95,35 +95,58 @@ Use this file as the durable work tracker when the chat context is compressed. U
 
 ## Phase 6 - Usability And Polish
 
-- [ ] Standardize loading, empty, error, success, and confirmation patterns across Admin, Store, Accounting, and User pages.
+- [x] Standardize loading, empty, error, success, and confirmation patterns across Admin, Store, Accounting, and User pages.
 - [x] Standardize table/search controls in recently touched Store, Accounting, Store Admin, and Admin Products screens.
 - [x] Standardize modal layout for Store open-day and close-day workflows.
-- [ ] Review mobile responsiveness for Store POS, Inventory, Accounting Debts, and Admin User Management.
-- [ ] Add keyboard-friendly actions for POS scanning, cart controls, modal confirmation, and table search.
+- [x] Review responsive behavior for Store POS, Inventory, Accounting Debts, and Admin User Management.
+- [x] Add keyboard-friendly actions for POS scanning, cart controls, modal confirmation, shared dropdowns/dates, and table search.
 - [x] Replace unclear Accounting Debts labels with role-specific sections and explanation copy.
 
 ## Phase 7 - Release Hygiene
 
-- [ ] Run `php -l` on changed PHP files before every handoff.
-- [ ] Run `node --check` on changed JS files before every handoff.
-- [ ] Run `php spark migrate` after adding migrations.
-- [ ] Run a browser smoke test on `http://localhost:8080` after major UI changes.
-- [ ] Update this checklist after each completed implementation.
-- [ ] Keep unrelated user changes intact; do not revert dirty files unless explicitly requested.
-- [ ] Before pushing to GitHub, review `git status --short`, summarize changed scope, then commit intentionally.
+- [x] Run `php -l` on changed PHP files before every handoff.
+- [x] Run `node --check` on changed JS files before every handoff.
+- [x] Run `php spark migrate` after adding migrations.
+- [x] Run browser smoke tests on `http://localhost:8080` after major UI changes.
+- [x] Update this checklist after each completed implementation.
+- [x] Keep unrelated user changes intact; do not revert dirty files unless explicitly requested.
+- [x] Before publishing, review `git status --short`, summarize changed scope, and commit intentionally.
 
 ## Recommended Next Work Order
 
-1. Run instructor demo smoke test in the browser:
+1. Implement the approved debt policy baseline:
+   - Faculty/staff only; students excluded from debt.
+   - Individual Accounting-approved credit limits.
+   - Private hashed PIN with failed-attempt throttling.
+   - Configurable semi-monthly, monthly, and custom deduction periods.
+   - Confirmed partial deductions and automatic unresolved-balance carryover.
+   - Investigation plus Accounting-approved reversal for corrections.
+   - See `docs/DEBT_POLICY_AND_IMPLEMENTATION_PLAN.md`.
+   - [x] Add backward-compatible `deduction_periods`, `deduction_batches`, and
+     `deduction_batch_items` foundation with configurable date ranges and
+     pending/confirmed/carryover result fields.
+   - [x] Persist shared debt PIN attempt state, lock after five failed attempts
+     in 15 minutes, audit authorization outcomes, and reset after success.
+   - [x] Add Accounting UI for period preparation and result confirmation.
+   - [x] Add Accounting endpoints for configurable period creation, batch
+     preparation, and idempotent result confirmation.
+   - [x] Reduce debt only by the confirmed result and retain the unresolved
+     employee balance as traceable carryover.
+   - [x] Add append-only debt investigations with documented evidence,
+     independent Accounting approval, and linked ledger reversals.
+   - [x] Require prepare, submit, confirm, reconcile, and independent finalize
+     states for deduction batches.
+   - [x] Retire production routes for one-click settlement and manual Accounting
+     deductions while preserving legacy history as read-only.
+2. Run instructor demo smoke test in the browser:
    - Login for Admin, Store, Store Admin, Accounting, and User.
    - Open Store day, perform POS sale, perform direct debt repayment, close Store day, approve variance when needed.
    - Confirm Accounting tabs show employee debts, advance payments, and operator accountabilities.
-2. Polish remaining responsive layouts:
+3. Polish remaining responsive layouts:
    - Store POS.
    - Accounting Debts.
    - Store Admin Dashboard.
    - Admin Products.
-3. Decide final salary-deduction handling for operator accountabilities:
-   - Current system records the accountability.
-   - A payroll export or deduction posting workflow is still the next business step.
-4. Commit current scope after validation and instructor-ready doc review.
+4. Replace one-step monthly settlement with prepare, submit, confirm, reconcile,
+   and finalize deduction-period states while retaining legacy run readability.
+5. Commit each financial workflow slice only after focused and full validation.

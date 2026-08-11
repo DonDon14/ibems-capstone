@@ -12,8 +12,23 @@ class InitialSeeder extends Seeder
 
         $existingUsers = (int) $db->table('users')->countAllResults();
         if ($existingUsers > 0) {
-            return;
+            $isRecoverablePostgrePartialSeed = $db->DBDriver === 'Postgre'
+                && $existingUsers === 8
+                && (int) $db->table('stores')->countAllResults() === 2
+                && (int) $db->table('balances')->countAllResults() === 0
+                && (int) $db->table('products')->countAllResults() === 0;
+
+            if (! $isRecoverablePostgrePartialSeed) {
+                return;
+            }
+
+            // Recover only the known partial demo seed left by an interrupted
+            // PostgreSQL staging run. The empty production baseline was
+            // verified before this seed was attempted.
+            $db->query('TRUNCATE TABLE users RESTART IDENTITY CASCADE');
         }
+
+        $db->transStart();
 
         $now = date('Y-m-d H:i:s');
         $passwordHash = password_hash('123456', PASSWORD_DEFAULT);
@@ -30,7 +45,7 @@ class InitialSeeder extends Seeder
                 'user_type' => 'staff',
                 'qr_token' => 'QR-ADM-001',
                 'base_salary' => 55000,
-                'is_active' => 1,
+                'is_active' => true,
                 'created_at' => $now,
             ],
             [
@@ -43,7 +58,7 @@ class InitialSeeder extends Seeder
                 'user_type' => 'staff',
                 'qr_token' => 'QR-ACC-001',
                 'base_salary' => 42000,
-                'is_active' => 1,
+                'is_active' => true,
                 'created_at' => $now,
             ],
             [
@@ -56,7 +71,7 @@ class InitialSeeder extends Seeder
                 'user_type' => 'staff',
                 'qr_token' => 'QR-STR-001',
                 'base_salary' => 28000,
-                'is_active' => 1,
+                'is_active' => true,
                 'created_at' => $now,
             ],
             [
@@ -69,7 +84,7 @@ class InitialSeeder extends Seeder
                 'user_type' => 'staff',
                 'qr_token' => 'QR-STR-002',
                 'base_salary' => 28000,
-                'is_active' => 1,
+                'is_active' => true,
                 'created_at' => $now,
             ],
             [
@@ -82,7 +97,7 @@ class InitialSeeder extends Seeder
                 'user_type' => 'faculty',
                 'qr_token' => 'QR-FAC-001',
                 'base_salary' => 38000,
-                'is_active' => 1,
+                'is_active' => true,
                 'created_at' => $now,
             ],
             [
@@ -95,7 +110,7 @@ class InitialSeeder extends Seeder
                 'user_type' => 'staff',
                 'qr_token' => 'QR-STF-001',
                 'base_salary' => 22000,
-                'is_active' => 1,
+                'is_active' => true,
                 'created_at' => $now,
             ],
             [
@@ -108,7 +123,7 @@ class InitialSeeder extends Seeder
                 'user_type' => 'student',
                 'qr_token' => 'QR-STD-001',
                 'base_salary' => 0,
-                'is_active' => 1,
+                'is_active' => true,
                 'created_at' => $now,
             ],
             [
@@ -121,7 +136,7 @@ class InitialSeeder extends Seeder
                 'user_type' => 'staff',
                 'qr_token' => 'QR-STF-002',
                 'base_salary' => 24000,
-                'is_active' => 1,
+                'is_active' => true,
                 'created_at' => $now,
             ],
         ];
@@ -171,13 +186,13 @@ class InitialSeeder extends Seeder
             [
                 'store_name' => 'Main Campus Store',
                 'officer_id' => $userIdsByEmail['store.main@ibems.local'] ?? null,
-                'is_active' => 1,
+                'is_active' => true,
                 'created_at' => $now,
             ],
             [
                 'store_name' => 'Tech Annex Store',
                 'officer_id' => $userIdsByEmail['store.tech@ibems.local'] ?? null,
-                'is_active' => 1,
+                'is_active' => true,
                 'created_at' => $now,
             ],
         ];
@@ -238,7 +253,7 @@ class InitialSeeder extends Seeder
             [
                 'user_id' => $userIdsByEmail['leo.mercado@ibems.local'] ?? 0,
                 'credit_limit' => 1500,
-                'current_debt' => 1750,
+                'current_debt' => 1250,
                 'updated_at' => $now,
             ],
             [
@@ -262,7 +277,7 @@ class InitialSeeder extends Seeder
                 'stock_qty' => 110,
                 'low_stock_threshold' => 20,
                 'location_bin' => 'Counter A',
-                'is_active' => 1,
+                'is_active' => true,
                 'updated_at' => $now,
             ],
             [
@@ -277,7 +292,7 @@ class InitialSeeder extends Seeder
                 'stock_qty' => 92,
                 'low_stock_threshold' => 15,
                 'location_bin' => 'Rack B1',
-                'is_active' => 1,
+                'is_active' => true,
                 'updated_at' => $now,
             ],
             [
@@ -292,7 +307,7 @@ class InitialSeeder extends Seeder
                 'stock_qty' => 185,
                 'low_stock_threshold' => 30,
                 'location_bin' => 'Cooler 1',
-                'is_active' => 1,
+                'is_active' => true,
                 'updated_at' => $now,
             ],
             [
@@ -307,7 +322,7 @@ class InitialSeeder extends Seeder
                 'stock_qty' => 4,
                 'low_stock_threshold' => 12,
                 'location_bin' => 'Cooler 2',
-                'is_active' => 1,
+                'is_active' => true,
                 'updated_at' => $now,
             ],
             [
@@ -322,7 +337,7 @@ class InitialSeeder extends Seeder
                 'stock_qty' => 0,
                 'low_stock_threshold' => 25,
                 'location_bin' => 'Shelf S1',
-                'is_active' => 1,
+                'is_active' => true,
                 'updated_at' => $now,
             ],
             [
@@ -337,7 +352,7 @@ class InitialSeeder extends Seeder
                 'stock_qty' => 58,
                 'low_stock_threshold' => 10,
                 'location_bin' => 'Cabinet T2',
-                'is_active' => 1,
+                'is_active' => true,
                 'updated_at' => $now,
             ],
             [
@@ -352,7 +367,7 @@ class InitialSeeder extends Seeder
                 'stock_qty' => 140,
                 'low_stock_threshold' => 20,
                 'location_bin' => 'Shelf S3',
-                'is_active' => 1,
+                'is_active' => true,
                 'updated_at' => $now,
             ],
             [
@@ -367,7 +382,7 @@ class InitialSeeder extends Seeder
                 'stock_qty' => 2,
                 'low_stock_threshold' => 8,
                 'location_bin' => 'Cabinet T3',
-                'is_active' => 1,
+                'is_active' => true,
                 'updated_at' => $now,
             ],
             [
@@ -382,7 +397,7 @@ class InitialSeeder extends Seeder
                 'stock_qty' => 0,
                 'low_stock_threshold' => 6,
                 'location_bin' => 'Cabinet T4',
-                'is_active' => 1,
+                'is_active' => true,
                 'updated_at' => $now,
             ],
         ];
@@ -631,5 +646,7 @@ class InitialSeeder extends Seeder
                 'created_at' => date('Y-m-d H:i:s', strtotime('-2 days 17:15:00')),
             ],
         ]);
+
+        $db->transComplete();
     }
 }

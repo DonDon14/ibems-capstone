@@ -4,6 +4,13 @@
 
 Integrated Business Enterprise Management System for school store operations, POS transactions, inventory, debt monitoring, accounting settlement, and role-based portals.
 
+Database migration guidance: [Supabase Migration Plan](docs/SUPABASE_MIGRATION_PLAN.md).
+
+The versioned PostgreSQL staging baseline and verification query are under
+`database/postgresql/`. Use `.env.supabase.example` only as a non-secret
+configuration reference; real credentials belong in the ignored `.env` or a
+deployment secret manager.
+
 ## Current Local Setup
 
 Active local project path:
@@ -118,6 +125,7 @@ Primary seeded accounts:
 | --- | --- | --- |
 | Admin | `admin@ibems.local` | `123456` |
 | Accounting | `accounting@ibems.local` | `123456` |
+| Accounting Supervisor | `accounting.supervisor@ibems.local` | `123456` |
 | Store - Main | `store.main@ibems.local` | `123456` |
 | Store - Tech | `store.tech@ibems.local` | `123456` |
 | User - Faculty | `maria.santos@ibems.local` | `123456` |
@@ -141,7 +149,9 @@ Debt purchases require the debtor to set their own debt authorization PIN first.
 4. Log in as a Store user.
 5. In POS, choose Debt payment, select the debtor, enter their PIN, then complete checkout.
 
-The PIN is stored only as a hash. Store and admin users cannot view it.
+The PIN is stored only as a hash. Store and admin users cannot view it. Five
+failed attempts within 15 minutes lock debt PIN authorization for 15 minutes
+across all store terminals. Security events are recorded without the PIN.
 
 ## Frontend Assets
 

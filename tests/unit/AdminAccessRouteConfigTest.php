@@ -42,14 +42,22 @@ final class AdminAccessRouteConfigTest extends CIUnitTestCase
             "store/inventory/adjust-stock', 'StoreController::adjustStock', ['filter' => 'role:STORE_SYSTEM']",
             "store/inventory/add-product', 'StoreController::addProduct', ['filter' => 'role:STORE_SYSTEM']",
             "store/inventory/update-product', 'StoreController::updateProduct', ['filter' => 'role:STORE_SYSTEM']",
-            "accounting/settlement/apply', 'AccountingController::applySettlementRun', ['filter' => 'role:ACCOUNTING_OFFICE']",
+            "accounting/deduction-batches/(:num)/submit', 'AccountingController::submitDeductionBatch/$1', ['filter' => 'role:ACCOUNTING_OFFICE']",
+            "accounting/deduction-batches/(:num)/reconcile', 'AccountingController::reconcileDeductionBatch/$1', ['filter' => 'role:ACCOUNTING_OFFICE']",
+            "accounting/deduction-batches/(:num)/finalize', 'AccountingController::finalizeDeductionBatch/$1', ['filter' => 'role:ACCOUNTING_OFFICE']",
             "accounting/debts/import-csv', 'AccountingController::importCsv', ['filter' => 'role:ACCOUNTING_OFFICE']",
-            "accounting/debts/deduct', 'AccountingController::deductDebt', ['filter' => 'role:ACCOUNTING_OFFICE']",
-            "accounting/debts/deduct-full', 'AccountingController::deductFullDebt', ['filter' => 'role:ACCOUNTING_OFFICE']",
             "accounting/debts/credit-limit', 'AccountingController::updateCreditLimit', ['filter' => 'role:ACCOUNTING_OFFICE']",
         ] as $expectedRoute) {
             $this->assertStringContainsString($expectedRoute, $routes);
             $this->assertStringNotContainsString($this->withAdminRole($expectedRoute), $routes);
+        }
+
+        foreach ([
+            "accounting/settlement/apply'",
+            "accounting/debts/deduct'",
+            "accounting/debts/deduct-full'",
+        ] as $retiredWriteRoute) {
+            $this->assertStringNotContainsString($retiredWriteRoute, $routes);
         }
     }
 

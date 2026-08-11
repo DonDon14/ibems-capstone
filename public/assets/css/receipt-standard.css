@@ -2,6 +2,27 @@
     max-width: 560px;
 }
 
+.receipt-loading,
+.receipt-error {
+    display: grid;
+    min-height: 180px;
+    place-items: center;
+    border: 1px dashed #cbd5e1;
+    border-radius: 12px;
+    padding: 24px;
+    text-align: center;
+}
+
+.receipt-loading {
+    color: #475569;
+}
+
+.receipt-error {
+    border-color: #fecaca;
+    background: #fef2f2;
+    color: #b91c1c;
+}
+
 .ibems-receipt {
     border: 1px dashed #94a3b8;
     border-radius: 10px;

@@ -143,6 +143,17 @@ if (! function_exists('ibems_money')) {
     }
 }
 
+if (! function_exists('ibems_bool')) {
+    function ibems_bool(mixed $value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+
+        return in_array(strtolower(trim((string) $value)), ['1', 't', 'true', 'yes', 'on'], true);
+    }
+}
+
 if (! function_exists('ibems_datetime')) {
     function ibems_datetime(?string $value, string $format = 'M d, h:i A'): string
     {

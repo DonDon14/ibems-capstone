@@ -13,6 +13,7 @@ let settlementSelectedUserIds = new Set();
 let settlementRunsCache = [];
 let importCsvPreviewReady = false;
 let activeSettlementDetails = null;
+let deductionWorkflowPeriods = [];
 
 function aEscape(value) {
     return String(value ?? "")
@@ -1080,6 +1081,421 @@ document.getElementById("acct-refresh-btn").addEventListener("click", async () =
     await loadData();
 });
 
+function setWorkflowMessage(message, type = "ok") {
+    const element = document.getElementById("workflow-message");
+    element.textContent = message || "";
+    element.className = `text-sm font-semibold ${type === "error" ? "text-red-700" : "text-emerald-700"}`;
+}
+
+function renderWorkflowCandidates() {
+    const container = document.getElementById("workflow-candidates");
+    const rows = acctRows.filter((row) => Number(row.current_debt || 0) > 0);
+    container.innerHTML = rows.length ? rows.map((row) => `
+        <label class="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[auto_minmax(0,1fr)_170px] sm:items-center">
+            <input type="checkbox" class="workflow-candidate-check h-4 w-4" data-workflow-user="${aEscape(row.user_id)}">
+            <span>
+                <strong class="block text-sm text-slate-900">${aEscape(row.name || "Employee")}</strong>
+                <small class="text-slate-500">${aEscape(row.employee_id || "-")} · Current debt ${aEscape(aMoney(row.current_debt || 0))}</small>
+            </span>
+            <input type="number" class="workflow-request-amount h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm" min="0.01" max="${aEscape(row.current_debt || 0)}" step="0.01" value="${aEscape(Number(row.current_debt || 0).toFixed(2))}" aria-label="Requested amount for ${aEscape(row.name || "employee")}">
+        </label>
+    `).join("") : '<div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-500">No active faculty/staff debt accounts are available.</div>';
+}
+
+function workflowStatusLabel(value) {
+    return aCategory(String(value || "pending").replace(/_/g, " "));
+}
+
+function renderWorkflowResults(items, batchStatus, batchCreatedBy) {
+    const section = document.getElementById("workflow-results-section");
+    const container = document.getElementById("workflow-results");
+    const actions = document.getElementById("workflow-batch-actions");
+    const workflowModal = document.getElementById("deduction-workflow-modal");
+    const currentRole = workflowModal.dataset.currentRole || "";
+    const currentUser = Number(workflowModal.dataset.currentUser || 0);
+    const canConfirm = ["submitted", "partially_processed"].includes(String(batchStatus || ""));
+    section.classList.remove("hidden");
+    if (batchStatus === "prepared") {
+        actions.innerHTML = '<button type="button" data-workflow-batch-action="submit" class="inline-flex h-10 items-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700">Submit for payroll processing</button>';
+    } else if (batchStatus === "processed") {
+        actions.innerHTML = '<button type="button" data-workflow-batch-action="reconcile" class="inline-flex h-10 items-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700">Reconcile batch totals</button>';
+    } else if (batchStatus === "reconciled") {
+        actions.innerHTML = currentRole === "ACCOUNTING_OFFICE" && Number(batchCreatedBy || 0) !== currentUser
+            ? '<button type="button" data-workflow-batch-action="finalize" class="inline-flex h-10 items-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700">Finalize period</button>'
+            : '<span class="inline-flex rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">Awaiting a different Accounting user for finalization</span>';
+    } else if (batchStatus === "finalized") {
+        actions.innerHTML = '<span class="inline-flex rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">Finalized and locked</span>';
+    } else {
+        actions.innerHTML = '<span class="inline-flex rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800">Record each official payroll result below</span>';
+    }
+    if (!items.length) {
+        container.innerHTML = '<div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-500">No batch items found.</div>';
+        return;
+    }
+
+    container.innerHTML = items.map((item) => {
+        const pending = String(item.result_status || "pending") === "pending";
+        return `
+            <article class="rounded-xl border border-slate-200 bg-slate-50 p-3" data-workflow-item="${aEscape(item.id)}">
+                <div class="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                        <strong class="block text-sm text-slate-900">${aEscape(item.name || "Employee")}</strong>
+                        <small class="text-slate-500">${aEscape(item.employee_id || "-")} · Requested ${aEscape(aMoney(item.requested_amount || 0))} · Current debt ${aEscape(aMoney(item.current_debt || 0))}</small>
+                    </div>
+                    <span class="acct-debt-status ${pending ? "is-info" : "is-success"}">${aEscape(workflowStatusLabel(item.result_status))}</span>
+                </div>
+                ${pending && canConfirm ? `
+                    <div class="mt-3 grid gap-2 md:grid-cols-[150px_210px_minmax(200px,1fr)_auto]">
+                        <input class="workflow-confirmed-amount h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm" type="number" min="0" max="${aEscape(item.requested_amount || 0)}" step="0.01" value="${aEscape(Number(item.requested_amount || 0).toFixed(2))}" aria-label="Confirmed amount">
+                        <select class="workflow-reason h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm" aria-label="Result reason">
+                            <option value="">No exception</option>
+                            <option value="insufficient_salary">Insufficient salary</option>
+                            <option value="not_deducted">Not deducted</option>
+                            <option value="employee_not_found">Employee not found</option>
+                            <option value="duplicate">Duplicate</option>
+                            <option value="returned_for_correction">Returned for correction</option>
+                        </select>
+                        <input class="workflow-reference h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm" maxlength="120" placeholder="Official payroll reference" aria-label="Official payroll reference">
+                        <button type="button" class="workflow-confirm-result inline-flex h-10 items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700">Confirm</button>
+                    </div>
+                ` : pending ? `
+                    <div class="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-2 text-sm text-blue-800">Submit this prepared batch before recording results.</div>
+                ` : `
+                    <div class="mt-2 text-sm text-slate-600">Confirmed ${aEscape(aMoney(item.confirmed_amount || 0))} · Carryover ${aEscape(aMoney(item.carryover_amount || 0))} · Reference ${aEscape(item.result_reference || "-")}</div>
+                `}
+            </article>
+        `;
+    }).join("");
+}
+
+async function loadDeductionWorkflow(preferredPeriodId = null) {
+    const select = document.getElementById("workflow-period-select");
+    const currentPeriodId = preferredPeriodId || Number(select.value || 0);
+    const selectedBefore = deductionWorkflowPeriods.find((period) => Number(period.id) === Number(currentPeriodId));
+    const query = selectedBefore?.batch_id ? `?batch_id=${encodeURIComponent(selectedBefore.batch_id)}` : "";
+    const response = await fetch(`/accounting/deduction-workflow${query}`);
+    const data = await response.json();
+    if (!data || data.status !== "success") {
+        setWorkflowMessage(data?.message || "Unable to load deduction workflow.", "error");
+        return;
+    }
+
+    deductionWorkflowPeriods = Array.isArray(data.periods) ? data.periods : [];
+    select.innerHTML = '<option value="">Select a period</option>' + deductionWorkflowPeriods.map((period) =>
+        `<option value="${aEscape(period.id)}">${aEscape(period.period_code)} · ${aEscape(period.label)}</option>`
+    ).join("");
+    if (currentPeriodId && deductionWorkflowPeriods.some((period) => Number(period.id) === Number(currentPeriodId))) {
+        select.value = String(currentPeriodId);
+    }
+
+    const selected = deductionWorkflowPeriods.find((period) => Number(period.id) === Number(select.value || 0));
+    const summary = document.getElementById("workflow-period-summary");
+    const prepareSection = document.getElementById("workflow-prepare-section");
+    const resultsSection = document.getElementById("workflow-results-section");
+    if (!selected) {
+        summary.textContent = "Choose or create a deduction period.";
+        prepareSection.classList.add("hidden");
+        resultsSection.classList.add("hidden");
+        return;
+    }
+
+    summary.innerHTML = `<strong>${aEscape(selected.period_code)} · ${aEscape(selected.label)}</strong><br><span>${aEscape(selected.date_start)} to ${aEscape(selected.date_end)} · ${selected.batch_id ? `Batch ${aEscape(workflowStatusLabel(selected.batch_status))}` : "No batch prepared"}</span>`;
+    if (selected.batch_id) {
+        prepareSection.classList.add("hidden");
+        if (!query || Number(selected.batch_id) !== Number(selectedBefore?.batch_id)) {
+            const detailResponse = await fetch(`/accounting/deduction-workflow?batch_id=${encodeURIComponent(selected.batch_id)}`);
+            const detail = await detailResponse.json();
+            renderWorkflowResults(Array.isArray(detail.items) ? detail.items : [], selected.batch_status, selected.batch_created_by);
+        } else {
+            renderWorkflowResults(Array.isArray(data.items) ? data.items : [], selected.batch_status, selected.batch_created_by);
+        }
+    } else {
+        resultsSection.classList.add("hidden");
+        prepareSection.classList.remove("hidden");
+        renderWorkflowCandidates();
+    }
+}
+
+async function openDeductionWorkflow() {
+    document.getElementById("deduction-workflow-modal").style.display = "grid";
+    setWorkflowMessage("");
+    await loadDeductionWorkflow();
+}
+
+function closeDeductionWorkflow() {
+    document.getElementById("deduction-workflow-modal").style.display = "none";
+}
+
+async function createWorkflowPeriod() {
+    const button = document.getElementById("workflow-create-period");
+    button.disabled = true;
+    try {
+        const response = await fetch("/accounting/deduction-periods", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                period_code: document.getElementById("workflow-period-code").value.trim(),
+                label: document.getElementById("workflow-period-label").value.trim(),
+                frequency: document.getElementById("workflow-period-frequency").value,
+                date_start: document.getElementById("workflow-period-start").value,
+                date_end: document.getElementById("workflow-period-end").value,
+            }),
+        });
+        const data = await response.json();
+        if (!data || data.status !== "success") {
+            setWorkflowMessage(data?.message || "Failed to create deduction period.", "error");
+            return;
+        }
+        setWorkflowMessage("Deduction period created.");
+        await loadDeductionWorkflow(Number(data.period?.id || 0));
+    } finally {
+        button.disabled = false;
+    }
+}
+
+async function prepareWorkflowBatch() {
+    const periodId = Number(document.getElementById("workflow-period-select").value || 0);
+    const requests = Array.from(document.querySelectorAll(".workflow-candidate-check:checked")).map((checkbox) => {
+        const row = checkbox.closest("label");
+        return {
+            user_id: Number(checkbox.dataset.workflowUser || 0),
+            requested_amount: Number(row.querySelector(".workflow-request-amount").value || 0),
+        };
+    });
+    if (!periodId || !requests.length) {
+        setWorkflowMessage("Select a period and at least one employee.", "error");
+        return;
+    }
+
+    const response = await fetch("/accounting/deduction-batches", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ period_id: periodId, requests }),
+    });
+    const data = await response.json();
+    if (!data || data.status !== "success") {
+        setWorkflowMessage(data?.message || "Failed to prepare deduction batch.", "error");
+        return;
+    }
+    setWorkflowMessage("Batch prepared. No employee debt has been reduced yet.");
+    await loadDeductionWorkflow(periodId);
+}
+
+async function confirmWorkflowResult(button) {
+    const row = button.closest("[data-workflow-item]");
+    const itemId = Number(row?.dataset.workflowItem || 0);
+    button.disabled = true;
+    try {
+        const response = await fetch(`/accounting/deduction-batch-items/${itemId}/confirm`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                confirmed_amount: Number(row.querySelector(".workflow-confirmed-amount").value || 0),
+                reason_code: row.querySelector(".workflow-reason").value,
+                result_reference: row.querySelector(".workflow-reference").value.trim(),
+            }),
+        });
+        const data = await response.json();
+        if (!data || data.status !== "success") {
+            setWorkflowMessage(data?.message || "Failed to confirm payroll result.", "error");
+            return;
+        }
+        setWorkflowMessage(`Payroll result confirmed. Employee debt is now ${aMoney(data.debt_after)}.`);
+        await loadData();
+        await loadDeductionWorkflow(Number(document.getElementById("workflow-period-select").value || 0));
+    } finally {
+        button.disabled = false;
+    }
+}
+
+async function advanceWorkflowBatch(action) {
+    const periodId = Number(document.getElementById("workflow-period-select").value || 0);
+    const period = deductionWorkflowPeriods.find((row) => Number(row.id) === periodId);
+    if (!period?.batch_id || !["submit", "reconcile", "finalize"].includes(action)) return;
+    const response = await fetch(`/accounting/deduction-batches/${Number(period.batch_id)}/${action}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+    });
+    const data = await response.json();
+    if (!data || data.status !== "success") {
+        setWorkflowMessage(data?.message || `Failed to ${action} deduction batch.`, "error");
+        return;
+    }
+    const messages = {
+        submit: "Batch submitted. Official payroll results may now be recorded.",
+        reconcile: "Batch totals reconciled. It now requires independent finalization.",
+        finalize: "Deduction period finalized and locked.",
+    };
+    setWorkflowMessage(messages[action]);
+    await loadDeductionWorkflow(periodId);
+}
+
+function setInvestigationMessage(message, type = "ok") {
+    const element = document.getElementById("investigation-message");
+    element.textContent = message || "";
+    element.className = `mt-3 text-sm font-semibold ${type === "error" ? "text-red-700" : "text-emerald-700"}`;
+}
+
+function investigationLabel(value) {
+    return aCategory(String(value || "").replace(/_/g, " "));
+}
+
+function renderInvestigations(rows) {
+    const container = document.getElementById("investigation-list");
+    const modal = document.getElementById("debt-investigations-modal");
+    const currentRole = modal.dataset.currentRole || "";
+    const currentUser = Number(modal.dataset.currentUser || 0);
+    if (!rows.length) {
+        container.innerHTML = '<div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">No debt investigations have been opened.</div>';
+        return;
+    }
+
+    container.innerHTML = rows.map((row) => {
+        const status = String(row.status || "open");
+        const canRecommend = ["open", "investigating"].includes(status);
+        const canApprove = status === "recommended" && currentRole === "ACCOUNTING_OFFICE" && Number(row.recommended_by || 0) !== currentUser;
+        return `
+            <article class="rounded-xl border border-slate-200 bg-slate-50 p-4" data-investigation-id="${aEscape(row.id)}">
+                <div class="flex flex-wrap items-start justify-between gap-2">
+                    <div>
+                        <strong class="block text-sm text-slate-900">#${aEscape(row.id)} · ${aEscape(row.name || "Employee")}</strong>
+                        <small class="text-slate-500">${aEscape(row.employee_id || "-")} · ${aEscape(investigationLabel(row.issue_type))} · ${aEscape(row.client_txn_id || "General balance")}</small>
+                    </div>
+                    <span class="acct-debt-status ${status === "closed" ? "is-success" : status === "recommended" ? "is-warning" : "is-info"}">${aEscape(investigationLabel(status))}</span>
+                </div>
+                <p class="mt-2 text-sm text-slate-700">${aEscape(row.summary || "")}</p>
+                ${row.findings ? `<div class="mt-2 rounded-lg border border-slate-200 bg-white p-2 text-sm text-slate-600"><strong>Findings:</strong> ${aEscape(row.findings)}</div>` : ""}
+                ${canRecommend ? `
+                    <div class="mt-3 grid gap-2">
+                        <textarea class="investigation-findings min-h-20 rounded-xl border border-slate-200 bg-white p-3 text-sm" placeholder="Document findings (minimum 10 characters)"></textarea>
+                        <textarea class="investigation-result-evidence min-h-16 rounded-xl border border-slate-200 bg-white p-3 text-sm" placeholder="Evidence reviewed"></textarea>
+                        <div class="grid gap-2 md:grid-cols-[220px_170px_auto]">
+                            <select class="investigation-action h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm" aria-label="Recommended action">
+                                <option value="no_change">No financial change</option>
+                                <option value="partial_reversal">Partial reversal</option>
+                                <option value="full_reversal">Full reversal</option>
+                            </select>
+                            <input class="investigation-amount h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm" type="number" min="0" step="0.01" value="0.00" aria-label="Recommended reversal amount">
+                            <button type="button" class="investigation-recommend inline-flex h-10 items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700">Submit recommendation</button>
+                        </div>
+                    </div>
+                ` : ""}
+                ${status === "recommended" ? `
+                    <div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                        <strong>${aEscape(investigationLabel(row.recommended_action))} · ${aEscape(aMoney(row.recommended_amount || 0))}</strong>
+                        <p class="mt-1">Recommended by ${aEscape(row.recommended_by_name || "Unknown")}.</p>
+                        ${canApprove
+                            ? '<button type="button" class="investigation-approve mt-2 inline-flex h-10 items-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700">Approve and post correction</button>'
+                            : '<p class="mt-2 font-semibold">Awaiting approval by a different Accounting user.</p>'}
+                    </div>
+                ` : ""}
+                ${status === "closed" ? `<div class="mt-2 text-sm text-emerald-700">Closed by ${aEscape(row.approved_by_name || "Accounting")} · Posted reversal ${aEscape(aMoney(row.recommended_amount || 0))}</div>` : ""}
+            </article>
+        `;
+    }).join("");
+}
+
+async function loadInvestigationTransactions(userId) {
+    const select = document.getElementById("investigation-transaction");
+    select.innerHTML = '<option value="">General balance investigation</option>';
+    if (!userId) return;
+    const response = await fetch(`/accounting/debt-investigations?user_id=${encodeURIComponent(userId)}`);
+    const data = await response.json();
+    if (!data || data.status !== "success") return;
+    select.innerHTML += (data.transactions || []).map((row) =>
+        `<option value="${aEscape(row.id)}">${aEscape(row.client_txn_id)} · ${aEscape(aMoney(row.amount))} · ${aEscape(aDateTime(row.created_at))}</option>`
+    ).join("");
+}
+
+async function loadInvestigations() {
+    const response = await fetch("/accounting/debt-investigations");
+    const data = await response.json();
+    if (!data || data.status !== "success") {
+        setInvestigationMessage(data?.message || "Unable to load investigations.", "error");
+        return;
+    }
+    renderInvestigations(Array.isArray(data.investigations) ? data.investigations : []);
+}
+
+async function openInvestigationsModal() {
+    const modal = document.getElementById("debt-investigations-modal");
+    modal.style.display = "grid";
+    const userSelect = document.getElementById("investigation-user");
+    userSelect.innerHTML = '<option value="">Select employee</option>' + acctRows.map((row) =>
+        `<option value="${aEscape(row.user_id)}">${aEscape(row.name)} · ${aEscape(row.employee_id || "-")} · ${aEscape(aMoney(row.current_debt || 0))}</option>`
+    ).join("");
+    setInvestigationMessage("");
+    await loadInvestigations();
+}
+
+function closeInvestigationsModal() {
+    document.getElementById("debt-investigations-modal").style.display = "none";
+}
+
+async function openInvestigation() {
+    const response = await fetch("/accounting/debt-investigations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            user_id: Number(document.getElementById("investigation-user").value || 0),
+            transaction_id: Number(document.getElementById("investigation-transaction").value || 0),
+            issue_type: document.getElementById("investigation-issue").value,
+            summary: document.getElementById("investigation-summary").value.trim(),
+            evidence_summary: document.getElementById("investigation-evidence").value.trim(),
+        }),
+    });
+    const data = await response.json();
+    if (!data || data.status !== "success") {
+        setInvestigationMessage(data?.message || "Failed to open investigation.", "error");
+        return;
+    }
+    document.getElementById("investigation-summary").value = "";
+    document.getElementById("investigation-evidence").value = "";
+    setInvestigationMessage("Investigation opened. Financial records remain unchanged.");
+    await loadInvestigations();
+}
+
+async function recommendInvestigation(button) {
+    const row = button.closest("[data-investigation-id]");
+    const id = Number(row?.dataset.investigationId || 0);
+    const response = await fetch(`/accounting/debt-investigations/${id}/recommend`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            findings: row.querySelector(".investigation-findings").value.trim(),
+            evidence_summary: row.querySelector(".investigation-result-evidence").value.trim(),
+            recommended_action: row.querySelector(".investigation-action").value,
+            recommended_amount: Number(row.querySelector(".investigation-amount").value || 0),
+        }),
+    });
+    const data = await response.json();
+    if (!data || data.status !== "success") {
+        setInvestigationMessage(data?.message || "Failed to submit recommendation.", "error");
+        return;
+    }
+    setInvestigationMessage("Recommendation submitted for independent Accounting approval.");
+    await loadInvestigations();
+}
+
+async function approveInvestigation(button) {
+    const row = button.closest("[data-investigation-id]");
+    const id = Number(row?.dataset.investigationId || 0);
+    const response = await fetch(`/accounting/debt-investigations/${id}/approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+    });
+    const data = await response.json();
+    if (!data || data.status !== "success") {
+        setInvestigationMessage(data?.message || "Failed to approve correction.", "error");
+        return;
+    }
+    setInvestigationMessage(`Correction posted. Employee debt changed from ${aMoney(data.debt_before)} to ${aMoney(data.debt_after)}.`);
+    await loadData();
+    await loadInvestigations();
+}
+
 document.getElementById("acct-search").addEventListener("input", () => {
     applyMainFiltersAndRender();
 });
@@ -1103,13 +1519,51 @@ document.getElementById("acct-body").addEventListener("click", async (event) => 
 });
 
 document.getElementById("open-deduction-mode").addEventListener("click", openMode);
+document.getElementById("open-deduction-workflow").addEventListener("click", openDeductionWorkflow);
+document.getElementById("open-debt-investigations").addEventListener("click", openInvestigationsModal);
 document.getElementById("open-settlement-run").addEventListener("click", openSettlementModal);
 document.getElementById("open-import-csv").addEventListener("click", openImportModal);
 document.getElementById("close-deduction-mode").addEventListener("click", closeMode);
+document.getElementById("close-deduction-workflow").addEventListener("click", closeDeductionWorkflow);
+document.getElementById("close-debt-investigations").addEventListener("click", closeInvestigationsModal);
 document.getElementById("close-settlement-run").addEventListener("click", closeSettlementModal);
 document.getElementById("close-import-csv").addEventListener("click", closeImportModal);
 document.getElementById("deduction-mode-modal").addEventListener("click", (event) => {
     if (event.target.id === "deduction-mode-modal") closeMode();
+});
+document.getElementById("deduction-workflow-modal").addEventListener("click", (event) => {
+    if (event.target.id === "deduction-workflow-modal") closeDeductionWorkflow();
+});
+document.getElementById("debt-investigations-modal").addEventListener("click", (event) => {
+    if (event.target.id === "debt-investigations-modal") closeInvestigationsModal();
+});
+document.getElementById("investigation-user").addEventListener("change", (event) => {
+    loadInvestigationTransactions(Number(event.target.value || 0));
+});
+document.getElementById("investigation-open").addEventListener("click", openInvestigation);
+document.getElementById("investigation-refresh").addEventListener("click", loadInvestigations);
+document.getElementById("investigation-list").addEventListener("click", (event) => {
+    const recommendButton = event.target.closest(".investigation-recommend");
+    if (recommendButton) {
+        recommendInvestigation(recommendButton);
+        return;
+    }
+    const approveButton = event.target.closest(".investigation-approve");
+    if (approveButton) approveInvestigation(approveButton);
+});
+document.getElementById("workflow-create-period").addEventListener("click", createWorkflowPeriod);
+document.getElementById("workflow-refresh").addEventListener("click", () => loadDeductionWorkflow());
+document.getElementById("workflow-period-select").addEventListener("change", (event) => {
+    loadDeductionWorkflow(Number(event.target.value || 0));
+});
+document.getElementById("workflow-prepare-batch").addEventListener("click", prepareWorkflowBatch);
+document.getElementById("workflow-results").addEventListener("click", (event) => {
+    const button = event.target.closest(".workflow-confirm-result");
+    if (button) confirmWorkflowResult(button);
+});
+document.getElementById("workflow-batch-actions").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-workflow-batch-action]");
+    if (button) advanceWorkflowBatch(button.dataset.workflowBatchAction || "");
 });
 document.getElementById("settlement-run-modal").addEventListener("click", (event) => {
     if (event.target.id === "settlement-run-modal") closeSettlementModal();

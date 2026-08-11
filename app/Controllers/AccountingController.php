@@ -8,11 +8,164 @@ use App\Models\SalaryImportBatchModel;
 use App\Models\SalaryImportRowModel;
 use App\Models\UserModel;
 use App\Models\DebtCashbookEntryModel;
+use App\Services\DeductionBatchService;
+use App\Services\DeductionPeriodService;
+use App\Services\DebtInvestigationService;
 use CodeIgniter\Controller;
 use Config\Database;
 
 class AccountingController extends Controller
 {
+    public function debtInvestigationsData()
+    {
+        $db = Database::connect();
+        $userId = max(0, (int) ($this->request->getGet('user_id') ?? 0));
+        $investigations = $db->table('debt_investigations di')
+            ->select('di.*, u.employee_id, u.name, t.client_txn_id, opener.name AS opened_by_name, recommender.name AS recommended_by_name, approver.name AS approved_by_name')
+            ->join('users u', 'u.id = di.user_id', 'inner')
+            ->join('transactions t', 't.id = di.transaction_id', 'left')
+            ->join('users opener', 'opener.id = di.opened_by', 'left')
+            ->join('users recommender', 'recommender.id = di.recommended_by', 'left')
+            ->join('users approver', 'approver.id = di.approved_by', 'left')
+            ->orderBy('di.id', 'DESC')
+            ->limit(100)
+            ->get()
+            ->getResultArray();
+        $transactions = [];
+        if ($userId > 0) {
+            $transactions = $db->table('transactions')
+                ->select('id, client_txn_id, amount, store_id, created_at')
+                ->where('user_id', $userId)
+                ->where('payment_method', 'debt')
+                ->orderBy('id', 'DESC')
+                ->limit(100)
+                ->get()
+                ->getResultArray();
+        }
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'investigations' => $investigations,
+            'transactions' => $transactions,
+        ]);
+    }
+
+    public function openDebtInvestigation()
+    {
+        $result = (new DebtInvestigationService())->open(
+            $this->request->getJSON(true) ?? $this->request->getPost(),
+            (int) session()->get('user_id')
+        );
+        return $this->response->setStatusCode((int) ($result['code'] ?? 400))->setJSON($result);
+    }
+
+    public function recommendDebtInvestigation(int $investigationId)
+    {
+        $result = (new DebtInvestigationService())->recommend(
+            $investigationId,
+            $this->request->getJSON(true) ?? $this->request->getPost(),
+            (int) session()->get('user_id')
+        );
+        return $this->response->setStatusCode((int) ($result['code'] ?? 400))->setJSON($result);
+    }
+
+    public function approveDebtInvestigation(int $investigationId)
+    {
+        $result = (new DebtInvestigationService())->approveAndPost(
+            $investigationId,
+            (int) session()->get('user_id')
+        );
+        return $this->response->setStatusCode((int) ($result['code'] ?? 400))->setJSON($result);
+    }
+
+    public function deductionWorkflowData()
+    {
+        $db = Database::connect();
+        $batchId = max(0, (int) ($this->request->getGet('batch_id') ?? 0));
+        $periods = $db->table('deduction_periods dp')
+            ->select('dp.*, db.id AS batch_id, db.status AS batch_status, db.total_accounts, db.total_requested, db.total_confirmed, db.total_carryover, db.created_by AS batch_created_by')
+            ->join('deduction_batches db', 'db.period_id = dp.id', 'left')
+            ->orderBy('dp.date_start', 'DESC')
+            ->orderBy('dp.id', 'DESC')
+            ->get()
+            ->getResultArray();
+
+        $items = [];
+        if ($batchId > 0) {
+            $items = $db->table('deduction_batch_items dbi')
+                ->select('dbi.*, u.employee_id, u.name, u.email, u.user_type, b.current_debt')
+                ->join('users u', 'u.id = dbi.user_id', 'inner')
+                ->join('balances b', 'b.user_id = dbi.user_id', 'left')
+                ->where('dbi.batch_id', $batchId)
+                ->orderBy('u.name', 'ASC')
+                ->get()
+                ->getResultArray();
+        }
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'periods' => $periods,
+            'items' => $items,
+        ]);
+    }
+
+    public function createDeductionPeriod()
+    {
+        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $result = (new DeductionPeriodService())->create($request, (int) session()->get('user_id'));
+
+        return $this->response
+            ->setStatusCode((int) ($result['code'] ?? 400))
+            ->setJSON($result);
+    }
+
+    public function prepareDeductionBatch()
+    {
+        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $result = (new DeductionBatchService())->prepare(
+            (int) ($request['period_id'] ?? 0),
+            is_array($request['requests'] ?? null) ? $request['requests'] : [],
+            (int) session()->get('user_id'),
+            isset($request['notes']) ? (string) $request['notes'] : null
+        );
+
+        return $this->response
+            ->setStatusCode((int) ($result['code'] ?? 400))
+            ->setJSON($result);
+    }
+
+    public function confirmDeductionResult(int $itemId)
+    {
+        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $result = (new DeductionBatchService())->confirmResult(
+            $itemId,
+            $request,
+            (int) session()->get('user_id')
+        );
+
+        return $this->response
+            ->setStatusCode((int) ($result['code'] ?? 400))
+            ->setJSON($result);
+    }
+
+    public function submitDeductionBatch(int $batchId)
+    {
+        $result = (new DeductionBatchService())->submit($batchId, (int) session()->get('user_id'));
+        return $this->response->setStatusCode((int) ($result['code'] ?? 400))->setJSON($result);
+    }
+
+    public function reconcileDeductionBatch(int $batchId)
+    {
+        $result = (new DeductionBatchService())->reconcile($batchId, (int) session()->get('user_id'));
+        return $this->response->setStatusCode((int) ($result['code'] ?? 400))->setJSON($result);
+    }
+
+    public function finalizeDeductionBatch(int $batchId)
+    {
+        $result = (new DeductionBatchService())->finalize($batchId, (int) session()->get('user_id'));
+        return $this->response->setStatusCode((int) ($result['code'] ?? 400))->setJSON($result);
+    }
+
     private function addDebtCashbookEntry(
         int $userId,
         string $entryType,
@@ -58,7 +211,7 @@ class AccountingController extends Controller
         $accountsRow = $db->table('balances b')
             ->select('COUNT(*) AS total_accounts, SUM(b.current_debt) AS total_debt, SUM(CASE WHEN b.current_debt > 0 THEN 1 ELSE 0 END) AS with_debt, SUM(CASE WHEN b.current_debt > b.credit_limit AND b.current_debt > 0 THEN 1 ELSE 0 END) AS over_limit_count')
             ->join('users u', 'u.id = b.user_id', 'inner')
-            ->where('u.is_active', 1)
+            ->where('u.is_active', true)
             ->whereIn('u.user_type', ['faculty', 'staff'])
             ->get()
             ->getRowArray() ?? [];
@@ -68,6 +221,7 @@ class AccountingController extends Controller
         $todayCashbook = $db->table('debt_cashbook_entries')
             ->select('COUNT(*) AS entry_count, COALESCE(SUM(amount), 0) AS total_amount')
             ->where('direction', 'credit')
+            ->whereIn('entry_type', ['confirmed_salary_deduction', 'salary_deduction', 'manual_deduction', 'full_deduction'])
             ->where('created_at >=', $todayStart)
             ->where('created_at <=', $todayEnd)
             ->get()
@@ -76,10 +230,9 @@ class AccountingController extends Controller
         $todayDeductionCount = (int) ($todayCashbook['entry_count'] ?? 0);
         $todayDeductionAmount = (float) ($todayCashbook['total_amount'] ?? 0);
 
-        $lastRun = $db->table('settlement_runs sr')
-            ->select('sr.id, sr.run_month, sr.run_at, sr.total_accounts, sr.total_debt_before, u.name AS run_by_name')
-            ->join('users u', 'u.id = sr.run_by', 'left')
-            ->orderBy('sr.id', 'DESC')
+        $lastPeriod = $db->table('deduction_periods')
+            ->select('period_code, label, status, updated_at')
+            ->orderBy('id', 'DESC')
             ->limit(1)
             ->get()
             ->getRowArray();
@@ -87,7 +240,7 @@ class AccountingController extends Controller
         $topDebtAccounts = $db->table('balances b')
             ->select('u.id AS user_id, u.employee_id, u.name, u.email, b.current_debt, b.credit_limit')
             ->join('users u', 'u.id = b.user_id', 'inner')
-            ->where('u.is_active', 1)
+            ->where('u.is_active', true)
             ->whereIn('u.user_type', ['faculty', 'staff'])
             ->where('b.current_debt >', 0)
             ->orderBy('b.current_debt', 'DESC')
@@ -98,7 +251,7 @@ class AccountingController extends Controller
         $overLimitAccounts = $db->table('balances b')
             ->select('u.id AS user_id, u.employee_id, u.name, u.email, b.current_debt, b.credit_limit')
             ->join('users u', 'u.id = b.user_id', 'inner')
-            ->where('u.is_active', 1)
+            ->where('u.is_active', true)
             ->whereIn('u.user_type', ['faculty', 'staff'])
             ->where('b.current_debt > b.credit_limit', null, false)
             ->where('b.current_debt >', 0)
@@ -112,11 +265,11 @@ class AccountingController extends Controller
             ->select('u.id AS user_id, u.employee_id, u.name, u.email, b.current_debt, b.updated_at, MAX(dce.created_at) AS last_cashbook_at')
             ->join('users u', 'u.id = b.user_id', 'inner')
             ->join('debt_cashbook_entries dce', 'dce.user_id = u.id', 'left')
-            ->where('u.is_active', 1)
+            ->where('u.is_active', true)
             ->whereIn('u.user_type', ['faculty', 'staff'])
             ->where('b.current_debt >', 0)
             ->groupBy('u.id, u.employee_id, u.name, u.email, b.current_debt, b.updated_at')
-            ->having('(last_cashbook_at IS NULL OR last_cashbook_at < ' . $db->escape($staleCutoff) . ')', null, false)
+            ->having('(MAX(dce.created_at) IS NULL OR MAX(dce.created_at) < ' . $db->escape($staleCutoff) . ')', null, false)
             ->orderBy('b.current_debt', 'DESC')
             ->limit(5)
             ->get()
@@ -142,6 +295,7 @@ class AccountingController extends Controller
         $trendRows = $db->table('debt_cashbook_entries')
             ->select('created_at, amount')
             ->where('direction', 'credit')
+            ->whereIn('entry_type', ['confirmed_salary_deduction', 'salary_deduction', 'manual_deduction', 'full_deduction'])
             ->where('created_at >=', date('Y-m-d 00:00:00', strtotime('-6 day')))
             ->where('created_at <=', date('Y-m-d 23:59:59'))
             ->orderBy('created_at', 'ASC')
@@ -171,7 +325,7 @@ class AccountingController extends Controller
         $recentActivities = $db->table('audit_logs al')
             ->select('al.id, al.action, al.created_at, al.payload_json, actor.name AS actor_name, target.name AS target_name')
             ->join('users actor', 'actor.id = al.actor_id', 'left')
-            ->join('users target', 'target.id = al.entity_id AND al.entity = "balances"', 'left')
+            ->join('users target', "target.id = al.entity_id AND al.entity = 'balances'", 'left', false)
             ->whereIn('al.action', [
                 'ACCOUNTING_IMPORT_HR_CSV',
                 'ACCOUNTING_DEDUCT_DEBT',
@@ -179,6 +333,14 @@ class AccountingController extends Controller
                 'ACCOUNTING_UPDATE_CREDIT_LIMIT',
                 'ACCOUNTING_RUN_SETTLEMENT',
                 'ACCOUNTING_SETTLEMENT_DEDUCT',
+                'ACCOUNTING_PREPARE_DEDUCTION_BATCH',
+                'ACCOUNTING_SUBMIT_DEDUCTION_BATCH',
+                'ACCOUNTING_CONFIRM_DEDUCTION_RESULT',
+                'ACCOUNTING_RECONCILE_DEDUCTION_BATCH',
+                'ACCOUNTING_FINALIZE_DEDUCTION_BATCH',
+                'OPEN_DEBT_INVESTIGATION',
+                'RECOMMEND_DEBT_INVESTIGATION',
+                'APPROVE_AND_POST_DEBT_REVERSAL',
             ])
             ->orderBy('al.id', 'DESC')
             ->limit(10)
@@ -205,6 +367,22 @@ class AccountingController extends Controller
                 $label = 'Ran monthly settlement';
             } elseif ($action === 'ACCOUNTING_SETTLEMENT_DEDUCT') {
                 $label = 'Settlement deduction entry';
+            } elseif ($action === 'ACCOUNTING_PREPARE_DEDUCTION_BATCH') {
+                $label = 'Prepared deduction batch';
+            } elseif ($action === 'ACCOUNTING_SUBMIT_DEDUCTION_BATCH') {
+                $label = 'Submitted deduction batch';
+            } elseif ($action === 'ACCOUNTING_CONFIRM_DEDUCTION_RESULT') {
+                $label = 'Confirmed payroll result';
+            } elseif ($action === 'ACCOUNTING_RECONCILE_DEDUCTION_BATCH') {
+                $label = 'Reconciled deduction batch';
+            } elseif ($action === 'ACCOUNTING_FINALIZE_DEDUCTION_BATCH') {
+                $label = 'Finalized deduction period';
+            } elseif ($action === 'OPEN_DEBT_INVESTIGATION') {
+                $label = 'Opened debt investigation';
+            } elseif ($action === 'RECOMMEND_DEBT_INVESTIGATION') {
+                $label = 'Recommended debt correction';
+            } elseif ($action === 'APPROVE_AND_POST_DEBT_REVERSAL') {
+                $label = 'Approved debt correction';
             }
 
             return [
@@ -212,7 +390,7 @@ class AccountingController extends Controller
                 'label' => $label,
                 'actor_name' => $row['actor_name'] ?: 'Unknown',
                 'target_name' => $row['target_name'] ?: null,
-                'amount' => (float) ($payload['deducted_amount'] ?? 0),
+                'amount' => (float) ($payload['deducted_amount'] ?? $payload['confirmed_amount'] ?? $payload['amount'] ?? 0),
                 'created_at' => $row['created_at'] ?? null,
             ];
         }, $recentActivities);
@@ -226,8 +404,10 @@ class AccountingController extends Controller
                 'today_deduction_count' => $todayDeductionCount,
                 'today_deduction_amount' => $todayDeductionAmount,
                 'over_limit_count' => (int) ($accountsRow['over_limit_count'] ?? 0),
-                'last_settlement_month' => $lastRun['run_month'] ?? null,
-                'last_settlement_at' => $lastRun['run_at'] ?? null,
+                'last_deduction_period' => $lastPeriod['period_code'] ?? null,
+                'last_deduction_label' => $lastPeriod['label'] ?? null,
+                'last_deduction_status' => $lastPeriod['status'] ?? null,
+                'last_deduction_at' => $lastPeriod['updated_at'] ?? null,
             ],
             'top_debt_accounts' => array_map(static function (array $row): array {
                 return [
@@ -295,7 +475,7 @@ class AccountingController extends Controller
         $query = $db->table('balances b')
             ->select('u.id AS user_id, u.employee_id, u.name, u.email, u.user_type, u.is_active, b.credit_limit, b.current_debt, b.updated_at')
             ->join('users u', 'u.id = b.user_id', 'inner')
-            ->where('u.is_active', 1)
+            ->where('u.is_active', true)
             ->whereIn('u.user_type', ['faculty', 'staff']);
 
         if ($debtOnly) {
@@ -360,7 +540,7 @@ class AccountingController extends Controller
         $row = $db->table('balances b')
             ->select('u.id AS user_id, u.employee_id, u.name, u.email, u.user_type, b.credit_limit, b.current_debt, b.updated_at')
             ->join('users u', 'u.id = b.user_id', 'inner')
-            ->where('u.is_active', 1)
+            ->where('u.is_active', true)
             ->where('u.id', $userId)
             ->get()
             ->getRowArray();
@@ -443,37 +623,24 @@ class AccountingController extends Controller
         $start = date('Y-m-d 00:00:00');
         $end = date('Y-m-d 23:59:59');
 
-        $rows = $db->table('audit_logs')
-            ->select('action, payload_json')
-            ->whereIn('action', [
-                'ACCOUNTING_DEDUCT_DEBT',
-                'ACCOUNTING_DEDUCT_FULL_DEBT',
+        $summary = $db->table('debt_cashbook_entries')
+            ->select('COUNT(*) AS deduction_count, COALESCE(SUM(amount), 0) AS deducted_amount')
+            ->whereIn('entry_type', [
+                'confirmed_salary_deduction',
+                'salary_deduction',
+                'manual_deduction',
+                'full_deduction',
             ])
             ->where('created_at >=', $start)
             ->where('created_at <=', $end)
             ->get()
-            ->getResultArray();
-
-        $count = 0;
-        $amount = 0.0;
-        foreach ($rows as $row) {
-            $payload = json_decode((string) ($row['payload_json'] ?? ''), true);
-            if (!is_array($payload)) {
-                continue;
-            }
-            $deducted = (float) ($payload['deducted_amount'] ?? 0);
-            if ($deducted <= 0) {
-                continue;
-            }
-            $count++;
-            $amount += $deducted;
-        }
+            ->getRowArray() ?? [];
 
         return $this->response->setJSON([
             'status' => 'success',
             'date' => date('Y-m-d'),
-            'deduction_count' => $count,
-            'deducted_amount' => $amount,
+            'deduction_count' => (int) ($summary['deduction_count'] ?? 0),
+            'deducted_amount' => (float) ($summary['deducted_amount'] ?? 0),
         ]);
     }
 
@@ -491,7 +658,7 @@ class AccountingController extends Controller
         $rows = $db->table('balances b')
             ->select('u.id AS user_id, u.employee_id, u.name, u.email, u.user_type, u.base_salary, b.current_debt')
             ->join('users u', 'u.id = b.user_id', 'inner')
-            ->where('u.is_active', 1)
+            ->where('u.is_active', true)
             ->whereIn('u.user_type', ['faculty', 'staff'])
             ->where('b.current_debt >', 0)
             ->orderBy('b.current_debt', 'DESC')
@@ -590,7 +757,7 @@ class AccountingController extends Controller
         $settlementBuilder = $db->table('balances b')
             ->select('u.id AS user_id, u.base_salary, b.current_debt')
             ->join('users u', 'u.id = b.user_id', 'inner')
-            ->where('u.is_active', 1)
+            ->where('u.is_active', true)
             ->whereIn('u.user_type', ['faculty', 'staff'])
             ->where('b.current_debt >', 0);
 
@@ -1032,7 +1199,7 @@ class AccountingController extends Controller
                     'email' => $email,
                     'user_type' => $userType,
                     'base_salary' => $monthlySalary,
-                    'is_active' => 1,
+                    'is_active' => true,
                 ]);
                 $userId = (int) $existingUser['id'];
             } else {
@@ -1048,7 +1215,7 @@ class AccountingController extends Controller
                     'user_type' => $userType,
                     'qr_token' => $qrToken,
                     'base_salary' => $monthlySalary,
-                    'is_active' => 1,
+                    'is_active' => true,
                     'created_at' => date('Y-m-d H:i:s'),
                 ]);
             }
@@ -1324,8 +1491,10 @@ class AccountingController extends Controller
         $balanceModel = new BalanceModel();
         $auditLogModel = new AuditLogModel();
 
-        $balance = $balanceModel->getBalanceByUserId($userId);
+        $db->transBegin();
+        $balance = $balanceModel->getBalanceForUpdate($userId);
         if (!$balance) {
+            $db->transRollback();
             return $this->response->setStatusCode(404)->setJSON([
                 'status' => 'error',
                 'message' => 'Balance record not found.',
@@ -1335,6 +1504,7 @@ class AccountingController extends Controller
         $currentDebt = (float) $balance['current_debt'];
         $creditLimit = (float) $balance['credit_limit'];
         if ($currentDebt <= 0) {
+            $db->transRollback();
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
                 'message' => 'This account has no debt.',
@@ -1342,6 +1512,7 @@ class AccountingController extends Controller
         }
 
         if ($amount > $currentDebt) {
+            $db->transRollback();
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
                 'message' => 'Deduction cannot exceed current debt.',
@@ -1349,8 +1520,6 @@ class AccountingController extends Controller
         }
 
         $newDebt = $currentDebt - $amount;
-
-        $db->transStart();
 
         $balanceModel->update($userId, [
             'current_debt' => $newDebt,
@@ -1386,14 +1555,15 @@ class AccountingController extends Controller
             ['source' => 'accounting_manual_deduction']
         );
 
-        $db->transComplete();
-
         if (!$db->transStatus()) {
+            $db->transRollback();
             return $this->response->setStatusCode(500)->setJSON([
                 'status' => 'error',
                 'message' => 'Failed to apply deduction.',
             ]);
         }
+
+        $db->transCommit();
 
         return $this->response->setJSON([
             'status' => 'success',
@@ -1422,8 +1592,10 @@ class AccountingController extends Controller
         $balanceModel = new BalanceModel();
         $auditLogModel = new AuditLogModel();
 
-        $balance = $balanceModel->getBalanceByUserId($userId);
+        $db->transBegin();
+        $balance = $balanceModel->getBalanceForUpdate($userId);
         if (!$balance) {
+            $db->transRollback();
             return $this->response->setStatusCode(404)->setJSON([
                 'status' => 'error',
                 'message' => 'Balance record not found.',
@@ -1433,13 +1605,12 @@ class AccountingController extends Controller
         $currentDebt = (float) $balance['current_debt'];
         $creditLimit = (float) ($balance['credit_limit'] ?? 0);
         if ($currentDebt <= 0) {
+            $db->transRollback();
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
                 'message' => 'This account has no debt.',
             ]);
         }
-
-        $db->transStart();
 
         $balanceModel->update($userId, [
             'current_debt' => 0,
@@ -1475,14 +1646,15 @@ class AccountingController extends Controller
             ['source' => 'accounting_full_deduction']
         );
 
-        $db->transComplete();
-
         if (!$db->transStatus()) {
+            $db->transRollback();
             return $this->response->setStatusCode(500)->setJSON([
                 'status' => 'error',
                 'message' => 'Failed to apply full deduction.',
             ]);
         }
+
+        $db->transCommit();
 
         return $this->response->setJSON([
             'status' => 'success',
@@ -1512,8 +1684,10 @@ class AccountingController extends Controller
         $balanceModel = new BalanceModel();
         $auditLogModel = new AuditLogModel();
 
-        $balance = $balanceModel->getBalanceByUserId($userId);
+        $db->transBegin();
+        $balance = $balanceModel->getBalanceForUpdate($userId);
         if (!$balance) {
+            $db->transRollback();
             return $this->response->setStatusCode(404)->setJSON([
                 'status' => 'error',
                 'message' => 'Balance record not found.',
@@ -1521,8 +1695,6 @@ class AccountingController extends Controller
         }
 
         $previousLimit = (float) $balance['credit_limit'];
-
-        $db->transStart();
 
         $balanceModel->update($userId, [
             'credit_limit' => $creditLimit,
@@ -1543,14 +1715,15 @@ class AccountingController extends Controller
             'created_at' => date('Y-m-d H:i:s'),
         ]);
 
-        $db->transComplete();
-
         if (!$db->transStatus()) {
+            $db->transRollback();
             return $this->response->setStatusCode(500)->setJSON([
                 'status' => 'error',
                 'message' => 'Failed to update credit limit.',
             ]);
         }
+
+        $db->transCommit();
 
         return $this->response->setJSON([
             'status' => 'success',

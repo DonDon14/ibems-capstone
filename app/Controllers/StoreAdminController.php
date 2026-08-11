@@ -93,7 +93,7 @@ class StoreAdminController extends AdminController
         $storePayload = [];
         foreach ($stores as $store) {
             $storeId = (int) ($store['id'] ?? 0);
-            $isActive = (int) ($store['is_active'] ?? 0) === 1;
+            $isActive = ibems_bool($store['is_active'] ?? false);
             $session = $latestSessionsByStore[$storeId] ?? null;
             $today = $todayByStore[$storeId] ?? ['txn_count' => 0, 'sales_total' => 0.0];
             $todaySalesTotal += (float) $today['sales_total'];

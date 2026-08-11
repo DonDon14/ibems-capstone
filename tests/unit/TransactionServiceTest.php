@@ -268,6 +268,77 @@ final class TransactionServiceTest extends CIUnitTestCase
         $this->assertSame(25.0, (float) ($balance['current_debt'] ?? 0));
     }
 
+    public function testFiveInvalidDebtPinsLockTheEmployeeAcrossRequests(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+
+        $this->seedStore($now);
+        $this->seedOpenStoreDay($now);
+        $this->seedPaymentMethod('debt', true, $now);
+        $this->seedProduct(101, 5, 50, $now);
+        $this->seedDebtCustomer(501, 'faculty', 500, 25, '1234', $now);
+
+        for ($attempt = 1; $attempt <= 5; $attempt++) {
+            $result = $this->createDebtTransaction('9999');
+        }
+
+        $this->assertSame('error', $result['status']);
+        $this->assertSame(423, $result['code'] ?? null);
+        $this->assertStringContainsString('temporarily locked', $result['message']);
+
+        $state = $db->table('debt_pin_security')->where('user_id', 501)->get()->getRowArray();
+        $this->assertSame(5, (int) ($state['failed_attempts'] ?? 0));
+        $this->assertNotEmpty($state['locked_until'] ?? null);
+        $this->assertSame(4, $db->table('audit_logs')->where('action', 'FAILED_DEBT_PIN')->countAllResults());
+        $this->assertSame(1, $db->table('audit_logs')->where('action', 'DEBT_PIN_LOCKED')->countAllResults());
+
+        $correctPinResult = $this->createDebtTransaction('1234');
+        $this->assertSame(423, $correctPinResult['code'] ?? null);
+        $this->assertSame(1, $db->table('audit_logs')->where('action', 'BLOCKED_DEBT_PIN')->countAllResults());
+        $this->assertSame(0, $db->table('transactions')->countAllResults());
+    }
+
+    public function testExpiredDebtPinLockAllowsSuccessAndResetsAttempts(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+
+        $this->seedStore($now);
+        $this->seedOpenStoreDay($now);
+        $this->seedPaymentMethod('debt', true, $now);
+        $this->seedProduct(101, 5, 50, $now);
+        $this->seedDebtCustomer(501, 'staff', 500, 25, '1234', $now);
+        $db->table('debt_pin_security')->insert([
+            'user_id' => 501,
+            'failed_attempts' => 5,
+            'window_started_at' => date('Y-m-d H:i:s', strtotime('-30 minutes')),
+            'locked_until' => date('Y-m-d H:i:s', strtotime('-1 minute')),
+            'last_failed_at' => date('Y-m-d H:i:s', strtotime('-16 minutes')),
+            'updated_at' => $now,
+        ]);
+
+        $result = $this->createDebtTransaction('1234');
+
+        $this->assertSame('success', $result['status']);
+        $state = $db->table('debt_pin_security')->where('user_id', 501)->get()->getRowArray();
+        $this->assertSame(0, (int) ($state['failed_attempts'] ?? -1));
+        $this->assertNull($state['window_started_at']);
+        $this->assertNull($state['locked_until']);
+        $this->assertNotEmpty($state['last_success_at'] ?? null);
+        $this->assertSame(1, $db->table('audit_logs')->where('action', 'DEBT_PIN_AUTHORIZED')->countAllResults());
+        $this->assertSame(1, $db->table('transactions')->countAllResults());
+
+        $authorizationAudit = $db->table('audit_logs')
+            ->where('action', 'DEBT_PIN_AUTHORIZED')
+            ->get()
+            ->getRowArray();
+        $payload = (string) ($authorizationAudit['payload_json'] ?? '');
+        $this->assertStringNotContainsString('1234', $payload);
+        $this->assertStringNotContainsString('debt_pin', $payload);
+        $this->assertStringNotContainsString('hash', $payload);
+    }
+
     public function testDuplicateProductLinesAreAggregatedBeforeStockDeduction(): void
     {
         $db = Database::connect();
@@ -407,6 +478,19 @@ final class TransactionServiceTest extends CIUnitTestCase
         ]);
     }
 
+    private function createDebtTransaction(string $pin): array
+    {
+        return (new TransactionService())->createTransaction([
+            'store_id' => 1,
+            'payment_method' => 'debt',
+            'customer_user_id' => 501,
+            'debt_pin' => $pin,
+            'items' => [
+                ['product_id' => 101, 'qty' => 1],
+            ],
+        ], 7, 'STORE_SYSTEM');
+    }
+
     private function resetSchema(): void
     {
         $db = Database::connect();
@@ -414,6 +498,7 @@ final class TransactionServiceTest extends CIUnitTestCase
         $tn = static fn (string $name): string => $prefix . $name;
 
         $tables = [
+            'debt_pin_security',
             'debt_cashbook_entries',
             'inventory_movements',
             'transaction_items',
@@ -508,6 +593,16 @@ final class TransactionServiceTest extends CIUnitTestCase
             user_id INTEGER PRIMARY KEY,
             credit_limit REAL NOT NULL DEFAULT 0,
             current_debt REAL NOT NULL DEFAULT 0,
+            updated_at TEXT
+        )');
+
+        $db->query('CREATE TABLE ' . $tn('debt_pin_security') . ' (
+            user_id INTEGER PRIMARY KEY,
+            failed_attempts INTEGER NOT NULL DEFAULT 0,
+            window_started_at TEXT,
+            locked_until TEXT,
+            last_failed_at TEXT,
+            last_success_at TEXT,
             updated_at TEXT
         )');
 

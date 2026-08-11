@@ -21,7 +21,7 @@
             <h1>Welcome Back</h1>
             <p>Sign in to the Integrated Business Enterprise Management System.</p>
 
-            <form id="login-form" class="auth-form">
+            <form id="login-form" class="auth-form" method="post" action="/auth/login">
                 <label for="email">Username</label>
                 <input id="email" name="email" type="email" required autocomplete="username" placeholder="you@example.com">
 

@@ -135,17 +135,36 @@ class IbemsDataAudit extends BaseCommand
         }
 
         // 4) Store mapping integrity
-        $storesWithoutOfficer = (int) $db->query(
+        $invalidStoreOfficers = (int) $db->query(
             'SELECT COUNT(*) AS c
              FROM stores s
              LEFT JOIN users u ON u.id = s.officer_id
-             WHERE s.officer_id IS NULL OR u.id IS NULL'
+             WHERE s.officer_id IS NOT NULL AND u.id IS NULL'
         )->getRow('c');
-        if ($storesWithoutOfficer > 0) {
-            CLI::write("[FAIL] stores with missing/invalid officer mapping: {$storesWithoutOfficer}", 'red');
+        if ($invalidStoreOfficers > 0) {
+            CLI::write("[FAIL] stores with invalid officer mapping: {$invalidStoreOfficers}", 'red');
             $errors++;
         } else {
-            CLI::write('[OK] every store has a valid officer mapping', 'green');
+            CLI::write('[OK] all assigned store officers reference valid users', 'green');
+        }
+
+        $orphanSupervisorMappings = $db->tableExists('store_supervisors')
+            ? (int) $db->query(
+                'SELECT COUNT(*) AS c
+                 FROM store_supervisors ss
+                 LEFT JOIN stores s ON s.id = ss.store_id
+                 LEFT JOIN users u ON u.id = ss.user_id
+                 WHERE s.id IS NULL OR u.id IS NULL'
+            )->getRow('c')
+            : -1;
+        if ($orphanSupervisorMappings < 0) {
+            CLI::write('[FAIL] store_supervisors table is missing', 'red');
+            $errors++;
+        } elseif ($orphanSupervisorMappings > 0) {
+            CLI::write("[FAIL] orphaned store supervisor mappings: {$orphanSupervisorMappings}", 'red');
+            $errors++;
+        } else {
+            CLI::write('[OK] all store supervisor mappings are valid', 'green');
         }
 
         $orphanPayments = (int) $db->query(
@@ -159,6 +178,73 @@ class IbemsDataAudit extends BaseCommand
             $errors++;
         } else {
             CLI::write('[OK] all transactions reference valid stores', 'green');
+        }
+
+        // 5) Governed debt workflow integrity
+        $invalidDeductionResults = (int) $db->query(
+            'SELECT COUNT(*) AS c
+             FROM deduction_batch_items
+             WHERE requested_amount < 0
+                OR confirmed_amount < 0
+                OR confirmed_amount > requested_amount
+                OR carryover_amount < 0'
+        )->getRow('c');
+        if ($invalidDeductionResults > 0) {
+            CLI::write("[FAIL] invalid deduction batch result amounts: {$invalidDeductionResults}", 'red');
+            $errors++;
+        } else {
+            CLI::write('[OK] deduction result amounts are valid', 'green');
+        }
+
+        $finalizedWithPendingItems = (int) $db->query(
+            "SELECT COUNT(*) AS c
+             FROM deduction_batches db
+             JOIN deduction_batch_items dbi ON dbi.batch_id = db.id
+             WHERE db.status = 'finalized' AND dbi.result_status = 'pending'"
+        )->getRow('c');
+        if ($finalizedWithPendingItems > 0) {
+            CLI::write("[FAIL] finalized deduction batches with pending results: {$finalizedWithPendingItems}", 'red');
+            $errors++;
+        } else {
+            CLI::write('[OK] finalized deduction batches have no pending results', 'green');
+        }
+
+        $selfApprovedInvestigations = (int) $db->query(
+            'SELECT COUNT(*) AS c
+             FROM debt_investigations
+             WHERE approved_by IS NOT NULL AND approved_by = recommended_by'
+        )->getRow('c');
+        if ($selfApprovedInvestigations > 0) {
+            CLI::write("[FAIL] self-approved debt investigations: {$selfApprovedInvestigations}", 'red');
+            $errors++;
+        } else {
+            CLI::write('[OK] debt investigation approvals are independently assigned', 'green');
+        }
+
+        $closedReversalsWithoutLedger = (int) $db->query(
+            "SELECT COUNT(*) AS c
+             FROM debt_investigations
+             WHERE status = 'closed'
+               AND recommended_action IN ('partial_reversal', 'full_reversal')
+               AND (recommended_amount > 0 AND reversal_cashbook_entry_id IS NULL)"
+        )->getRow('c');
+        if ($closedReversalsWithoutLedger > 0) {
+            CLI::write("[FAIL] closed debt reversals without linked cashbook entries: {$closedReversalsWithoutLedger}", 'red');
+            $errors++;
+        } else {
+            CLI::write('[OK] closed debt reversals link to cashbook entries', 'green');
+        }
+
+        $invalidPinAttemptState = (int) $db->query(
+            'SELECT COUNT(*) AS c
+             FROM debt_pin_security
+             WHERE failed_attempts < 0 OR failed_attempts > 5'
+        )->getRow('c');
+        if ($invalidPinAttemptState > 0) {
+            CLI::write("[FAIL] invalid debt PIN attempt state rows: {$invalidPinAttemptState}", 'red');
+            $errors++;
+        } else {
+            CLI::write('[OK] debt PIN attempt state is within policy limits', 'green');
         }
 
         CLI::newLine();

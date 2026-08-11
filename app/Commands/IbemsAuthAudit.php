@@ -17,7 +17,7 @@ class IbemsAuthAudit extends BaseCommand
 
     public function run(array $params): void
     {
-        $allowedRoles = ['ADMIN', 'STORE_SYSTEM', 'ACCOUNTING_OFFICE', 'USER'];
+        $allowedRoles = ['ADMIN', 'STORE_SYSTEM', 'STORE_SUPERVISOR', 'ACCOUNTING_OFFICE', 'USER'];
         $errors = 0;
         $warnings = 0;
 
@@ -111,7 +111,8 @@ class IbemsAuthAudit extends BaseCommand
             }
         }
 
-        // Store officer mapping checks.
+        // Store officer mapping checks. An officer is optional, but any assigned
+        // officer must exist and have the STORE_SYSTEM role.
         $stores = $db->table('stores')
             ->select('id, store_name, officer_id, is_active')
             ->get()
@@ -122,8 +123,6 @@ class IbemsAuthAudit extends BaseCommand
             $officerId = (int) ($store['officer_id'] ?? 0);
             $storeName = (string) ($store['store_name'] ?? ('Store #' . $storeId));
             if ($officerId <= 0) {
-                CLI::write("[FAIL] store_id={$storeId} ({$storeName}) has invalid officer_id", 'red');
-                $errors++;
                 continue;
             }
 
@@ -146,6 +145,38 @@ class IbemsAuthAudit extends BaseCommand
             if (!$hasStoreSystem) {
                 CLI::write("[FAIL] store_id={$storeId} ({$storeName}) officer_id={$officerId} missing STORE_SYSTEM role", 'red');
                 $errors++;
+            }
+        }
+
+        // Store supervisor mappings are an independent, many-to-many access path.
+        if (!$db->tableExists('store_supervisors')) {
+            CLI::write('[FAIL] store_supervisors table is missing', 'red');
+            $errors++;
+        } else {
+            $supervisorRows = $db->table('store_supervisors ss')
+                ->select('ss.store_id, ss.user_id, s.id AS valid_store_id, u.id AS valid_user_id, u.role AS legacy_role')
+                ->join('stores s', 's.id = ss.store_id', 'left')
+                ->join('users u', 'u.id = ss.user_id', 'left')
+                ->get()
+                ->getResultArray();
+
+            foreach ($supervisorRows as $mapping) {
+                $storeId = (int) ($mapping['store_id'] ?? 0);
+                $userId = (int) ($mapping['user_id'] ?? 0);
+                if (empty($mapping['valid_store_id']) || empty($mapping['valid_user_id'])) {
+                    CLI::write("[FAIL] invalid store supervisor mapping: store_id={$storeId}, user_id={$userId}", 'red');
+                    $errors++;
+                    continue;
+                }
+
+                $legacyRole = strtoupper(trim((string) ($mapping['legacy_role'] ?? '')));
+                $assignedRoles = $rolesByUser[$userId] ?? [];
+                $hasSupervisorRole = $legacyRole === 'STORE_SUPERVISOR'
+                    || in_array('STORE_SUPERVISOR', $assignedRoles, true);
+                if (!$hasSupervisorRole) {
+                    CLI::write("[FAIL] store_id={$storeId} supervisor user_id={$userId} missing STORE_SUPERVISOR role", 'red');
+                    $errors++;
+                }
             }
         }
 

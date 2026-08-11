@@ -5,7 +5,7 @@ Last updated: 2026-07-02
 ## Active Project
 
 - Path: `D:\xampp\htdocs\ibems-tailwind-test`
-- Framework: CodeIgniter 4.7.2
+- Framework: CodeIgniter 4.7.4
 - Local URL: `http://localhost:8080`
 - Database: `ibems_tailwind_test`
 - Primary tracker: `docs/SYSTEM_IMPLEMENTATION_CHECKLIST.md`
@@ -50,6 +50,7 @@ Seeded baseline accounts use password `123456`.
 | --- | --- | --- |
 | Admin | `admin@ibems.local` | `123456` |
 | Accounting | `accounting@ibems.local` | `123456` |
+| Accounting Supervisor | `accounting.supervisor@ibems.local` | `123456` |
 | Store - Main | `store.main@ibems.local` | `123456` |
 | Store - Tech | `store.tech@ibems.local` | `123456` |
 | User - Faculty | `maria.santos@ibems.local` | `123456` |

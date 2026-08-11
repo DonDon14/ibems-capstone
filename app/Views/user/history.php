@@ -85,14 +85,16 @@
 </section>
 
 <div id="uh-receipt-modal" class="receipt-modal is-hidden">
-    <div class="receipt-card">
+    <div class="receipt-card" tabindex="-1">
         <div class="receipt-head">
             <h3>Transaction Receipt</h3>
-            <button id="uh-receipt-close" type="button" class="receipt-close">x</button>
+            <button id="uh-receipt-close" type="button" class="receipt-close" aria-label="Close receipt">&times;</button>
         </div>
-        <div id="uh-receipt-content"></div>
+        <div id="uh-receipt-content" aria-live="polite"></div>
         <div class="receipt-actions">
-            <button id="uh-receipt-print" type="button" class="primary-btn">Print Receipt</button>
+            <button id="uh-receipt-print" type="button" class="primary-btn">
+                <i class="bi bi-printer"></i> Print Receipt
+            </button>
         </div>
     </div>
 </div>

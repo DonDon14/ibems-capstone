@@ -132,26 +132,17 @@ class TransactionService
             if (!$customer || trim((string) ($customer['debt_pin_hash'] ?? '')) === '') {
                 return $this->error('Selected customer has no debt PIN set. Ask them to set it in their user portal first.');
             }
-            if (!password_verify($debtPin, (string) ($customer['debt_pin_hash'] ?? ''))) {
-                (new AuditLogModel())->insert([
-                    'actor_id' => $actorId > 0 ? $actorId : null,
-                    'action' => 'FAILED_DEBT_PIN',
-                    'entity' => 'users',
-                    'entity_id' => $customerUserId,
-                    'payload_json' => json_encode([
-                        'store_id' => $storeId,
-                        'amount' => $totalAmount,
-                        'customer_user_id' => $customerUserId,
-                    ]),
-                    'created_at' => date('Y-m-d H:i:s'),
-                ]);
-
-                return $this->error('Invalid debt PIN.');
+            $pinAuthorization = (new DebtPinAuthorizationService())->authorize(
+                $customerUserId,
+                (string) $customer['debt_pin_hash'],
+                $debtPin,
+                $actorId,
+                $storeId,
+                $totalAmount
+            );
+            if (($pinAuthorization['status'] ?? 'error') !== 'success') {
+                return $pinAuthorization;
             }
-            if (!$balanceModel->canUseCredit($customerUserId, $totalAmount)) {
-                return $this->error('Insufficient credit.');
-            }
-            $debtBalanceBefore = $balanceModel->getBalanceByUserId($customerUserId);
         }
 
         $transactionModel = new TransactionModel();
@@ -166,6 +157,19 @@ class TransactionService
         $createdAt = date('Y-m-d H:i:s');
 
         try {
+            if ($paymentMethod === 'debt') {
+                $debtBalanceBefore = $balanceModel->getBalanceForUpdate((int) $customerUserId);
+                if (!$debtBalanceBefore) {
+                    throw new \RuntimeException('Balance record not found.');
+                }
+
+                $availableCredit = (float) $debtBalanceBefore['credit_limit']
+                    - (float) $debtBalanceBefore['current_debt'];
+                if ($availableCredit < $totalAmount) {
+                    throw new \RuntimeException('Insufficient credit.');
+                }
+            }
+
             $txnId = $transactionModel->insert([
                 'client_txn_id' => $clientTxnId,
                 'user_id' => $customerUserId,

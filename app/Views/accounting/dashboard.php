@@ -4,7 +4,7 @@
 <section class="dashboard-shell">
     <div class="dashboard-title">
         <h3>Accounting Dashboard</h3>
-        <p>Debt settlement and payroll-linked deduction monitoring.</p>
+        <p>Employee debt, governed payroll deductions, and correction monitoring.</p>
     </div>
 
     <div class="dashboard-grid">
@@ -18,7 +18,7 @@
     <div class="dash-panels">
         <article class="dash-panel">
             <h4><i class="bi bi-activity"></i> Debt Deduction Trend (7 Days)</h4>
-            <p>Daily deduction amount from manual deductions and settlement runs.</p>
+            <p>Daily amount from confirmed payroll deduction results.</p>
             <div class="dash-chart-wrap">
                 <canvas id="acd-trend-chart"></canvas>
             </div>
@@ -27,10 +27,10 @@
             <h4><i class="bi bi-lightning-charge"></i> Quick Access</h4>
             <div class="quick-links">
                 <a href="/accounting/debts"><i class="bi bi-search"></i> Open Debt Monitoring</a>
-                <a href="/accounting/debts"><i class="bi bi-calculator"></i> Run Settlement Preview</a>
+                <a href="/accounting/debts"><i class="bi bi-diagram-3"></i> Open Deduction Workflow</a>
                 <a href="/accounting/debts"><i class="bi bi-file-earmark-arrow-up"></i> Import HR CSV</a>
             </div>
-            <p id="acd-last-settlement" class="muted mt-10">Last settlement: -</p>
+            <p id="acd-last-settlement" class="muted mt-10">Latest deduction period: -</p>
         </article>
     </div>
 

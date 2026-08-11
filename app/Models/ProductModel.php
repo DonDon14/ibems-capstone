@@ -46,7 +46,7 @@ class ProductModel extends Model
     public function getActiveProductsByStore(int $storeId): array
     {
         return $this->where('store_id', $storeId)
-                    ->where('is_active', 1)
+                    ->where('is_active', true)
                     ->findAll();
     }
 

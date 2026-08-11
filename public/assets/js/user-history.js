@@ -1,4 +1,5 @@
 let uhSelectedReceipt = null;
+let uhReceiptTrigger = null;
 
 function uhMoney(value) {
     return window.IbemsFormat?.money(value) || `PHP ${Number(value || 0).toFixed(2)}`;
@@ -23,6 +24,8 @@ function uhEntryLabel(value) {
     if (key === "manual_deduction") return "Manual Deduction";
     if (key === "full_deduction") return "Full Deduction";
     if (key === "salary_deduction") return "Salary Deduction";
+    if (key === "confirmed_salary_deduction") return "Confirmed Payroll Deduction";
+    if (key === "investigation_reversal") return "Approved Debt Correction";
     if (key === "store_repayment") return "Store Payment";
     if (key === "operator_shortage") return "Store Shortage";
     return key.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
@@ -99,9 +102,9 @@ async function loadUserTransactions() {
             <td>${uhEscape(uhMoney(row.amount))}</td>
             <td>${uhEscape(row.client_txn_id || `TXN-${row.id}`)}</td>
             <td>
-                <a class="history-action" href="/user/receipt/${encodeURIComponent(String(row.id))}">
-                    Receipt
-                </a>
+                <button class="history-action" type="button" data-receipt-id="${Number(row.id)}">
+                    <i class="bi bi-receipt"></i> Receipt
+                </button>
             </td>
         </tr>
     `).join("");
@@ -133,7 +136,7 @@ async function loadUserCashbook() {
         const canOpenReceipt = String(row.reference_type || "").toLowerCase() === "transaction" && referenceId > 0;
         const remarks = uhEscape(row.remarks || "-");
         const remarksHtml = canOpenReceipt
-            ? `<a class="user-inline-link" href="/user/receipt/${encodeURIComponent(String(referenceId))}">${remarks}</a>`
+            ? `<button class="user-inline-link" type="button" data-receipt-id="${referenceId}">${remarks}</button>`
             : remarks;
 
         return `
@@ -152,34 +155,53 @@ async function loadUserCashbook() {
 }
 
 async function openReceipt(transactionId) {
-    const response = await fetch(`/user/transactions/${transactionId}`);
-    const data = await response.json();
+    const modal = document.getElementById("uh-receipt-modal");
+    const content = document.getElementById("uh-receipt-content");
+    const printButton = document.getElementById("uh-receipt-print");
+    uhReceiptTrigger = document.activeElement;
+    uhSelectedReceipt = null;
+    content.innerHTML = '<div class="receipt-loading">Loading receipt...</div>';
+    printButton.disabled = true;
+    modal.classList.remove("is-hidden");
+    modal.querySelector(".receipt-card")?.focus();
 
-    if (!data || data.status !== "success" || !data.transaction) {
-        return;
-    }
+    try {
+        const response = await fetch(`/user/transactions/${transactionId}`);
+        const data = await response.json();
 
-    const tx = data.transaction;
-    uhSelectedReceipt = {
-        transactionId: tx.id,
-        clientTxnId: tx.client_txn_id,
-        createdAt: tx.created_at,
-        storeName: tx.store_name,
-        customerName: tx.customer_name,
-        paymentMethod: tx.payment_method,
-        totalAmount: tx.amount,
-        items: tx.items,
-        lookupUrl: `${window.location.origin}/user/receipt/${encodeURIComponent(String(tx.id))}`,
-    };
+        if (!response.ok || !data || data.status !== "success" || !data.transaction) {
+            throw new Error(data?.message || "Unable to load this receipt.");
+        }
 
-    if (window.IbemsReceipt) {
+        const tx = data.transaction;
+        uhSelectedReceipt = {
+            transactionId: tx.id,
+            clientTxnId: tx.client_txn_id,
+            createdAt: tx.created_at,
+            storeName: tx.store_name,
+            customerName: tx.customer_name,
+            paymentMethod: tx.payment_method,
+            totalAmount: tx.amount,
+            items: tx.items,
+            lookupUrl: `${window.location.origin}/user/receipt/${encodeURIComponent(String(tx.id))}`,
+        };
+
+        if (!window.IbemsReceipt) {
+            throw new Error("Receipt renderer is unavailable.");
+        }
         window.IbemsReceipt.renderReceipt("uh-receipt-content", uhSelectedReceipt);
+        printButton.disabled = false;
+    } catch (error) {
+        content.innerHTML = `<div class="receipt-error">${uhEscape(error.message || "Unable to load this receipt.")}</div>`;
     }
-    document.getElementById("uh-receipt-modal").classList.remove("is-hidden");
 }
 
 function closeReceipt() {
     document.getElementById("uh-receipt-modal").classList.add("is-hidden");
+    if (uhReceiptTrigger instanceof HTMLElement) {
+        uhReceiptTrigger.focus();
+    }
+    uhReceiptTrigger = null;
 }
 
 function printReceipt() {
@@ -203,16 +225,31 @@ document.getElementById("uh-clear").addEventListener("click", () => {
 });
 
 document.getElementById("uh-body").addEventListener("click", async (event) => {
-    if (event.target.closest("a")) return;
+    const receiptButton = event.target.closest("[data-receipt-id]");
+    if (receiptButton) {
+        await openReceipt(Number(receiptButton.dataset.receiptId));
+        return;
+    }
     const row = event.target.closest("[data-txn-id]");
     if (!row) return;
     await openReceipt(Number(row.dataset.txnId));
+});
+
+document.getElementById("uh-cashbook-body").addEventListener("click", async (event) => {
+    const receiptButton = event.target.closest("[data-receipt-id]");
+    if (!receiptButton) return;
+    await openReceipt(Number(receiptButton.dataset.receiptId));
 });
 
 document.getElementById("uh-receipt-close").addEventListener("click", closeReceipt);
 document.getElementById("uh-receipt-print").addEventListener("click", printReceipt);
 document.getElementById("uh-receipt-modal").addEventListener("click", (event) => {
     if (event.target.id === "uh-receipt-modal") {
+        closeReceipt();
+    }
+});
+document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !document.getElementById("uh-receipt-modal").classList.contains("is-hidden")) {
         closeReceipt();
     }
 });
