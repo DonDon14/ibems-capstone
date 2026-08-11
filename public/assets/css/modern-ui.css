@@ -304,6 +304,15 @@ body.ibems-modern {
     margin-inline: auto;
 }
 
+/* Fixed dialogs are direct content children, but must cover the viewport. */
+.ibems-modern .app-container > :is(.admin-modal, .acct-modal, .inv-modal, .receipt-modal, .app-modal) {
+    width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    max-width: none;
+    margin: 0;
+}
+
 .ibems-modern :is(.dashboard-shell, .dashboard-grid, .dash-panels, .dashboard-title),
 .ibems-modern :is(.dashboard-shell, .dashboard-grid, .dash-panels) > * {
     min-width: 0;
@@ -670,7 +679,8 @@ body.ibems-modern {
 
 .ui-select-menu,
 .ui-date-popup {
-    z-index: 1000;
+    /* Popovers are portalled to <body>; keep them above app modals (1300). */
+    z-index: 1400;
     overflow: auto;
     border: 1px solid #e2e8f0;
     border-radius: .9rem;
