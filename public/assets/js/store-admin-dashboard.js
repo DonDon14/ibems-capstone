@@ -37,6 +37,16 @@ function sadVarianceLabel(value) {
     return labels[String(value || "balanced")] || "Variance";
 }
 
+function sadDayStatusLabel(value) {
+    const labels = {
+        open: "Open Today",
+        closed: "Closed Today",
+        stale_open: "Previous Day Still Open",
+        not_started: "Not Opened Today",
+    };
+    return labels[String(value || "not_started")] || "Store Day Unknown";
+}
+
 function sadPillClass(value) {
     const status = String(value || "");
     if (status === "shortage" || status === "approved") return "is-danger";
@@ -65,7 +75,7 @@ function sadRenderStores(stores) {
     }
 
     wrap.innerHTML = rows.map((store) => {
-        const dayStatus = String(store.day_status || "not_started").replace(/_/g, " ");
+        const dayStatus = sadDayStatusLabel(store.day_status);
         const reviewStatus = String(store.review_status || "not_required");
         return `
             <a class="store-admin-store-item" href="${sadEscape(detailPrefix)}/${Number(store.id || 0)}">
@@ -76,7 +86,7 @@ function sadRenderStores(stores) {
                 <div class="store-admin-store-metrics">
                     <span>${sadEscape(sadMoney(store.today_sales_total || 0))}</span>
                     <small>${Number(store.today_txn_count || 0)} txns today</small>
-                    <small>${sadEscape(dayStatus.charAt(0).toUpperCase() + dayStatus.slice(1))}</small>
+                    <small>${sadEscape(dayStatus)}</small>
                     ${reviewStatus !== "not_required" ? `<small class="text-warning">${sadEscape(sadReviewLabel(reviewStatus))}</small>` : ""}
                 </div>
             </a>
