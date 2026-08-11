@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('validate', 'preflight', 'smoke', 'seed', 'snapshot', 'serve', 'serve-background')]
+    [ValidateSet('validate', 'reconcile', 'preflight', 'smoke', 'seed', 'snapshot', 'serve', 'serve-background')]
     [string] $Action = 'preflight',
 
     [ValidateRange(1024, 65535)]
@@ -19,6 +19,13 @@ $validationLogPath = Join-Path $logDirectory 'supabase-validation-latest.log'
 $serverOutputPath = Join-Path $logDirectory 'supabase-server-latest.log'
 $serverErrorPath = Join-Path $logDirectory 'supabase-server-error-latest.log'
 $serverPidPath = Join-Path $logDirectory 'supabase-server-latest.pid'
+$tempDirectory = Join-Path $projectRoot 'writable\temp'
+$mysqlTransferPath = Join-Path $tempDirectory 'mysql-transfer.json'
+$postgresBackupPath = Join-Path $tempDirectory 'supabase-before-reconcile.json'
+$postgresImportedPath = Join-Path $tempDirectory 'supabase-after-import.json'
+$postgresRestoredPath = Join-Path $tempDirectory 'supabase-after-restore.json'
+$postgresFinalPath = Join-Path $tempDirectory 'supabase-final-transfer.json'
+$reconcileLogPath = Join-Path $logDirectory 'supabase-reconcile-latest.log'
 $originalLocation = Get-Location
 
 if (-not (Test-Path -LiteralPath $logDirectory)) {
@@ -44,7 +51,8 @@ $environmentKeys = @(
     'IBEMS_DATABASE_DRIVER',
     'IBEMS_DATABASE_PORT',
     'IBEMS_DATABASE_SCHEMA',
-    'IBEMS_DATABASE_SSLMODE'
+    'IBEMS_DATABASE_SSLMODE',
+    'IBEMS_ALLOW_STAGING_RESET'
 )
 
 try {
@@ -60,6 +68,7 @@ try {
     [Environment]::SetEnvironmentVariable('IBEMS_DATABASE_PORT', '5432', 'Process')
     [Environment]::SetEnvironmentVariable('IBEMS_DATABASE_SCHEMA', 'public', 'Process')
     [Environment]::SetEnvironmentVariable('IBEMS_DATABASE_SSLMODE', 'require', 'Process')
+    [Environment]::SetEnvironmentVariable('IBEMS_ALLOW_STAGING_RESET', '1', 'Process')
 
     function Invoke-LoggedPhpAction {
         param(
@@ -89,6 +98,30 @@ try {
         }
     }
 
+    function Assert-TransferEqual {
+        param(
+            [Parameter(Mandatory)] [string] $ExpectedPath,
+            [Parameter(Mandatory)] [string] $ActualPath,
+            [Parameter(Mandatory)] [string] $Label
+        )
+
+        $expected = Get-Content -Raw -LiteralPath $ExpectedPath | ConvertFrom-Json
+        $actual = Get-Content -Raw -LiteralPath $ActualPath | ConvertFrom-Json
+        $failures = @()
+        foreach ($property in $expected.tables.PSObject.Properties) {
+            $name = $property.Name
+            $expectedTable = $property.Value
+            $actualTable = $actual.tables.$name
+            if ($null -eq $actualTable -or $expectedTable.count -ne $actualTable.count -or $expectedTable.sha256 -ne $actualTable.sha256) {
+                $failures += $name
+            }
+        }
+        if ($failures.Count -gt 0) {
+            throw "$Label failed for tables: $($failures -join ', ')"
+        }
+        "$Label passed for $(@($expected.tables.PSObject.Properties).Count) tables." | Tee-Object -FilePath $reconcileLogPath -Append
+    }
+
     switch ($Action) {
         'validate' {
             "IBEMS Supabase validation started at $(Get-Date -Format o)" | Set-Content -LiteralPath $validationLogPath
@@ -96,6 +129,26 @@ try {
             Invoke-LoggedPhpAction -Name 'preflight' -Arguments @('spark', 'ibems:preflight') -OutputPath $validationLogPath -Append
             Invoke-LoggedPhpAction -Name 'snapshot' -Arguments @('spark', 'ibems:financial-snapshot', '--output', $snapshotPath) -OutputPath $validationLogPath -Append
             Invoke-LoggedPhpAction -Name 'smoke' -Arguments @('spark', 'ibems:smoke') -OutputPath $validationLogPath -Append
+        }
+        'reconcile' {
+            if (-not (Test-Path -LiteralPath $mysqlTransferPath)) {
+                throw "Create the canonical MySQL transfer first: $mysqlTransferPath"
+            }
+            "IBEMS Supabase reconciliation started at $(Get-Date -Format o)" | Set-Content -LiteralPath $reconcileLogPath
+            Invoke-LoggedPhpAction -Name 'backup-export' -Arguments @('spark', 'ibems:database-transfer', '--export', $postgresBackupPath) -OutputPath $reconcileLogPath -Append
+            Invoke-LoggedPhpAction -Name 'mysql-import' -Arguments @('spark', 'ibems:database-transfer', '--import', $mysqlTransferPath) -OutputPath $reconcileLogPath -Append
+            Invoke-LoggedPhpAction -Name 'import-export' -Arguments @('spark', 'ibems:database-transfer', '--export', $postgresImportedPath) -OutputPath $reconcileLogPath -Append
+            Assert-TransferEqual -ExpectedPath $mysqlTransferPath -ActualPath $postgresImportedPath -Label 'MySQL to PostgreSQL reconciliation'
+
+            Invoke-LoggedPhpAction -Name 'backup-restore' -Arguments @('spark', 'ibems:database-transfer', '--import', $postgresBackupPath) -OutputPath $reconcileLogPath -Append
+            Invoke-LoggedPhpAction -Name 'restore-export' -Arguments @('spark', 'ibems:database-transfer', '--export', $postgresRestoredPath) -OutputPath $reconcileLogPath -Append
+            Assert-TransferEqual -ExpectedPath $postgresBackupPath -ActualPath $postgresRestoredPath -Label 'PostgreSQL backup restoration'
+
+            Invoke-LoggedPhpAction -Name 'final-import' -Arguments @('spark', 'ibems:database-transfer', '--import', $mysqlTransferPath) -OutputPath $reconcileLogPath -Append
+            Invoke-LoggedPhpAction -Name 'final-export' -Arguments @('spark', 'ibems:database-transfer', '--export', $postgresFinalPath) -OutputPath $reconcileLogPath -Append
+            Assert-TransferEqual -ExpectedPath $mysqlTransferPath -ActualPath $postgresFinalPath -Label 'Final PostgreSQL reconciliation'
+            Invoke-LoggedPhpAction -Name 'final-snapshot' -Arguments @('spark', 'ibems:financial-snapshot', '--output', $snapshotPath) -OutputPath $reconcileLogPath -Append
+            Invoke-LoggedPhpAction -Name 'final-preflight' -Arguments @('spark', 'ibems:preflight') -OutputPath $reconcileLogPath -Append
         }
         'preflight' { $actionOutput = & php spark ibems:preflight 2>&1; $actionExitCode = $LASTEXITCODE; $actionOutput | Tee-Object -FilePath $logPath }
         'smoke' { $actionOutput = & php spark ibems:smoke 2>&1; $actionExitCode = $LASTEXITCODE; $actionOutput | Tee-Object -FilePath $logPath }
@@ -109,7 +162,7 @@ try {
         }
     }
 
-    if ($Action -notin @('validate', 'serve', 'serve-background') -and $actionExitCode -ne 0) {
+    if ($Action -notin @('validate', 'reconcile', 'serve', 'serve-background') -and $actionExitCode -ne 0) {
         throw "IBEMS Supabase action '$Action' failed with exit code $actionExitCode."
     }
 
@@ -123,5 +176,12 @@ finally {
     [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordPointer)
     foreach ($key in $environmentKeys) {
         [Environment]::SetEnvironmentVariable($key, $null, 'Process')
+    }
+    if ($Action -eq 'reconcile') {
+        foreach ($artifactPath in @($mysqlTransferPath, $postgresBackupPath, $postgresImportedPath, $postgresRestoredPath, $postgresFinalPath)) {
+            if (Test-Path -LiteralPath $artifactPath) {
+                Remove-Item -LiteralPath $artifactPath -Force
+            }
+        }
     }
 }

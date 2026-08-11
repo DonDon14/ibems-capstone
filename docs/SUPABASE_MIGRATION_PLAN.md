@@ -27,8 +27,13 @@ Date: 2026-08-11
   (PHP 55.00) and an Accounting credit-limit write overlapped successfully;
   Notebook stock changed `140 -> 139`, while Maria Santos remained at PHP
   850.00 debt and a PHP 7,000.00 credit limit
-- Remaining acceptance prerequisites: exact sanitized MySQL-to-PostgreSQL
-  financial reconciliation and backup/rollback restoration rehearsal
+- Canonical logical migration matched all 25 application tables by row count
+  and SHA-256 hash; the 13 normalized financial tables also match exactly
+- PostgreSQL logical backup restoration matched all 25 pre-rehearsal table
+  hashes, after which the reconciled MySQL demo dataset was imported again and
+  passed the complete PostgreSQL preflight
+- Staging now contains the reconciled 9-user, 4-store development/demo dataset;
+  no production data was imported
 
 ## Decision
 
@@ -230,6 +235,5 @@ Supabase is ready for IBEMS only when:
 - Backup and rollback restoration are rehearsed.
 - No privileged key is present in browser assets or Git history.
 
-Current verified completion: 5 of 7 gates (71%). Financial reconciliation and
-backup/rollback restoration remain deliberately open; no production cutover is
-authorized.
+Current verified completion: 7 of 7 gates (100%). This completes staging
+acceptance only; no production cutover, push, or deployment is authorized.
