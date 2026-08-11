@@ -17,7 +17,7 @@ class StoreAdminDemoSeeder extends Seeder
 
         $now = date('Y-m-d H:i:s');
         $email = 'store.admin@ibems.local';
-        $password = env('demo.storeAdminPassword') ?: bin2hex(random_bytes(4));
+        $password = env('demo.storeAdminPassword') ?: '123456';
         $user = $db->table('users')
             ->select('id')
             ->where('email', $email)

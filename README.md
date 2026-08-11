@@ -69,6 +69,13 @@ Optional smaller account-only seeder:
 php spark db:seed PortalAccountsSeeder
 ```
 
+Development supervisor accounts used for separation-of-duties testing:
+
+```powershell
+php spark db:seed StoreAdminDemoSeeder
+php spark db:seed AccountingSupervisorDemoSeeder
+```
+
 6. Start the app on the configured port:
 
 ```powershell
@@ -126,6 +133,7 @@ Primary seeded accounts:
 | Admin | `admin@ibems.local` | `123456` |
 | Accounting | `accounting@ibems.local` | `123456` |
 | Accounting Supervisor | `accounting.supervisor@ibems.local` | `123456` |
+| Store Supervisor | `store.admin@ibems.local` | `123456` |
 | Store - Main | `store.main@ibems.local` | `123456` |
 | Store - Tech | `store.tech@ibems.local` | `123456` |
 | User - Faculty | `maria.santos@ibems.local` | `123456` |

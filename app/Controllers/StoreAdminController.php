@@ -44,8 +44,9 @@ class StoreAdminController extends AdminController
             ->get()
             ->getResultArray();
 
-        $todayStart = date('Y-m-d 00:00:00');
-        $todayEnd = date('Y-m-d 23:59:59');
+        $todayDate = date('Y-m-d');
+        $todayStart = $todayDate . ' 00:00:00';
+        $todayEnd = $todayDate . ' 23:59:59';
         $todayRows = $db->table('transactions')
             ->select('store_id, COUNT(*) AS txn_count, COALESCE(SUM(amount), 0) AS sales_total')
             ->whereIn('store_id', $storeIds)
@@ -100,7 +101,8 @@ class StoreAdminController extends AdminController
             if ($isActive) {
                 $activeStoreCount++;
             }
-            if ($session && (string) ($session['status'] ?? '') === 'open') {
+            $dayStatus = $this->dayStatusForDate($session, $todayDate);
+            if ($dayStatus === 'open') {
                 $openDayCount++;
             }
 
@@ -113,7 +115,7 @@ class StoreAdminController extends AdminController
                 'officer_email' => $store['officer_email'] ?? null,
                 'today_txn_count' => (int) $today['txn_count'],
                 'today_sales_total' => (float) $today['sales_total'],
-                'day_status' => $session ? (string) ($session['status'] ?? '') : 'not_started',
+                'day_status' => $dayStatus,
                 'business_date' => $session['business_date'] ?? null,
                 'review_status' => $session ? (string) ($session['review_status'] ?? 'not_required') : 'not_required',
                 'variance_status' => $session ? (string) ($session['variance_status'] ?? 'balanced') : 'balanced',
@@ -159,6 +161,17 @@ class StoreAdminController extends AdminController
             'stores' => $storePayload,
             'pending_reviews' => $pendingReviews,
         ]);
+    }
+
+    protected function dayStatusForDate(?array $session, string $todayDate): string
+    {
+        $sessionDate = (string) ($session['business_date'] ?? '');
+        $sessionStatus = (string) ($session['status'] ?? '');
+        if ($sessionDate === $todayDate) {
+            return $sessionStatus !== '' ? $sessionStatus : 'not_started';
+        }
+
+        return $sessionStatus === 'open' ? 'stale_open' : 'not_started';
     }
 
     public function stores()

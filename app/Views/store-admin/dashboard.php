@@ -13,7 +13,7 @@
 
     <div class="summary-grid store-admin-summary">
         <?= view('components/stat_card', ['title' => 'Assigned Stores', 'value' => '0', 'valueId' => 'sad-assigned-stores', 'icon' => 'bi bi-shop-window', 'tone' => 'users']) ?>
-        <?= view('components/stat_card', ['title' => 'Open Store Days', 'value' => '0', 'valueId' => 'sad-open-days', 'icon' => 'bi bi-door-open', 'tone' => 'sales']) ?>
+        <?= view('components/stat_card', ['title' => 'Open Today', 'value' => '0', 'valueId' => 'sad-open-days', 'icon' => 'bi bi-door-open', 'tone' => 'sales']) ?>
         <?= view('components/stat_card', ['title' => 'Pending Reviews', 'value' => '0', 'valueId' => 'sad-pending-reviews', 'icon' => 'bi bi-exclamation-triangle', 'tone' => 'warning']) ?>
         <?= view('components/stat_card', ['title' => 'Today Sales', 'value' => 'PHP 0.00', 'valueId' => 'sad-today-sales', 'icon' => 'bi bi-graph-up-arrow', 'tone' => 'finance']) ?>
     </div>
