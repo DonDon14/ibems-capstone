@@ -297,6 +297,15 @@ class IbemsDataAudit extends BaseCommand
             CLI::write('[OK] variance evidence and handoffs have valid ownership', 'green');
         }
 
+        $invalidGovernance = (int) $db->query("SELECT COUNT(*) AS c FROM store_day_variance_case_attachments WHERE retention_until IS NULL OR retention_until < DATE(created_at)")->getRow('c')
+            + (int) $db->query("SELECT COUNT(*) AS c FROM store_day_variance_case_handoffs WHERE due_at IS NULL OR (status = 'acknowledged' AND (acknowledged_by IS NULL OR acknowledged_at IS NULL))")->getRow('c');
+        if ($invalidGovernance > 0) {
+            CLI::write("[FAIL] invalid variance retention or acknowledgment records: {$invalidGovernance}", 'red');
+            $errors++;
+        } else {
+            CLI::write('[OK] variance retention and acknowledgment records are complete', 'green');
+        }
+
         CLI::newLine();
         CLI::write("Warnings: {$warnings}", $warnings > 0 ? 'light_yellow' : 'green');
         CLI::write("Errors: {$errors}", $errors > 0 ? 'red' : 'green');

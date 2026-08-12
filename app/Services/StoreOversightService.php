@@ -359,6 +359,21 @@ public function reviewStoreDayVariance(RequestInterface $request, ResponseInterf
         $accountabilityUserId = null;
         $accountabilityAmount = 0.0;
 
+        if (in_array($action, ['approve_shortage', 'waive', 'corrected'], true)) {
+            $case = (new StoreDayVarianceCaseService())->ensureCase($db, $session, $actorId, $now);
+            $attachmentCount = $case ? $db->table('store_day_variance_case_attachments')->where('case_id', (int) $case['id'])->countAllResults() : 0;
+            $latestHandoff = $case ? $db->table('store_day_variance_case_handoffs')->where('case_id', (int) $case['id'])->orderBy('id', 'DESC')->get(1)->getRowArray() : null;
+            if (!$case || (int) ($case['owner_user_id'] ?? 0) !== $actorId) {
+                return $response->setStatusCode(409)->setJSON(['status' => 'error', 'message' => 'Only the assigned case owner can finalize this variance.']);
+            }
+            if ($latestHandoff && (string) ($latestHandoff['status'] ?? '') !== 'acknowledged') {
+                return $response->setStatusCode(409)->setJSON(['status' => 'error', 'message' => 'Acknowledge the latest reviewer handoff before final disposition.']);
+            }
+            if ($attachmentCount <= 0) {
+                return $response->setStatusCode(409)->setJSON(['status' => 'error', 'message' => 'Attach at least one supporting evidence file before final disposition.']);
+            }
+        }
+
         if ($action === 'approve_shortage') {
             if ((string) ($session['variance_status'] ?? '') !== 'shortage' || $shortageAmount <= 0) {
                 return $response->setStatusCode(422)->setJSON([
@@ -522,7 +537,7 @@ public function reviewStoreDayVariance(RequestInterface $request, ResponseInterf
         $db->table('store_day_variance_case_attachments')->insert([
             'case_id' => $caseId, 'uploaded_by' => $actorId, 'original_name' => basename((string) $file->getClientName()),
             'stored_name' => $storedName, 'mime_type' => $mime, 'file_size' => filesize($path), 'sha256' => hash_file('sha256', $path),
-            'description' => $description !== '' ? $description : null, 'created_at' => $now,
+            'description' => $description !== '' ? $description : null, 'retention_until' => date('Y-m-d', strtotime($now . ' +7 years')), 'created_at' => $now,
         ]);
         $attachmentId = (int) $db->insertID();
         $this->appendVarianceEvent($db, $caseId, $actorId, 'evidence_attached', $description ?: 'Evidence file attached.', ['attachment_id' => $attachmentId, 'mime_type' => $mime, 'file_size' => filesize($path)], $now);
@@ -550,11 +565,27 @@ public function reviewStoreDayVariance(RequestInterface $request, ResponseInterf
         $actorId = (int) session()->get('user_id'); $now = date('Y-m-d H:i:s');
         if ($toUserId === $actorId || !in_array($toUserId, $eligible, true) || $note === '') return $response->setStatusCode(422)->setJSON(['status' => 'error', 'message' => 'Choose a different eligible independent reviewer and provide a handoff note.']);
         $db->transStart();
-        $db->table('store_day_variance_case_handoffs')->insert(['case_id' => $caseId, 'from_user_id' => $actorId, 'to_user_id' => $toUserId, 'note' => $note, 'status' => 'pending', 'created_at' => $now]);
+        $db->table('store_day_variance_case_handoffs')->insert(['case_id' => $caseId, 'from_user_id' => $actorId, 'to_user_id' => $toUserId, 'note' => $note, 'status' => 'pending', 'created_at' => $now, 'due_at' => date('Y-m-d H:i:s', strtotime($now . ' +48 hours'))]);
         $db->table('store_day_variance_cases')->where('id', $caseId)->update(['owner_user_id' => $toUserId, 'updated_at' => $now]);
         $this->appendVarianceEvent($db, $caseId, $actorId, 'reviewer_handoff', $note, ['to_user_id' => $toUserId], $now);
         $db->transComplete();
         if (!$db->transStatus()) return $response->setStatusCode(500)->setJSON(['status' => 'error', 'message' => 'Failed to record reviewer handoff.']);
+        return $response->setJSON(['status' => 'success']);
+    }
+
+    public function acknowledgeVarianceCase(ResponseInterface $response, int $caseId): ResponseInterface
+    {
+        $db = Database::connect(); $case = $this->accessibleVarianceCase($db, $caseId); $actorId = (int) session()->get('user_id');
+        if (!$case) return $response->setStatusCode(404)->setJSON(['status' => 'error', 'message' => 'Variance case not found or inaccessible.']);
+        $handoff = $db->table('store_day_variance_case_handoffs')->where('case_id', $caseId)->orderBy('id', 'DESC')->get(1)->getRowArray();
+        if (!$handoff || (int) ($handoff['to_user_id'] ?? 0) !== $actorId || (string) ($handoff['status'] ?? '') !== 'pending') {
+            return $response->setStatusCode(409)->setJSON(['status' => 'error', 'message' => 'No pending handoff is assigned to this user.']);
+        }
+        $now = date('Y-m-d H:i:s'); $db->transStart();
+        $db->table('store_day_variance_case_handoffs')->where('id', (int) $handoff['id'])->update(['status' => 'acknowledged', 'acknowledged_by' => $actorId, 'acknowledged_at' => $now]);
+        $this->appendVarianceEvent($db, $caseId, $actorId, 'handoff_acknowledged', 'Reviewer accepted case ownership.', ['handoff_id' => (int) $handoff['id']], $now);
+        $db->transComplete();
+        if (!$db->transStatus()) return $response->setStatusCode(500)->setJSON(['status' => 'error', 'message' => 'Failed to acknowledge handoff.']);
         return $response->setJSON(['status' => 'success']);
     }
 

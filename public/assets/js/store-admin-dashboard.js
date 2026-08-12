@@ -126,6 +126,8 @@ function sadRenderReviews(reviews) {
                     <div><span>E-Cash Variance</span><strong class="${Number(row.variance_ecash || 0) < 0 ? "text-danger" : ""}">${sadEscape(sadMoney(row.variance_ecash || 0))}</strong></div>
                 </div>
                 <div class="variance-note">Closed ${sadEscape(sadDateTime(row.closed_at))}. Shortage exposure: ${sadEscape(sadMoney(row.shortage_amount || 0))}.</div>
+                ${row.case_ref ? `<div class="variance-note">Case ${sadEscape(row.case_ref)} · Owner: ${sadEscape(row.owner_name || "Unassigned")}</div>` : ""}
+                ${row.handoff_overdue ? `<div class="variance-case-overdue">Reviewer acknowledgment is overdue.</div>` : ""}
                 <div class="variance-actions">
                     ${varianceStatus === "shortage" ? `<button type="button" class="danger-btn btn-sm" data-variance-action="approve_shortage" data-session-id="${Number(row.id || 0)}">Approve Shortage</button>` : ""}
                     <button type="button" class="secondary-btn btn-sm" data-variance-action="waive" data-session-id="${Number(row.id || 0)}">Waive</button>

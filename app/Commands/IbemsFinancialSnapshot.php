@@ -57,11 +57,12 @@ class IbemsFinancialSnapshot extends BaseCommand
         'store_day_variance_case_attachments' => [
             'id' => 'int', 'case_id' => 'int', 'uploaded_by' => 'int', 'original_name' => 'string',
             'mime_type' => 'string', 'file_size' => 'int', 'sha256' => 'string', 'description' => 'nullable_string',
-            'created_at' => 'string',
+            'retention_until' => 'nullable_string', 'created_at' => 'string',
         ],
         'store_day_variance_case_handoffs' => [
             'id' => 'int', 'case_id' => 'int', 'from_user_id' => 'int', 'to_user_id' => 'int',
-            'note' => 'string', 'status' => 'string', 'created_at' => 'string', 'acknowledged_at' => 'nullable_string',
+            'note' => 'string', 'status' => 'string', 'created_at' => 'string', 'due_at' => 'nullable_string',
+            'acknowledged_by' => 'nullable_int', 'acknowledged_at' => 'nullable_string',
         ],
         'store_cash_movements' => [
             'id' => 'int', 'store_id' => 'int', 'business_date' => 'string', 'channel' => 'string',

@@ -69,9 +69,12 @@ class StoreAdminController extends Controller
         $pendingRows = [];
         if ($db->tableExists('store_day_sessions')) {
             $sessionRows = $db->table('store_day_sessions sds')
-                ->select('sds.id, sds.store_id, sds.business_date, sds.status, sds.expected_cash, sds.expected_ecash, sds.counted_cash, sds.counted_ecash, sds.variance_cash, sds.variance_ecash, sds.variance_status, sds.review_status, sds.closed_at, sds.accountability_amount, s.store_name, closer.name AS closed_by_name')
+                ->select('sds.id, sds.store_id, sds.business_date, sds.status, sds.expected_cash, sds.expected_ecash, sds.counted_cash, sds.counted_ecash, sds.variance_cash, sds.variance_ecash, sds.variance_status, sds.review_status, sds.closed_at, sds.accountability_amount, s.store_name, closer.name AS closed_by_name, c.case_ref, c.owner_user_id, owner.name AS owner_name, h.status AS handoff_status, h.due_at AS handoff_due_at')
                 ->join('stores s', 's.id = sds.store_id', 'left')
                 ->join('users closer', 'closer.id = sds.closed_by', 'left')
+                ->join('store_day_variance_cases c', 'c.store_day_session_id = sds.id', 'left')
+                ->join('users owner', 'owner.id = c.owner_user_id', 'left')
+                ->join('store_day_variance_case_handoffs h', 'h.id = (SELECT MAX(h2.id) FROM store_day_variance_case_handoffs h2 WHERE h2.case_id = c.id)', 'left', false)
                 ->whereIn('sds.store_id', $storeIds)
                 ->orderBy('sds.business_date', 'DESC')
                 ->orderBy('sds.id', 'DESC')
@@ -147,6 +150,9 @@ class StoreAdminController extends Controller
                 'variance_status' => (string) ($row['variance_status'] ?? 'balanced'),
                 'review_status' => (string) ($row['review_status'] ?? 'pending'),
                 'shortage_amount' => $shortageAmount,
+                'case_ref' => $row['case_ref'] ?? null,
+                'owner_name' => $row['owner_name'] ?? null,
+                'handoff_overdue' => (string) ($row['handoff_status'] ?? '') === 'pending' && (string) ($row['handoff_due_at'] ?? '') !== '' && strtotime((string) $row['handoff_due_at']) < time(),
             ];
         }, $pendingRows);
 
@@ -208,4 +214,5 @@ class StoreAdminController extends Controller
     public function uploadVarianceCaseAttachment(int $caseId) { return (new StoreOversightService())->uploadVarianceCaseAttachment($this->request, $this->response, $caseId); }
     public function downloadVarianceCaseAttachment(int $attachmentId) { return (new StoreOversightService())->downloadVarianceCaseAttachment($this->response, $attachmentId); }
     public function handoffVarianceCase(int $caseId) { return (new StoreOversightService())->handoffVarianceCase($this->request, $this->response, $caseId); }
+    public function acknowledgeVarianceCase(int $caseId) { return (new StoreOversightService())->acknowledgeVarianceCase($this->response, $caseId); }
 }

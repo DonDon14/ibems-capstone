@@ -93,6 +93,8 @@ function sdCaseSummary(session) {
     const eligible = Array.isArray(session.eligible_reviewers) ? session.eligible_reviewers : [];
     const attachments = Array.isArray(varianceCase.attachments) ? varianceCase.attachments : [];
     const handoffs = Array.isArray(varianceCase.handoffs) ? varianceCase.handoffs : [];
+    const latestHandoff = handoffs.length ? handoffs[handoffs.length - 1] : null;
+    const handoffOverdue = latestHandoff?.status === "pending" && latestHandoff?.due_at && new Date(latestHandoff.due_at).getTime() < Date.now();
     const portalPrefix = window.location.pathname.includes("/store-admin/") ? "/store-admin" : "/admin";
     return `
         <details class="variance-case">
@@ -100,8 +102,10 @@ function sdCaseSummary(session) {
             <div class="variance-note">Owner: ${sdEscape(varianceCase.owner_name || "Unassigned")}</div>
             ${eligible.length > 0 ? `<div class="variance-note">Eligible independent reviewers: ${eligible.map((reviewer) => sdEscape(reviewer.name || reviewer.email || "Reviewer")).join(", ")}</div>` : ""}
             ${eventRows ? `<ol class="variance-case-timeline">${eventRows}</ol>` : ""}
-            ${handoffs.map((handoff) => `<div class="variance-note">Handoff: ${sdEscape(handoff.from_name || "-")} → ${sdEscape(handoff.to_name || "-")} (${sdEscape(handoff.status || "pending")})</div>`).join("")}
-            ${attachments.length ? `<ul class="variance-case-files">${attachments.map((attachment) => `<li><a href="${portalPrefix}/variance-case-attachments/${Number(attachment.id)}">${sdEscape(attachment.original_name)}</a> · ${sdEscape(attachment.uploaded_by_name || "-")}</li>`).join("")}</ul>` : `<div class="variance-note">No evidence files attached.</div>`}
+            ${handoffs.map((handoff) => `<div class="variance-note">Handoff: ${sdEscape(handoff.from_name || "-")} → ${sdEscape(handoff.to_name || "-")} (${sdEscape(handoff.status || "pending")})${handoff.due_at ? ` · due ${sdEscape(sdDateTime(handoff.due_at))}` : ""}</div>`).join("")}
+            ${handoffOverdue ? `<div class="variance-case-overdue">Reviewer acknowledgment is overdue.</div>` : ""}
+            ${varianceCase.can_acknowledge ? `<button type="button" class="primary-btn btn-sm" data-case-acknowledge="${Number(varianceCase.id || 0)}">Acknowledge handoff</button>` : ""}
+            ${attachments.length ? `<ul class="variance-case-files">${attachments.map((attachment) => `<li><a href="${portalPrefix}/variance-case-attachments/${Number(attachment.id)}">${sdEscape(attachment.original_name)}</a> · ${sdEscape(attachment.uploaded_by_name || "-")}${attachment.retention_until ? ` · retain through ${sdEscape(attachment.retention_until)}` : ""}</li>`).join("")}</ul>` : `<div class="variance-note">No evidence files attached. Final disposition is blocked until evidence is attached.</div>`}
             <form class="variance-evidence-form" data-case-id="${Number(varianceCase.id || 0)}">
                 <input type="file" name="evidence_file" accept="application/pdf,image/jpeg,image/png" required aria-label="Evidence file">
                 <input type="text" name="description" maxlength="255" placeholder="Evidence description" aria-label="Evidence description">
@@ -131,6 +135,17 @@ async function sdSubmitCaseForm(form, kind) {
     const data = await response.json().catch(() => ({}));
     if (!response.ok || data.status !== "success") {
         await window.IbemsDialog.alert(data.message || "Case update failed.", { title: "Case not updated", tone: "danger" });
+        return;
+    }
+    await loadStoreDetails();
+}
+
+async function sdAcknowledgeCase(caseId) {
+    const prefix = window.location.pathname.includes("/store-admin/") ? "/store-admin" : "/admin";
+    const response = await fetch(`${prefix}/variance-cases/${Number(caseId)}/acknowledge`, { method: "POST" });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.status !== "success") {
+        await window.IbemsDialog.alert(data.message || "Handoff acknowledgment failed.", { title: "Case not acknowledged", tone: "danger" });
         return;
     }
     await loadStoreDetails();
@@ -404,6 +419,12 @@ async function loadStoreDetails() {
 }
 
 document.addEventListener("click", (event) => {
+    const acknowledge = event.target.closest("[data-case-acknowledge]");
+    if (acknowledge) {
+        event.preventDefault();
+        sdAcknowledgeCase(acknowledge.getAttribute("data-case-acknowledge"));
+        return;
+    }
     const button = event.target.closest("[data-variance-action]");
     if (!button) return;
     event.preventDefault();

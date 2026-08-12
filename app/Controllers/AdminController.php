@@ -111,9 +111,12 @@ class AdminController extends Controller
                 ->getResultArray();
 
             $unresolvedReviewRows = $db->table('store_day_sessions sds')
-                ->select('sds.id, sds.store_id, sds.business_date, sds.variance_cash, sds.variance_ecash, sds.variance_status, sds.review_status, s.store_name, closer.name AS closed_by_name')
+                ->select('sds.id, sds.store_id, sds.business_date, sds.variance_cash, sds.variance_ecash, sds.variance_status, sds.review_status, s.store_name, closer.name AS closed_by_name, c.case_ref, c.owner_user_id, h.status AS handoff_status, h.due_at AS handoff_due_at, owner.name AS owner_name')
                 ->join('stores s', 's.id = sds.store_id', 'inner')
                 ->join('users closer', 'closer.id = sds.closed_by', 'left')
+                ->join('store_day_variance_cases c', 'c.store_day_session_id = sds.id', 'left')
+                ->join('store_day_variance_case_handoffs h', 'h.id = (SELECT MAX(h2.id) FROM store_day_variance_case_handoffs h2 WHERE h2.case_id = c.id)', 'left', false)
+                ->join('users owner', 'owner.id = c.owner_user_id', 'left')
                 ->where('sds.status', 'closed')
                 ->whereIn('sds.review_status', ['pending', 'needs_investigation'])
                 ->orderBy('sds.business_date', 'ASC')
@@ -274,11 +277,14 @@ class AdminController extends Controller
         $alerts = [];
         foreach ($unresolvedReviewRows as $row) {
             $variance = (float) ($row['variance_cash'] ?? 0) + (float) ($row['variance_ecash'] ?? 0);
+            $isOverdue = (string) ($row['handoff_status'] ?? '') === 'pending'
+                && (string) ($row['handoff_due_at'] ?? '') !== ''
+                && strtotime((string) $row['handoff_due_at']) < time();
             $alerts[] = [
                 'tone' => 'danger',
-                'label' => 'Store-Day Review',
+                'label' => $isOverdue ? 'Overdue Case' : 'Store-Day Review',
                 'title' => (string) ($row['store_name'] ?? 'Store') . ' has an unresolved ' . str_replace('_', ' ', (string) ($row['review_status'] ?? 'review')),
-                'detail' => (string) ($row['business_date'] ?? '-') . ' | Variance PHP ' . number_format($variance, 2) . ' | Closed by ' . ((string) ($row['closed_by_name'] ?? '') !== '' ? (string) $row['closed_by_name'] : 'Unknown'),
+                'detail' => trim(((string) ($row['case_ref'] ?? '') !== '' ? (string) $row['case_ref'] . ' | ' : '') . (string) ($row['business_date'] ?? '-') . ' | Variance PHP ' . number_format($variance, 2) . ' | Owner: ' . ((string) ($row['owner_name'] ?? '') !== '' ? (string) $row['owner_name'] : 'Unassigned') . ($isOverdue ? ' | Acknowledgment overdue' : '')),
                 'href' => site_url('admin/stores/' . (int) ($row['store_id'] ?? 0)),
             ];
         }
@@ -1513,6 +1519,7 @@ class AdminController extends Controller
     public function uploadVarianceCaseAttachment(int $caseId) { return (new StoreOversightService())->uploadVarianceCaseAttachment($this->request, $this->response, $caseId); }
     public function downloadVarianceCaseAttachment(int $attachmentId) { return (new StoreOversightService())->downloadVarianceCaseAttachment($this->response, $attachmentId); }
     public function handoffVarianceCase(int $caseId) { return (new StoreOversightService())->handoffVarianceCase($this->request, $this->response, $caseId); }
+    public function acknowledgeVarianceCase(int $caseId) { return (new StoreOversightService())->acknowledgeVarianceCase($this->response, $caseId); }
 
     public function officers()
     {

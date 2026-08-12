@@ -111,7 +111,7 @@ final class StoreDayVarianceCaseService
         $attachmentsByCase = [];
         if ($db->tableExists('store_day_variance_case_attachments')) {
             foreach ($db->table('store_day_variance_case_attachments a')
-                ->select('a.id, a.case_id, a.original_name, a.mime_type, a.file_size, a.description, a.created_at, uploader.name AS uploaded_by_name')
+                ->select('a.id, a.case_id, a.original_name, a.mime_type, a.file_size, a.description, a.retention_until, a.created_at, uploader.name AS uploaded_by_name')
                 ->join('users uploader', 'uploader.id = a.uploaded_by', 'left')
                 ->whereIn('a.case_id', array_map(static fn (array $case): int => (int) $case['id'], $cases))
                 ->orderBy('a.created_at', 'ASC')->get()->getResultArray() as $attachment) {
@@ -119,6 +119,7 @@ final class StoreDayVarianceCaseService
                     'id' => (int) $attachment['id'], 'original_name' => (string) $attachment['original_name'],
                     'mime_type' => (string) $attachment['mime_type'], 'file_size' => (int) $attachment['file_size'],
                     'description' => $attachment['description'] ?? null, 'created_at' => $attachment['created_at'] ?? null,
+                    'retention_until' => $attachment['retention_until'] ?? null,
                     'uploaded_by_name' => $attachment['uploaded_by_name'] ?? 'Unknown',
                 ];
             }
@@ -127,7 +128,7 @@ final class StoreDayVarianceCaseService
         $handoffsByCase = [];
         if ($db->tableExists('store_day_variance_case_handoffs')) {
             foreach ($db->table('store_day_variance_case_handoffs h')
-                ->select('h.case_id, h.note, h.status, h.created_at, sender.name AS from_name, recipient.name AS to_name')
+                ->select('h.id, h.case_id, h.to_user_id, h.note, h.status, h.created_at, h.due_at, h.acknowledged_at, sender.name AS from_name, recipient.name AS to_name')
                 ->join('users sender', 'sender.id = h.from_user_id', 'left')->join('users recipient', 'recipient.id = h.to_user_id', 'left')
                 ->whereIn('h.case_id', array_map(static fn (array $case): int => (int) $case['id'], $cases))
                 ->orderBy('h.created_at', 'ASC')->get()->getResultArray() as $handoff) {
@@ -149,9 +150,17 @@ final class StoreDayVarianceCaseService
                 'events' => $eventsByCase[(int) $case['id']] ?? [],
                 'attachments' => $attachmentsByCase[(int) $case['id']] ?? [],
                 'handoffs' => $handoffsByCase[(int) $case['id']] ?? [],
+                'can_acknowledge' => $this->canAcknowledge($handoffsByCase[(int) $case['id']] ?? []),
             ];
         }
         return $result;
+    }
+
+    private function canAcknowledge(array $handoffs): bool
+    {
+        if ($handoffs === []) return false;
+        $latest = $handoffs[array_key_last($handoffs)];
+        return (int) ($latest['to_user_id'] ?? 0) === (int) session()->get('user_id') && (string) ($latest['status'] ?? '') === 'pending';
     }
 
     private function evidence(array $session): array

@@ -42,6 +42,7 @@ $routes->post('admin/store-day-sessions/(:num)/review', 'AdminController::review
 $routes->post('admin/variance-cases/(:num)/attachments', 'AdminController::uploadVarianceCaseAttachment/$1', ['filter' => 'access:system.manage']);
 $routes->get('admin/variance-case-attachments/(:num)', 'AdminController::downloadVarianceCaseAttachment/$1', ['filter' => 'access:system.manage']);
 $routes->post('admin/variance-cases/(:num)/handoff', 'AdminController::handoffVarianceCase/$1', ['filter' => 'access:system.manage']);
+$routes->post('admin/variance-cases/(:num)/acknowledge', 'AdminController::acknowledgeVarianceCase/$1', ['filter' => 'access:system.manage']);
 $routes->get('admin/stores/officers', 'AdminController::officers', ['filter' => 'access:system.manage']);
 $routes->post('admin/stores/create', 'AdminController::createStore', ['filter' => 'access:system.manage']);
 $routes->post('admin/stores/update', 'AdminController::updateStore', ['filter' => 'access:system.manage']);
@@ -58,6 +59,7 @@ $routes->post('store-admin/store-day-sessions/(:num)/review', 'StoreAdminControl
 $routes->post('store-admin/variance-cases/(:num)/attachments', 'StoreAdminController::uploadVarianceCaseAttachment/$1', ['filter' => 'access:store.review_assigned']);
 $routes->get('store-admin/variance-case-attachments/(:num)', 'StoreAdminController::downloadVarianceCaseAttachment/$1', ['filter' => 'access:store.review_assigned']);
 $routes->post('store-admin/variance-cases/(:num)/handoff', 'StoreAdminController::handoffVarianceCase/$1', ['filter' => 'access:store.review_assigned']);
+$routes->post('store-admin/variance-cases/(:num)/acknowledge', 'StoreAdminController::acknowledgeVarianceCase/$1', ['filter' => 'access:store.review_assigned']);
 
 $routes->get('store/pos', 'StoreController::pos', ['filter' => 'access:store.inspect']);
 $routes->get('store/dashboard', 'StoreController::dashboard', ['filter' => 'access:store.inspect']);

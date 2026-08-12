@@ -127,4 +127,20 @@ final class StoreAdminDayStatusTest extends CIUnitTestCase
         $this->assertStringContainsString('variance-evidence-form', $script);
         $this->assertStringContainsString('variance-handoff-form', $script);
     }
+
+    public function testFinalVarianceDispositionRequiresAcknowledgedOwnershipAndEvidence(): void
+    {
+        $service = (string) file_get_contents(APPPATH . 'Services/StoreOversightService.php');
+        $admin = (string) file_get_contents(APPPATH . 'Controllers/AdminController.php');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-store-details.js');
+
+        $this->assertStringContainsString('Only the assigned case owner can finalize this variance.', $service);
+        $this->assertStringContainsString('Acknowledge the latest reviewer handoff before final disposition.', $service);
+        $this->assertStringContainsString('Attach at least one supporting evidence file before final disposition.', $service);
+        $this->assertStringContainsString('acknowledgeVarianceCase', $service);
+        $this->assertStringContainsString("'retention_until'", $service);
+        $this->assertStringContainsString("'due_at'", $service);
+        $this->assertStringContainsString('Acknowledgment overdue', $admin);
+        $this->assertStringContainsString('data-case-acknowledge', $script);
+    }
 }

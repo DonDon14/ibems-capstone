@@ -66,6 +66,8 @@ The first part of items 1 and 3 was implemented in the next follow-up. Every rev
 
 The next follow-up added private PDF/JPG/PNG evidence attachments (5 MB maximum), randomized storage names outside the public web root, SHA-256 verification on authorized download, and store-scoped reviewer handoffs. The synthetic PHP 20 case was handed from Scenario Supervisor 5 to System Administrator and persisted after reload; its `needs_investigation` status and PHP -20 variance were unchanged. File attachments are available but no synthetic file was added to either financial case during acceptance.
 
+Governance was then tightened with a 48-hour handoff-acknowledgment deadline, dashboard overdue indicators, a seven-year attachment-retention date, and guarded final disposition. Only the assigned owner may finalize; the latest handoff must be acknowledged and at least one evidence file must exist. System Administrator acknowledged the PHP 20 case. A live waiver attempt without evidence was correctly blocked, leaving the PHP -20 variance and `needs_investigation` status unchanged.
+
 The improved dashboard exposed a second pre-existing unresolved record: Dashboard Demo Store has a PHP 500 shortage from 2026-06-30. Read-only reconciliation confirmed PHP 3,000 expected cash, PHP 2,500 counted cash, no cash movement, and only one PHP 40 debt sale that did not affect cash. An Administrator attempt to review it was correctly blocked because that same user closed the store day. A separately assigned store supervisor then changed only the review status to `needs_investigation` and recorded the evidence; the PHP -500 variance, counted cash, and accountability remain unchanged pending source evidence.
 
 ## Role-by-role browser acceptance
