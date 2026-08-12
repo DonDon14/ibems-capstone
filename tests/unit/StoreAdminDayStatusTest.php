@@ -104,6 +104,9 @@ final class StoreAdminDayStatusTest extends CIUnitTestCase
         $this->assertStringContainsString("admin/store-day-sessions/(:num)/resolve-stale", $routes);
         $this->assertStringContainsString("store-admin/store-day-sessions/(:num)/resolve-stale", $routes);
         $this->assertStringContainsString('stale-day-resolution-form', $script);
+        $this->assertStringContainsString('stale-day-expected', $script);
+        $this->assertStringContainsString('System expected cash', $script);
+        $this->assertStringContainsString("\$expectedService->calculate", $oversight);
     }
 
     public function testVarianceDispositionRequiresAVisiblePreviewAndEvidenceAwareCorrectionCopy(): void

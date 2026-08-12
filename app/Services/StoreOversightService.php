@@ -170,16 +170,20 @@ public function storeDetailsData(RequestInterface $request, ResponseInterface $r
             ];
         }
 
-        $normalizeDaySession = function (array $row) use ($db, $varianceCases): array {
+        $expectedService = new StoreDayExpectedService();
+        $normalizeDaySession = function (array $row) use ($db, $varianceCases, $expectedService): array {
             $sessionId = (int) ($row['id'] ?? 0);
+            $liveExpected = (string) ($row['status'] ?? '') === 'open'
+                ? $expectedService->calculate((int) ($row['store_id'] ?? 0), $row)
+                : [];
             return [
                 'id' => $sessionId,
                 'business_date' => (string) ($row['business_date'] ?? ''),
                 'status' => (string) ($row['status'] ?? ''),
                 'opening_cash' => (float) ($row['opening_cash'] ?? 0),
                 'opening_ecash' => (float) ($row['opening_ecash'] ?? 0),
-                'expected_cash' => (float) ($row['expected_cash'] ?? 0),
-                'expected_ecash' => (float) ($row['expected_ecash'] ?? 0),
+                'expected_cash' => (float) ($liveExpected['expected_cash_on_hand'] ?? $row['expected_cash'] ?? 0),
+                'expected_ecash' => (float) ($liveExpected['expected_ecash_on_hand'] ?? $row['expected_ecash'] ?? 0),
                 'counted_cash' => $row['counted_cash'] !== null ? (float) $row['counted_cash'] : null,
                 'counted_ecash' => $row['counted_ecash'] !== null ? (float) $row['counted_ecash'] : null,
                 'variance_cash' => $row['variance_cash'] !== null ? (float) $row['variance_cash'] : null,

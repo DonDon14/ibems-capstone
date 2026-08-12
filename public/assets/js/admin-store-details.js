@@ -210,6 +210,11 @@ function sdRenderDaySession(session) {
                     <p>Enter independently counted balances. The original business date and opener will be preserved.</p>
                 </div>
             </div>
+            <div class="stale-day-expected" role="status">
+                <div><span>System expected cash</span><strong>${sdEscape(sdMoney(session.expected_cash || 0))}</strong></div>
+                <div><span>System expected e-cash</span><strong>${sdEscape(sdMoney(session.expected_ecash || 0))}</strong></div>
+                <p>Count independently before entering values. These expectations are shown for reconciliation and must not replace a physical count.</p>
+            </div>
             <div class="stale-day-fields">
                 <label><span>Counted Cash</span><input type="number" name="counted_cash" min="0" step="0.01" placeholder="PHP 0.00" required></label>
                 <label><span>Counted E-Cash</span><input type="number" name="counted_ecash" min="0" step="0.01" placeholder="PHP 0.00" required></label>
@@ -294,7 +299,18 @@ function sdRenderDaySession(session) {
 async function sdResolveStaleDay(form) {
     const sessionId = Number(form.getAttribute("data-stale-session-id") || 0);
     if (!sessionId) return;
-    const confirmed = await window.IbemsDialog.confirm("Close this previous business day using the entered physical counts? The original date will remain unchanged.", {
+    const currentSession = sdDaySessions.find((row) => Number(row.id || 0) === sessionId);
+    const payload = Object.fromEntries(new FormData(form).entries());
+    const preview = [
+        `Business date: ${currentSession?.business_date || "-"}`,
+        `Expected cash: ${sdMoney(currentSession?.expected_cash || 0)}`,
+        `Counted cash: ${sdMoney(payload.counted_cash || 0)}`,
+        `Expected e-cash: ${sdMoney(currentSession?.expected_ecash || 0)}`,
+        `Counted e-cash: ${sdMoney(payload.counted_ecash || 0)}`,
+        "",
+        "The original business date and opener will remain unchanged. Any difference creates a variance case for independent review.",
+    ].join("\n");
+    const confirmed = await window.IbemsDialog.confirm(preview, {
         title: "Resolve previous store day",
         confirmLabel: "Resolve day",
         tone: "danger",
@@ -303,7 +319,6 @@ async function sdResolveStaleDay(form) {
 
     const root = document.querySelector("[data-store-id]");
     const prefix = (root?.getAttribute("data-review-url-prefix") || "/admin/store-day-sessions").replace(/\/$/, "");
-    const payload = Object.fromEntries(new FormData(form).entries());
     const response = await fetch(`${prefix}/${sessionId}/resolve-stale`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
