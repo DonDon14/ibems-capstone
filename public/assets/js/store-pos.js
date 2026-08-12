@@ -542,10 +542,16 @@ function updateStoreDayCloseVariance() {
     }
 }
 
-function openStoreDayCloseModal() {
+async function openStoreDayCloseModal() {
     const modal = document.getElementById("store-day-close-modal");
+    if (!modal) return;
+
+    await loadOpeningBalanceStatus();
     const summary = document.getElementById("store-day-close-summary");
-    if (!modal || !currentDaySession) return;
+    if (!currentDaySession || String(currentDaySession.status || "") !== "open") {
+        setResult("The store day is no longer open. Reload its current status before closing.", "error");
+        return;
+    }
 
     const expectedCash = Number(currentDaySession.expected_cash_on_hand ?? currentDaySession.expected_cash ?? 0);
     const expectedEcash = Number(currentDaySession.expected_ecash_on_hand ?? currentDaySession.expected_ecash ?? 0);
@@ -2402,7 +2408,9 @@ document.getElementById("opening-ecash-input").addEventListener("keydown", (even
     event.preventDefault();
     saveOpeningBalance();
 });
-document.getElementById("store-day-close-btn").addEventListener("click", openStoreDayCloseModal);
+document.getElementById("store-day-close-btn").addEventListener("click", () => {
+    openStoreDayCloseModal().catch((error) => setResult(error.message || "Unable to load current close-day totals.", "error"));
+});
 document.getElementById("store-day-close-x").addEventListener("click", closeStoreDayCloseModal);
 document.getElementById("store-day-close-cancel").addEventListener("click", closeStoreDayCloseModal);
 document.getElementById("store-day-close-save").addEventListener("click", saveStoreDayClose);

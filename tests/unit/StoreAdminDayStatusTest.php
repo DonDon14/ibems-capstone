@@ -118,6 +118,15 @@ final class StoreAdminDayStatusTest extends CIUnitTestCase
         $this->assertStringContainsString('options.multiline ? textarea : input', $dialogs);
     }
 
+    public function testCloseDayPreviewRefreshesExpectedBalancesBeforeShowingCounts(): void
+    {
+        $script = (string) file_get_contents(FCPATH . 'assets/js/store-pos.js');
+
+        $this->assertStringContainsString('async function openStoreDayCloseModal()', $script);
+        $this->assertStringContainsString('await loadOpeningBalanceStatus();', $script);
+        $this->assertStringContainsString('Unable to load current close-day totals.', $script);
+    }
+
     public function testActiveStoreConfigurationRequiresOfficerAndSupervisorCoverage(): void
     {
         $source = (string) file_get_contents(APPPATH . 'Controllers/AdminController.php');
