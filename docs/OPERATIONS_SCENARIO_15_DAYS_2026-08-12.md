@@ -6,7 +6,7 @@ Scenario key: `SCN15-2026-07`
 
 ## Executed coverage
 
-- Four active stores, each with an assigned store officer.
+- Four active stores, each with an assigned store officer and store supervisor. Missing coverage was filled with one dedicated, store-scoped synthetic supervisor per uncovered store.
 - Sixty closed store-day sessions: 15 dates for every store.
 - One dedicated acceptance product in every store, including JL Store, which previously had no product.
 - Seventy-two completed transactions: 60 cash sales and 12 employee-debt sales.
@@ -32,17 +32,17 @@ The scenario is idempotent. Run `php spark ibems:scenario-15-days` to create it 
 
 - `ibems:data-audit`: passed, zero warnings and zero errors.
 - `ibems:auth-audit`: passed, zero warnings and zero errors.
-- PHPUnit: 73 tests and 471 assertions passed; only the expected missing-coverage-driver warning remains.
+- PHPUnit: 76 tests and 487 assertions passed; only the expected missing-coverage-driver warning remains.
 - Browser: Main Campus Store history displayed all 18 applicable records for the selected 15-day range (15 cash plus 3 debt), with PHP 525 total sales and no console warnings/errors.
-- `ibems:route-audit`: failed 38 of 41 write endpoints because its parser only recognizes legacy `role:*` filters. The routes use the newer `access:*` permission filters and are covered by the authorization tests.
+- `ibems:route-audit`: passed all 41 write endpoints after adding support for the current `access:*` permission filters.
 
 ## Improvements and remaining errors
 
 ### High priority
 
-1. Update `IbemsRouteAudit` to recognize and validate `access:*` filters against the authorization capability map. The stale parser makes the full preflight fail and could hide a real unprotected route among false positives.
+1. Create a durable exception/case record for store-day variances, with evidence attachments, an owner, eligible independent reviewers, status history, and final disposition. The review note alone is not a full investigation file.
 2. Prevent an active store from existing without an assigned operational officer, or give it an explicit `setup_pending` state. JL Store was active but had no officer and no products before this scenario.
-3. Link `needs_investigation` store-day variances to a durable investigation/case identifier. The current variance review status and debt-investigation workflow are separate, so a reviewer cannot trace a flagged shortage to a case from end to end.
+3. When segregation of duties blocks a reviewer, show who is eligible to continue and provide a direct handoff action. The current error is correct but leaves the operator to find another reviewer manually.
 
 ### Medium priority
 
@@ -62,12 +62,13 @@ The scenario is idempotent. Run `php spark ibems:scenario-15-days` to create it 
 
 Items 12 and 13 were implemented during follow-up acceptance. Administrator and Store Supervisor details now expose up to 60 recent sessions with review-status filters and permitted actions. The Administrator dashboard now counts and links unresolved historical reviews. Active-store creation or updates also require both a primary officer and supervisor coverage.
 
-The improved dashboard exposed a second pre-existing unresolved record: Dashboard Demo Store has a PHP 500 shortage from 2026-06-30 with `pending` review status. It was left unchanged for a separate evidence-based investigation.
+The improved dashboard exposed a second pre-existing unresolved record: Dashboard Demo Store has a PHP 500 shortage from 2026-06-30. Read-only reconciliation confirmed PHP 3,000 expected cash, PHP 2,500 counted cash, no cash movement, and only one PHP 40 debt sale that did not affect cash. An Administrator attempt to review it was correctly blocked because that same user closed the store day. A separately assigned store supervisor then changed only the review status to `needs_investigation` and recorded the evidence; the PHP -500 variance, counted cash, and accountability remain unchanged pending source evidence.
 
 ## Role-by-role browser acceptance
 
 - Store Officer: scenario product, remaining stock, and dated inventory movements persisted after load.
 - Store Supervisor: assignment scope was correct, but Main Campus still reported an August 11 store day as open on August 12.
+- Store Supervisor segregation of duties: the closer could not review their own variance. A different supervisor could record the investigation note, and reopening the dashboard preserved `Needs Investigation` with PHP -500 unchanged.
 - Accounting: the scenario employee displayed PHP 150 debt and PHP 850 available credit; the finalized period displayed PHP 300 confirmed and PHP 150 carryover.
 - Accounting investigation: the duplicate-charge case displayed its transaction reference, findings, independent closer, and PHP 50 posted reversal.
 - Administrator: all four stores, their officers, products, totals, and transactions were visible. JL Store displayed 18 transactions, PHP 525 sales, one product, and 479 remaining units.
@@ -77,4 +78,4 @@ The improved dashboard exposed a second pre-existing unresolved record: Dashboar
 
 The core transaction design is logical and safe: server-derived prices, store/day authorization, atomic stock deduction, debt balance locking, append-only cashbook history, and rollback on failure agree with each other. Salary deductions also enforce reconciliation and require a different Accounting user to finalize.
 
-The weakest operational connection is exception handling. Credit rejections, PIN failures, store shortages, debt investigations, and salary carryovers exist in different surfaces without one case record tying the evidence, owner, status, and final disposition together.
+The weakest operational connection is exception handling. Credit rejections, PIN failures, store shortages, debt investigations, and salary carryovers exist in different surfaces without one case record tying the evidence, owner, status, and final disposition together. Segregation of duties is correctly enforced, but the interface should name the eligible independent reviewers when it blocks the closer so the operator knows who can continue the case.

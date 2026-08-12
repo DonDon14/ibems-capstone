@@ -21,6 +21,8 @@ class IbemsScenario15Days extends BaseCommand
 
         if ($this->db->table('transactions')->like('client_txn_id', self::PREFIX, 'after')->countAllResults() > 0) {
             CLI::write('Scenario already exists; running verification only.', 'yellow');
+            $actors = $this->actors();
+            $this->ensureSupervisorCoverage($this->storesWithOfficers($actors['admin']), $actors['admin']);
             $this->repairScenarioTimestamps();
             return $this->verify();
         }
@@ -29,6 +31,7 @@ class IbemsScenario15Days extends BaseCommand
         try {
             $actors = $this->actors();
             $stores = $this->storesWithOfficers($actors['admin']);
+            $this->ensureSupervisorCoverage($stores, $actors['admin']);
             $customers = $this->customers();
             $products = $this->products($stores);
             $this->simulateDays($stores, $products, $customers['employee']);
@@ -111,6 +114,60 @@ class IbemsScenario15Days extends BaseCommand
             $employee = $this->db->table('users')->where('id', $employeeId)->get()->getRowArray();
         }
         return ['employee' => (int) $employee['id']];
+    }
+
+    private function ensureSupervisorCoverage(array $stores, int $adminId): void
+    {
+        $scenarioPassword = env('scenario.supervisorPassword') ?: env('demo.storeAdminPassword') ?: '123456';
+
+        foreach ($stores as $store) {
+            $storeId = (int) ($store['id'] ?? 0);
+            if ($storeId <= 0) {
+                continue;
+            }
+
+            $employeeId = sprintf('SCN15-SUP-%03d', $storeId);
+            $supervisor = $this->db->table('users')->where('employee_id', $employeeId)->get()->getRowArray();
+            if ($supervisor) {
+                $this->db->table('users')->where('id', (int) $supervisor['id'])->update([
+                    'password_hash' => password_hash($scenarioPassword, PASSWORD_BCRYPT),
+                    'is_active' => 1,
+                ]);
+            }
+            if ($this->db->table('store_supervisors')->where('store_id', $storeId)->countAllResults() > 0) {
+                continue;
+            }
+
+            if (!$supervisor) {
+                $this->db->table('users')->insert([
+                    'employee_id' => $employeeId,
+                    'name' => 'Scenario Supervisor ' . $storeId,
+                    'email' => strtolower($employeeId) . '@example.test',
+                    'password_hash' => password_hash($scenarioPassword, PASSWORD_BCRYPT),
+                    'role' => 'STORE_SUPERVISOR', 'user_type' => 'staff',
+                    'qr_token' => 'QR-' . $employeeId,
+                    'base_salary' => 32000, 'is_active' => 1,
+                    'created_at' => '2026-07-14 08:02:00',
+                ]);
+                $supervisorId = (int) $this->db->insertID();
+            } else {
+                $supervisorId = (int) $supervisor['id'];
+            }
+
+            if ($this->db->table('user_roles')->where(['user_id' => $supervisorId, 'role' => 'STORE_SUPERVISOR'])->countAllResults() === 0) {
+                $this->db->table('user_roles')->insert([
+                    'user_id' => $supervisorId, 'role' => 'STORE_SUPERVISOR',
+                    'created_at' => '2026-07-14 08:02:00', 'updated_at' => '2026-07-14 08:02:00',
+                ]);
+            }
+            $this->db->table('store_supervisors')->insert([
+                'store_id' => $storeId, 'user_id' => $supervisorId,
+                'created_at' => '2026-07-14 08:03:00', 'updated_at' => '2026-07-14 08:03:00',
+            ]);
+            $this->audit($adminId, 'ASSIGN_STORE_SUPERVISOR', 'stores', $storeId, [
+                'scenario' => self::PREFIX, 'supervisor_id' => $supervisorId,
+            ], '2026-07-14 08:03:00');
+        }
     }
 
     private function products(array $stores): array
@@ -349,6 +406,7 @@ class IbemsScenario15Days extends BaseCommand
         $coveredStores = $this->db->query("SELECT COUNT(DISTINCT store_id) AS total FROM store_day_sessions WHERE business_date BETWEEN '2026-07-15' AND '2026-07-29'")->getRowArray();
         $transactions = $this->db->table('transactions')->like('client_txn_id', self::PREFIX, 'after')->countAllResults();
         $scenarioProducts = $this->db->table('products')->like('sku', 'SCN15-', 'after')->countAllResults();
+        $coveredSupervisorStores = $this->db->query('SELECT COUNT(DISTINCT store_id) AS total FROM store_supervisors')->getRowArray();
         $pinChanges = $this->db->table('audit_logs')->where('action', 'SET_DEBT_PIN')->like('payload_json', self::PREFIX)->countAllResults();
         $rejections = $this->db->table('audit_logs')->where('action', 'REJECT_CREDIT_LIMIT_EXCEEDED')->like('payload_json', self::PREFIX)->countAllResults();
         $period = $this->db->table('deduction_periods')->where('period_code', self::PREFIX)->get()->getRowArray();
@@ -371,6 +429,7 @@ class IbemsScenario15Days extends BaseCommand
         $checks = [
             'all stores covered for 15 days' => $sessions === $stores * 15 && (int) ($coveredStores['total'] ?? 0) === $stores,
             'every store has a scenario product' => $scenarioProducts === $stores,
+            'every store has supervisor coverage' => (int) ($coveredSupervisorStores['total'] ?? 0) === $stores,
             'cash and debt transactions recorded' => $transactions >= ($stores * 15) + 12,
             'two PIN changes audited' => $pinChanges === 2,
             'credit-limit rejection audited' => $rejections === 1,
