@@ -21,6 +21,7 @@ class IbemsScenario15Days extends BaseCommand
 
         if ($this->db->table('transactions')->like('client_txn_id', self::PREFIX, 'after')->countAllResults() > 0) {
             CLI::write('Scenario already exists; running verification only.', 'yellow');
+            $this->repairScenarioTimestamps();
             return $this->verify();
         }
 
@@ -44,6 +45,7 @@ class IbemsScenario15Days extends BaseCommand
         }
 
         CLI::write('15-day operations scenario created.', 'green');
+        $this->repairScenarioTimestamps();
         return $this->verify();
     }
 
@@ -189,19 +191,36 @@ class IbemsScenario15Days extends BaseCommand
     private function transaction(int $storeId, int $productId, int $actorId, string $date, int $day, string $method, ?int $userId, float $amount, string $kind): int
     {
         $clientId = sprintf('%s-%s-S%03d-D%02d', self::PREFIX, $kind, $storeId, $day + 1);
+        $eventTime = $date . ($method === 'debt' ? ' 10:30:00' : ' 09:15:00');
         $this->db->table('transactions')->insert([
             'client_txn_id' => $clientId, 'user_id' => $userId,
             'customer_type' => $userId ? 'staff' : 'walk_in', 'store_id' => $storeId,
             'amount' => $amount, 'payment_method' => $method, 'status' => 'completed',
-            'created_at' => $date . ($method === 'debt' ? ' 10:30:00' : ' 09:15:00'),
+            'created_at' => $eventTime,
             'synced_at' => $date . ($method === 'debt' ? ' 10:30:02' : ' 09:15:02'),
         ]);
         $txnId = (int) $this->db->insertID();
         $qty = $amount === 50.0 ? 2 : 1;
-        $this->db->table('transaction_items')->insert(['transaction_id' => $txnId, 'product_id' => $productId, 'qty' => $qty, 'unit_price' => 25, 'line_total' => $amount, 'created_at' => $date . ' 09:15:00']);
-        $this->db->table('inventory_movements')->insert(['product_id' => $productId, 'store_id' => $storeId, 'type' => 'sale', 'qty' => -$qty, 'reason' => self::PREFIX, 'txn_id' => $txnId, 'created_at' => $date . ' 09:15:00']);
+        $this->db->table('transaction_items')->insert(['transaction_id' => $txnId, 'product_id' => $productId, 'qty' => $qty, 'unit_price' => 25, 'line_total' => $amount, 'created_at' => $eventTime]);
+        $this->db->table('inventory_movements')->insert(['product_id' => $productId, 'store_id' => $storeId, 'type' => 'sale', 'qty' => -$qty, 'reason' => self::PREFIX, 'txn_id' => $txnId, 'created_at' => $eventTime]);
         $this->db->table('products')->where('id', $productId)->set('stock_qty', 'stock_qty - ' . $qty, false)->update(['updated_at' => $date . ' 10:30:00']);
         return $txnId;
+    }
+
+    private function repairScenarioTimestamps(): void
+    {
+        $transactions = $this->db->table('transactions')
+            ->select('id, created_at')
+            ->like('client_txn_id', self::PREFIX, 'after')
+            ->get()
+            ->getResultArray();
+
+        foreach ($transactions as $transaction) {
+            $transactionId = (int) $transaction['id'];
+            $createdAt = (string) $transaction['created_at'];
+            $this->db->table('transaction_items')->where('transaction_id', $transactionId)->update(['created_at' => $createdAt]);
+            $this->db->table('inventory_movements')->where('txn_id', $transactionId)->update(['created_at' => $createdAt]);
+        }
     }
 
     private function recordPinChanges(int $userId): void
@@ -334,6 +353,21 @@ class IbemsScenario15Days extends BaseCommand
         $rejections = $this->db->table('audit_logs')->where('action', 'REJECT_CREDIT_LIMIT_EXCEEDED')->like('payload_json', self::PREFIX)->countAllResults();
         $period = $this->db->table('deduction_periods')->where('period_code', self::PREFIX)->get()->getRowArray();
         $investigation = $this->db->table('debt_investigations')->like('summary', 'scenario')->get()->getRowArray();
+        $timestampRows = $this->db->table('transactions t')
+            ->select('t.created_at AS transaction_created_at, ti.created_at AS item_created_at, im.created_at AS movement_created_at')
+            ->join('transaction_items ti', 'ti.transaction_id = t.id', 'inner')
+            ->join('inventory_movements im', 'im.txn_id = t.id', 'inner')
+            ->like('t.client_txn_id', self::PREFIX, 'after')
+            ->get()
+            ->getResultArray();
+        $timestampsMatch = $timestampRows !== [];
+        foreach ($timestampRows as $timestampRow) {
+            if ((string) $timestampRow['transaction_created_at'] !== (string) $timestampRow['item_created_at']
+                || (string) $timestampRow['transaction_created_at'] !== (string) $timestampRow['movement_created_at']) {
+                $timestampsMatch = false;
+                break;
+            }
+        }
         $checks = [
             'all stores covered for 15 days' => $sessions === $stores * 15 && (int) ($coveredStores['total'] ?? 0) === $stores,
             'every store has a scenario product' => $scenarioProducts === $stores,
@@ -342,6 +376,7 @@ class IbemsScenario15Days extends BaseCommand
             'credit-limit rejection audited' => $rejections === 1,
             'salary period finalized' => ($period['status'] ?? '') === 'finalized',
             'investigation independently approved' => $investigation && (int) $investigation['recommended_by'] !== (int) $investigation['approved_by'],
+            'transaction timestamps agree across inventory records' => $timestampsMatch,
         ];
         foreach ($checks as $label => $ok) {
             CLI::write(($ok ? '[OK] ' : '[FAIL] ') . $label, $ok ? 'green' : 'red');

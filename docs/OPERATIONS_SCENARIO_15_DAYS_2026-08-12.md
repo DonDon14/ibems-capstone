@@ -57,6 +57,17 @@ The scenario is idempotent. Run `php spark ibems:scenario-15-days` to create it 
 9. In transaction history, explain that the count is transaction count rather than business-day count. Main Campus correctly showed 18 transactions over 15 days, but the difference is easy to misread.
 10. Add an exception dashboard joining over-limit attempts, failed PIN attempts, store-day variances, repayment exceptions, deduction carryovers, and open investigations.
 11. Add a scenario cleanup command scoped only to the scenario key. The fixture is idempotent, but there is no safe, selective rollback command yet.
+12. Add a historical store-day session list with date/status filters to Administrator and Store Supervisor store details. A later balanced close currently hides an older unresolved shortage because only the latest session is presented.
+13. Add an Administrator alert for unresolved historical `pending` and `needs_investigation` reviews. The dashboard's current-day alerts did not surface the scenario's July 24 PHP 20 shortage.
+
+## Role-by-role browser acceptance
+
+- Store Officer: scenario product, remaining stock, and dated inventory movements persisted after load.
+- Store Supervisor: assignment scope was correct, but Main Campus still reported an August 11 store day as open on August 12.
+- Accounting: the scenario employee displayed PHP 150 debt and PHP 850 available credit; the finalized period displayed PHP 300 confirmed and PHP 150 carryover.
+- Accounting investigation: the duplicate-charge case displayed its transaction reference, findings, independent closer, and PHP 50 posted reversal.
+- Administrator: all four stores, their officers, products, totals, and transactions were visible. JL Store displayed 18 transactions, PHP 525 sales, one product, and 479 remaining units.
+- Administrator exception review: the historical PHP 20 shortage was not discoverable from the dashboard or store detail once July 29 became the latest balanced session.
 
 ## Workflow assessment
 
