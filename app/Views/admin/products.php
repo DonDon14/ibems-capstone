@@ -5,7 +5,7 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
-<section class="admin-overview-shell space-y-5">
+<section class="admin-overview-shell">
     <?= view('components/page_header', [
         'eyebrow' => 'Catalog intelligence',
         'title' => 'Product oversight',

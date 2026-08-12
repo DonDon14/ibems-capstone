@@ -280,6 +280,15 @@
     min-height: 20px;
 }
 
+.stores-result:empty {
+    display: none;
+}
+
+.ap-filter-panel + .uv-count-text,
+.ap-filter-panel + .stores-result + .uv-count-text {
+    margin-top: 0;
+}
+
 .uv-count-text {
     margin: -4px 0 0;
     color: #5e738b;
