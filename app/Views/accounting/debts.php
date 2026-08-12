@@ -53,7 +53,6 @@
             <label class="field min-w-[260px] grow" for="acct-search">
                 <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Search employees</span>
                 <span class="acct-search-wrap relative block">
-                    <i class="bi bi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true"></i>
                     <input id="acct-search" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm text-slate-700 outline-none transition focus:border-blue-300 focus:bg-white" type="search" placeholder="Name, ID, or office">
                 </span>
             </label>
@@ -206,7 +205,6 @@
             <label class="field min-w-[260px] grow" for="settlement-preview-search">
                 <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Search preview</span>
                 <span class="acct-search-wrap relative block">
-                    <i class="bi bi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true"></i>
                     <input id="settlement-preview-search" class="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm text-slate-700 outline-none transition focus:border-blue-300" type="search" placeholder="Employee, ID, or category">
                 </span>
             </label>

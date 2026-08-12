@@ -28,7 +28,6 @@
             <label class="uv-search-field min-w-[260px] grow">
                 <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Search users</span>
                 <span class="uv-search-wrap relative block">
-                    <i class="bi bi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true"></i>
                     <input id="uv-search" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm text-slate-700 outline-none ring-0 transition focus:border-blue-300 focus:bg-white" type="search" placeholder="Search name, ID, office...">
                 </span>
             </label>

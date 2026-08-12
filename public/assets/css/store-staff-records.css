@@ -120,21 +120,6 @@
     font-weight: 700;
 }
 
-.staff-search-icon {
-    position: absolute;
-    left: 14px;
-    top: 50%;
-    width: 18px;
-    height: 18px;
-    transform: translateY(-50%);
-    fill: none;
-    stroke: #64748b;
-    stroke-width: 1.75;
-    stroke-linecap: round;
-    stroke-linejoin: round;
-    pointer-events: none;
-}
-
 .staff-search-wrap input {
     width: 100%;
     min-height: 44px;

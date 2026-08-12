@@ -728,11 +728,6 @@ textarea:focus {
     padding-left: 42px;
 }
 
-:is(.staff-search-wrap, .acct-search-wrap, .uv-search-wrap) > i {
-    left: 14px;
-    color: #64748b;
-}
-
 :is(.staff-filter-panel, .acct-filters-redesign, .uv-filter-panel, .ap-filter-panel, .audit-filter-panel) {
     border: 1px solid #d8e2ee;
     border-radius: 8px;

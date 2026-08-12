@@ -20,10 +20,6 @@
                 <div class="staff-search-field">
                     <label for="debt-search">Search Employees</label>
                     <div class="staff-search-wrap">
-                        <svg class="staff-search-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                            <circle cx="11" cy="11" r="6.5"></circle>
-                            <path d="m16 16 4 4"></path>
-                        </svg>
                         <input id="debt-search" type="search" placeholder="Name, ID, or office">
                         <button id="debt-search-scan-btn" type="button" class="staff-scan-btn" title="Scan employee QR/ID">
                             <i class="bi bi-qr-code-scan"></i>
