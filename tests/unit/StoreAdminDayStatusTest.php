@@ -124,6 +124,9 @@ final class StoreAdminDayStatusTest extends CIUnitTestCase
         $this->assertStringContainsString("view('components/stat_card'", $view);
         $this->assertStringContainsString("view('components/data_state'", $view);
         $this->assertStringContainsString('store-admin-panel', $view);
+        $this->assertSame(2, substr_count($view, 'class="data-panel store-admin-panel"'));
+        $this->assertSame(2, substr_count($view, 'class="data-panel-head store-admin-section-head"'));
+        $this->assertSame(2, substr_count($view, 'class="data-panel-body store-admin-panel-body"'));
         $this->assertStringContainsString('function sadDataState(', $script);
         $this->assertStringContainsString('No pending variance reviews', $script);
         $this->assertStringContainsString('.store-admin-store-item:focus-visible', $styles);

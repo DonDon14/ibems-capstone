@@ -1104,25 +1104,18 @@
 }
 
 .store-admin-grid {
-    align-items: start;
+    align-items: stretch;
     grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.75fr);
     gap: 16px;
 }
 
 .store-admin-panel {
-    padding: 18px;
-    overflow: visible;
-    min-height: 190px;
+    min-width: 0;
 }
 
 .store-admin-section-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin-bottom: 16px;
-    padding-bottom: 14px;
-    border-bottom: 1px solid #e2e8f0;
+    min-height: 76px;
+    padding: 14px 16px;
 }
 
 .store-admin-section-head h4 {
@@ -1132,6 +1125,11 @@
     gap: 8px;
     color: #0b3f73;
     font-size: 1rem;
+}
+
+.store-admin-panel-body {
+    padding: 14px 16px 16px;
+    overflow: visible;
 }
 
 .store-admin-section-head h4 i {
@@ -1177,7 +1175,7 @@
 
 .store-admin-review-list > .data-state,
 .store-admin-store-list > .data-state {
-    min-height: 92px;
+    min-height: 88px;
     border: 1px dashed #cbd5e1;
     border-radius: 10px;
     background: #f8fafc;
@@ -1189,6 +1187,11 @@
     border-radius: 10px;
     background: #fff;
     padding: 12px;
+}
+
+.store-admin-review-list > :only-child,
+.store-admin-store-list > :only-child {
+    min-height: 88px;
 }
 
 .store-admin-review-head,
@@ -1340,6 +1343,10 @@
     .store-admin-section-head {
         flex-direction: column;
         align-items: stretch;
+    }
+
+    .store-admin-section-head {
+        min-height: 0;
     }
 
     .store-admin-store-metrics {
