@@ -2,6 +2,8 @@ function sdMoney(value) {
     return window.IbemsFormat?.money(value) || `PHP ${Number(value || 0).toFixed(2)}`;
 }
 
+let sdDaySessions = [];
+
 function sdDateTime(value) {
     return window.IbemsFormat?.dateTime(value) || new Date(value).toLocaleString();
 }
@@ -217,6 +219,52 @@ function sdRenderOfficers(officers) {
     `).join("");
 }
 
+function sdRenderSessionHistory() {
+    const body = document.getElementById("sd-session-history-body");
+    if (!body) return;
+
+    const filter = document.getElementById("sd-session-filter")?.value || "all";
+    const unresolved = ["pending", "needs_investigation"];
+    const resolved = ["approved", "waived", "corrected"];
+    const rows = sdDaySessions.filter((session) => {
+        const reviewStatus = String(session.review_status || "not_required");
+        if (filter === "unresolved") return unresolved.includes(reviewStatus);
+        if (filter === "resolved") return resolved.includes(reviewStatus);
+        if (filter === "pending" || filter === "needs_investigation") return reviewStatus === filter;
+        return true;
+    });
+
+    if (rows.length === 0) {
+        body.innerHTML = sdDataState("empty", "No store day sessions match this filter.", 6);
+        return;
+    }
+
+    body.innerHTML = rows.map((session) => {
+        const varianceStatus = String(session.variance_status || "balanced");
+        const reviewStatus = String(session.review_status || "not_required");
+        const canReview = String(session.status || "") === "closed" && unresolved.includes(reviewStatus);
+        const sessionId = Number(session.id || 0);
+        const action = canReview
+            ? `<div class="variance-actions history-variance-actions">
+                ${varianceStatus === "shortage" ? `<button type="button" class="danger-btn btn-sm" data-variance-action="approve_shortage" data-session-id="${sessionId}">Approve</button>` : ""}
+                <button type="button" class="secondary-btn btn-sm" data-variance-action="waive" data-session-id="${sessionId}">Waive</button>
+                <button type="button" class="secondary-btn btn-sm" data-variance-action="corrected" data-session-id="${sessionId}">Corrected</button>
+                <button type="button" class="secondary-btn btn-sm" data-variance-action="needs_investigation" data-session-id="${sessionId}">Investigate</button>
+            </div>`
+            : '<span class="text-muted">-</span>';
+        return `
+            <tr class="${canReview ? "store-day-row-unresolved" : ""}">
+                <td>${sdEscape(session.business_date || "-")}</td>
+                <td>${sdEscape(String(session.status || "-").toUpperCase())}</td>
+                <td><span class="variance-pill ${sdVarianceClass(varianceStatus)}">${sdEscape(sdVarianceStatusLabel(varianceStatus))}</span><div class="stack-meta">${sdEscape(sdMoney(Number(session.variance_cash || 0) + Number(session.variance_ecash || 0)))}</div></td>
+                <td><span class="variance-pill ${sdReviewClass(reviewStatus)}">${sdEscape(sdReviewLabel(reviewStatus))}</span></td>
+                <td>${sdEscape(session.closed_by_name || "-")}</td>
+                <td>${action}</td>
+            </tr>
+        `;
+    }).join("");
+}
+
 async function loadStoreDetails() {
     const root = document.querySelector("[data-store-id]");
     if (!root) return;
@@ -252,6 +300,8 @@ async function loadStoreDetails() {
     document.getElementById("sd-low-stock").textContent = String(summary.low_stock_count || 0);
 
     sdRenderDaySession(data.day_session || null);
+    sdDaySessions = Array.isArray(data.day_sessions) ? data.day_sessions : [];
+    sdRenderSessionHistory();
     sdRenderOfficers(data.officers || []);
 
     const inventory = Array.isArray(data.inventory) ? data.inventory : [];
@@ -301,5 +351,7 @@ document.addEventListener("click", (event) => {
     event.preventDefault();
     sdReviewVariance(button.getAttribute("data-session-id"), button.getAttribute("data-variance-action"));
 });
+
+document.getElementById("sd-session-filter")?.addEventListener("change", sdRenderSessionHistory);
 
 loadStoreDetails();

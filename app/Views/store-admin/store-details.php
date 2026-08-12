@@ -43,6 +43,33 @@
     </div>
 
     <section class="data-panel">
+        <header class="data-panel-head store-day-history-head">
+            <div>
+                <h4>Store Day History</h4>
+                <p>Review recent sessions and unresolved historical variances.</p>
+            </div>
+            <label class="store-day-history-filter">
+                <span>Review status</span>
+                <select id="sd-session-filter">
+                    <option value="all">All sessions</option>
+                    <option value="unresolved">Unresolved only</option>
+                    <option value="needs_investigation">Needs investigation</option>
+                    <option value="pending">Pending review</option>
+                    <option value="resolved">Resolved</option>
+                </select>
+            </label>
+        </header>
+        <div class="data-panel-body table-standard-wrap">
+            <table class="table table-standard">
+                <thead><tr><th>Date</th><th>Day</th><th>Variance</th><th>Review</th><th>Closed By</th><th>Action</th></tr></thead>
+                <tbody id="sd-session-history-body">
+                    <?= view('components/data_state', ['tag' => 'tr', 'colspan' => 6, 'type' => 'loading', 'message' => 'Loading store day history...']) ?>
+                </tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="data-panel">
         <header class="data-panel-head"><h4>Inventory</h4></header>
         <div class="data-panel-body table-standard-wrap">
         <table class="table table-standard">

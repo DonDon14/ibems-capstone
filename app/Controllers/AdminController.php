@@ -82,6 +82,8 @@ class AdminController extends Controller
             'not_open_today' => 0,
         ];
         $storesNotOpenRows = [];
+        $unresolvedReviewRows = [];
+        $unresolvedReviewCount = 0;
         if ($db->tableExists('store_day_sessions')) {
             $sessionSummary = $db->table('stores s')
                 ->select("SUM(CASE WHEN sds.status = 'open' THEN 1 ELSE 0 END) AS open_today, SUM(CASE WHEN sds.status = 'closed' THEN 1 ELSE 0 END) AS closed_today", false)
@@ -107,6 +109,22 @@ class AdminController extends Controller
                 ->limit(5)
                 ->get()
                 ->getResultArray();
+
+            $unresolvedReviewRows = $db->table('store_day_sessions sds')
+                ->select('sds.id, sds.store_id, sds.business_date, sds.variance_cash, sds.variance_ecash, sds.variance_status, sds.review_status, s.store_name, closer.name AS closed_by_name')
+                ->join('stores s', 's.id = sds.store_id', 'inner')
+                ->join('users closer', 'closer.id = sds.closed_by', 'left')
+                ->where('sds.status', 'closed')
+                ->whereIn('sds.review_status', ['pending', 'needs_investigation'])
+                ->orderBy('sds.business_date', 'ASC')
+                ->orderBy('sds.id', 'ASC')
+                ->limit(12)
+                ->get()
+                ->getResultArray();
+            $unresolvedReviewCount = $db->table('store_day_sessions')
+                ->where('status', 'closed')
+                ->whereIn('review_status', ['pending', 'needs_investigation'])
+                ->countAllResults();
         }
 
         $todayStart = date('Y-m-d 00:00:00');
@@ -206,7 +224,8 @@ class AdminController extends Controller
         $lowStockProducts = (int) ($productAlerts['low_stock_products'] ?? 0);
         $overCreditAccounts = (int) ($creditAlerts['over_credit_accounts'] ?? 0);
         $storesNotOpenToday = (int) ($storeDaySummary['not_open_today'] ?? 0);
-        $openAlerts = $inactiveStores + $storesNotOpenToday + $outOfStockProducts + $lowStockProducts + $overCreditAccounts;
+        $unresolvedReviews = $unresolvedReviewCount;
+        $openAlerts = $inactiveStores + $storesNotOpenToday + $outOfStockProducts + $lowStockProducts + $overCreditAccounts + $unresolvedReviews;
 
         $healthMessages = [];
         if ($inactiveStores > 0) {
@@ -223,6 +242,9 @@ class AdminController extends Controller
         }
         if ($overCreditAccounts > 0) {
             $healthMessages[] = $overCreditAccounts . ' over-credit account(s)';
+        }
+        if ($unresolvedReviews > 0) {
+            $healthMessages[] = $unresolvedReviews . ' unresolved store-day review(s)';
         }
         $healthText = $openAlerts > 0
             ? 'Attention needed: ' . implode(' | ', $healthMessages) . '.'
@@ -250,6 +272,16 @@ class AdminController extends Controller
             ->getResultArray();
 
         $alerts = [];
+        foreach ($unresolvedReviewRows as $row) {
+            $variance = (float) ($row['variance_cash'] ?? 0) + (float) ($row['variance_ecash'] ?? 0);
+            $alerts[] = [
+                'tone' => 'danger',
+                'label' => 'Store-Day Review',
+                'title' => (string) ($row['store_name'] ?? 'Store') . ' has an unresolved ' . str_replace('_', ' ', (string) ($row['review_status'] ?? 'review')),
+                'detail' => (string) ($row['business_date'] ?? '-') . ' | Variance PHP ' . number_format($variance, 2) . ' | Closed by ' . ((string) ($row['closed_by_name'] ?? '') !== '' ? (string) $row['closed_by_name'] : 'Unknown'),
+                'href' => site_url('admin/stores/' . (int) ($row['store_id'] ?? 0)),
+            ];
+        }
         foreach ($storesNotOpenRows as $row) {
             $alerts[] = [
                 'tone' => 'warning',
@@ -292,6 +324,7 @@ class AdminController extends Controller
                 'out_of_stock_products' => $outOfStockProducts,
                 'low_stock_products' => $lowStockProducts,
                 'over_credit_accounts' => $overCreditAccounts,
+                'unresolved_store_day_reviews' => $unresolvedReviews,
                 'stores_open_today' => (int) ($storeDaySummary['open_today'] ?? 0),
                 'stores_closed_today' => (int) ($storeDaySummary['closed_today'] ?? 0),
                 'stores_not_open_today' => $storesNotOpenToday,
@@ -1560,6 +1593,12 @@ class AdminController extends Controller
                 'message' => $e->getMessage(),
             ]);
         }
+        if ($officerId <= 0 || $supervisorIds === []) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'An active store requires a primary officer and at least one supervisor.',
+            ]);
+        }
 
         try {
             $logoUrl = $this->resolveStoreLogoUrl($logoUrl, null);
@@ -1680,6 +1719,13 @@ class AdminController extends Controller
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
                 'message' => $e->getMessage(),
+            ]);
+        }
+        $willBeActive = $isActive !== null ? $isActive === 1 : ibems_bool($store['is_active'] ?? false);
+        if ($willBeActive && ($officerId <= 0 || $supervisorIds === [])) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'An active store requires a primary officer and at least one supervisor.',
             ]);
         }
 

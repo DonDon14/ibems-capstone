@@ -964,6 +964,42 @@
     line-height: 1.4;
 }
 
+.store-day-history-head {
+    align-items: end;
+    gap: 1rem;
+}
+
+.store-day-history-head p {
+    margin: 0.25rem 0 0;
+    color: var(--text-muted, #64748b);
+    font-size: 0.85rem;
+}
+
+.store-day-history-filter {
+    display: grid;
+    gap: 0.35rem;
+    min-width: 13rem;
+    font-size: 0.78rem;
+    color: var(--text-muted, #64748b);
+}
+
+.store-day-history-filter select {
+    min-height: 2.5rem;
+    border: 1px solid var(--border-color, #e2e8f0);
+    border-radius: 0.7rem;
+    background: #fff;
+    padding: 0 0.75rem;
+}
+
+.store-day-row-unresolved {
+    background: #fffaf0;
+}
+
+.history-variance-actions {
+    flex-wrap: wrap;
+    min-width: 15rem;
+}
+
 .variance-actions .admin-action-btn {
     display: inline-flex;
     align-items: center;

@@ -123,8 +123,9 @@ public function storeDetailsData(RequestInterface $request, ResponseInterface $r
             ->getRowArray();
 
         $daySession = null;
+        $daySessions = [];
         if ($db->tableExists('store_day_sessions')) {
-            $daySession = $db->table('store_day_sessions sds')
+            $daySessions = $db->table('store_day_sessions sds')
                 ->select('sds.id, sds.business_date, sds.status, sds.opening_cash, sds.opening_ecash, sds.expected_cash, sds.expected_ecash, sds.counted_cash, sds.counted_ecash, sds.variance_cash, sds.variance_ecash, sds.variance_status, sds.review_status, sds.review_note, sds.reviewed_at, sds.accountability_user_id, sds.accountability_amount, sds.closing_note, sds.opened_at, sds.closed_at, opener.name AS opened_by_name, closer.id AS closed_by_id, closer.name AS closed_by_name, reviewer.name AS reviewed_by_name, accountable.name AS accountability_user_name')
                 ->join('users opener', 'opener.id = sds.opened_by', 'left')
                 ->join('users closer', 'closer.id = sds.closed_by', 'left')
@@ -133,9 +134,10 @@ public function storeDetailsData(RequestInterface $request, ResponseInterface $r
                 ->where('sds.store_id', $storeId)
                 ->orderBy('sds.business_date', 'DESC')
                 ->orderBy('sds.id', 'DESC')
-                ->limit(1)
+                ->limit(60)
                 ->get()
-                ->getRowArray();
+                ->getResultArray();
+            $daySession = $daySessions[0] ?? null;
         }
 
         $recentTransactions = $db->table('transactions t')
@@ -162,6 +164,36 @@ public function storeDetailsData(RequestInterface $request, ResponseInterface $r
             ];
         }
 
+        $normalizeDaySession = static function (array $row): array {
+            return [
+                'id' => (int) ($row['id'] ?? 0),
+                'business_date' => (string) ($row['business_date'] ?? ''),
+                'status' => (string) ($row['status'] ?? ''),
+                'opening_cash' => (float) ($row['opening_cash'] ?? 0),
+                'opening_ecash' => (float) ($row['opening_ecash'] ?? 0),
+                'expected_cash' => (float) ($row['expected_cash'] ?? 0),
+                'expected_ecash' => (float) ($row['expected_ecash'] ?? 0),
+                'counted_cash' => $row['counted_cash'] !== null ? (float) $row['counted_cash'] : null,
+                'counted_ecash' => $row['counted_ecash'] !== null ? (float) $row['counted_ecash'] : null,
+                'variance_cash' => $row['variance_cash'] !== null ? (float) $row['variance_cash'] : null,
+                'variance_ecash' => $row['variance_ecash'] !== null ? (float) $row['variance_ecash'] : null,
+                'variance_status' => (string) ($row['variance_status'] ?? 'balanced'),
+                'review_status' => (string) ($row['review_status'] ?? 'not_required'),
+                'review_note' => $row['review_note'] ?? null,
+                'reviewed_at' => $row['reviewed_at'] ?? null,
+                'reviewed_by_name' => $row['reviewed_by_name'] ?? null,
+                'accountability_user_id' => $row['accountability_user_id'] !== null ? (int) $row['accountability_user_id'] : null,
+                'accountability_user_name' => $row['accountability_user_name'] ?? null,
+                'accountability_amount' => (float) ($row['accountability_amount'] ?? 0),
+                'closing_note' => $row['closing_note'] ?? null,
+                'opened_at' => $row['opened_at'] ?? null,
+                'closed_at' => $row['closed_at'] ?? null,
+                'opened_by_name' => $row['opened_by_name'] ?: null,
+                'closed_by_id' => $row['closed_by_id'] !== null ? (int) $row['closed_by_id'] : null,
+                'closed_by_name' => $row['closed_by_name'] ?: null,
+            ];
+        };
+
         return $response->setJSON([
             'status' => 'success',
             'store' => [
@@ -185,33 +217,8 @@ public function storeDetailsData(RequestInterface $request, ResponseInterface $r
                 'today_debt_txn_count' => (int) ($todaySummary['debt_txn_count'] ?? 0),
                 'today_debt_sales_total' => (float) ($todaySummary['debt_sales_total'] ?? 0),
             ],
-            'day_session' => $daySession ? [
-                'id' => (int) ($daySession['id'] ?? 0),
-                'business_date' => (string) ($daySession['business_date'] ?? ''),
-                'status' => (string) ($daySession['status'] ?? ''),
-                'opening_cash' => (float) ($daySession['opening_cash'] ?? 0),
-                'opening_ecash' => (float) ($daySession['opening_ecash'] ?? 0),
-                'expected_cash' => (float) ($daySession['expected_cash'] ?? 0),
-                'expected_ecash' => (float) ($daySession['expected_ecash'] ?? 0),
-                'counted_cash' => $daySession['counted_cash'] !== null ? (float) $daySession['counted_cash'] : null,
-                'counted_ecash' => $daySession['counted_ecash'] !== null ? (float) $daySession['counted_ecash'] : null,
-                'variance_cash' => $daySession['variance_cash'] !== null ? (float) $daySession['variance_cash'] : null,
-                'variance_ecash' => $daySession['variance_ecash'] !== null ? (float) $daySession['variance_ecash'] : null,
-                'variance_status' => (string) ($daySession['variance_status'] ?? 'balanced'),
-                'review_status' => (string) ($daySession['review_status'] ?? 'not_required'),
-                'review_note' => $daySession['review_note'] ?? null,
-                'reviewed_at' => $daySession['reviewed_at'] ?? null,
-                'reviewed_by_name' => $daySession['reviewed_by_name'] ?? null,
-                'accountability_user_id' => $daySession['accountability_user_id'] !== null ? (int) $daySession['accountability_user_id'] : null,
-                'accountability_user_name' => $daySession['accountability_user_name'] ?? null,
-                'accountability_amount' => (float) ($daySession['accountability_amount'] ?? 0),
-                'closing_note' => $daySession['closing_note'] ?? null,
-                'opened_at' => $daySession['opened_at'] ?? null,
-                'closed_at' => $daySession['closed_at'] ?? null,
-                'opened_by_name' => $daySession['opened_by_name'] ?: null,
-                'closed_by_id' => $daySession['closed_by_id'] !== null ? (int) $daySession['closed_by_id'] : null,
-                'closed_by_name' => $daySession['closed_by_name'] ?: null,
-            ] : null,
+            'day_session' => $daySession ? $normalizeDaySession($daySession) : null,
+            'day_sessions' => array_map($normalizeDaySession, $daySessions),
             'officers' => $assignedOfficers,
             'inventory' => array_map(static function (array $row): array {
                 return [
@@ -529,4 +536,3 @@ private function buildStoreSupervisorsMap(array $storeIds): array
         return $map;
     }
 }
-

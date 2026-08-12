@@ -68,4 +68,30 @@ final class StoreAdminDayStatusTest extends CIUnitTestCase
         $this->assertTrue($policy->isIndependentReviewer(13, ['closed_by' => 12]));
         $this->assertFalse($policy->isIndependentReviewer(0, ['closed_by' => 12]));
     }
+
+    public function testHistoricalStoreDayReviewsRemainDiscoverable(): void
+    {
+        $service = (string) file_get_contents(APPPATH . 'Services/StoreOversightService.php');
+        $adminController = (string) file_get_contents(APPPATH . 'Controllers/AdminController.php');
+        $adminView = (string) file_get_contents(APPPATH . 'Views/admin/store-details.php');
+        $supervisorView = (string) file_get_contents(APPPATH . 'Views/store-admin/store-details.php');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-store-details.js');
+
+        $this->assertStringContainsString("'day_sessions' => array_map", $service);
+        $this->assertStringContainsString("->limit(60)", $service);
+        $this->assertStringContainsString("whereIn('sds.review_status', ['pending', 'needs_investigation'])", $adminController);
+        $this->assertStringContainsString('unresolved_store_day_reviews', $adminController);
+        $this->assertSame(1, substr_count($adminView, 'id="sd-session-history-body"'));
+        $this->assertSame(1, substr_count($supervisorView, 'id="sd-session-history-body"'));
+        $this->assertStringContainsString('function sdRenderSessionHistory()', $script);
+        $this->assertStringContainsString('data-variance-action', $script);
+    }
+
+    public function testActiveStoreConfigurationRequiresOfficerAndSupervisorCoverage(): void
+    {
+        $source = (string) file_get_contents(APPPATH . 'Controllers/AdminController.php');
+
+        $this->assertSame(2, substr_count($source, 'An active store requires a primary officer and at least one supervisor.'));
+        $this->assertStringContainsString('$willBeActive', $source);
+    }
 }

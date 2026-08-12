@@ -60,6 +60,10 @@ The scenario is idempotent. Run `php spark ibems:scenario-15-days` to create it 
 12. Add a historical store-day session list with date/status filters to Administrator and Store Supervisor store details. A later balanced close currently hides an older unresolved shortage because only the latest session is presented.
 13. Add an Administrator alert for unresolved historical `pending` and `needs_investigation` reviews. The dashboard's current-day alerts did not surface the scenario's July 24 PHP 20 shortage.
 
+Items 12 and 13 were implemented during follow-up acceptance. Administrator and Store Supervisor details now expose up to 60 recent sessions with review-status filters and permitted actions. The Administrator dashboard now counts and links unresolved historical reviews. Active-store creation or updates also require both a primary officer and supervisor coverage.
+
+The improved dashboard exposed a second pre-existing unresolved record: Dashboard Demo Store has a PHP 500 shortage from 2026-06-30 with `pending` review status. It was left unchanged for a separate evidence-based investigation.
+
 ## Role-by-role browser acceptance
 
 - Store Officer: scenario product, remaining stock, and dated inventory movements persisted after load.
