@@ -68,6 +68,33 @@ function sdShortageAmount(session) {
     return Math.max(0, -Number(session?.variance_cash || 0)) + Math.max(0, -Number(session?.variance_ecash || 0));
 }
 
+function sdReviewActionDetails(session, action) {
+    const consequences = {
+        approve_shortage: `Approve the shortage and assign ${sdMoney(sdShortageAmount(session))} as operator accountability to ${session.accountability_user_name || session.closed_by_name || "the closing operator"}.`,
+        waive: "Close the variance without assigning operator accountability. The original counts and variance remain in the audit history.",
+        corrected: "Accept the attached correction evidence and close the case as corrected. This does not change the original counts or reopen the store day.",
+        needs_investigation: "Keep the variance unresolved and move it into investigation. No debt or final disposition is recorded.",
+    };
+    return consequences[action] || "Record a review decision for this variance.";
+}
+
+function sdReviewPreview(session, action) {
+    const varianceTotal = Number(session.variance_cash || 0) + Number(session.variance_ecash || 0);
+    const evidenceCount = Array.isArray(session?.variance_case?.attachments) ? session.variance_case.attachments.length : 0;
+    const finalAction = ["approve_shortage", "waive", "corrected"].includes(action);
+    return [
+        `Business date: ${session.business_date || "-"}`,
+        `Closed by: ${session.closed_by_name || "-"}`,
+        `Expected: ${sdMoney(session.expected_cash || 0)} cash; ${sdMoney(session.expected_ecash || 0)} e-cash`,
+        `Counted: ${sdMoney(session.counted_cash || 0)} cash; ${sdMoney(session.counted_ecash || 0)} e-cash`,
+        `Total variance: ${sdMoney(varianceTotal)} (${sdVarianceStatusLabel(session.variance_status)})`,
+        `Supporting files: ${evidenceCount}`,
+        finalAction && evidenceCount === 0 ? "Final disposition blocked: attach at least one supporting file in the variance case first." : "",
+        "",
+        sdReviewActionDetails(session, action),
+    ].join("\n");
+}
+
 function sdVarianceClass(value) {
     const status = String(value || "balanced");
     if (status === "shortage") return "is-danger";
@@ -196,10 +223,10 @@ function sdRenderDaySession(session) {
     ` : "";
     const reviewActions = canReview ? `
         <div class="variance-actions">
-            ${varianceStatus === "shortage" ? `<button type="button" class="danger-btn btn-sm" data-variance-action="approve_shortage" data-session-id="${Number(session.id || 0)}">Approve Shortage</button>` : ""}
-            <button type="button" class="secondary-btn btn-sm" data-variance-action="waive" data-session-id="${Number(session.id || 0)}">Waive</button>
-            <button type="button" class="secondary-btn btn-sm" data-variance-action="corrected" data-session-id="${Number(session.id || 0)}">Corrected</button>
-            <button type="button" class="secondary-btn btn-sm" data-variance-action="needs_investigation" data-session-id="${Number(session.id || 0)}">Investigate</button>
+            ${varianceStatus === "shortage" ? `<button type="button" class="danger-btn btn-sm" data-variance-action="approve_shortage" data-session-id="${Number(session.id || 0)}"><i class="bi bi-person-exclamation"></i> Approve accountability</button>` : ""}
+            <button type="button" class="secondary-btn btn-sm" data-variance-action="waive" data-session-id="${Number(session.id || 0)}"><i class="bi bi-slash-circle"></i> Waive variance</button>
+            <button type="button" class="secondary-btn btn-sm" data-variance-action="corrected" data-session-id="${Number(session.id || 0)}"><i class="bi bi-file-earmark-check"></i> Accept correction evidence</button>
+            <button type="button" class="secondary-btn btn-sm" data-variance-action="needs_investigation" data-session-id="${Number(session.id || 0)}"><i class="bi bi-search"></i> Investigate</button>
         </div>
     ` : "";
     const reviewCopy = canReview && varianceStatus === "shortage"
@@ -240,6 +267,7 @@ function sdRenderDaySession(session) {
         ${sdCaseSummary(session)}
         ${Number(session.accountability_amount || 0) > 0 ? `<div class="variance-note">Accountability: ${sdEscape(sdMoney(session.accountability_amount))} assigned to ${sdEscape(accountabilityName)}.</div>` : ""}
         ${reviewCopy}
+        ${canReview ? `<div class="variance-review-guidance"><strong>Before deciding</strong><span>Open the case, inspect its timeline and supporting files, then choose a disposition. Closed-day amounts remain immutable; a corrected disposition accepts documented evidence rather than rewriting the original count.</span></div>` : ""}
         ${reviewActions}
     ` : "";
     wrap.innerHTML = `
@@ -294,15 +322,38 @@ async function sdReviewVariance(sessionId, action) {
     const actionLabels = {
         approve_shortage: "Approve shortage",
         waive: "Waive variance",
-        corrected: "Mark corrected",
+        corrected: "Accept correction evidence",
         needs_investigation: "Mark for investigation",
     };
-    const note = await window.IbemsDialog.prompt("Enter a review note for this variance decision.", {
+    const session = sdDaySessions.find((row) => Number(row.id || 0) === Number(sessionId));
+    if (!session) {
+        await window.IbemsDialog.alert("Reload the store details before reviewing this variance.", { title: "Review unavailable", tone: "danger" });
+        return;
+    }
+
+    const confirmed = await window.IbemsDialog.confirm(sdReviewPreview(session, action), {
+        title: `Review before: ${actionLabels[action] || "Variance decision"}`,
+        confirmLabel: "Continue to review note",
+        tone: action === "approve_shortage" ? "danger" : "default",
+    });
+    if (!confirmed) return;
+
+    const evidenceCount = Array.isArray(session?.variance_case?.attachments) ? session.variance_case.attachments.length : 0;
+    if (["approve_shortage", "waive", "corrected"].includes(action) && evidenceCount === 0) {
+        await window.IbemsDialog.alert("Open the variance case and attach at least one supporting PDF or image before recording a final disposition.", {
+            title: "Supporting evidence required",
+            tone: "danger",
+        });
+        return;
+    }
+
+    const note = await window.IbemsDialog.prompt(`${sdReviewActionDetails(session, action)}\n\nEnter the evidence reviewed and reason for this decision.`, {
         title: actionLabels[action] || "Review variance",
-        inputLabel: "Review note",
-        placeholder: "Explain the decision",
+        inputLabel: "Decision and evidence note",
+        placeholder: "State what was checked, the evidence used, and why this decision is appropriate",
         required: true,
-        confirmLabel: "Save review",
+        multiline: true,
+        confirmLabel: actionLabels[action] || "Save review",
     });
     if (note === null) return;
 
@@ -372,9 +423,9 @@ function sdRenderSessionHistory() {
         const sessionId = Number(session.id || 0);
         const action = canReview
             ? `<div class="variance-actions history-variance-actions">
-                ${varianceStatus === "shortage" ? `<button type="button" class="danger-btn btn-sm" data-variance-action="approve_shortage" data-session-id="${sessionId}">Approve</button>` : ""}
+                ${varianceStatus === "shortage" ? `<button type="button" class="danger-btn btn-sm" data-variance-action="approve_shortage" data-session-id="${sessionId}">Approve accountability</button>` : ""}
                 <button type="button" class="secondary-btn btn-sm" data-variance-action="waive" data-session-id="${sessionId}">Waive</button>
-                <button type="button" class="secondary-btn btn-sm" data-variance-action="corrected" data-session-id="${sessionId}">Corrected</button>
+                <button type="button" class="secondary-btn btn-sm" data-variance-action="corrected" data-session-id="${sessionId}">Accept correction</button>
                 <button type="button" class="secondary-btn btn-sm" data-variance-action="needs_investigation" data-session-id="${sessionId}">Investigate</button>
             </div>`
             : '<span class="text-muted">-</span>';

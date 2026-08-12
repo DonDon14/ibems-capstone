@@ -106,6 +106,18 @@ final class StoreAdminDayStatusTest extends CIUnitTestCase
         $this->assertStringContainsString('stale-day-resolution-form', $script);
     }
 
+    public function testVarianceDispositionRequiresAVisiblePreviewAndEvidenceAwareCorrectionCopy(): void
+    {
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-store-details.js');
+        $dialogs = (string) file_get_contents(FCPATH . 'assets/js/app-dialog.js');
+
+        $this->assertStringContainsString('function sdReviewPreview(', $script);
+        $this->assertStringContainsString('Supporting evidence required', $script);
+        $this->assertStringContainsString('This does not change the original counts or reopen the store day.', $script);
+        $this->assertStringContainsString('Accept correction evidence', $script);
+        $this->assertStringContainsString('options.multiline ? textarea : input', $dialogs);
+    }
+
     public function testActiveStoreConfigurationRequiresOfficerAndSupervisorCoverage(): void
     {
         $source = (string) file_get_contents(APPPATH . 'Controllers/AdminController.php');

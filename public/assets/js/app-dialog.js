@@ -18,6 +18,7 @@
             <label class="app-dialog-input-wrap is-hidden" for="app-dialog-input">
                 <span id="app-dialog-input-label">Value</span>
                 <input id="app-dialog-input" type="text" autocomplete="off">
+                <textarea id="app-dialog-textarea" rows="4" class="is-hidden"></textarea>
             </label>
             <p id="app-dialog-error" class="app-dialog-error is-hidden" role="alert"></p>
             <div class="app-dialog-actions">
@@ -33,11 +34,13 @@
     const inputWrap = root.querySelector(".app-dialog-input-wrap");
     const inputLabel = root.querySelector("#app-dialog-input-label");
     const input = root.querySelector("#app-dialog-input");
+    const textarea = root.querySelector("#app-dialog-textarea");
     const error = root.querySelector("#app-dialog-error");
     const cancelButton = root.querySelector("[data-dialog-cancel]");
     const confirmButton = root.querySelector("[data-dialog-confirm]");
     let mode = "confirm";
     let requireValue = false;
+    let activeInput = input;
 
     const finish = (result) => {
         if (root.classList.contains("is-hidden")) return;
@@ -61,8 +64,12 @@
         root.dataset.tone = options.tone || "default";
         inputWrap.classList.toggle("is-hidden", mode !== "prompt");
         inputLabel.textContent = options.inputLabel || "Value";
-        input.value = options.defaultValue || "";
-        input.placeholder = options.placeholder || "";
+        activeInput = options.multiline ? textarea : input;
+        input.classList.toggle("is-hidden", activeInput !== input);
+        textarea.classList.toggle("is-hidden", activeInput !== textarea);
+        inputWrap.htmlFor = activeInput.id;
+        activeInput.value = options.defaultValue || "";
+        activeInput.placeholder = options.placeholder || "";
         error.textContent = "";
         error.classList.add("is-hidden");
         cancelButton.classList.toggle("is-hidden", mode === "alert");
@@ -72,8 +79,8 @@
         document.body.classList.add("has-app-dialog");
 
         window.requestAnimationFrame(() => {
-            (mode === "prompt" ? input : confirmButton).focus();
-            if (mode === "prompt") input.select();
+            (mode === "prompt" ? activeInput : confirmButton).focus();
+            if (mode === "prompt") activeInput.select();
         });
 
         return new Promise((resolve) => {
@@ -84,11 +91,11 @@
     cancelButton.addEventListener("click", () => finish(mode === "prompt" ? null : false));
     confirmButton.addEventListener("click", () => {
         if (mode === "prompt") {
-            const value = input.value.trim();
+            const value = activeInput.value.trim();
             if (requireValue && !value) {
                 error.textContent = "This field is required.";
                 error.classList.remove("is-hidden");
-                input.focus();
+                activeInput.focus();
                 return;
             }
             finish(value);
@@ -109,7 +116,7 @@
             confirmButton.click();
         }
         if (event.key === "Tab") {
-            const controls = Array.from(root.querySelectorAll("button:not(.is-hidden), input:not(.is-hidden)"));
+            const controls = Array.from(root.querySelectorAll("button:not(.is-hidden), input:not(.is-hidden), textarea:not(.is-hidden)"));
             const first = controls[0];
             const last = controls[controls.length - 1];
             if (event.shiftKey && document.activeElement === first) {

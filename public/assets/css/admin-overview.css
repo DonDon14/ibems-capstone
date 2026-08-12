@@ -965,6 +965,32 @@
     line-height: 1.4;
 }
 
+.variance-review-guidance {
+    display: grid;
+    gap: 4px;
+    margin-top: 12px;
+    padding: 11px 12px;
+    border: 1px solid #bfdbfe;
+    border-radius: 10px;
+    background: #eff6ff;
+    color: #334155;
+    font-size: 0.82rem;
+    line-height: 1.45;
+}
+
+.variance-review-guidance strong {
+    color: #1e3a8a;
+    font-size: 0.84rem;
+}
+
+.variance-actions {
+    align-items: stretch;
+}
+
+.variance-actions button {
+    min-height: 38px;
+}
+
 .variance-case {
     margin-top: 10px;
     border: 1px solid #d8e2ee;

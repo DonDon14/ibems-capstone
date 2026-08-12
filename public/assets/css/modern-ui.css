@@ -1170,6 +1170,7 @@ body.ibems-modern :is(
     color: #64748b;
     font-size: .85rem;
     line-height: 1.5;
+    white-space: pre-line;
 }
 
 .app-dialog-input-wrap,
@@ -1192,8 +1193,17 @@ body.ibems-modern :is(
     display: none;
 }
 
-.app-dialog-input-wrap input {
+.app-dialog-input-wrap :is(input, textarea) {
     min-height: 2.75rem;
+}
+
+.app-dialog-input-wrap textarea {
+    min-height: 7rem;
+    resize: vertical;
+}
+
+.app-dialog-input-wrap :is(input, textarea).is-hidden {
+    display: none;
 }
 
 .app-dialog-error {
