@@ -128,7 +128,7 @@ public function storeDetailsData(RequestInterface $request, ResponseInterface $r
         $varianceCases = [];
         if ($db->tableExists('store_day_sessions')) {
             $daySessions = $db->table('store_day_sessions sds')
-                ->select('sds.id, sds.store_id, sds.business_date, sds.status, sds.opening_cash, sds.opening_ecash, sds.expected_cash, sds.expected_ecash, sds.counted_cash, sds.counted_ecash, sds.variance_cash, sds.variance_ecash, sds.variance_status, sds.review_status, sds.review_note, sds.reviewed_at, sds.accountability_user_id, sds.accountability_amount, sds.closing_note, sds.opened_at, sds.closed_at, opener.name AS opened_by_name, closer.id AS closed_by_id, closer.name AS closed_by_name, reviewer.name AS reviewed_by_name, accountable.name AS accountability_user_name')
+                ->select('sds.id, sds.store_id, sds.business_date, sds.status, sds.opening_cash, sds.opening_ecash, sds.expected_cash, sds.expected_ecash, sds.counted_cash, sds.counted_ecash, sds.variance_cash, sds.variance_ecash, sds.variance_status, sds.review_status, sds.review_note, sds.reviewed_at, sds.accountability_user_id, sds.accountability_amount, sds.closing_note, sds.opened_at, sds.closed_at, opener.id AS opened_by_id, opener.name AS opened_by_name, closer.id AS closed_by_id, closer.name AS closed_by_name, reviewer.name AS reviewed_by_name, accountable.name AS accountability_user_name')
                 ->join('users opener', 'opener.id = sds.opened_by', 'left')
                 ->join('users closer', 'closer.id = sds.closed_by', 'left')
                 ->join('users reviewer', 'reviewer.id = sds.reviewed_by', 'left')
@@ -195,6 +195,7 @@ public function storeDetailsData(RequestInterface $request, ResponseInterface $r
                 'closing_note' => $row['closing_note'] ?? null,
                 'opened_at' => $row['opened_at'] ?? null,
                 'closed_at' => $row['closed_at'] ?? null,
+                'opened_by_id' => $row['opened_by_id'] !== null ? (int) $row['opened_by_id'] : null,
                 'opened_by_name' => $row['opened_by_name'] ?: null,
                 'closed_by_id' => $row['closed_by_id'] !== null ? (int) $row['closed_by_id'] : null,
                 'closed_by_name' => $row['closed_by_name'] ?: null,
@@ -253,6 +254,108 @@ public function storeDetailsData(RequestInterface $request, ResponseInterface $r
                     'customer_name' => $row['customer_name'] ?: 'Walk-in',
                 ];
             }, $recentTransactions),
+        ]);
+    }
+
+public function resolveStaleStoreDay(RequestInterface $request, ResponseInterface $response, int $sessionId): ResponseInterface
+    {
+        if ($sessionId <= 0) {
+            return $response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => 'Invalid store day session.']);
+        }
+
+        $data = $this->getRequestData($request);
+        $countedCash = filter_var($data['counted_cash'] ?? null, FILTER_VALIDATE_FLOAT);
+        $countedEcash = filter_var($data['counted_ecash'] ?? null, FILTER_VALIDATE_FLOAT);
+        $reason = trim((string) ($data['reason'] ?? ''));
+        if ($countedCash === false || $countedEcash === false || $countedCash < 0 || $countedEcash < 0) {
+            return $response->setStatusCode(422)->setJSON(['status' => 'error', 'message' => 'Counted cash and e-cash must be valid amounts of 0 or greater.']);
+        }
+        if ($reason === '') {
+            return $response->setStatusCode(422)->setJSON(['status' => 'error', 'message' => 'A stale-day resolution reason is required.']);
+        }
+
+        $db = Database::connect();
+        $session = $db->table('store_day_sessions')->where('id', $sessionId)->get()->getRowArray();
+        if (!$session) {
+            return $response->setStatusCode(404)->setJSON(['status' => 'error', 'message' => 'Store day session not found.']);
+        }
+        if (!$this->canAccessStoreForAdminArea((int) ($session['store_id'] ?? 0))) {
+            return $response->setStatusCode(403)->setJSON(['status' => 'error', 'message' => 'You cannot resolve this store day.']);
+        }
+        if ((string) ($session['status'] ?? '') !== 'open' || (string) ($session['business_date'] ?? '') >= date('Y-m-d')) {
+            return $response->setStatusCode(409)->setJSON(['status' => 'error', 'message' => 'Only an open store day from a previous date can be resolved here.']);
+        }
+
+        $actorId = (int) session()->get('user_id');
+        if ($actorId <= 0 || $actorId === (int) ($session['opened_by'] ?? 0)) {
+            return $response->setStatusCode(409)->setJSON(['status' => 'error', 'message' => 'The operator who opened a store day cannot resolve that same stale day. Ask another assigned supervisor or Administrator.']);
+        }
+
+        $expected = (new StoreDayExpectedService())->calculate((int) $session['store_id'], $session);
+        $expectedCash = (float) ($expected['expected_cash_on_hand'] ?? 0);
+        $expectedEcash = (float) ($expected['expected_ecash_on_hand'] ?? 0);
+        $varianceCash = round((float) $countedCash - $expectedCash, 2);
+        $varianceEcash = round((float) $countedEcash - $expectedEcash, 2);
+        $totalVariance = round($varianceCash + $varianceEcash, 2);
+        $varianceStatus = $totalVariance < 0 ? 'shortage' : ($totalVariance > 0 ? 'overage' : 'balanced');
+        $reviewStatus = $varianceStatus === 'balanced' ? 'not_required' : 'pending';
+        $now = date('Y-m-d H:i:s');
+
+        $db->transStart();
+        $db->table('store_day_sessions')->where('id', $sessionId)->where('status', 'open')->update([
+            'status' => 'closed',
+            'expected_cash' => $expectedCash,
+            'expected_ecash' => $expectedEcash,
+            'counted_cash' => (float) $countedCash,
+            'counted_ecash' => (float) $countedEcash,
+            'variance_cash' => $varianceCash,
+            'variance_ecash' => $varianceEcash,
+            'variance_status' => $varianceStatus,
+            'review_status' => $reviewStatus,
+            'closing_note' => 'Stale-day resolution: ' . $reason,
+            'closed_by' => $actorId,
+            'closed_at' => $now,
+            'updated_at' => $now,
+        ]);
+        if ($db->affectedRows() !== 1) {
+            $db->transRollback();
+            return $response->setStatusCode(409)->setJSON(['status' => 'error', 'message' => 'This store day changed while it was being resolved. Reload and review its current status.']);
+        }
+        $closed = $db->table('store_day_sessions')->where('id', $sessionId)->get()->getRowArray();
+        if ($reviewStatus === 'pending' && $closed) {
+            (new StoreDayVarianceCaseService())->ensureCase($db, $closed, $actorId, $now);
+        }
+        (new AuditLogModel())->insert([
+            'actor_id' => $actorId,
+            'action' => 'RESOLVE_STALE_STORE_DAY_SESSION',
+            'entity' => 'store_day_sessions',
+            'entity_id' => $sessionId,
+            'payload_json' => json_encode([
+                'store_id' => (int) $session['store_id'],
+                'business_date' => (string) $session['business_date'],
+                'resolved_on' => date('Y-m-d'),
+                'expected_cash' => $expectedCash,
+                'expected_ecash' => $expectedEcash,
+                'counted_cash' => (float) $countedCash,
+                'counted_ecash' => (float) $countedEcash,
+                'variance_cash' => $varianceCash,
+                'variance_ecash' => $varianceEcash,
+                'variance_status' => $varianceStatus,
+                'review_status' => $reviewStatus,
+                'reason' => $reason,
+            ]),
+            'created_at' => $now,
+        ]);
+        $db->transComplete();
+        if (!$db->transStatus()) {
+            return $response->setStatusCode(500)->setJSON(['status' => 'error', 'message' => 'Failed to resolve the stale store day.']);
+        }
+
+        return $response->setJSON([
+            'status' => 'success',
+            'message' => $reviewStatus === 'pending' ? 'Stale store day closed. Its variance now requires independent review.' : 'Stale store day closed and balanced.',
+            'session_id' => $sessionId,
+            'review_status' => $reviewStatus,
         ]);
     }
 

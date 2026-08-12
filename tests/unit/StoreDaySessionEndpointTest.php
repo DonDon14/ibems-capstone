@@ -125,6 +125,25 @@ final class StoreDaySessionEndpointTest extends CIUnitTestCase
         $this->assertSame(0, $db->table('audit_logs')->countAllResults());
     }
 
+    public function testOfficerCannotCloseAStaleStoreDay(): void
+    {
+        $this->seedOpenSession(1000, 350);
+        Database::connect()->table('store_day_sessions')->where('store_id', 1)->update([
+            'business_date' => date('Y-m-d', strtotime('-1 day')),
+        ]);
+
+        $result = $this->storePost('store/day-session/close', [
+            'store_id' => 1,
+            'counted_cash' => 1000,
+            'counted_ecash' => 350,
+        ]);
+
+        $result->assertStatus(409);
+        $body = $this->jsonBody($result);
+        $this->assertStringContainsString('stale store day must be resolved', strtolower((string) ($body['message'] ?? '')));
+        $this->assertSame('open', Database::connect()->table('store_day_sessions')->where('store_id', 1)->get()->getRowArray()['status'] ?? null);
+    }
+
     private function storePost(string $path, array $payload)
     {
         $security = service('security');

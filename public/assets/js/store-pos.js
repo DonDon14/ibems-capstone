@@ -148,14 +148,14 @@ function updateOpeningBalanceDisplay(opening = null, businessDate = null) {
 
     if (opening.is_stale_open) {
         openingBalanceMode = "locked";
-        setOpeningReadinessState("blocked", "A previous store day is still open. Close it before opening today.");
+        setOpeningReadinessState("blocked", "A previous store day is still open. Ask another assigned supervisor or an Administrator to resolve it.");
         if (openBtn) {
             openBtn.disabled = true;
             openBtn.innerHTML = '<i class="bi bi-lock"></i> Close Previous Day First';
         }
         if (closeBtn) {
-            closeBtn.classList.remove("is-hidden");
-            closeBtn.disabled = false;
+            closeBtn.classList.add("is-hidden");
+            closeBtn.disabled = true;
         }
         return;
     }
@@ -2046,8 +2046,7 @@ async function submitTransaction() {
     if (isSubmitting) return;
     if (!openingBalanceReady) {
         if (currentDaySession?.is_stale_open) {
-            openStoreDayCloseModal();
-            setResult("Close the previous store day before creating today's transactions.", "error");
+            setResult("Ask another assigned supervisor or an Administrator to resolve the previous store day.", "error");
             return;
         }
         openOpeningBalanceModal();

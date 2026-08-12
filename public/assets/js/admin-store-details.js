@@ -169,6 +169,19 @@ function sdRenderDaySession(session) {
     const shortageAmount = sdShortageAmount(session);
     const accountabilityName = session.accountability_user_name || closedBy;
     const canReview = isClosed && reviewStatus !== "not_required" && !["approved", "waived", "corrected"].includes(reviewStatus);
+    const isStaleOpen = !isClosed && String(session.business_date || "") < new Date().toLocaleDateString("en-CA");
+    const staleResolution = isStaleOpen ? `
+        <form class="variance-evidence-form stale-day-resolution-form" data-stale-session-id="${Number(session.id || 0)}">
+            <div class="variance-note"><strong>Previous day still open.</strong> Enter the independently counted balances. The original business date and opener will be preserved.</div>
+            <div class="variance-grid">
+                <label><span>Counted Cash</span><input type="number" name="counted_cash" min="0" step="0.01" required></label>
+                <label><span>Counted E-Cash</span><input type="number" name="counted_ecash" min="0" step="0.01" required></label>
+            </div>
+            <label><span>Resolution Reason</span><textarea name="reason" rows="3" required placeholder="Explain why the day remained open and how the balances were counted"></textarea></label>
+            <div class="variance-note">If the count differs from the system expectation, a variance case will open for a different reviewer.</div>
+            <button type="submit" class="danger-btn btn-sm">Resolve Previous Day</button>
+        </form>
+    ` : "";
     const reviewActions = canReview ? `
         <div class="variance-actions">
             ${varianceStatus === "shortage" ? `<button type="button" class="danger-btn btn-sm" data-variance-action="approve_shortage" data-session-id="${Number(session.id || 0)}">Approve Shortage</button>` : ""}
@@ -232,9 +245,37 @@ function sdRenderDaySession(session) {
             <div class="stack-meta">
                 Closed by ${sdEscape(closedBy)}${session.closed_at ? ` at ${sdEscape(sdDateTime(session.closed_at))}` : ""}
             </div>
+            ${staleResolution}
             ${closedSummary}
         </div>
     `;
+}
+
+async function sdResolveStaleDay(form) {
+    const sessionId = Number(form.getAttribute("data-stale-session-id") || 0);
+    if (!sessionId) return;
+    const confirmed = await window.IbemsDialog.confirm("Close this previous business day using the entered physical counts? The original date will remain unchanged.", {
+        title: "Resolve previous store day",
+        confirmLabel: "Resolve day",
+        tone: "danger",
+    });
+    if (!confirmed) return;
+
+    const root = document.querySelector("[data-store-id]");
+    const prefix = (root?.getAttribute("data-review-url-prefix") || "/admin/store-day-sessions").replace(/\/$/, "");
+    const payload = Object.fromEntries(new FormData(form).entries());
+    const response = await fetch(`${prefix}/${sessionId}/resolve-stale`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.status !== "success") {
+        await window.IbemsDialog.alert(data.message || "Failed to resolve the previous store day.", { title: "Store day not resolved", tone: "danger" });
+        return;
+    }
+    await window.IbemsDialog.alert(data.message || "Previous store day resolved.", { title: "Store day resolved", tone: "success" });
+    await loadStoreDetails();
 }
 
 async function sdReviewVariance(sessionId, action) {
@@ -432,6 +473,12 @@ document.addEventListener("click", (event) => {
 });
 
 document.addEventListener("submit", (event) => {
+    const staleForm = event.target.closest(".stale-day-resolution-form");
+    if (staleForm) {
+        event.preventDefault();
+        sdResolveStaleDay(staleForm);
+        return;
+    }
     const evidenceForm = event.target.closest(".variance-evidence-form");
     const handoffForm = event.target.closest(".variance-handoff-form");
     if (!evidenceForm && !handoffForm) return;

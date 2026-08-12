@@ -15,6 +15,7 @@ use App\Models\BalanceModel;
 use App\Models\DebtCashbookEntryModel;
 use App\Services\StoreAccessService;
 use App\Services\StoreDayVarianceCaseService;
+use App\Services\StoreDayExpectedService;
 use Config\Database;
 
 class StoreController extends BaseController
@@ -833,6 +834,12 @@ class StoreController extends BaseController
             ]);
         }
         $businessDate = (string) ($session['business_date'] ?? date('Y-m-d'));
+        if ($businessDate !== date('Y-m-d')) {
+            return $this->response->setStatusCode(409)->setJSON([
+                'status' => 'error',
+                'message' => 'A stale store day must be resolved by another assigned supervisor or an Administrator.',
+            ]);
+        }
 
         $expected = $this->calculateStoreSessionExpected((int) $store['id'], $session);
         $expectedCash = (float) ($expected['expected_cash_on_hand'] ?? 0);
@@ -2711,109 +2718,7 @@ class StoreController extends BaseController
 
     private function calculateStoreSessionExpected(int $storeId, array $session): array
     {
-        if ($storeId <= 0) {
-            return [
-                'cash_sales' => 0.0,
-                'ecash_sales' => 0.0,
-                'debt_sales' => 0.0,
-                'cash_debt_payments' => 0.0,
-                'ecash_debt_payments' => 0.0,
-                'cash_in' => 0.0,
-                'cash_out' => 0.0,
-                'ecash_in' => 0.0,
-                'ecash_out' => 0.0,
-                'expected_cash_on_hand' => 0.0,
-                'expected_ecash_on_hand' => 0.0,
-                'expected_total_on_hand' => 0.0,
-            ];
-        }
-
-        $businessDate = (string) ($session['business_date'] ?? date('Y-m-d'));
-        $fromTs = $businessDate . ' 00:00:00';
-        $toTs = $businessDate . ' 23:59:59';
-        $db = Database::connect();
-
-        $paymentRows = $db->table('transactions')
-            ->select('payment_method, COALESCE(SUM(amount), 0) AS total_sales')
-            ->where('store_id', $storeId)
-            ->where('created_at >=', $fromTs)
-            ->where('created_at <=', $toTs)
-            ->groupBy('payment_method')
-            ->get()
-            ->getResultArray();
-
-        $cashSales = 0.0;
-        $ecashSales = 0.0;
-        $debtSales = 0.0;
-        foreach ($paymentRows as $row) {
-            $method = strtolower((string) ($row['payment_method'] ?? ''));
-            $sales = (float) ($row['total_sales'] ?? 0);
-            if ($method === 'cash') {
-                $cashSales += $sales;
-            } elseif ($method === 'debt') {
-                $debtSales += $sales;
-            } else {
-                $ecashSales += $sales;
-            }
-        }
-
-        $movementRows = $db->table('store_cash_movements')
-            ->select('channel, movement_type, amount, reason')
-            ->where('store_id', $storeId)
-            ->where('business_date', $businessDate)
-            ->get()
-            ->getResultArray();
-
-        $cashIn = 0.0;
-        $cashOut = 0.0;
-        $ecashIn = 0.0;
-        $ecashOut = 0.0;
-        $cashDebtPayments = 0.0;
-        $ecashDebtPayments = 0.0;
-        foreach ($movementRows as $row) {
-            $channel = strtolower((string) ($row['channel'] ?? 'cash'));
-            $type = strtolower((string) ($row['movement_type'] ?? 'cash_in'));
-            $amount = (float) ($row['amount'] ?? 0);
-            $isDebtPayment = stripos((string) ($row['reason'] ?? ''), 'Debt repayment') === 0;
-            if ($channel === 'ecash') {
-                if ($type === 'cash_out') {
-                    $ecashOut += $amount;
-                } else {
-                    $ecashIn += $amount;
-                    if ($isDebtPayment) {
-                        $ecashDebtPayments += $amount;
-                    }
-                }
-                continue;
-            }
-
-            if ($type === 'cash_out') {
-                $cashOut += $amount;
-            } else {
-                $cashIn += $amount;
-                if ($isDebtPayment) {
-                    $cashDebtPayments += $amount;
-                }
-            }
-        }
-
-        $expectedCash = (float) ($session['opening_cash'] ?? 0) + $cashSales + $cashIn - $cashOut;
-        $expectedEcash = (float) ($session['opening_ecash'] ?? 0) + $ecashSales + $ecashIn - $ecashOut;
-
-        return [
-            'cash_sales' => $cashSales,
-            'ecash_sales' => $ecashSales,
-            'debt_sales' => $debtSales,
-            'cash_debt_payments' => $cashDebtPayments,
-            'ecash_debt_payments' => $ecashDebtPayments,
-            'cash_in' => $cashIn,
-            'cash_out' => $cashOut,
-            'ecash_in' => $ecashIn,
-            'ecash_out' => $ecashOut,
-            'expected_cash_on_hand' => $expectedCash,
-            'expected_ecash_on_hand' => $expectedEcash,
-            'expected_total_on_hand' => $expectedCash + $expectedEcash,
-        ];
+        return (new StoreDayExpectedService())->calculate($storeId, $session);
     }
 
     private function resolveAccessibleStore(int $requestedStoreId = 0): ?array

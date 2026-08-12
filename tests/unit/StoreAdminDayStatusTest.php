@@ -87,6 +87,25 @@ final class StoreAdminDayStatusTest extends CIUnitTestCase
         $this->assertStringContainsString('data-variance-action', $script);
     }
 
+    public function testStaleDayResolutionIsIndependentAuditedAndUsesSharedExpectedBalances(): void
+    {
+        $oversight = (string) file_get_contents(APPPATH . 'Services/StoreOversightService.php');
+        $storeController = (string) file_get_contents(APPPATH . 'Controllers/StoreController.php');
+        $calculator = (string) file_get_contents(APPPATH . 'Services/StoreDayExpectedService.php');
+        $routes = (string) file_get_contents(APPPATH . 'Config/Routes.php');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-store-details.js');
+
+        $this->assertStringContainsString('StoreDayExpectedService', $storeController);
+        $this->assertStringContainsString('StoreDayExpectedService', $oversight);
+        $this->assertStringContainsString("where('business_date', \$businessDate)", $calculator);
+        $this->assertStringContainsString("\$actorId === (int) (\$session['opened_by']", $oversight);
+        $this->assertStringContainsString('RESOLVE_STALE_STORE_DAY_SESSION', $oversight);
+        $this->assertStringContainsString('StoreDayVarianceCaseService', $oversight);
+        $this->assertStringContainsString("admin/store-day-sessions/(:num)/resolve-stale", $routes);
+        $this->assertStringContainsString("store-admin/store-day-sessions/(:num)/resolve-stale", $routes);
+        $this->assertStringContainsString('stale-day-resolution-form', $script);
+    }
+
     public function testActiveStoreConfigurationRequiresOfficerAndSupervisorCoverage(): void
     {
         $source = (string) file_get_contents(APPPATH . 'Controllers/AdminController.php');

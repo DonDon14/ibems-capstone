@@ -71,6 +71,7 @@ final class AdminAccessRouteConfigTest extends CIUnitTestCase
             "store-admin/stores/data', 'StoreAdminController::storesData', ['filter' => 'access:store.review_assigned']",
             "store-admin/stores/(:num)/data', 'StoreAdminController::storeDetailsData/$1', ['filter' => 'access:store.review_assigned']",
             "store-admin/store-day-sessions/(:num)/review', 'StoreAdminController::reviewStoreDayVariance/$1', ['filter' => 'access:store.review_assigned']",
+            "store-admin/store-day-sessions/(:num)/resolve-stale', 'StoreAdminController::resolveStaleStoreDay/$1', ['filter' => 'access:store.review_assigned']",
         ] as $expectedRoute) {
             $this->assertStringContainsString($expectedRoute, $routes);
         }

@@ -8,7 +8,7 @@ Scope: local/staging workflow and source review; no production deployment or unr
 
 The core financial paths passed acceptance: server-priced POS transactions, atomic stock movements, debt-limit rejection, debt PIN changes, repayments, investigation reversal, payroll deduction, carryover, independent finalization, and store-day reconciliation. All four stores have officer, supervisor, product, and 15-day records.
 
-The main residual risk is operational exception management rather than transaction mathematics. Store-day variance cases now have stable references, owners, evidence history, private attachments, reviewer handoffs, acknowledgment deadlines, retention metadata, and final-disposition guards. The remaining work is to collect real evidence and connect the other exception types to similarly searchable workflows.
+The main residual risk is operational exception management rather than transaction mathematics. Store-day variance cases now have stable references, owners, evidence history, private attachments, reviewer handoffs, acknowledgment deadlines, retention metadata, final-disposition guards, and a guarded stale-day resolution path. The remaining work is to collect real evidence and connect the other exception types to similarly searchable workflows.
 
 ## P0 - operational actions before resolving shortages
 
@@ -40,6 +40,8 @@ Main Campus showed an August 11 store day still open on August 12. Add an explic
 - prohibit silent auto-close or date reassignment.
 
 Acceptance gate: Officer, Supervisor, and Administrator browser tests cover stale detection, guarded resolution, independent review, and next-day opening.
+
+Implementation status: completed in source and automated regression coverage. Ordinary Store Officers can no longer close a previous-date session. An assigned Store Supervisor or Administrator must enter independently counted cash/e-cash and a required reason; the original business date and opener are preserved, the action is audited, and any variance opens the existing case workflow for another reviewer. The live Main Campus August 11 record remains open until its real physical counts and reason are supplied; implementation did not invent or alter financial values.
 
 ## P1 - next implementation cycle
 
@@ -111,7 +113,7 @@ Before broader or production use, add malware scanning/quarantine, configurable 
 ## Recommended delivery order
 
 1. Collect and review real evidence for both open shortage cases.
-2. Implement stale-store-day resolution.
+2. Implement stale-store-day resolution. Completed; live use remains evidence-bound.
 3. Implement the rejected-attempt ledger.
 4. Add store readiness state and activation checklist.
 5. Add payroll timeline.

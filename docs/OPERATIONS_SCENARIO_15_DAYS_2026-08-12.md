@@ -32,9 +32,9 @@ The scenario is idempotent. Run `php spark ibems:scenario-15-days` to create it 
 
 - `ibems:data-audit`: passed, zero warnings and zero errors.
 - `ibems:auth-audit`: passed, zero warnings and zero errors.
-- PHPUnit: 79 tests and 519 assertions passed; only the expected missing-coverage-driver warning remains.
+- PHPUnit: 81 tests and 535 assertions passed; only the expected missing-coverage-driver warning remains.
 - Browser: Main Campus Store history displayed all 18 applicable records for the selected 15-day range (15 cash plus 3 debt), with PHP 525 total sales and no console warnings/errors.
-- `ibems:route-audit`: passed all 47 write endpoints after adding support for the current `access:*` permission filters.
+- `ibems:route-audit`: passed all 49 write endpoints after adding the guarded Administrator and Store Supervisor stale-day routes.
 
 ## Improvements and remaining errors
 
@@ -70,14 +70,18 @@ Governance was then tightened with a 48-hour handoff-acknowledgment deadline, da
 
 The improved dashboard exposed a second pre-existing unresolved record: Dashboard Demo Store has a PHP 500 shortage from 2026-06-30. Read-only reconciliation confirmed PHP 3,000 expected cash, PHP 2,500 counted cash, no cash movement, and only one PHP 40 debt sale that did not affect cash. An Administrator attempt to review it was correctly blocked because that same user closed the store day. A separately assigned store supervisor then changed only the review status to `needs_investigation` and recorded the evidence; the PHP -500 variance, counted cash, and accountability remain unchanged pending source evidence.
 
+The stale-day follow-up added a guarded resolution workflow for an open session from a previous date. Store Officers are blocked from closing stale sessions; an assigned Store Supervisor or Administrator must provide independently counted cash/e-cash and a required reason. Resolution preserves the original business date and opener, writes a dedicated audit event, and opens an independent variance case when the count differs. The live Main Campus August 11 session was deliberately not closed because no verified physical count or operational reason was provided.
+
 ## Role-by-role browser acceptance
 
 - Store Officer: scenario product, remaining stock, and dated inventory movements persisted after load.
+- Store Officer stale-day guard: POS displayed the previous-day escalation message, exposed no Close Day action, and kept transaction controls locked pending Supervisor/Administrator resolution.
 - Store Supervisor: assignment scope was correct, but Main Campus still reported an August 11 store day as open on August 12.
 - Store Supervisor segregation of duties: the closer could not review their own variance. A different supervisor could record the investigation note, and reopening the dashboard preserved `Needs Investigation` with PHP -500 unchanged.
 - Accounting: the scenario employee displayed PHP 150 debt and PHP 850 available credit; the finalized period displayed PHP 300 confirmed and PHP 150 carryover.
 - Accounting investigation: the duplicate-charge case displayed its transaction reference, findings, independent closer, and PHP 50 posted reversal.
 - Administrator: all four stores, their officers, products, totals, and transactions were visible. JL Store displayed 18 transactions, PHP 525 sales, one product, and 479 remaining units.
+- Administrator stale-day control: Main Campus details displayed the August 11 opener and opening balances plus required counted-cash, counted-e-cash, and reason fields. The form was inspected but not submitted, and browser diagnostics reported no errors.
 - Administrator exception review: the historical PHP 20 shortage was not discoverable from the dashboard or store detail once July 29 became the latest balanced session.
 
 ## Workflow assessment
