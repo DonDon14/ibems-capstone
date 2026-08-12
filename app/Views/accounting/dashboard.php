@@ -23,12 +23,33 @@
                 <canvas id="acd-trend-chart"></canvas>
             </div>
         </article>
-        <article class="dash-panel">
+        <article class="dash-panel action-quick-panel">
             <h4><i class="bi bi-lightning-charge"></i> Quick Access</h4>
-            <div class="quick-links">
-                <a href="/accounting/debts"><i class="bi bi-search"></i> Open Debt Monitoring</a>
-                <a href="/accounting/debts"><i class="bi bi-diagram-3"></i> Open Deduction Workflow</a>
-                <a href="/accounting/debts"><i class="bi bi-file-earmark-arrow-up"></i> Import HR CSV</a>
+            <div class="quick-links action-quick-links">
+                <a href="<?= site_url('accounting/debts') ?>">
+                    <span class="quick-link-icon"><i class="bi bi-search"></i></span>
+                    <span class="quick-link-copy">
+                        <strong>Open Debt Monitoring</strong>
+                        <small>Review employee balances, credit limits, and payment history</small>
+                    </span>
+                    <i class="bi bi-arrow-right quick-link-arrow"></i>
+                </a>
+                <a href="<?= site_url('accounting/debts') ?>">
+                    <span class="quick-link-icon"><i class="bi bi-diagram-3"></i></span>
+                    <span class="quick-link-copy">
+                        <strong>Open Deduction Workflow</strong>
+                        <small>Prepare, reconcile, and finalize salary-period deductions</small>
+                    </span>
+                    <i class="bi bi-arrow-right quick-link-arrow"></i>
+                </a>
+                <a href="<?= site_url('accounting/debts') ?>">
+                    <span class="quick-link-icon"><i class="bi bi-file-earmark-arrow-up"></i></span>
+                    <span class="quick-link-copy">
+                        <strong>Import HR CSV</strong>
+                        <small>Preview employee records before applying controlled updates</small>
+                    </span>
+                    <i class="bi bi-arrow-right quick-link-arrow"></i>
+                </a>
             </div>
             <p id="acd-last-settlement" class="muted mt-10">Latest deduction period: -</p>
         </article>
