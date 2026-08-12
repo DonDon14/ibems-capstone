@@ -124,9 +124,10 @@ public function storeDetailsData(RequestInterface $request, ResponseInterface $r
 
         $daySession = null;
         $daySessions = [];
+        $varianceCases = [];
         if ($db->tableExists('store_day_sessions')) {
             $daySessions = $db->table('store_day_sessions sds')
-                ->select('sds.id, sds.business_date, sds.status, sds.opening_cash, sds.opening_ecash, sds.expected_cash, sds.expected_ecash, sds.counted_cash, sds.counted_ecash, sds.variance_cash, sds.variance_ecash, sds.variance_status, sds.review_status, sds.review_note, sds.reviewed_at, sds.accountability_user_id, sds.accountability_amount, sds.closing_note, sds.opened_at, sds.closed_at, opener.name AS opened_by_name, closer.id AS closed_by_id, closer.name AS closed_by_name, reviewer.name AS reviewed_by_name, accountable.name AS accountability_user_name')
+                ->select('sds.id, sds.store_id, sds.business_date, sds.status, sds.opening_cash, sds.opening_ecash, sds.expected_cash, sds.expected_ecash, sds.counted_cash, sds.counted_ecash, sds.variance_cash, sds.variance_ecash, sds.variance_status, sds.review_status, sds.review_note, sds.reviewed_at, sds.accountability_user_id, sds.accountability_amount, sds.closing_note, sds.opened_at, sds.closed_at, opener.name AS opened_by_name, closer.id AS closed_by_id, closer.name AS closed_by_name, reviewer.name AS reviewed_by_name, accountable.name AS accountability_user_name')
                 ->join('users opener', 'opener.id = sds.opened_by', 'left')
                 ->join('users closer', 'closer.id = sds.closed_by', 'left')
                 ->join('users reviewer', 'reviewer.id = sds.reviewed_by', 'left')
@@ -138,6 +139,10 @@ public function storeDetailsData(RequestInterface $request, ResponseInterface $r
                 ->get()
                 ->getResultArray();
             $daySession = $daySessions[0] ?? null;
+            $varianceCases = (new StoreDayVarianceCaseService())->getCasesForSessions(
+                $db,
+                array_column($daySessions, 'id')
+            );
         }
 
         $recentTransactions = $db->table('transactions t')
@@ -164,9 +169,10 @@ public function storeDetailsData(RequestInterface $request, ResponseInterface $r
             ];
         }
 
-        $normalizeDaySession = static function (array $row): array {
+        $normalizeDaySession = function (array $row) use ($db, $varianceCases): array {
+            $sessionId = (int) ($row['id'] ?? 0);
             return [
-                'id' => (int) ($row['id'] ?? 0),
+                'id' => $sessionId,
                 'business_date' => (string) ($row['business_date'] ?? ''),
                 'status' => (string) ($row['status'] ?? ''),
                 'opening_cash' => (float) ($row['opening_cash'] ?? 0),
@@ -191,6 +197,12 @@ public function storeDetailsData(RequestInterface $request, ResponseInterface $r
                 'opened_by_name' => $row['opened_by_name'] ?: null,
                 'closed_by_id' => $row['closed_by_id'] !== null ? (int) $row['closed_by_id'] : null,
                 'closed_by_name' => $row['closed_by_name'] ?: null,
+                'variance_case' => $varianceCases[$sessionId] ?? null,
+                'eligible_reviewers' => $this->eligibleReviewers(
+                    $db,
+                    (int) ($row['store_id'] ?? 0),
+                    (int) ($row['closed_by_id'] ?? 0)
+                ),
             ];
         };
 
@@ -318,9 +330,17 @@ public function reviewStoreDayVariance(RequestInterface $request, ResponseInterf
 
         $actorId = (int) session()->get('user_id');
         if (!(new StoreDayReviewPolicy())->isIndependentReviewer($actorId, $session)) {
+            $eligibleReviewers = $this->eligibleReviewers(
+                $db,
+                (int) ($session['store_id'] ?? 0),
+                (int) ($session['closed_by'] ?? 0)
+            );
+            $eligibleNames = array_column($eligibleReviewers, 'name');
             return $response->setStatusCode(409)->setJSON([
                 'status' => 'error',
-                'message' => 'The operator who closed a store day cannot review the same store day.',
+                'message' => 'The operator who closed a store day cannot review the same store day.'
+                    . ($eligibleNames !== [] ? ' Eligible reviewers: ' . implode(', ', $eligibleNames) . '.' : ' No eligible reviewer is currently assigned.'),
+                'eligible_reviewers' => $eligibleReviewers,
             ]);
         }
 
@@ -356,6 +376,16 @@ public function reviewStoreDayVariance(RequestInterface $request, ResponseInterf
         }
 
         $db->transStart();
+
+        (new StoreDayVarianceCaseService())->recordReview(
+            $db,
+            $session,
+            $actorId,
+            $action,
+            $newReviewStatus,
+            $reviewNote,
+            $now
+        );
 
         if ($action === 'approve_shortage') {
             $balanceModel = new BalanceModel();
@@ -459,6 +489,34 @@ public function reviewStoreDayVariance(RequestInterface $request, ResponseInterf
         }
 
         return (array) $request->getPost();
+    }
+
+    private function eligibleReviewers($db, int $storeId, int $closingOperatorId): array
+    {
+        $ids = [];
+        foreach ($db->table('users')->select('id')->where('is_active', true)->where('role', 'ADMIN')->get()->getResultArray() as $row) {
+            $ids[(int) $row['id']] = true;
+        }
+        if ($db->tableExists('user_roles')) {
+            foreach ($db->table('user_roles')->select('user_id')->where('role', 'ADMIN')->get()->getResultArray() as $row) {
+                $ids[(int) $row['user_id']] = true;
+            }
+        }
+        if ($db->tableExists('store_supervisors')) {
+            foreach ($db->table('store_supervisors')->select('user_id')->where('store_id', $storeId)->get()->getResultArray() as $row) {
+                $ids[(int) $row['user_id']] = true;
+            }
+        }
+        unset($ids[$closingOperatorId], $ids[0]);
+        if ($ids === []) {
+            return [];
+        }
+
+        return array_map(static fn (array $row): array => [
+            'id' => (int) $row['id'],
+            'name' => (string) $row['name'],
+            'email' => (string) $row['email'],
+        ], $db->table('users')->select('id, name, email')->where('is_active', true)->whereIn('id', array_keys($ids))->orderBy('name', 'ASC')->get()->getResultArray());
     }
 
 private function canAccessStoreForAdminArea(int $storeId): bool

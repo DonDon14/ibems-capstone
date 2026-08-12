@@ -247,6 +247,47 @@ class IbemsDataAudit extends BaseCommand
             CLI::write('[OK] debt PIN attempt state is within policy limits', 'green');
         }
 
+        $varianceWithoutCase = (int) $db->query(
+            "SELECT COUNT(*) AS c
+             FROM store_day_sessions sds
+             LEFT JOIN store_day_variance_cases c ON c.store_day_session_id = sds.id
+             WHERE sds.review_status <> 'not_required' AND c.id IS NULL"
+        )->getRow('c');
+        if ($varianceWithoutCase > 0) {
+            CLI::write("[FAIL] reviewable store-day variances without cases: {$varianceWithoutCase}", 'red');
+            $errors++;
+        } else {
+            CLI::write('[OK] every reviewable store-day variance has a case', 'green');
+        }
+
+        $orphanCaseEvents = (int) $db->query(
+            'SELECT COUNT(*) AS c
+             FROM store_day_variance_case_events e
+             LEFT JOIN store_day_variance_cases c ON c.id = e.case_id
+             WHERE c.id IS NULL'
+        )->getRow('c');
+        if ($orphanCaseEvents > 0) {
+            CLI::write("[FAIL] orphaned store-day variance case events: {$orphanCaseEvents}", 'red');
+            $errors++;
+        } else {
+            CLI::write('[OK] store-day variance case events have valid cases', 'green');
+        }
+
+        $invalidResolvedCases = (int) $db->query(
+            "SELECT COUNT(*) AS c
+             FROM store_day_variance_cases c
+             JOIN store_day_sessions sds ON sds.id = c.store_day_session_id
+             WHERE c.status = 'resolved'
+               AND (c.resolved_by IS NULL OR c.resolved_at IS NULL OR c.disposition IS NULL
+                    OR sds.review_status NOT IN ('approved', 'waived', 'corrected'))"
+        )->getRow('c');
+        if ($invalidResolvedCases > 0) {
+            CLI::write("[FAIL] resolved variance cases with incomplete disposition: {$invalidResolvedCases}", 'red');
+            $errors++;
+        } else {
+            CLI::write('[OK] resolved variance cases have complete dispositions', 'green');
+        }
+
         CLI::newLine();
         CLI::write("Warnings: {$warnings}", $warnings > 0 ? 'light_yellow' : 'green');
         CLI::write("Errors: {$errors}", $errors > 0 ? 'red' : 'green');

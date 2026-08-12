@@ -34,6 +34,8 @@ class IbemsDatabaseTransfer extends BaseCommand
         'store_payment_methods',
         'products',
         'store_day_sessions',
+        'store_day_variance_cases',
+        'store_day_variance_case_events',
         'store_opening_balances',
         'store_cash_movements',
         'transactions',

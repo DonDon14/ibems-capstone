@@ -62,6 +62,8 @@ The scenario is idempotent. Run `php spark ibems:scenario-15-days` to create it 
 
 Items 12 and 13 were implemented during follow-up acceptance. Administrator and Store Supervisor details now expose up to 60 recent sessions with review-status filters and permitted actions. The Administrator dashboard now counts and links unresolved historical reviews. Active-store creation or updates also require both a primary officer and supervisor coverage.
 
+The first part of items 1 and 3 was implemented in the next follow-up. Every reviewable store-day variance now has a stable `SDV-*` case reference, an owner, an append-only event timeline, and a financial evidence snapshot. Existing variance records were backfilled without changing their amounts or dispositions. Store details list eligible independent reviewers and the self-review error names who can continue. File attachments and an active notification/handoff action remain future work.
+
 The improved dashboard exposed a second pre-existing unresolved record: Dashboard Demo Store has a PHP 500 shortage from 2026-06-30. Read-only reconciliation confirmed PHP 3,000 expected cash, PHP 2,500 counted cash, no cash movement, and only one PHP 40 debt sale that did not affect cash. An Administrator attempt to review it was correctly blocked because that same user closed the store day. A separately assigned store supervisor then changed only the review status to `needs_investigation` and recorded the evidence; the PHP -500 variance, counted cash, and accountability remain unchanged pending source evidence.
 
 ## Role-by-role browser acceptance

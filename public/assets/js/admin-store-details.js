@@ -79,6 +79,28 @@ function sdReviewClass(value) {
     return "is-muted";
 }
 
+function sdCaseSummary(session) {
+    const varianceCase = session?.variance_case;
+    if (!varianceCase) return "";
+    const events = Array.isArray(varianceCase.events) ? varianceCase.events : [];
+    const eventRows = events.map((event) => `
+        <li>
+            <strong>${sdEscape(String(event.event_type || "update").replace(/_/g, " "))}</strong>
+            by ${sdEscape(event.actor_name || "System")}${event.created_at ? ` on ${sdEscape(sdDateTime(event.created_at))}` : ""}
+            ${event.note ? `<div>${sdEscape(event.note)}</div>` : ""}
+        </li>
+    `).join("");
+    const eligible = Array.isArray(session.eligible_reviewers) ? session.eligible_reviewers : [];
+    return `
+        <details class="variance-case">
+            <summary>Case ${sdEscape(varianceCase.case_ref || "-")} · ${sdEscape(String(varianceCase.status || "open").replace(/_/g, " "))}</summary>
+            <div class="variance-note">Owner: ${sdEscape(varianceCase.owner_name || "Unassigned")}</div>
+            ${eligible.length > 0 ? `<div class="variance-note">Eligible independent reviewers: ${eligible.map((reviewer) => sdEscape(reviewer.name || reviewer.email || "Reviewer")).join(", ")}</div>` : ""}
+            ${eventRows ? `<ol class="variance-case-timeline">${eventRows}</ol>` : ""}
+        </details>
+    `;
+}
+
 function sdRenderDaySession(session) {
     const wrap = document.getElementById("sd-day-session");
     if (!wrap) return;
@@ -140,6 +162,7 @@ function sdRenderDaySession(session) {
             <span class="variance-pill ${sdReviewClass(reviewStatus)}">${sdEscape(sdReviewLabel(reviewStatus))}</span>
         </div>
         ${session.review_note ? `<div class="variance-note">Review note: ${sdEscape(session.review_note)}</div>` : ""}
+        ${sdCaseSummary(session)}
         ${Number(session.accountability_amount || 0) > 0 ? `<div class="variance-note">Accountability: ${sdEscape(sdMoney(session.accountability_amount))} assigned to ${sdEscape(accountabilityName)}.</div>` : ""}
         ${reviewCopy}
         ${reviewActions}
@@ -257,7 +280,7 @@ function sdRenderSessionHistory() {
                 <td>${sdEscape(session.business_date || "-")}</td>
                 <td>${sdEscape(String(session.status || "-").toUpperCase())}</td>
                 <td><span class="variance-pill ${sdVarianceClass(varianceStatus)}">${sdEscape(sdVarianceStatusLabel(varianceStatus))}</span><div class="stack-meta">${sdEscape(sdMoney(Number(session.variance_cash || 0) + Number(session.variance_ecash || 0)))}</div></td>
-                <td><span class="variance-pill ${sdReviewClass(reviewStatus)}">${sdEscape(sdReviewLabel(reviewStatus))}</span></td>
+                <td><span class="variance-pill ${sdReviewClass(reviewStatus)}">${sdEscape(sdReviewLabel(reviewStatus))}</span>${sdCaseSummary(session)}</td>
                 <td>${sdEscape(session.closed_by_name || "-")}</td>
                 <td>${action}</td>
             </tr>

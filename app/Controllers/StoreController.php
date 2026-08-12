@@ -14,6 +14,7 @@ use App\Models\AuditLogModel;
 use App\Models\BalanceModel;
 use App\Models\DebtCashbookEntryModel;
 use App\Services\StoreAccessService;
+use App\Services\StoreDayVarianceCaseService;
 use Config\Database;
 
 class StoreController extends BaseController
@@ -874,6 +875,14 @@ class StoreController extends BaseController
         ]);
 
         $closed = $model->find((int) $session['id']) ?? $session;
+        if ($reviewStatus === 'pending') {
+            (new StoreDayVarianceCaseService())->ensureCase(
+                Database::connect(),
+                $closed,
+                $actorId > 0 ? $actorId : null,
+                $now
+            );
+        }
         $closedExpected = $this->calculateStoreSessionExpected((int) $store['id'], $closed);
 
         $auditLogModel = new AuditLogModel();

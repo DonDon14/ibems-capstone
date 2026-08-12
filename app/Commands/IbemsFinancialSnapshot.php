@@ -44,6 +44,16 @@ class IbemsFinancialSnapshot extends BaseCommand
             'counted_ecash' => 'nullable_money', 'variance_cash' => 'nullable_money',
             'variance_ecash' => 'nullable_money', 'accountability_amount' => 'nullable_money',
         ],
+        'store_day_variance_cases' => [
+            'id' => 'int', 'case_ref' => 'string', 'store_day_session_id' => 'int', 'store_id' => 'int',
+            'status' => 'string', 'owner_user_id' => 'nullable_int', 'resolved_by' => 'nullable_int',
+            'resolved_at' => 'nullable_string', 'disposition' => 'nullable_string',
+        ],
+        'store_day_variance_case_events' => [
+            'id' => 'int', 'case_id' => 'int', 'actor_id' => 'nullable_int', 'event_type' => 'string',
+            'from_status' => 'nullable_string', 'to_status' => 'nullable_string', 'note' => 'nullable_string',
+            'evidence_json' => 'nullable_string', 'created_at' => 'string',
+        ],
         'store_cash_movements' => [
             'id' => 'int', 'store_id' => 'int', 'business_date' => 'string', 'channel' => 'string',
             'movement_type' => 'string', 'amount' => 'money', 'created_at' => 'string',

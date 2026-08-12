@@ -94,4 +94,20 @@ final class StoreAdminDayStatusTest extends CIUnitTestCase
         $this->assertSame(2, substr_count($source, 'An active store requires a primary officer and at least one supervisor.'));
         $this->assertStringContainsString('$willBeActive', $source);
     }
+
+    public function testVarianceReviewUsesDurableCasesAndShowsIndependentReviewers(): void
+    {
+        $service = (string) file_get_contents(APPPATH . 'Services/StoreDayVarianceCaseService.php');
+        $oversight = (string) file_get_contents(APPPATH . 'Services/StoreOversightService.php');
+        $migration = (string) file_get_contents(APPPATH . 'Database/Migrations/2026-08-12-000001_CreateStoreDayVarianceCases.php');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-store-details.js');
+
+        $this->assertStringContainsString('store_day_variance_cases', $migration);
+        $this->assertStringContainsString('store_day_variance_case_events', $migration);
+        $this->assertStringContainsString("'evidence_json'", $service);
+        $this->assertStringContainsString('recordReview(', $oversight);
+        $this->assertStringContainsString('Eligible reviewers:', $oversight);
+        $this->assertStringContainsString('function sdCaseSummary(session)', $script);
+        $this->assertStringContainsString('Eligible independent reviewers:', $script);
+    }
 }

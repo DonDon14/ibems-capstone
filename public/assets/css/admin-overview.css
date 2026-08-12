@@ -964,6 +964,32 @@
     line-height: 1.4;
 }
 
+.variance-case {
+    margin-top: 10px;
+    border: 1px solid #d8e2ee;
+    border-radius: 10px;
+    background: #f8fafc;
+    padding: 10px 12px;
+}
+
+.variance-case summary {
+    cursor: pointer;
+    color: #0b3f73;
+    font-size: 0.84rem;
+    font-weight: 800;
+}
+
+.variance-case-timeline {
+    margin: 10px 0 0;
+    padding-left: 1.2rem;
+    color: #475569;
+    font-size: 0.82rem;
+}
+
+.variance-case-timeline li + li {
+    margin-top: 8px;
+}
+
 .store-day-history-head {
     align-items: end;
     gap: 1rem;
