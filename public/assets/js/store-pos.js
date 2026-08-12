@@ -1135,7 +1135,18 @@ function getStockState(stock, inCart = 0, threshold = 10) {
 
 function updateCheckoutState() {
     const submitBtn = document.getElementById("submit-transaction");
+    const debtPaymentBtn = document.getElementById("open-debt-payment-modal");
     if (!submitBtn) return;
+
+    if (debtPaymentBtn) {
+        debtPaymentBtn.disabled = !openingBalanceReady;
+        debtPaymentBtn.title = openingBalanceReady
+            ? "Record a direct collection against existing employee debt"
+            : "Open today's store day before recording a debt collection";
+        debtPaymentBtn.innerHTML = openingBalanceReady
+            ? '<i class="bi bi-plus-circle"></i> Record Payment'
+            : '<i class="bi bi-lock"></i> Open Day First';
+    }
 
     if (!openingBalanceReady) {
         submitBtn.disabled = true;
@@ -1493,7 +1504,6 @@ function openDebtPaymentModal() {
 
     if (!openingBalanceReady) {
         setResult("Open today's store day before recording debt payments.", "error");
-        openOpeningBalanceModal();
         return;
     }
 

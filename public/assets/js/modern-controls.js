@@ -1,5 +1,5 @@
 (function () {
-    const CONTROL_SELECTOR = "select:not([multiple]):not([size]), input[type='date']";
+    const CONTROL_SELECTOR = "select:not([multiple]):not([size]):not([data-no-enhance]), input[type='date']:not([data-no-enhance])";
     const enhanced = new WeakSet();
     let openControl = null;
 

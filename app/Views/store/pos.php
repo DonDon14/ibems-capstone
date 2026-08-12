@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/store') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/store-pos.css') ?>?v=20260813c">
+<link rel="stylesheet" href="<?= base_url('assets/css/store-pos.css') ?>?v=20260813d">
 <link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <?= $this->endSection() ?>
@@ -60,8 +60,8 @@
 
         <div class="debt-payment-card">
             <div>
-                <strong><i class="bi bi-cash-coin"></i> Debt Payment</strong>
-                <small>Record direct payment toward an employee&apos;s existing debt.</small>
+                <strong><i class="bi bi-cash-coin"></i> Debt Collection</strong>
+                <small>Apply a direct cash or e-cash collection to an employee&apos;s existing debt.</small>
             </div>
             <button id="open-debt-payment-modal" type="button" class="secondary-btn">
                 <i class="bi bi-plus-circle"></i> Record Payment
@@ -108,7 +108,8 @@
         <div class="payment-wrap">
             <label for="payment-method"><i class="bi bi-credit-card-2-front"></i> Payment Method</label>
             <div class="payment-quick" id="payment-quick"></div>
-            <select id="payment-method" class="is-hidden"></select>
+            <select id="payment-method" class="is-hidden" data-no-enhance aria-hidden="true" tabindex="-1"></select>
+            <small class="payment-method-help">Methods are loaded from this store&apos;s active payment settings. Advance Payment classifies a prepaid sale; debt collections are recorded separately above.</small>
         </div>
 
         <div id="debt-customer-wrap" class="payment-wrap is-hidden">
@@ -206,10 +207,10 @@
 <div id="debt-payment-modal" class="receipt-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="debt-payment-title">
     <div class="receipt-card confirm-card debt-payment-modal-card">
         <div class="receipt-head">
-            <h3 id="debt-payment-title"><i class="bi bi-cash-coin"></i> Direct Debt Payment</h3>
+            <h3 id="debt-payment-title"><i class="bi bi-cash-coin"></i> Record Debt Collection</h3>
             <button id="debt-payment-close" type="button" class="receipt-close" aria-label="Close direct debt payment">&times;</button>
         </div>
-        <p class="scanner-status">Use this only when the debtor pays the store directly. It reduces their existing debt and records cash/e-cash in the store day.</p>
+        <p class="scanner-status">Use this when a debtor pays the store directly. The amount reduces existing debt and is added to today&apos;s cash or e-cash. It cannot create an advance credit.</p>
         <div class="payment-wrap">
             <label for="debt-payment-search">Debtor (Faculty/Staff)</label>
             <div class="debt-search-wrap">
