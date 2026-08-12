@@ -32,9 +32,9 @@ The scenario is idempotent. Run `php spark ibems:scenario-15-days` to create it 
 
 - `ibems:data-audit`: passed, zero warnings and zero errors.
 - `ibems:auth-audit`: passed, zero warnings and zero errors.
-- PHPUnit: 76 tests and 487 assertions passed; only the expected missing-coverage-driver warning remains.
+- PHPUnit: 79 tests and 519 assertions passed; only the expected missing-coverage-driver warning remains.
 - Browser: Main Campus Store history displayed all 18 applicable records for the selected 15-day range (15 cash plus 3 debt), with PHP 525 total sales and no console warnings/errors.
-- `ibems:route-audit`: passed all 41 write endpoints after adding support for the current `access:*` permission filters.
+- `ibems:route-audit`: passed all 47 write endpoints after adding support for the current `access:*` permission filters.
 
 ## Improvements and remaining errors
 
