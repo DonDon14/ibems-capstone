@@ -990,6 +990,36 @@
     margin-top: 8px;
 }
 
+.variance-case-files {
+    margin: 10px 0;
+    padding-left: 1.2rem;
+    font-size: 0.82rem;
+}
+
+.variance-evidence-form,
+.variance-handoff-form {
+    display: grid;
+    grid-template-columns: minmax(160px, 1fr) minmax(180px, 1fr) auto;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.variance-evidence-form input,
+.variance-handoff-form input,
+.variance-handoff-form select {
+    min-height: 36px;
+    min-width: 0;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    background: #fff;
+    padding: 6px 9px;
+}
+
+@media (max-width: 760px) {
+    .variance-evidence-form,
+    .variance-handoff-form { grid-template-columns: 1fr; }
+}
+
 .store-day-history-head {
     align-items: end;
     gap: 1rem;

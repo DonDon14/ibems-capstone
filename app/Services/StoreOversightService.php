@@ -9,6 +9,7 @@ use App\Models\StoreModel;
 use App\Models\StoreSupervisorModel;
 use CodeIgniter\HTTP\RequestInterface;
 use CodeIgniter\HTTP\ResponseInterface;
+use CodeIgniter\HTTP\Files\UploadedFile;
 use Config\Database;
 
 final class StoreOversightService
@@ -489,6 +490,83 @@ public function reviewStoreDayVariance(RequestInterface $request, ResponseInterf
         }
 
         return (array) $request->getPost();
+    }
+
+    public function uploadVarianceCaseAttachment(RequestInterface $request, ResponseInterface $response, int $caseId): ResponseInterface
+    {
+        $db = Database::connect();
+        $case = $this->accessibleVarianceCase($db, $caseId);
+        if (!$case) return $response->setStatusCode(404)->setJSON(['status' => 'error', 'message' => 'Variance case not found or inaccessible.']);
+
+        $file = $request->getFile('evidence_file');
+        if (!$file instanceof UploadedFile || !$file->isValid() || $file->hasMoved()) {
+            return $response->setStatusCode(422)->setJSON(['status' => 'error', 'message' => 'A valid evidence file is required.']);
+        }
+        $allowed = ['application/pdf' => 'pdf', 'image/jpeg' => 'jpg', 'image/png' => 'png'];
+        $mime = strtolower((string) $file->getMimeType());
+        if (!isset($allowed[$mime]) || $file->getSize() <= 0 || $file->getSize() > 5 * 1024 * 1024) {
+            return $response->setStatusCode(422)->setJSON(['status' => 'error', 'message' => 'Evidence must be a PDF, JPG, or PNG file up to 5 MB.']);
+        }
+
+        $actorId = (int) session()->get('user_id');
+        $storedName = bin2hex(random_bytes(24)) . '.' . $allowed[$mime];
+        $directory = WRITEPATH . 'private/variance-evidence/' . $caseId;
+        if (!is_dir($directory) && !mkdir($directory, 0700, true) && !is_dir($directory)) {
+            return $response->setStatusCode(500)->setJSON(['status' => 'error', 'message' => 'Evidence storage is unavailable.']);
+        }
+        $file->move($directory, $storedName);
+        $path = $directory . DIRECTORY_SEPARATOR . $storedName;
+        $now = date('Y-m-d H:i:s');
+        $description = mb_substr(trim((string) $request->getPost('description')), 0, 255);
+        $db->transStart();
+        $db->table('store_day_variance_case_attachments')->insert([
+            'case_id' => $caseId, 'uploaded_by' => $actorId, 'original_name' => basename((string) $file->getClientName()),
+            'stored_name' => $storedName, 'mime_type' => $mime, 'file_size' => filesize($path), 'sha256' => hash_file('sha256', $path),
+            'description' => $description !== '' ? $description : null, 'created_at' => $now,
+        ]);
+        $attachmentId = (int) $db->insertID();
+        $this->appendVarianceEvent($db, $caseId, $actorId, 'evidence_attached', $description ?: 'Evidence file attached.', ['attachment_id' => $attachmentId, 'mime_type' => $mime, 'file_size' => filesize($path)], $now);
+        $db->transComplete();
+        if (!$db->transStatus()) { @unlink($path); return $response->setStatusCode(500)->setJSON(['status' => 'error', 'message' => 'Failed to record evidence.']); }
+        return $response->setJSON(['status' => 'success', 'attachment_id' => $attachmentId]);
+    }
+
+    public function downloadVarianceCaseAttachment(ResponseInterface $response, int $attachmentId): ResponseInterface
+    {
+        $db = Database::connect();
+        $attachment = $db->table('store_day_variance_case_attachments a')->select('a.*, c.store_id')->join('store_day_variance_cases c', 'c.id = a.case_id')->where('a.id', $attachmentId)->get()->getRowArray();
+        if (!$attachment || !$this->canAccessStoreForAdminArea((int) $attachment['store_id'])) return $response->setStatusCode(404)->setBody('Evidence not found.');
+        $path = WRITEPATH . 'private/variance-evidence/' . (int) $attachment['case_id'] . DIRECTORY_SEPARATOR . basename((string) $attachment['stored_name']);
+        if (!is_file($path) || !hash_equals((string) $attachment['sha256'], hash_file('sha256', $path))) return $response->setStatusCode(410)->setBody('Evidence file is missing or failed integrity verification.');
+        return $response->download($path, null)->setFileName((string) $attachment['original_name']);
+    }
+
+    public function handoffVarianceCase(RequestInterface $request, ResponseInterface $response, int $caseId): ResponseInterface
+    {
+        $db = Database::connect(); $case = $this->accessibleVarianceCase($db, $caseId);
+        if (!$case) return $response->setStatusCode(404)->setJSON(['status' => 'error', 'message' => 'Variance case not found or inaccessible.']);
+        $data = $this->getRequestData($request); $toUserId = (int) ($data['to_user_id'] ?? 0); $note = mb_substr(trim((string) ($data['note'] ?? '')), 0, 255);
+        $eligible = array_column($this->eligibleReviewers($db, (int) $case['store_id'], (int) $case['closed_by']), 'id');
+        $actorId = (int) session()->get('user_id'); $now = date('Y-m-d H:i:s');
+        if ($toUserId === $actorId || !in_array($toUserId, $eligible, true) || $note === '') return $response->setStatusCode(422)->setJSON(['status' => 'error', 'message' => 'Choose a different eligible independent reviewer and provide a handoff note.']);
+        $db->transStart();
+        $db->table('store_day_variance_case_handoffs')->insert(['case_id' => $caseId, 'from_user_id' => $actorId, 'to_user_id' => $toUserId, 'note' => $note, 'status' => 'pending', 'created_at' => $now]);
+        $db->table('store_day_variance_cases')->where('id', $caseId)->update(['owner_user_id' => $toUserId, 'updated_at' => $now]);
+        $this->appendVarianceEvent($db, $caseId, $actorId, 'reviewer_handoff', $note, ['to_user_id' => $toUserId], $now);
+        $db->transComplete();
+        if (!$db->transStatus()) return $response->setStatusCode(500)->setJSON(['status' => 'error', 'message' => 'Failed to record reviewer handoff.']);
+        return $response->setJSON(['status' => 'success']);
+    }
+
+    private function accessibleVarianceCase($db, int $caseId): ?array
+    {
+        $case = $db->table('store_day_variance_cases c')->select('c.*, sds.closed_by')->join('store_day_sessions sds', 'sds.id = c.store_day_session_id')->where('c.id', $caseId)->get()->getRowArray();
+        return $case && $this->canAccessStoreForAdminArea((int) $case['store_id']) ? $case : null;
+    }
+
+    private function appendVarianceEvent($db, int $caseId, int $actorId, string $type, string $note, array $evidence, string $now): void
+    {
+        $db->table('store_day_variance_case_events')->insert(['case_id' => $caseId, 'actor_id' => $actorId, 'event_type' => $type, 'note' => $note, 'evidence_json' => json_encode($evidence), 'created_at' => $now]);
     }
 
     private function eligibleReviewers($db, int $storeId, int $closingOperatorId): array

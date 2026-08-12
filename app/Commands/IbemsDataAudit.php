@@ -288,6 +288,15 @@ class IbemsDataAudit extends BaseCommand
             CLI::write('[OK] resolved variance cases have complete dispositions', 'green');
         }
 
+        $orphanEvidence = (int) $db->query('SELECT COUNT(*) AS c FROM store_day_variance_case_attachments a LEFT JOIN store_day_variance_cases c ON c.id = a.case_id LEFT JOIN users u ON u.id = a.uploaded_by WHERE c.id IS NULL OR u.id IS NULL')->getRow('c');
+        $orphanHandoffs = (int) $db->query('SELECT COUNT(*) AS c FROM store_day_variance_case_handoffs h LEFT JOIN store_day_variance_cases c ON c.id = h.case_id LEFT JOIN users sender ON sender.id = h.from_user_id LEFT JOIN users recipient ON recipient.id = h.to_user_id WHERE c.id IS NULL OR sender.id IS NULL OR recipient.id IS NULL')->getRow('c');
+        if ($orphanEvidence + $orphanHandoffs > 0) {
+            CLI::write('[FAIL] orphaned variance evidence or handoff records: ' . ($orphanEvidence + $orphanHandoffs), 'red');
+            $errors++;
+        } else {
+            CLI::write('[OK] variance evidence and handoffs have valid ownership', 'green');
+        }
+
         CLI::newLine();
         CLI::write("Warnings: {$warnings}", $warnings > 0 ? 'light_yellow' : 'green');
         CLI::write("Errors: {$errors}", $errors > 0 ? 'red' : 'green');

@@ -39,6 +39,8 @@ class IbemsSmoke extends BaseCommand
             'store_day_sessions',
             'store_day_variance_cases',
             'store_day_variance_case_events',
+            'store_day_variance_case_attachments',
+            'store_day_variance_case_handoffs',
             'balances',
             'products',
             'transactions',

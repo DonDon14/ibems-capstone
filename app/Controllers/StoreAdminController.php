@@ -204,4 +204,8 @@ class StoreAdminController extends Controller
     {
         return (new StoreOversightService())->reviewStoreDayVariance($this->request, $this->response, $sessionId);
     }
+
+    public function uploadVarianceCaseAttachment(int $caseId) { return (new StoreOversightService())->uploadVarianceCaseAttachment($this->request, $this->response, $caseId); }
+    public function downloadVarianceCaseAttachment(int $attachmentId) { return (new StoreOversightService())->downloadVarianceCaseAttachment($this->response, $attachmentId); }
+    public function handoffVarianceCase(int $caseId) { return (new StoreOversightService())->handoffVarianceCase($this->request, $this->response, $caseId); }
 }

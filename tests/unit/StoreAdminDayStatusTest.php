@@ -110,4 +110,21 @@ final class StoreAdminDayStatusTest extends CIUnitTestCase
         $this->assertStringContainsString('function sdCaseSummary(session)', $script);
         $this->assertStringContainsString('Eligible independent reviewers:', $script);
     }
+
+    public function testVarianceEvidenceIsPrivateAndHandoffsStayStoreScoped(): void
+    {
+        $service = (string) file_get_contents(APPPATH . 'Services/StoreOversightService.php');
+        $routes = (string) file_get_contents(APPPATH . 'Config/Routes.php');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-store-details.js');
+
+        $this->assertStringContainsString("WRITEPATH . 'private/variance-evidence/'", $service);
+        $this->assertStringContainsString("['application/pdf' => 'pdf', 'image/jpeg' => 'jpg', 'image/png' => 'png']", $service);
+        $this->assertStringContainsString("5 * 1024 * 1024", $service);
+        $this->assertStringContainsString("hash_equals", $service);
+        $this->assertStringContainsString('accessibleVarianceCase', $service);
+        $this->assertStringContainsString('variance-cases/(:num)/attachments', $routes);
+        $this->assertStringContainsString('variance-cases/(:num)/handoff', $routes);
+        $this->assertStringContainsString('variance-evidence-form', $script);
+        $this->assertStringContainsString('variance-handoff-form', $script);
+    }
 }

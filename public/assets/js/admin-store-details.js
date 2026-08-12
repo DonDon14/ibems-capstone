@@ -91,14 +91,49 @@ function sdCaseSummary(session) {
         </li>
     `).join("");
     const eligible = Array.isArray(session.eligible_reviewers) ? session.eligible_reviewers : [];
+    const attachments = Array.isArray(varianceCase.attachments) ? varianceCase.attachments : [];
+    const handoffs = Array.isArray(varianceCase.handoffs) ? varianceCase.handoffs : [];
+    const portalPrefix = window.location.pathname.includes("/store-admin/") ? "/store-admin" : "/admin";
     return `
         <details class="variance-case">
             <summary>Case ${sdEscape(varianceCase.case_ref || "-")} · ${sdEscape(String(varianceCase.status || "open").replace(/_/g, " "))}</summary>
             <div class="variance-note">Owner: ${sdEscape(varianceCase.owner_name || "Unassigned")}</div>
             ${eligible.length > 0 ? `<div class="variance-note">Eligible independent reviewers: ${eligible.map((reviewer) => sdEscape(reviewer.name || reviewer.email || "Reviewer")).join(", ")}</div>` : ""}
             ${eventRows ? `<ol class="variance-case-timeline">${eventRows}</ol>` : ""}
+            ${handoffs.map((handoff) => `<div class="variance-note">Handoff: ${sdEscape(handoff.from_name || "-")} → ${sdEscape(handoff.to_name || "-")} (${sdEscape(handoff.status || "pending")})</div>`).join("")}
+            ${attachments.length ? `<ul class="variance-case-files">${attachments.map((attachment) => `<li><a href="${portalPrefix}/variance-case-attachments/${Number(attachment.id)}">${sdEscape(attachment.original_name)}</a> · ${sdEscape(attachment.uploaded_by_name || "-")}</li>`).join("")}</ul>` : `<div class="variance-note">No evidence files attached.</div>`}
+            <form class="variance-evidence-form" data-case-id="${Number(varianceCase.id || 0)}">
+                <input type="file" name="evidence_file" accept="application/pdf,image/jpeg,image/png" required aria-label="Evidence file">
+                <input type="text" name="description" maxlength="255" placeholder="Evidence description" aria-label="Evidence description">
+                <button type="submit" class="secondary-btn btn-sm">Attach evidence</button>
+            </form>
+            ${eligible.length ? `<form class="variance-handoff-form" data-case-id="${Number(varianceCase.id || 0)}">
+                <select name="to_user_id" required aria-label="Handoff reviewer"><option value="">Select reviewer</option>${eligible.map((reviewer) => `<option value="${Number(reviewer.id)}">${sdEscape(reviewer.name || reviewer.email)}</option>`).join("")}</select>
+                <input type="text" name="note" maxlength="255" required placeholder="Handoff note" aria-label="Handoff note">
+                <button type="submit" class="secondary-btn btn-sm">Send handoff</button>
+            </form>` : ""}
         </details>
     `;
+}
+
+async function sdSubmitCaseForm(form, kind) {
+    const caseId = Number(form.getAttribute("data-case-id") || 0);
+    if (!caseId) return;
+    const prefix = window.location.pathname.includes("/store-admin/") ? "/store-admin" : "/admin";
+    const options = { method: "POST" };
+    if (kind === "attachments") options.body = new FormData(form);
+    else {
+        const payload = Object.fromEntries(new FormData(form).entries());
+        options.headers = { "Content-Type": "application/json" };
+        options.body = JSON.stringify(payload);
+    }
+    const response = await fetch(`${prefix}/variance-cases/${caseId}/${kind}`, options);
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.status !== "success") {
+        await window.IbemsDialog.alert(data.message || "Case update failed.", { title: "Case not updated", tone: "danger" });
+        return;
+    }
+    await loadStoreDetails();
 }
 
 function sdRenderDaySession(session) {
@@ -373,6 +408,14 @@ document.addEventListener("click", (event) => {
     if (!button) return;
     event.preventDefault();
     sdReviewVariance(button.getAttribute("data-session-id"), button.getAttribute("data-variance-action"));
+});
+
+document.addEventListener("submit", (event) => {
+    const evidenceForm = event.target.closest(".variance-evidence-form");
+    const handoffForm = event.target.closest(".variance-handoff-form");
+    if (!evidenceForm && !handoffForm) return;
+    event.preventDefault();
+    sdSubmitCaseForm(evidenceForm || handoffForm, evidenceForm ? "attachments" : "handoff");
 });
 
 document.getElementById("sd-session-filter")?.addEventListener("change", sdRenderSessionHistory);
