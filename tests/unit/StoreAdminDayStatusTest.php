@@ -114,6 +114,21 @@ final class StoreAdminDayStatusTest extends CIUnitTestCase
         $this->assertStringContainsString('$willBeActive', $source);
     }
 
+    public function testStoreAdminDashboardUsesSharedPresentationConventions(): void
+    {
+        $view = (string) file_get_contents(APPPATH . 'Views/store-admin/dashboard.php');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/store-admin-dashboard.js');
+        $styles = (string) file_get_contents(FCPATH . 'assets/css/admin-overview.css');
+
+        $this->assertStringContainsString("view('components/page_header'", $view);
+        $this->assertStringContainsString("view('components/stat_card'", $view);
+        $this->assertStringContainsString("view('components/data_state'", $view);
+        $this->assertStringContainsString('store-admin-panel', $view);
+        $this->assertStringContainsString('function sadDataState(', $script);
+        $this->assertStringContainsString('No pending variance reviews', $script);
+        $this->assertStringContainsString('.store-admin-store-item:focus-visible', $styles);
+    }
+
     public function testVarianceReviewUsesDurableCasesAndShowsIndependentReviewers(): void
     {
         $service = (string) file_get_contents(APPPATH . 'Services/StoreDayVarianceCaseService.php');

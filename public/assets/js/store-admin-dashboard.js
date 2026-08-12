@@ -64,13 +64,27 @@ function sadSetText(id, value) {
     if (el) el.textContent = value;
 }
 
+function sadDataState(type, message, detail = "") {
+    const safeType = ["loading", "empty", "error", "success"].includes(type) ? type : "loading";
+    const icons = {
+        loading: "bi bi-arrow-repeat",
+        empty: "bi bi-inbox",
+        error: "bi bi-exclamation-circle",
+        success: "bi bi-check-circle",
+    };
+    return `<div class="data-state data-state--${safeType}" role="${safeType === "error" ? "alert" : "status"}" aria-live="polite">
+        <i class="${icons[safeType]}" aria-hidden="true"></i>
+        <div><strong>${sadEscape(message)}</strong>${detail ? `<small>${sadEscape(detail)}</small>` : ""}</div>
+    </div>`;
+}
+
 function sadRenderStores(stores) {
     const wrap = document.getElementById("sad-store-list");
     const root = sadRoot();
     const detailPrefix = (root?.getAttribute("data-store-detail-prefix") || "/store-admin/stores").replace(/\/$/, "");
     const rows = Array.isArray(stores) ? stores : [];
     if (rows.length === 0) {
-        wrap.innerHTML = '<div class="mini-bar-empty">No stores assigned yet.</div>';
+        wrap.innerHTML = sadDataState("empty", "No stores assigned", "Ask an Administrator to assign this supervisor to a store.");
         return;
     }
 
@@ -98,7 +112,7 @@ function sadRenderReviews(reviews) {
     const wrap = document.getElementById("sad-pending-reviews-list");
     const rows = Array.isArray(reviews) ? reviews : [];
     if (rows.length === 0) {
-        wrap.innerHTML = '<div class="mini-bar-empty">No pending variance reviews.</div>';
+        wrap.innerHTML = sadDataState("success", "No pending variance reviews", "All assigned store-day variances are currently cleared.");
         return;
     }
 
@@ -145,8 +159,8 @@ async function sadLoadDashboard() {
     const response = await fetch(root.getAttribute("data-dashboard-url") || "/store-admin/dashboard/data");
     const data = await response.json().catch(() => ({}));
     if (!response.ok || data.status !== "success") {
-        sadRenderReviews([]);
-        sadRenderStores([]);
+        document.getElementById("sad-pending-reviews-list").innerHTML = sadDataState("error", "Variance reviews could not be loaded", "Refresh the page or check the server connection.");
+        document.getElementById("sad-store-list").innerHTML = sadDataState("error", "Assigned stores could not be loaded", "Refresh the page or check the server connection.");
         return;
     }
 
@@ -155,7 +169,7 @@ async function sadLoadDashboard() {
     sadSetText("sad-open-days", String(summary.open_day_count || 0));
     sadSetText("sad-pending-reviews", String(summary.pending_review_count || 0));
     sadSetText("sad-today-sales", sadMoney(summary.today_sales_total || 0));
-    sadSetText("sad-shortage-total", `Shortage ${sadMoney(summary.pending_shortage_total || 0)}`);
+    sadSetText("sad-shortage-total", `Shortage exposure: ${sadMoney(summary.pending_shortage_total || 0)}`);
     sadRenderReviews(data.pending_reviews || []);
     sadRenderStores(data.stores || []);
 }

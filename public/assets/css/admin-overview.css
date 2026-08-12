@@ -1096,7 +1096,7 @@
 }
 
 .store-admin-dashboard {
-    gap: 18px;
+    gap: 20px;
 }
 
 .store-admin-summary {
@@ -1106,6 +1106,13 @@
 .store-admin-grid {
     align-items: start;
     grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.75fr);
+    gap: 16px;
+}
+
+.store-admin-panel {
+    padding: 18px;
+    overflow: visible;
+    min-height: 190px;
 }
 
 .store-admin-section-head {
@@ -1113,11 +1120,29 @@
     align-items: center;
     justify-content: space-between;
     gap: 12px;
-    margin-bottom: 12px;
+    margin-bottom: 16px;
+    padding-bottom: 14px;
+    border-bottom: 1px solid #e2e8f0;
 }
 
 .store-admin-section-head h4 {
     margin: 0;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    color: #0b3f73;
+    font-size: 1rem;
+}
+
+.store-admin-section-head h4 i {
+    color: #2563eb;
+}
+
+.store-admin-section-head p {
+    margin: 5px 0 0;
+    color: #64748b;
+    font-size: 0.8rem;
+    line-height: 1.4;
 }
 
 .store-admin-section-head span,
@@ -1128,16 +1153,40 @@
     text-decoration: none;
 }
 
+.store-admin-section-head .secondary-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    white-space: nowrap;
+}
+
+.store-admin-exposure {
+    border: 1px solid #fed7aa;
+    border-radius: 999px;
+    background: #fff7ed;
+    color: #9a3412 !important;
+    padding: 6px 10px;
+}
+
 .store-admin-review-list,
 .store-admin-store-list {
     display: grid;
     gap: 10px;
+    min-width: 0;
+}
+
+.store-admin-review-list > .data-state,
+.store-admin-store-list > .data-state {
+    min-height: 92px;
+    border: 1px dashed #cbd5e1;
+    border-radius: 10px;
+    background: #f8fafc;
 }
 
 .store-admin-review-item,
 .store-admin-store-item {
     border: 1px solid #d8e2ee;
-    border-radius: 8px;
+    border-radius: 10px;
     background: #fff;
     padding: 12px;
 }
@@ -1177,6 +1226,12 @@
 .store-admin-store-item:hover {
     border-color: #9fb9d4;
     background: #f8fbff;
+}
+
+.store-admin-store-item:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, 0.25);
+    outline-offset: 2px;
+    border-color: #2563eb;
 }
 
 .store-admin-store-metrics {
