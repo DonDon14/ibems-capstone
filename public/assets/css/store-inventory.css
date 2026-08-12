@@ -434,14 +434,16 @@
 .create-product-layout {
     overflow-y: auto;
     display: grid;
-    grid-template-columns: 1.25fr 0.85fr;
-    gap: 14px 18px;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
 }
 
 .create-product-section {
-    border: 0;
-    padding: 0;
-    background: transparent;
+    min-width: 0;
+    border: 1px solid #dbe5f0;
+    border-radius: 14px;
+    padding: 14px;
+    background: #fff;
 }
 
 .create-product-section h5 {
@@ -527,14 +529,21 @@
 
 .section-product-info {
     grid-column: 1;
+    grid-row: span 2;
 }
 
 .section-media {
     grid-column: 2;
 }
 
-.section-pricing,
-.section-inventory,
+.section-pricing {
+    grid-column: 1;
+}
+
+.section-inventory {
+    grid-column: 2;
+}
+
 .section-review,
 .section-actions {
     grid-column: 1 / -1;
@@ -640,7 +649,7 @@
  * scoped and specific enough to win over the shared `body .inv-modal` rules.
  */
 body.ibems-modern #inventory-product-modal .inv-modal-card {
-    width: min(980px, 100%);
+    width: min(1080px, 100%);
     max-height: min(90vh, 860px);
     display: grid;
     grid-template-rows: auto minmax(0, 1fr) auto;
@@ -651,7 +660,7 @@ body.ibems-modern #inventory-product-modal .inv-modal-card {
 body.ibems-modern #inventory-product-modal .create-product-layout {
     min-width: 0;
     min-height: 0;
-    padding-right: 10px;
+    padding: 2px 10px 12px 2px;
     overflow-x: hidden;
     overflow-y: auto;
     scrollbar-gutter: stable;

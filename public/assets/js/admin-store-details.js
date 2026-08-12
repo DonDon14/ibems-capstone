@@ -172,14 +172,22 @@ function sdRenderDaySession(session) {
     const isStaleOpen = !isClosed && String(session.business_date || "") < new Date().toLocaleDateString("en-CA");
     const staleResolution = isStaleOpen ? `
         <form class="variance-evidence-form stale-day-resolution-form" data-stale-session-id="${Number(session.id || 0)}">
-            <div class="variance-note"><strong>Previous day still open.</strong> Enter the independently counted balances. The original business date and opener will be preserved.</div>
-            <div class="variance-grid">
-                <label><span>Counted Cash</span><input type="number" name="counted_cash" min="0" step="0.01" required></label>
-                <label><span>Counted E-Cash</span><input type="number" name="counted_ecash" min="0" step="0.01" required></label>
+            <div class="stale-day-intro">
+                <span class="stale-day-icon" aria-hidden="true"><i class="bi bi-calendar-x"></i></span>
+                <div>
+                    <strong>Previous day still open</strong>
+                    <p>Enter independently counted balances. The original business date and opener will be preserved.</p>
+                </div>
             </div>
-            <label><span>Resolution Reason</span><textarea name="reason" rows="3" required placeholder="Explain why the day remained open and how the balances were counted"></textarea></label>
-            <div class="variance-note">If the count differs from the system expectation, a variance case will open for a different reviewer.</div>
-            <button type="submit" class="danger-btn btn-sm">Resolve Previous Day</button>
+            <div class="stale-day-fields">
+                <label><span>Counted Cash</span><input type="number" name="counted_cash" min="0" step="0.01" placeholder="PHP 0.00" required></label>
+                <label><span>Counted E-Cash</span><input type="number" name="counted_ecash" min="0" step="0.01" placeholder="PHP 0.00" required></label>
+                <label class="stale-day-reason"><span>Resolution Reason</span><textarea name="reason" rows="3" required placeholder="Explain why the day remained open and how the balances were independently counted"></textarea></label>
+            </div>
+            <div class="stale-day-footer">
+                <p><i class="bi bi-shield-check" aria-hidden="true"></i> A difference from the system expectation opens a variance case for another reviewer.</p>
+                <button type="submit" class="danger-btn">Resolve Previous Day</button>
+            </div>
         </form>
     ` : "";
     const reviewActions = canReview ? `

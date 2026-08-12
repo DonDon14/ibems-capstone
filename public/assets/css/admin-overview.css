@@ -1017,9 +1017,107 @@
     padding: 6px 9px;
 }
 
+.stale-day-resolution-form {
+    grid-template-columns: 1fr;
+    gap: 14px;
+    margin-top: 14px;
+    padding: 16px;
+    border: 1px solid #fed7aa;
+    border-radius: 12px;
+    background: linear-gradient(180deg, #fffdf7 0%, #fffaf0 100%);
+}
+
+.stale-day-intro {
+    display: flex;
+    align-items: flex-start;
+    gap: 11px;
+}
+
+.stale-day-icon {
+    display: grid;
+    width: 36px;
+    height: 36px;
+    flex: 0 0 36px;
+    place-items: center;
+    border-radius: 10px;
+    background: #ffedd5;
+    color: #c2410c;
+}
+
+.stale-day-intro strong {
+    display: block;
+    color: #9a3412;
+    font-size: 0.9rem;
+}
+
+.stale-day-intro p,
+.stale-day-footer p {
+    margin: 3px 0 0;
+    color: #64748b;
+    font-size: 0.8rem;
+    line-height: 1.45;
+}
+
+.stale-day-fields {
+    display: grid;
+    grid-template-columns: minmax(130px, 0.8fr) minmax(130px, 0.8fr) minmax(260px, 1.6fr);
+    gap: 12px;
+    align-items: start;
+}
+
+.stale-day-fields label {
+    display: grid;
+    min-width: 0;
+    gap: 6px;
+}
+
+.stale-day-fields label > span {
+    color: #475569;
+    font-size: 0.76rem;
+    font-weight: 800;
+}
+
+.stale-day-fields :is(input, textarea) {
+    width: 100%;
+    min-width: 0;
+    min-height: 42px;
+    border: 1px solid #cbd5e1;
+    border-radius: 9px;
+    background: #fff;
+    padding: 9px 11px;
+    resize: vertical;
+}
+
+.stale-day-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding-top: 12px;
+    border-top: 1px solid #fed7aa;
+}
+
+.stale-day-footer p {
+    margin: 0;
+    max-width: 520px;
+}
+
+.stale-day-footer p i {
+    margin-right: 5px;
+    color: #0369a1;
+}
+
+.stale-day-footer button {
+    flex: 0 0 auto;
+}
+
 @media (max-width: 760px) {
     .variance-evidence-form,
     .variance-handoff-form { grid-template-columns: 1fr; }
+
+    .stale-day-fields { grid-template-columns: 1fr; }
+    .stale-day-footer { align-items: stretch; flex-direction: column; }
+    .stale-day-footer button { width: 100%; }
 }
 
 .store-day-history-head {
