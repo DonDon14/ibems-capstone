@@ -99,7 +99,7 @@ function sadRenderStores(stores) {
                 </div>
                 <div class="store-admin-store-metrics">
                     <span>${sadEscape(sadMoney(store.today_sales_total || 0))}</span>
-                    <small>${Number(store.today_txn_count || 0)} txns today</small>
+                    <small>${Number(store.today_txn_count || 0)} transaction${Number(store.today_txn_count || 0) === 1 ? "" : "s"} today</small>
                     <small>${sadEscape(dayStatus)}</small>
                     ${reviewStatus !== "not_required" ? `<small class="text-warning">${sadEscape(sadReviewLabel(reviewStatus))}</small>` : ""}
                 </div>

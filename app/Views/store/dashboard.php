@@ -180,7 +180,7 @@
                         <div class="stack-item">
                             <div class="stack-item-head">
                                 <strong><?= esc($paymentLabel($payment['method'] ?? 'Unknown')) ?></strong>
-                                <span><?= (int) ($payment['transactions'] ?? 0) ?> txns</span>
+                                <span><?= (int) ($payment['transactions'] ?? 0) ?> transaction<?= (int) ($payment['transactions'] ?? 0) === 1 ? '' : 's' ?></span>
                             </div>
                             <div class="stack-meta"><?= esc($money($payment['sales'] ?? 0)) ?></div>
                         </div>

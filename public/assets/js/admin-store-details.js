@@ -26,6 +26,10 @@ function sdInitials(text) {
         .join("") || "PR";
 }
 
+function sdIdentifierLabel(value) {
+    return window.IbemsFormat?.identifierLabel(value) || String(value || "").replace(/[_-]+/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 function sdDataState(type, message, colspan = 0) {
     const safeType = ["loading", "empty", "error", "success"].includes(type) ? type : "loading";
     const icons = {
@@ -334,7 +338,7 @@ function sdRenderOfficers(officers) {
         <div class="stack-item">
             <div class="stack-item-head">
                 <strong>${sdEscape(row.name || "No assigned officer")}</strong>
-                <span>${sdEscape(row.role || "Officer")}</span>
+                <span>${sdEscape(sdIdentifierLabel(row.role || "Officer"))}</span>
             </div>
             <div class="stack-meta">${sdEscape(row.email || "-")}</div>
         </div>

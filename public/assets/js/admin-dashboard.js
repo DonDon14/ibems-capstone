@@ -215,7 +215,7 @@ function adRenderPaymentBreakdown(rows) {
                     <span>${adEscape(adMoney(sales))}</span>
                 </div>
                 <div class="admin-payment-meta">
-                    <span>${Number(row.transactions || 0)} txn(s)</span>
+                    <span>${Number(row.transactions || 0)} transaction${Number(row.transactions || 0) === 1 ? "" : "s"}</span>
                     <span>${pct}%</span>
                 </div>
                 <div class="admin-payment-track" aria-hidden="true">
@@ -249,7 +249,7 @@ async function adLoadDashboard() {
 
         healthMessageEl.textContent = (data.health && data.health.message) ? data.health.message : "No health data available.";
         healthBreakdownEl.textContent = [
-            `Today Txns: ${Number(summary.today_transactions || 0)}`,
+            `Today Transactions: ${Number(summary.today_transactions || 0)}`,
             `Today Sales: ${adMoney(summary.today_sales || 0)}`,
             `Total Debt: ${adMoney(summary.total_debt || 0)}`,
         ].join(" | ");

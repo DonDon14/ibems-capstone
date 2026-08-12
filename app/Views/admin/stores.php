@@ -63,9 +63,6 @@
                 <label for="store-officer-search">Store Officer</label>
                 <div class="officer-picker-row">
                     <input id="store-officer-search" type="search" placeholder="Optional: type name, email, or employee ID">
-                    <button id="clear-store-officer" type="button" class="field-icon-btn" title="Clear assigned officer">
-                        <i class="bi bi-x-lg"></i>
-                    </button>
                 </div>
                 <input id="store-officer-id" type="hidden">
                 <div id="store-officer-suggestions" class="officer-suggestions is-hidden"></div>
@@ -75,23 +72,29 @@
                 <label for="store-supervisor-search">Store Supervisors</label>
                 <div class="officer-picker-row">
                     <input id="store-supervisor-search" type="search" placeholder="Optional: type name, email, or employee ID">
-                    <button id="clear-store-supervisor-search" type="button" class="field-icon-btn" title="Clear supervisor search">
-                        <i class="bi bi-x-lg"></i>
-                    </button>
                 </div>
                 <div id="store-supervisor-selected" class="supervisor-selected-list"></div>
                 <div id="store-supervisor-suggestions" class="officer-suggestions is-hidden"></div>
                 <small class="field-help">Supervisors can review store-day shortages for this store only.</small>
             </div>
-            <div class="field" id="store-logo-upload-wrap">
-                <label for="store-logo-file">Store Logo</label>
-                <input id="store-logo-file" type="file" accept="image/*">
-                <button id="store-logo-toggle" class="field-toggle-link" type="button">Use URL instead</button>
-            </div>
-            <div class="field is-hidden" id="store-logo-url-wrap">
-                <label for="store-logo-url">Store Logo URL</label>
-                <input id="store-logo-url" type="url" placeholder="https://...">
-                <button id="store-logo-toggle-url" class="field-toggle-link" type="button">Use Upload instead</button>
+            <div class="field store-logo-field">
+                <label for="store-logo-source">Store Logo</label>
+                <div class="store-logo-input-grid">
+                    <select id="store-logo-source" aria-label="Store logo source">
+                        <option value="upload">Upload File</option>
+                        <option value="url">Use Image URL</option>
+                    </select>
+                    <div id="store-logo-upload-wrap">
+                        <input id="store-logo-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+                    </div>
+                    <div class="is-hidden" id="store-logo-url-wrap">
+                        <input id="store-logo-url" type="url" placeholder="https://...">
+                    </div>
+                </div>
+                <div class="store-logo-preview-box">
+                    <img id="store-logo-preview" alt="Store logo preview" class="is-hidden">
+                    <span id="store-logo-preview-empty">No logo preview</span>
+                </div>
             </div>
             <div class="field">
                 <label for="store-active">Status</label>

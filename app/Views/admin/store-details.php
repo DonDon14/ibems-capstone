@@ -21,7 +21,7 @@
         <?= view('components/stat_card', ['title' => 'Products', 'value' => '0', 'valueId' => 'sd-product-count', 'icon' => 'bi bi-box-seam', 'tone' => 'finance']) ?>
         <?= view('components/stat_card', ['title' => 'Total Stock Units', 'value' => '0', 'valueId' => 'sd-stock-units', 'icon' => 'bi bi-boxes', 'tone' => 'warning']) ?>
         <?= view('components/stat_card', ['title' => 'Today Sales', 'value' => 'PHP 0.00', 'valueId' => 'sd-today-sales', 'icon' => 'bi bi-calendar2-check', 'tone' => 'sales']) ?>
-        <?= view('components/stat_card', ['title' => 'Debt Txns Today', 'value' => '0', 'valueId' => 'sd-debt-txns', 'icon' => 'bi bi-credit-card-2-front', 'tone' => 'debt']) ?>
+        <?= view('components/stat_card', ['title' => 'Debt Transactions Today', 'value' => '0', 'valueId' => 'sd-debt-txns', 'icon' => 'bi bi-credit-card-2-front', 'tone' => 'debt']) ?>
         <?= view('components/stat_card', ['title' => 'Active Products', 'value' => '0', 'valueId' => 'sd-active-products', 'icon' => 'bi bi-box-seam', 'tone' => 'users']) ?>
         <?= view('components/stat_card', ['title' => 'Low Stock', 'value' => '0', 'valueId' => 'sd-low-stock', 'icon' => 'bi bi-exclamation-triangle', 'tone' => 'warning']) ?>
     </div>

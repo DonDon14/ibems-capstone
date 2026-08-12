@@ -288,6 +288,43 @@
     grid-column: 1 / -1;
 }
 
+.store-logo-field {
+    grid-column: 1 / -1;
+}
+
+.store-logo-input-grid {
+    display: grid;
+    grid-template-columns: minmax(170px, 0.65fr) minmax(260px, 1.35fr);
+    gap: 10px;
+}
+
+.store-logo-input-grid > :is(div, .ui-select) {
+    min-width: 0;
+}
+
+.store-logo-input-grid input {
+    width: 100%;
+}
+
+.store-logo-preview-box {
+    display: grid;
+    min-height: 112px;
+    place-items: center;
+    overflow: hidden;
+    border: 1px dashed #cbd5e1;
+    border-radius: 12px;
+    background: #f8fafc;
+    color: #64748b;
+    font-size: 0.82rem;
+}
+
+.store-logo-preview-box img {
+    display: none;
+    width: 100%;
+    max-height: 150px;
+    object-fit: contain;
+}
+
 .officer-suggestions {
     position: absolute;
     top: calc(100% + 4px);
@@ -412,4 +449,7 @@
     .store-supervisors-field {
         grid-column: auto;
     }
+
+    .store-logo-field { grid-column: auto; }
+    .store-logo-input-grid { grid-template-columns: 1fr; }
 }

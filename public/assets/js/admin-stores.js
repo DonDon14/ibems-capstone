@@ -4,6 +4,7 @@ let editingStoreId = null;
 let lastOfficerSearchQuery = "";
 let editingCurrentLogoUrl = "";
 let logoInputMode = "upload";
+let storeLogoPreviewObjectUrl = null;
 let selectedSupervisorIds = [];
 const storeShell = document.querySelector(".admin-stores-shell");
 const canManageStores = storeShell?.getAttribute("data-can-manage-stores") === "1";
@@ -139,8 +140,40 @@ function findOfficerById(officerId) {
 }
 
 function toggleLogoSourceUI() {
-    document.getElementById("store-logo-upload-wrap").style.display = logoInputMode === "upload" ? "" : "none";
-    document.getElementById("store-logo-url-wrap").style.display = logoInputMode === "url" ? "" : "none";
+    document.getElementById("store-logo-upload-wrap").classList.toggle("is-hidden", logoInputMode !== "upload");
+    document.getElementById("store-logo-url-wrap").classList.toggle("is-hidden", logoInputMode !== "url");
+    document.getElementById("store-logo-source").value = logoInputMode;
+    updateStoreLogoPreview();
+}
+
+function updateStoreLogoPreview() {
+    const preview = document.getElementById("store-logo-preview");
+    const empty = document.getElementById("store-logo-preview-empty");
+    const file = document.getElementById("store-logo-file").files?.[0] || null;
+    const url = (document.getElementById("store-logo-url").value || "").trim();
+
+    if (storeLogoPreviewObjectUrl) {
+        URL.revokeObjectURL(storeLogoPreviewObjectUrl);
+        storeLogoPreviewObjectUrl = null;
+    }
+
+    let resolved = logoInputMode === "url" ? url : "";
+    if (logoInputMode === "upload" && file) {
+        storeLogoPreviewObjectUrl = URL.createObjectURL(file);
+        resolved = storeLogoPreviewObjectUrl;
+    } else if (logoInputMode === "upload" && editingCurrentLogoUrl) {
+        resolved = editingCurrentLogoUrl;
+    }
+
+    if (resolved) {
+        preview.src = resolved;
+        preview.style.display = "block";
+        empty.style.display = "none";
+    } else {
+        preview.removeAttribute("src");
+        preview.style.display = "none";
+        empty.style.display = "block";
+    }
 }
 
 function renderStoresDataState(type, message) {
@@ -264,6 +297,10 @@ function closeStoreModal() {
     editingStoreId = null;
     editingCurrentLogoUrl = "";
     selectedSupervisorIds = [];
+    if (storeLogoPreviewObjectUrl) {
+        URL.revokeObjectURL(storeLogoPreviewObjectUrl);
+        storeLogoPreviewObjectUrl = null;
+    }
     document.getElementById("store-officer-suggestions").style.display = "none";
     document.getElementById("store-supervisor-suggestions").style.display = "none";
     document.getElementById("store-modal").style.display = "none";
@@ -345,26 +382,17 @@ document.getElementById("store-modal")?.addEventListener("click", (event) => {
     if (event.target.id === "store-modal") closeStoreModal();
 });
 document.getElementById("store-save-btn")?.addEventListener("click", saveStore);
-document.getElementById("store-logo-toggle")?.addEventListener("click", () => {
-    logoInputMode = "url";
+document.getElementById("store-logo-source")?.addEventListener("change", (event) => {
+    logoInputMode = event.target.value === "url" ? "url" : "upload";
     toggleLogoSourceUI();
-    document.getElementById("store-logo-url").focus();
 });
-document.getElementById("store-logo-toggle-url")?.addEventListener("click", () => {
-    logoInputMode = "upload";
-    toggleLogoSourceUI();
-    document.getElementById("store-logo-file").focus();
-});
+document.getElementById("store-logo-file")?.addEventListener("change", updateStoreLogoPreview);
+document.getElementById("store-logo-url")?.addEventListener("input", updateStoreLogoPreview);
 document.getElementById("store-officer-search")?.addEventListener("input", (event) => {
     const query = event.target.value || "";
     lastOfficerSearchQuery = query;
     document.getElementById("store-officer-id").value = "";
     renderOfficerSuggestions(query);
-});
-document.getElementById("clear-store-officer")?.addEventListener("click", () => {
-    document.getElementById("store-officer-search").value = "";
-    document.getElementById("store-officer-id").value = "";
-    document.getElementById("store-officer-suggestions").style.display = "none";
 });
 document.getElementById("store-officer-search")?.addEventListener("focus", (event) => {
     renderOfficerSuggestions(event.target.value || "");
@@ -387,10 +415,6 @@ document.getElementById("store-supervisor-search")?.addEventListener("input", (e
 });
 document.getElementById("store-supervisor-search")?.addEventListener("focus", (event) => {
     renderSupervisorSuggestions(event.target.value || "");
-});
-document.getElementById("clear-store-supervisor-search")?.addEventListener("click", () => {
-    document.getElementById("store-supervisor-search").value = "";
-    document.getElementById("store-supervisor-suggestions").style.display = "none";
 });
 document.getElementById("store-supervisor-suggestions")?.addEventListener("click", (event) => {
     const item = event.target.closest("[data-supervisor-pick]");

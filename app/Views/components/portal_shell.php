@@ -18,7 +18,18 @@ $initials = (string) ($initials ?? 'IB');
 $availableRoles = is_array($availableRoles ?? null) ? $availableRoles : [];
 $navigation = is_array($navigation ?? null) ? $navigation : [];
 $profileImageUrl = trim((string) ($profileImageUrl ?? ''));
-$profileDetail = trim((string) ($profileDetail ?? $role));
+$roleLabels = [
+    'ADMIN' => 'Administrator',
+    'ACCOUNTING_OFFICE' => 'Accounting Office',
+    'STORE_SUPERVISOR' => 'Store Supervisor',
+    'STORE_SYSTEM' => 'Store Officer',
+    'USER' => 'Employee',
+];
+$readableRole = $roleLabels[strtoupper($role)] ?? ucwords(strtolower(str_replace('_', ' ', $role)));
+$profileDetail = trim((string) ($profileDetail ?? $readableRole));
+if ($role !== '' && str_starts_with($profileDetail, $role)) {
+    $profileDetail = $readableRole . substr($profileDetail, strlen($role));
+}
 $ustpLogoUrl = base_url('assets/images/ustp_claveria_logo.jpg');
 ?>
 <!DOCTYPE html>
