@@ -1,6 +1,6 @@
 .pos-shell {
     display: grid;
-    grid-template-columns: 1.7fr 1fr;
+    grid-template-columns: minmax(0, 1.7fr) minmax(340px, 1fr);
     gap: 20px;
     align-items: start;
 }
@@ -470,9 +470,9 @@
     background:
         linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(245, 249, 255, 0.95));
     padding: 10px 12px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    align-items: start;
     gap: 10px;
     box-shadow: 0 10px 20px rgba(15, 23, 42, 0.07);
 }
@@ -541,6 +541,7 @@
 .opening-balance-info strong {
     color: #003366;
     font-size: 1rem;
+    overflow-wrap: anywhere;
 }
 
 .opening-balance-info small {
@@ -551,7 +552,8 @@
 
 .opening-balance-actions {
     display: flex;
-    flex-direction: column;
+    flex-direction: row;
+    flex-wrap: wrap;
     gap: 0.5rem;
     align-items: stretch;
 }
@@ -591,6 +593,7 @@
     display: grid !important;
     align-items: stretch !important;
     gap: 6px !important;
+    min-width: 0;
 }
 
 .scan-code-wrap {
@@ -626,6 +629,7 @@
     height: 42px;
     font-size: 0.95rem;
     color: #334155;
+    min-width: 0;
 }
 
 #scan-code-input {
@@ -702,6 +706,10 @@
 
 .scan-suggestion-item:hover {
     background: #f8fafc;
+}
+
+#scan-qty-input {
+    width: 100%;
 }
 
 .debt-pin-wrap {

@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/store') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/store-pos.css') ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/store-pos.css') ?>?v=20260813c">
 <link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <?= $this->endSection() ?>
