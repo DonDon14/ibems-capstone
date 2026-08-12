@@ -4,6 +4,7 @@ namespace App\Commands;
 
 use CodeIgniter\CLI\BaseCommand;
 use CodeIgniter\CLI\CLI;
+use Config\Authorization;
 
 class IbemsRouteAudit extends BaseCommand
 {
@@ -28,6 +29,7 @@ class IbemsRouteAudit extends BaseCommand
         $errors = 0;
         $warnings = 0;
         $writeCount = 0;
+        $authorization = config(Authorization::class);
 
         CLI::write('IBEMS Route Security Audit', 'yellow');
         CLI::newLine();
@@ -51,16 +53,16 @@ class IbemsRouteAudit extends BaseCommand
             $options = isset($m[4]) ? (string) $m[4] : '';
             $writeCount++;
 
-            $hasRoleFilter = stripos($options, "'filter'") !== false && stripos($options, 'role:') !== false;
             $isWhitelisted = in_array($path, $publicWriteWhitelist, true);
+            $protection = self::inspectAuthorization($options, $authorization);
 
-            if (!$hasRoleFilter && !$isWhitelisted) {
-                CLI::write("[FAIL] Line {$lineNo}: {$verb} {$path} -> {$target} is missing role filter", 'red');
+            if (!$protection['protected'] && !$isWhitelisted) {
+                CLI::write("[FAIL] Line {$lineNo}: {$verb} {$path} -> {$target} {$protection['message']}", 'red');
                 $errors++;
             } elseif ($isWhitelisted) {
                 CLI::write("[OK]   Line {$lineNo}: {$verb} {$path} allowed public auth endpoint", 'green');
             } else {
-                CLI::write("[OK]   Line {$lineNo}: {$verb} {$path} protected by role filter", 'green');
+                CLI::write("[OK]   Line {$lineNo}: {$verb} {$path} protected by {$protection['label']}", 'green');
             }
 
             // Portal boundary hygiene warning (non-blocking).
@@ -96,6 +98,29 @@ class IbemsRouteAudit extends BaseCommand
         }
 
         CLI::write('Route audit passed.', 'green');
+    }
+
+    /** @return array{protected: bool, label: string, message: string} */
+    public static function inspectAuthorization(string $options, Authorization $authorization): array
+    {
+        if (stripos($options, "'filter'") === false && stripos($options, '"filter"') === false) {
+            return ['protected' => false, 'label' => '', 'message' => 'is missing an authorization filter'];
+        }
+
+        if (preg_match('/access:([a-z0-9._-]+)/i', $options, $match)) {
+            $policy = strtolower((string) $match[1]);
+            if ($authorization->rolesFor($policy) === null) {
+                return ['protected' => false, 'label' => '', 'message' => "uses unknown access policy {$policy}"];
+            }
+
+            return ['protected' => true, 'label' => "access policy {$policy}", 'message' => ''];
+        }
+
+        if (preg_match('/role:([A-Z0-9_|,-]+)/i', $options, $match) && trim((string) $match[1]) !== '') {
+            return ['protected' => true, 'label' => 'legacy role filter', 'message' => ''];
+        }
+
+        return ['protected' => false, 'label' => '', 'message' => 'has a filter but no recognized authorization policy'];
     }
 }
 

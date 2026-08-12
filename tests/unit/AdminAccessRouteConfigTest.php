@@ -1,6 +1,7 @@
 <?php
 
 use CodeIgniter\Test\CIUnitTestCase;
+use App\Commands\IbemsRouteAudit;
 use Config\Authorization;
 
 /** @internal */
@@ -140,6 +141,22 @@ final class AdminAccessRouteConfigTest extends CIUnitTestCase
         foreach (array_unique($matches[1]) as $policy) {
             $this->assertNotNull($authorization->rolesFor($policy), "Route uses unknown access policy {$policy}.");
         }
+    }
+
+    public function testRouteAuditRecognizesNamedPoliciesAndRejectsUnknownOnes(): void
+    {
+        $authorization = config(Authorization::class);
+
+        $known = IbemsRouteAudit::inspectAuthorization("['filter' => 'access:store.operate']", $authorization);
+        $unknown = IbemsRouteAudit::inspectAuthorization("['filter' => 'access:not.a.policy']", $authorization);
+        $missing = IbemsRouteAudit::inspectAuthorization('[]', $authorization);
+
+        $this->assertTrue($known['protected']);
+        $this->assertSame('access policy store.operate', $known['label']);
+        $this->assertFalse($unknown['protected']);
+        $this->assertStringContainsString('unknown access policy', $unknown['message']);
+        $this->assertFalse($missing['protected']);
+        $this->assertStringContainsString('missing an authorization filter', $missing['message']);
     }
 
     private function routesFile(): string
