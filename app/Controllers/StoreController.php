@@ -995,6 +995,13 @@ class StoreController extends BaseController
         $openingBalance = (float) ($request['opening_balance'] ?? 0);
         $note = trim((string) ($request['note'] ?? ''));
 
+        if ($note === '') {
+            return $this->response->setStatusCode(422)->setJSON([
+                'status' => 'error',
+                'message' => 'An override reason is required to reset the initial opening balance.',
+            ]);
+        }
+
         if ($openingBalance < 0) {
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',

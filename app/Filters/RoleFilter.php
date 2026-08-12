@@ -2,6 +2,7 @@
 
 namespace App\Filters;
 
+use Config\Authorization;
 use CodeIgniter\HTTP\RequestInterface;
 use CodeIgniter\HTTP\ResponseInterface;
 use CodeIgniter\Filters\FilterInterface;
@@ -58,9 +59,22 @@ class RoleFilter implements FilterInterface
             }
         }
 
-        $allowedRoles = array_map(static fn ($role) => ibems_normalize_role((string) $role), (array) $arguments);
+        $allowedRoles = [];
+        $authorization = config(Authorization::class);
+        $hasUnknownPolicy = false;
+        foreach ((array) $arguments as $argument) {
+            $argument = trim((string) $argument);
+            $policyRoles = $authorization->rolesFor($argument);
+            if ($policyRoles === null) {
+                $hasUnknownPolicy = true;
+                continue;
+            }
 
-        if ($allowedRoles !== [] && !in_array($userRole, $allowedRoles, true)) {
+            $allowedRoles = array_merge($allowedRoles, $policyRoles);
+        }
+        $allowedRoles = array_values(array_unique(array_filter($allowedRoles)));
+
+        if ($hasUnknownPolicy || $allowedRoles === [] || !in_array($userRole, $allowedRoles, true)) {
             if ($this->isDocumentRequest($request)) {
                 return redirect()->to(ibems_role_landing_path($userRole));
             }

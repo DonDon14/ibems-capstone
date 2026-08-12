@@ -15,7 +15,7 @@
     <div id="user-receipt-page-content"></div>
     <p id="user-receipt-page-result" class="stores-result"></p>
     <div class="user-receipt-actions">
-        <a href="<?= site_url('user/history') ?>" class="history-action alt">
+        <a href="<?= site_url('user/history') ?>" class="secondary-btn">
             <i class="bi bi-arrow-left"></i> Back to History
         </a>
         <button id="user-receipt-page-print" type="button" class="primary-btn">

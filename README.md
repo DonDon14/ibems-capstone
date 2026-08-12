@@ -185,6 +185,17 @@ npm run watch:tailwind
 
 ## Useful Checks
 
+Generate the non-blocking repository convention report:
+
+```powershell
+php spark ibems:conventions
+```
+
+The report checks authenticated view structure, source-level modal and control
+accessibility, ownership of shared CSS selectors, inline scripts/styles, and
+oversized controllers, views, and browser scripts. It does not modify files or
+fail the build; documented legacy exceptions remain visible or allowlisted.
+
 Run the complete automated test suite:
 
 ```powershell

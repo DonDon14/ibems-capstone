@@ -3,6 +3,8 @@ $title = trim((string) ($title ?? ''));
 $description = trim((string) ($description ?? ''));
 $eyebrow = trim((string) ($eyebrow ?? ''));
 $icon = trim((string) ($icon ?? ''));
+$titleId = trim((string) ($titleId ?? ''));
+$descriptionId = trim((string) ($descriptionId ?? ''));
 $actions = $actions ?? null;
 ?>
 <header class="page-header">
@@ -15,9 +17,9 @@ $actions = $actions ?? null;
                 <span class="page-header-icon" aria-hidden="true"><i class="<?= esc($icon) ?>"></i></span>
             <?php endif; ?>
             <div>
-                <h1><?= esc($title) ?></h1>
+                <h1<?= $titleId !== '' ? ' id="' . esc($titleId) . '"' : '' ?>><?= esc($title) ?></h1>
                 <?php if ($description !== ''): ?>
-                    <p><?= esc($description) ?></p>
+                    <p<?= $descriptionId !== '' ? ' id="' . esc($descriptionId) . '"' : '' ?>><?= esc($description) ?></p>
                 <?php endif; ?>
             </div>
         </div>

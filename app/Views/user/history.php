@@ -7,10 +7,12 @@
 
 <?= $this->section('content') ?>
 <section class="dashboard-shell">
-    <div class="dashboard-title">
-        <h3>Transaction History</h3>
-        <p>Your purchase records across stores.</p>
-    </div>
+    <?= view('components/page_header', [
+        'eyebrow' => 'Personal records',
+        'title' => 'Transaction history',
+        'description' => 'Your purchase records across stores.',
+        'icon' => 'bi bi-clock-history',
+    ]) ?>
 
     <div class="dashboard-grid">
         <?= view('components/stat_card', ['title' => 'Credit Limit', 'value' => 'PHP 0.00', 'valueId' => 'uh-credit-limit', 'icon' => 'bi bi-wallet2', 'tone' => 'finance']) ?>
@@ -37,7 +39,7 @@
             <input id="uh-date-to" type="date">
         </div>
         <button id="uh-apply" class="primary-btn" type="button">Apply</button>
-        <button id="uh-clear" class="history-action alt" type="button">Clear</button>
+        <button id="uh-clear" class="secondary-btn" type="button">Clear</button>
     </div>
 
     <div class="table-standard-wrap">
@@ -53,7 +55,7 @@
                 </tr>
             </thead>
             <tbody id="uh-body">
-                <tr><td colspan="6">Loading transactions...</td></tr>
+                <?= view('components/data_state', ['tag' => 'tr', 'colspan' => 6, 'type' => 'loading', 'message' => 'Loading transactions...']) ?>
             </tbody>
         </table>
     </div>
@@ -78,16 +80,16 @@
                 </tr>
             </thead>
             <tbody id="uh-cashbook-body">
-                <tr><td colspan="8">Loading cashbook...</td></tr>
+                <?= view('components/data_state', ['tag' => 'tr', 'colspan' => 8, 'type' => 'loading', 'message' => 'Loading cashbook...']) ?>
             </tbody>
         </table>
     </div>
 </section>
 
-<div id="uh-receipt-modal" class="receipt-modal is-hidden">
+<div id="uh-receipt-modal" class="receipt-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="uh-receipt-title">
     <div class="receipt-card" tabindex="-1">
         <div class="receipt-head">
-            <h3>Transaction Receipt</h3>
+            <h3 id="uh-receipt-title">Transaction Receipt</h3>
             <button id="uh-receipt-close" type="button" class="receipt-close" aria-label="Close receipt">&times;</button>
         </div>
         <div id="uh-receipt-content" aria-live="polite"></div>

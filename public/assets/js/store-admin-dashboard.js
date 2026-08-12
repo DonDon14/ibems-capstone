@@ -127,10 +127,10 @@ function sadRenderReviews(reviews) {
                 </div>
                 <div class="variance-note">Closed ${sadEscape(sadDateTime(row.closed_at))}. Shortage exposure: ${sadEscape(sadMoney(row.shortage_amount || 0))}.</div>
                 <div class="variance-actions">
-                    ${varianceStatus === "shortage" ? `<button type="button" class="admin-action-btn danger" data-variance-action="approve_shortage" data-session-id="${Number(row.id || 0)}">Approve Shortage</button>` : ""}
-                    <button type="button" class="admin-action-btn" data-variance-action="waive" data-session-id="${Number(row.id || 0)}">Waive</button>
-                    <button type="button" class="admin-action-btn" data-variance-action="corrected" data-session-id="${Number(row.id || 0)}">Corrected</button>
-                    <button type="button" class="admin-action-btn" data-variance-action="needs_investigation" data-session-id="${Number(row.id || 0)}">Investigate</button>
+                    ${varianceStatus === "shortage" ? `<button type="button" class="danger-btn btn-sm" data-variance-action="approve_shortage" data-session-id="${Number(row.id || 0)}">Approve Shortage</button>` : ""}
+                    <button type="button" class="secondary-btn btn-sm" data-variance-action="waive" data-session-id="${Number(row.id || 0)}">Waive</button>
+                    <button type="button" class="secondary-btn btn-sm" data-variance-action="corrected" data-session-id="${Number(row.id || 0)}">Corrected</button>
+                    <button type="button" class="secondary-btn btn-sm" data-variance-action="needs_investigation" data-session-id="${Number(row.id || 0)}">Investigate</button>
                 </div>
             </div>
         `;

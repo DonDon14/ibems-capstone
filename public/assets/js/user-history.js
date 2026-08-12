@@ -31,6 +31,18 @@ function uhEntryLabel(value) {
     return key.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
+function uhDataState(type, message, colspan) {
+    const safeType = ["loading", "empty", "error", "success"].includes(type) ? type : "loading";
+    const icons = {
+        loading: "bi bi-arrow-repeat",
+        empty: "bi bi-inbox",
+        error: "bi bi-exclamation-circle",
+        success: "bi bi-check-circle",
+    };
+    const role = safeType === "error" ? "alert" : "status";
+    return `<tr class="data-state-row"><td colspan="${Number(colspan)}"><div class="data-state data-state--${safeType}" role="${role}" aria-live="polite"><i class="${icons[safeType]}" aria-hidden="true"></i><div><strong>${uhEscape(message)}</strong></div></div></td></tr>`;
+}
+
 function uhApplyDebtStatus(summary) {
     const tone = String(summary.debt_status_tone || "info");
     const card = document.getElementById("uh-debt-status-card");
@@ -54,8 +66,18 @@ function uhApplyDebtStatus(summary) {
 }
 
 async function loadUserSummaryCards() {
-    const response = await fetch("/user/summary");
-    const data = await response.json();
+    let data;
+    try {
+        const response = await fetch("/user/summary");
+        data = await response.json();
+    } catch (error) {
+        uhApplyDebtStatus({
+            debt_status_tone: "danger",
+            debt_status_label: "Unavailable",
+            debt_status_message: "Unable to load your debt status right now.",
+        });
+        return;
+    }
     if (!data || data.status !== "success" || !data.summary) {
         uhApplyDebtStatus({
             debt_status_tone: "danger",
@@ -80,17 +102,25 @@ async function loadUserTransactions() {
     if (from) params.set("date_from", from);
     if (to) params.set("date_to", to);
 
-    const response = await fetch(`/user/transactions?${params.toString()}`);
-    const data = await response.json();
     const body = document.getElementById("uh-body");
+    body.innerHTML = uhDataState("loading", "Loading transactions...", 6);
+
+    let data;
+    try {
+        const response = await fetch(`/user/transactions?${params.toString()}`);
+        data = await response.json();
+    } catch (error) {
+        body.innerHTML = uhDataState("error", error.message || "Unable to load transactions.", 6);
+        return;
+    }
 
     if (!data || data.status !== "success" || !Array.isArray(data.data)) {
-        body.innerHTML = '<tr><td colspan="6">Unable to load transactions.</td></tr>';
+        body.innerHTML = uhDataState("error", data?.message || "Unable to load transactions.", 6);
         return;
     }
 
     if (data.data.length === 0) {
-        body.innerHTML = '<tr><td colspan="6">No transactions found.</td></tr>';
+        body.innerHTML = uhDataState("empty", "No transactions found.", 6);
         return;
     }
 
@@ -102,7 +132,7 @@ async function loadUserTransactions() {
             <td>${uhEscape(uhMoney(row.amount))}</td>
             <td>${uhEscape(row.client_txn_id || `TXN-${row.id}`)}</td>
             <td>
-                <button class="history-action" type="button" data-receipt-id="${Number(row.id)}">
+                <button class="secondary-btn btn-sm" type="button" data-receipt-id="${Number(row.id)}">
                     <i class="bi bi-receipt"></i> Receipt
                 </button>
             </td>
@@ -117,17 +147,25 @@ async function loadUserCashbook() {
     if (from) params.set("date_from", from);
     if (to) params.set("date_to", to);
 
-    const response = await fetch(`/user/cashbook?${params.toString()}`);
-    const data = await response.json();
     const body = document.getElementById("uh-cashbook-body");
+    body.innerHTML = uhDataState("loading", "Loading cashbook...", 8);
+
+    let data;
+    try {
+        const response = await fetch(`/user/cashbook?${params.toString()}`);
+        data = await response.json();
+    } catch (error) {
+        body.innerHTML = uhDataState("error", error.message || "Unable to load cashbook.", 8);
+        return;
+    }
 
     if (!data || data.status !== "success" || !Array.isArray(data.data)) {
-        body.innerHTML = '<tr><td colspan="8">Unable to load cashbook.</td></tr>';
+        body.innerHTML = uhDataState("error", data?.message || "Unable to load cashbook.", 8);
         return;
     }
 
     if (data.data.length === 0) {
-        body.innerHTML = '<tr><td colspan="8">No debt cashbook entries found.</td></tr>';
+        body.innerHTML = uhDataState("empty", "No debt cashbook entries found.", 8);
         return;
     }
 
@@ -212,9 +250,11 @@ function printReceipt() {
 }
 
 async function loadUserHistoryAll() {
-    await loadUserSummaryCards();
-    await loadUserTransactions();
-    await loadUserCashbook();
+    await Promise.allSettled([
+        loadUserSummaryCards(),
+        loadUserTransactions(),
+        loadUserCashbook(),
+    ]);
 }
 
 document.getElementById("uh-apply").addEventListener("click", loadUserHistoryAll);

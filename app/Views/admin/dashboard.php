@@ -58,13 +58,13 @@
         <article class="dash-panel">
             <h4><i class="bi bi-exclamation-triangle"></i> Operational Alerts</h4>
             <div id="ad-alerts-list" class="admin-alert-list">
-                <div class="admin-empty-state">Loading alerts...</div>
+                <?= view('components/data_state', ['type' => 'loading', 'message' => 'Loading alerts...']) ?>
             </div>
         </article>
         <article class="dash-panel">
             <h4><i class="bi bi-credit-card-2-front"></i> Payment Breakdown (Last 7 Days)</h4>
             <div id="ad-payment-breakdown" class="admin-payment-list">
-                <div class="admin-empty-state">Loading payment breakdown...</div>
+                <?= view('components/data_state', ['type' => 'loading', 'message' => 'Loading payment breakdown...']) ?>
             </div>
         </article>
     </div>
@@ -96,7 +96,12 @@
                     </tr>
                 </thead>
                 <tbody id="ad-top-stores-body">
-                    <tr><td colspan="3">Loading top stores...</td></tr>
+                    <?= view('components/data_state', [
+                        'tag' => 'tr',
+                        'colspan' => 3,
+                        'type' => 'loading',
+                        'message' => 'Loading top stores...',
+                    ]) ?>
                 </tbody>
             </table>
         </div>

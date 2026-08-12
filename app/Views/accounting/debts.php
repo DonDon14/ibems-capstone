@@ -50,10 +50,13 @@
     <article class="dash-panel rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
     <div class="acct-filters acct-filters-redesign space-y-3">
         <div class="acct-filters-main flex flex-wrap items-end gap-3">
-            <div class="acct-search-wrap relative min-w-[260px] grow">
-                <i class="bi bi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true"></i>
-                <input id="acct-search" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm text-slate-700 outline-none transition focus:border-blue-300 focus:bg-white" type="search" placeholder="Search name, ID, office...">
-            </div>
+            <label class="field min-w-[260px] grow" for="acct-search">
+                <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Search employees</span>
+                <span class="acct-search-wrap relative block">
+                    <i class="bi bi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true"></i>
+                    <input id="acct-search" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm text-slate-700 outline-none transition focus:border-blue-300 focus:bg-white" type="search" placeholder="Name, ID, or office">
+                </span>
+            </label>
             <label class="toggle-check acct-toggle-inline inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm text-slate-700">
                 <input id="acct-debt-only" class="h-4 w-4" type="checkbox">
                 <span>Debt only</span>
@@ -61,14 +64,14 @@
         </div>
         <div class="acct-filters-actions flex flex-wrap gap-2">
             <div class="action-group action-group-primary">
-                <button id="acct-refresh-btn" class="history-action alt inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="button"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+                <button id="acct-refresh-btn" class="secondary-btn" type="button"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
             </div>
             <div class="action-group action-group-tools flex flex-wrap gap-2">
-                <button id="open-deduction-workflow" class="history-action inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-blue-700" type="button"><i class="bi bi-diagram-3"></i> Deduction Workflow</button>
-                <button id="open-debt-investigations" class="history-action inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="button"><i class="bi bi-shield-check"></i> Investigations</button>
-                <button id="open-settlement-run" class="history-action inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="button"><i class="bi bi-clock-history"></i> Legacy History</button>
+                <button id="open-deduction-workflow" class="primary-btn" type="button"><i class="bi bi-diagram-3"></i> Deduction Workflow</button>
+                <button id="open-debt-investigations" class="secondary-btn" type="button"><i class="bi bi-shield-check"></i> Investigations</button>
+                <button id="open-settlement-run" class="secondary-btn" type="button"><i class="bi bi-clock-history"></i> Legacy History</button>
                 <button id="open-deduction-mode" class="hidden" type="button" tabindex="-1" aria-hidden="true">Retired manual deduction</button>
-                <button id="open-import-csv" class="history-action inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="button"><i class="bi bi-file-earmark-arrow-up"></i> Import HR CSV</button>
+                <button id="open-import-csv" class="secondary-btn" type="button"><i class="bi bi-file-earmark-arrow-up"></i> Import HR CSV</button>
             </div>
         </div>
     </div>
@@ -91,11 +94,11 @@
     <p id="acct-result" class="acct-result text-sm font-semibold"></p>
 </section>
 
-<div id="deduction-mode-modal" class="acct-modal is-hidden">
+<div id="deduction-mode-modal" class="acct-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="deduction-mode-title">
     <div class="acct-modal-card max-h-[92vh] w-[min(1200px,96vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
         <div class="acct-modal-head">
-            <h4 class="text-lg font-bold text-slate-900">Manual Payroll Deduction</h4>
-            <button id="close-deduction-mode" type="button" class="acct-modal-close">x</button>
+            <h4 id="deduction-mode-title" class="text-lg font-bold text-slate-900">Manual Payroll Deduction</h4>
+            <button id="close-deduction-mode" type="button" class="acct-modal-close" aria-label="Close manual payroll deduction">x</button>
         </div>
 
         <div class="mode-layout grid gap-4 lg:grid-cols-[340px_minmax(0,1fr)]">
@@ -111,15 +114,15 @@
                 <div id="mode-actions" class="mode-actions hidden">
                     <h5 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Actions</h5>
                     <div class="inline-actions">
-                        <button id="mode-deduct-full" type="button" class="mini-btn inline-flex h-10 items-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700">Deduct Full Balance</button>
-                        <button id="mode-open-manual" type="button" class="mini-btn alt inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Deduct Custom Amount</button>
+                        <button id="mode-deduct-full" type="button" class="primary-btn btn-sm">Deduct Full Balance</button>
+                        <button id="mode-open-manual" type="button" class="secondary-btn btn-sm">Deduct Custom Amount</button>
                     </div>
                     <div id="mode-manual-box" class="inline-box mt-2 flex flex-col gap-2 hidden">
-                        <input id="mode-manual-amount" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700" type="number" min="0.01" step="0.01" placeholder="Amount">
-                        <input id="mode-manual-reason" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700" type="text" value="Manual deduction">
+                        <label class="field" for="mode-manual-amount"><span class="text-xs font-semibold text-slate-500">Deduction amount</span><input id="mode-manual-amount" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700" type="number" min="0.01" step="0.01" placeholder="Amount"></label>
+                        <label class="field" for="mode-manual-reason"><span class="text-xs font-semibold text-slate-500">Reason</span><input id="mode-manual-reason" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700" type="text" value="Manual deduction"></label>
                         <div class="inline-actions">
-                            <button id="mode-apply-manual" type="button" class="mini-btn inline-flex h-10 items-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700">Apply Deduction</button>
-                            <button id="mode-cancel-manual" type="button" class="mini-btn alt inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Cancel</button>
+                            <button id="mode-apply-manual" type="button" class="primary-btn btn-sm">Apply Deduction</button>
+                            <button id="mode-cancel-manual" type="button" class="secondary-btn btn-sm">Cancel</button>
                         </div>
                     </div>
                 </div>
@@ -133,11 +136,11 @@
     </div>
 </div>
 
-<div id="employee-modal" class="acct-modal is-hidden">
+<div id="employee-modal" class="acct-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="employee-modal-title">
     <div class="acct-modal-card max-h-[92vh] w-[min(980px,95vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
         <div class="acct-modal-head">
-            <h4 class="text-lg font-bold text-slate-900">Employee Details</h4>
-            <button id="close-employee-modal" type="button" class="acct-modal-close">x</button>
+            <h4 id="employee-modal-title" class="text-lg font-bold text-slate-900">Employee Details</h4>
+            <button id="close-employee-modal" type="button" class="acct-modal-close" aria-label="Close employee details">x</button>
         </div>
         <div id="employee-modal-profile" class="mode-profile-empty rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">Loading profile...</div>
 
@@ -145,14 +148,14 @@
             <h5 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Credit Limit</h5>
             <div class="inline-actions">
                 <span id="employee-limit-current" class="limit-label">PHP 0.00</span>
-                <button id="employee-open-limit-edit" type="button" class="mini-btn alt inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Edit</button>
+                <button id="employee-open-limit-edit" type="button" class="secondary-btn btn-sm">Edit</button>
             </div>
             <div id="employee-limit-box" class="inline-box mt-2 flex flex-col gap-2 hidden">
-                <input id="employee-limit-value" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700" type="number" min="0" step="0.01" value="0">
-                <input id="employee-limit-reason" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700" type="text" value="Manual credit limit update">
+                <label class="field" for="employee-limit-value"><span class="text-xs font-semibold text-slate-500">New credit limit</span><input id="employee-limit-value" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700" type="number" min="0" step="0.01" value="0"></label>
+                <label class="field" for="employee-limit-reason"><span class="text-xs font-semibold text-slate-500">Reason</span><input id="employee-limit-reason" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700" type="text" value="Manual credit limit update"></label>
                 <div class="inline-actions">
-                    <button id="employee-limit-save" type="button" class="mini-btn inline-flex h-10 items-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700">Save</button>
-                    <button id="employee-limit-cancel" type="button" class="mini-btn alt inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Cancel</button>
+                    <button id="employee-limit-save" type="button" class="primary-btn btn-sm">Save</button>
+                    <button id="employee-limit-cancel" type="button" class="secondary-btn btn-sm">Cancel</button>
                 </div>
             </div>
         </div>
@@ -164,10 +167,10 @@
     </div>
 </div>
 
-<div id="settlement-run-modal" class="acct-modal is-hidden">
+<div id="settlement-run-modal" class="acct-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="settlement-run-title">
     <div class="acct-modal-card max-h-[92vh] w-[min(1320px,96vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
         <div class="acct-modal-head">
-            <h4 class="text-lg font-bold text-slate-900">Legacy Monthly Deduction History</h4>
+            <h4 id="settlement-run-title" class="text-lg font-bold text-slate-900">Legacy Monthly Deduction History</h4>
             <button id="close-settlement-run" type="button" class="acct-modal-close" aria-label="Close legacy deduction history"></button>
         </div>
 
@@ -184,12 +187,12 @@
                 <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500" for="settlement-notes">Notes</label>
                 <input id="settlement-notes" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700" type="text" placeholder="Optional note for this run">
             </div>
-            <button id="settlement-preview-btn" class="primary-btn inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="button">Preview Deductions</button>
-            <button id="settlement-apply-btn" class="primary-btn inline-flex h-10 items-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-slate-300" type="button" disabled>Review & Confirm</button>
+            <button id="settlement-preview-btn" class="secondary-btn" type="button">Preview Deductions</button>
+            <button id="settlement-apply-btn" class="primary-btn" type="button" disabled>Review & Confirm</button>
         </div>
         <div id="settlement-existing-run" class="settlement-existing-run mt-3 flex items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 hidden">
             <span id="settlement-existing-run-text"></span>
-            <button id="settlement-existing-run-view" type="button" class="history-action inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">View Existing Batch</button>
+            <button id="settlement-existing-run-view" type="button" class="secondary-btn">View Existing Batch</button>
         </div>
 
         <div class="acct-summary settlement-summary mt-3 hidden gap-3 md:grid-cols-2 xl:grid-cols-4">
@@ -200,10 +203,13 @@
         </div>
 
         <div class="settlement-preview-tools hidden">
-            <div class="acct-search-wrap relative min-w-[260px] grow">
-                <i class="bi bi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true"></i>
-                <input id="settlement-preview-search" class="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm text-slate-700 outline-none transition focus:border-blue-300" type="search" placeholder="Search employee, ID, or category in this preview">
-            </div>
+            <label class="field min-w-[260px] grow" for="settlement-preview-search">
+                <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Search preview</span>
+                <span class="acct-search-wrap relative block">
+                    <i class="bi bi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true"></i>
+                    <input id="settlement-preview-search" class="h-11 w-full rounded-xl border border-slate-200 bg-white pl-10 pr-3 text-sm text-slate-700 outline-none transition focus:border-blue-300" type="search" placeholder="Employee, ID, or category">
+                </span>
+            </label>
             <p id="settlement-preview-count" class="settlement-preview-count">Preview the batch to show employees for deduction.</p>
         </div>
 
@@ -232,11 +238,11 @@
     </div>
 </div>
 
-<div id="settlement-confirm-modal" class="acct-modal is-hidden">
+<div id="settlement-confirm-modal" class="acct-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="settlement-confirm-title">
     <div class="acct-modal-card max-h-[92vh] w-[min(1040px,95vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
         <div class="acct-modal-head">
-            <h4 class="text-lg font-bold text-slate-900">Confirm Salary Deduction</h4>
-            <button id="close-settlement-confirm" type="button" class="acct-modal-close">x</button>
+            <h4 id="settlement-confirm-title" class="text-lg font-bold text-slate-900">Confirm Salary Deduction</h4>
+            <button id="close-settlement-confirm" type="button" class="acct-modal-close" aria-label="Close salary deduction confirmation">x</button>
         </div>
 
         <div id="settlement-confirm-summary" class="settlement-confirm-summary rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
@@ -266,20 +272,20 @@
         </div>
 
         <div class="settlement-confirm-actions">
-            <button id="cancel-settlement-confirm" type="button" class="history-action alt inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Cancel</button>
-            <button id="confirm-settlement-apply" type="button" class="history-action inline-flex h-10 items-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700"><i class="bi bi-check2-circle"></i> Confirm Deduction</button>
+            <button id="cancel-settlement-confirm" type="button" class="secondary-btn">Cancel</button>
+            <button id="confirm-settlement-apply" type="button" class="primary-btn"><i class="bi bi-check2-circle"></i> Confirm Deduction</button>
         </div>
     </div>
 </div>
 
-<div id="settlement-run-details-modal" class="acct-modal is-hidden">
+<div id="settlement-run-details-modal" class="acct-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="settlement-run-details-title">
     <div class="acct-modal-card max-h-[92vh] w-[min(1320px,96vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
         <div class="acct-modal-head">
-            <h4 class="text-lg font-bold text-slate-900">Salary Deduction Batch Details</h4>
+            <h4 id="settlement-run-details-title" class="text-lg font-bold text-slate-900">Salary Deduction Batch Details</h4>
             <div class="flex flex-wrap items-center gap-2">
-                <button id="settlement-details-export" type="button" class="history-action inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" disabled><i class="bi bi-download"></i> Export CSV</button>
-                <button id="settlement-details-print" type="button" class="history-action inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" disabled><i class="bi bi-printer"></i> Print</button>
-                <button id="close-settlement-run-details" type="button" class="acct-modal-close">x</button>
+                <button id="settlement-details-export" type="button" class="secondary-btn" disabled><i class="bi bi-download"></i> Export CSV</button>
+                <button id="settlement-details-print" type="button" class="secondary-btn" disabled><i class="bi bi-printer"></i> Print</button>
+                <button id="close-settlement-run-details" type="button" class="acct-modal-close" aria-label="Close salary deduction batch details">x</button>
             </div>
         </div>
 
@@ -311,11 +317,11 @@
     </div>
 </div>
 
-<div id="deduction-workflow-modal" class="acct-modal is-hidden" data-current-role="<?= esc((string) session()->get('role')) ?>" data-current-user="<?= (int) session()->get('user_id') ?>">
+<div id="deduction-workflow-modal" class="acct-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="deduction-workflow-title" data-current-role="<?= esc((string) session()->get('role')) ?>" data-current-user="<?= (int) session()->get('user_id') ?>">
     <div class="acct-modal-card max-h-[94vh] w-[min(1380px,97vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
         <div class="acct-modal-head">
             <div>
-                <h4 class="text-lg font-bold text-slate-900">Payroll Deduction Workflow</h4>
+                <h4 id="deduction-workflow-title" class="text-lg font-bold text-slate-900">Payroll Deduction Workflow</h4>
                 <p class="mt-1 text-sm text-slate-500">Prepare requests first. Employee debt changes only after an official payroll result is confirmed.</p>
             </div>
             <button id="close-deduction-workflow" type="button" class="acct-modal-close" aria-label="Close deduction workflow"></button>
@@ -352,7 +358,7 @@
                                 <input id="workflow-period-end" type="date" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" placeholder="Select end date">
                             </label>
                         </div>
-                        <button id="workflow-create-period" type="button" class="inline-flex h-10 items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700">Create period</button>
+                        <button id="workflow-create-period" type="button" class="primary-btn">Create period</button>
                     </div>
                 </section>
 
@@ -371,7 +377,7 @@
                                 <option value="">Select a period</option>
                             </select>
                         </label>
-                        <button id="workflow-refresh" type="button" class="inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"><i class="bi bi-arrow-clockwise mr-2"></i>Refresh</button>
+                        <button id="workflow-refresh" type="button" class="secondary-btn"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
                     </div>
                     <div id="workflow-period-summary" class="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">Choose or create a deduction period.</div>
                 </section>
@@ -382,7 +388,7 @@
                             <h5 class="text-sm font-bold text-slate-900">2. Prepare employee requests</h5>
                             <p class="text-sm text-slate-500">Select employees and enter the requested payroll amount.</p>
                         </div>
-                        <button id="workflow-prepare-batch" type="button" class="inline-flex h-10 items-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:bg-slate-300">Prepare batch</button>
+                        <button id="workflow-prepare-batch" type="button" class="primary-btn">Prepare batch</button>
                     </div>
                     <div id="workflow-candidates" class="mt-3 max-h-72 space-y-2 overflow-auto"></div>
                 </section>
@@ -403,11 +409,11 @@
     </div>
 </div>
 
-<div id="debt-investigations-modal" class="acct-modal is-hidden" data-current-role="<?= esc((string) session()->get('role')) ?>" data-current-user="<?= (int) session()->get('user_id') ?>">
+<div id="debt-investigations-modal" class="acct-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="debt-investigations-title" data-current-role="<?= esc((string) session()->get('role')) ?>" data-current-user="<?= (int) session()->get('user_id') ?>">
     <div class="acct-modal-card max-h-[94vh] w-[min(1180px,97vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
         <div class="acct-modal-head">
             <div>
-                <h4 class="text-lg font-bold text-slate-900">Debt Investigations and Corrections</h4>
+                <h4 id="debt-investigations-title" class="text-lg font-bold text-slate-900">Debt Investigations and Corrections</h4>
                 <p class="mt-1 text-sm text-slate-500">Investigations preserve original transactions. Approved corrections are posted as linked ledger reversals.</p>
             </div>
             <button id="close-debt-investigations" type="button" class="acct-modal-close" aria-label="Close debt investigations"></button>
@@ -442,7 +448,7 @@
                         <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Initial evidence</span>
                         <textarea id="investigation-evidence" class="min-h-20 w-full rounded-xl border border-slate-200 bg-white p-3 text-sm" placeholder="Receipt, statement, store-day record, or other evidence."></textarea>
                     </label>
-                    <button id="investigation-open" type="button" class="inline-flex h-10 items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700">Open investigation</button>
+                    <button id="investigation-open" type="button" class="primary-btn">Open investigation</button>
                 </div>
             </section>
             <section class="rounded-xl border border-slate-200 bg-white p-4">
@@ -451,7 +457,7 @@
                         <h5 class="text-sm font-bold text-slate-900">Investigation queue</h5>
                         <p class="text-sm text-slate-500">A different Accounting user must approve a recommended correction.</p>
                     </div>
-                    <button id="investigation-refresh" type="button" class="inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50"><i class="bi bi-arrow-clockwise mr-2"></i>Refresh</button>
+                    <button id="investigation-refresh" type="button" class="secondary-btn"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
                 </div>
                 <div id="investigation-list" class="mt-3 max-h-[68vh] space-y-3 overflow-auto"></div>
             </section>
@@ -460,11 +466,11 @@
     </div>
 </div>
 
-<div id="import-csv-modal" class="acct-modal is-hidden">
+<div id="import-csv-modal" class="acct-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="import-csv-title">
     <div class="acct-modal-card max-h-[92vh] w-[min(880px,95vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
         <div class="acct-modal-head">
-            <h4 class="text-lg font-bold text-slate-900">Import Employee CSV</h4>
-            <button id="close-import-csv" type="button" class="acct-modal-close">x</button>
+            <h4 id="import-csv-title" class="text-lg font-bold text-slate-900">Import Employee CSV</h4>
+            <button id="close-import-csv" type="button" class="acct-modal-close" aria-label="Close employee CSV import">x</button>
         </div>
 
         <div class="import-guide rounded-xl border border-slate-200 bg-slate-50 p-3">
@@ -476,10 +482,10 @@
         </div>
 
         <div class="inline-box flex flex-col gap-2">
-            <input id="import-csv-file" class="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-blue-700" type="file" accept=".csv,.txt">
+            <label class="field" for="import-csv-file"><span class="text-xs font-semibold uppercase tracking-wide text-slate-500">CSV file</span><input id="import-csv-file" class="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-blue-700" type="file" accept=".csv,.txt"></label>
             <div class="flex flex-wrap gap-2">
-                <button id="import-csv-preview" type="button" class="primary-btn inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">Preview CSV</button>
-                <button id="import-csv-submit" type="button" class="primary-btn inline-flex h-10 items-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700" disabled>Apply Import</button>
+                <button id="import-csv-preview" type="button" class="secondary-btn">Preview CSV</button>
+                <button id="import-csv-submit" type="button" class="primary-btn" disabled>Apply Import</button>
             </div>
         </div>
 

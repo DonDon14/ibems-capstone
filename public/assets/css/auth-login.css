@@ -303,16 +303,26 @@ body.auth-modern {
 }
 
 .auth-modern .auth-shell {
-    grid-template-columns: minmax(380px, 500px) 1fr;
+    position: relative;
+    grid-template-columns: 1fr;
+    place-items: center;
+    padding: clamp(24px, 5vw, 56px);
+    overflow: hidden;
     background: #f8fafc;
 }
 
 .auth-modern .auth-panel-form {
+    position: relative;
+    z-index: 2;
+    width: min(100%, 440px);
+    min-height: 0;
     align-content: center;
-    padding: clamp(32px, 6vw, 72px);
+    padding: clamp(30px, 4vw, 44px);
     gap: 13px;
-    border-right: 1px solid #e2e8f0;
+    border: 1px solid rgba(226, 232, 240, 0.92);
+    border-radius: 20px;
     background: #fff;
+    box-shadow: 0 24px 70px rgba(15, 23, 42, 0.18);
 }
 
 .auth-modern .auth-mark {
@@ -444,6 +454,8 @@ body.auth-modern {
 }
 
 .auth-modern .auth-panel-art {
+    position: absolute;
+    inset: 0;
     background:
         radial-gradient(circle at 75% 25%, rgba(255, 255, 255, 0.28), transparent 28%),
         radial-gradient(circle at 20% 80%, rgba(244, 196, 48, 0.2), transparent 24%),
@@ -461,8 +473,8 @@ body.auth-modern {
     }
 
     .auth-modern .auth-panel-form {
-        max-width: none;
+        width: min(100%, 440px);
         padding: 28px 20px;
-        border-right: 0;
+        border: 1px solid #e2e8f0;
     }
 }

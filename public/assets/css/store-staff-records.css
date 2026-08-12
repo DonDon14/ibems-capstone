@@ -109,6 +109,17 @@
     min-width: 260px;
 }
 
+.staff-search-field {
+    display: grid;
+    gap: 6px;
+}
+
+.staff-search-field > label {
+    color: #475569;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
 .staff-search-icon {
     position: absolute;
     left: 14px;

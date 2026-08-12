@@ -3,7 +3,6 @@
     const LAST_NAV_PREFIX = "ibems.nav.last.";
     const shell = document.querySelector(".app-shell");
     const btn = document.getElementById("sidebar-toggle");
-    const btnIcon = btn ? btn.querySelector("i") : null;
     const sidebar = document.querySelector(".app-sidebar");
     const brand = document.querySelector(".app-brand");
     const navLinks = Array.from(document.querySelectorAll(".app-menu a"));
@@ -32,10 +31,6 @@
         btn.setAttribute("aria-pressed", collapsed ? "true" : "false");
         btn.setAttribute("title", collapsed ? "Expand Sidebar" : "Collapse Sidebar");
         btn.setAttribute("aria-label", collapsed ? "Expand Sidebar" : "Collapse Sidebar");
-        if (btnIcon) {
-            btnIcon.classList.remove("bi-chevron-left", "bi-chevron-right", "bi-layout-sidebar");
-            btnIcon.classList.add(collapsed ? "bi-chevron-right" : "bi-chevron-left");
-        }
     };
 
     const applyResponsiveState = () => {
@@ -90,11 +85,15 @@
 
     applyResponsiveState();
 
-    btn.addEventListener("click", () => {
+    btn.addEventListener("click", (event) => {
+        event.stopPropagation();
         if (!canCollapse()) return;
         const next = !shell.classList.contains("sidebar-collapsed");
         applyState(next);
         localStorage.setItem(KEY, next ? "1" : "0");
+        if (event.detail > 0) {
+            btn.blur();
+        }
     });
 
     window.addEventListener("resize", () => {

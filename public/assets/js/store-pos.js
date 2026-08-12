@@ -1,5 +1,6 @@
 let cart = [];
 let productsCache = [];
+let productsLoadCompleted = false;
 let filteredProducts = [];
 let activeStoreId = null;
 let myStores = [];
@@ -198,6 +199,19 @@ function escapeHtml(value) {
 
 function formatMoney(value) {
     return window.IbemsFormat?.money(value) || `PHP ${Number(value || 0).toFixed(2)}`;
+}
+
+function renderProductCatalogState(type, message, detail = "") {
+    const safeType = ["loading", "empty", "error", "success"].includes(type) ? type : "loading";
+    const icons = {
+        loading: "bi bi-arrow-repeat",
+        empty: "bi bi-inbox",
+        error: "bi bi-exclamation-circle",
+        success: "bi bi-check-circle",
+    };
+    const role = safeType === "error" ? "alert" : "status";
+    const detailHtml = detail ? `<small>${escapeHtml(detail)}</small>` : "";
+    document.getElementById("product-grid").innerHTML = `<div class="data-state data-state--${safeType}" role="${role}" aria-live="polite"><i class="${icons[safeType]}" aria-hidden="true"></i><div><strong>${escapeHtml(message)}</strong>${detailHtml}</div></div>`;
 }
 
 function formatDateTime(value) {
@@ -865,8 +879,8 @@ function renderSuccessStrip(receipt) {
             <small>${escapeHtml(formatPaymentLabel(receipt.paymentMethod))} | ${escapeHtml(receipt.customerName || "Walk-in")}</small>
         </div>
         <div class="pos-success-actions">
-            <button type="button" data-pos-success-action="view"><i class="bi bi-box-arrow-up-right"></i> View</button>
-            <button type="button" data-pos-success-action="print"><i class="bi bi-printer"></i> Print</button>
+            <button type="button" class="secondary-btn" data-pos-success-action="view"><i class="bi bi-box-arrow-up-right"></i> View</button>
+            <button type="button" class="primary-btn" data-pos-success-action="print"><i class="bi bi-printer"></i> Print</button>
             <a href="/store/history"><i class="bi bi-clock-history"></i> History</a>
         </div>
     `;
@@ -1218,12 +1232,12 @@ function renderProducts() {
     const grid = document.getElementById("product-grid");
 
     if (productsCache.length === 0) {
-        grid.innerHTML = '<div class="empty-state"><i class="bi bi-box-seam"></i><span>No active products in this store yet.</span><small>Add products in Inventory before using POS.</small></div>';
+        renderProductCatalogState("empty", "No active products in this store yet.", "Add products in Inventory before using POS.");
         return;
     }
 
     if (filteredProducts.length === 0) {
-        grid.innerHTML = '<div class="empty-state"><i class="bi bi-search"></i><span>No products match your search or category.</span><small>Try another SKU, barcode, product name, or category.</small></div>';
+        renderProductCatalogState("empty", "No products match your search or category.", "Try another SKU, barcode, product name, or category.");
         return;
     }
 
@@ -1804,12 +1818,14 @@ async function loadMyStores() {
 }
 
 async function loadProducts() {
-    const grid = document.getElementById("product-grid");
-
     if (!activeStoreId) {
-        grid.innerHTML = '<div class="empty-state"><i class="bi bi-shop-window"></i><span>No active store selected.</span></div>';
+        productsLoadCompleted = false;
+        renderProductCatalogState("error", "No active store selected.");
         return;
     }
+
+    productsLoadCompleted = false;
+    renderProductCatalogState("loading", "Loading products...", "Preparing the active store catalog.");
 
     try {
         const data = await requestJson(
@@ -1820,19 +1836,24 @@ async function loadProducts() {
 
         if (!data || data.status !== "success") {
             productsCache = [];
-            refreshUi();
-            setResult(data?.message || "Unable to load products.", "error");
+            const message = data?.message || "Unable to load products.";
+            renderProductCatalogState("error", message);
+            renderCart();
+            setResult(message, "error");
             return;
         }
 
         productsCache = Array.isArray(data.products) ? data.products : [];
+        productsLoadCompleted = true;
         buildCategories();
         renderCategoryTabs();
         refreshUi();
     } catch (error) {
         productsCache = [];
-        refreshUi();
-        setResult("Unable to load products.", "error");
+        const message = error.message || "Unable to load products.";
+        renderProductCatalogState("error", message);
+        renderCart();
+        setResult(message, "error");
     }
 }
 
@@ -2409,6 +2430,9 @@ document.getElementById("closing-ecash-input").addEventListener("input", updateS
         await loadPaymentMethods();
         await loadOpeningBalanceStatus();
     } catch (error) {
+        if (!productsLoadCompleted) {
+            renderProductCatalogState("error", error.message || "Unable to load store catalog.");
+        }
         setResult(error.message || "Unable to load store context.", "error");
     }
 })();

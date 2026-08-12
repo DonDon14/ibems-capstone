@@ -8,6 +8,7 @@
     <meta name="csrf-header-name" content="<?= esc(config('Security')->headerName) ?>">
     <meta name="csrf-cookie-name" content="<?= esc(config('Security')->cookieName) ?>">
     <title>Select Role</title>
+    <link rel="icon" type="image/jpeg" href="<?= base_url('assets/images/ustp_claveria_logo.jpg') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.css') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/auth-login.css') ?>">
 </head>

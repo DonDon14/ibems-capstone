@@ -79,6 +79,12 @@ body.ibems-modern {
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.1);
 }
 
+.ibems-modern .app-brand-mark {
+    width: 42px;
+    height: 42px;
+    flex-basis: 42px;
+}
+
 .ibems-modern .app-brand h1 {
     color: #0f172a;
     font-size: 1rem;
@@ -203,6 +209,22 @@ body.ibems-modern {
 
 .ibems-modern .app-shell.sidebar-collapsed .app-main {
     margin-left: 76px;
+}
+
+.ibems-modern .app-shell.sidebar-collapsed .app-sidebar {
+    padding-inline: 10px;
+}
+
+.ibems-modern .app-shell.sidebar-collapsed .app-menu::before {
+    display: none;
+}
+
+.ibems-modern .app-shell.sidebar-collapsed .app-sidebar-header {
+    min-height: 42px;
+}
+
+.ibems-modern .app-shell.sidebar-collapsed .sidebar-toggle-in-sidebar {
+    margin: 0;
 }
 
 .ibems-modern .app-topbar {
@@ -398,7 +420,7 @@ body.ibems-modern {
 }
 
 /* Cards and panels */
-.ibems-modern :is(.dash-card, .metric-card, .dash-panel, .overview-filter, .overview-table-wrap) {
+.ibems-modern :is(.dash-card, .metric-card, .dash-panel, .data-panel, .record-panel, .overview-filter, .overview-table-wrap) {
     border-color: #e2e8f0;
     background: #fff;
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.06);
@@ -913,7 +935,7 @@ body.ibems-modern {
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
 }
 
-.ibems-modern :is(.btn, .primary-btn, .secondary-btn, .danger-btn, .ghost-btn) {
+.ibems-modern :is(.btn, .btn-primary, .btn-secondary, .btn-danger, .btn-ghost, .primary-btn, .secondary-btn, .danger-btn, .ghost-btn) {
     min-height: 40px;
     padding: 0 14px;
     gap: 8px;
@@ -925,8 +947,13 @@ body.ibems-modern {
     transition: background-color 150ms, border-color 150ms, color 150ms, box-shadow 150ms;
 }
 
-.ibems-modern :is(.btn, .primary-btn, .secondary-btn, .danger-btn, .ghost-btn):hover:not(:disabled) {
+.ibems-modern :is(.btn, .btn-primary, .btn-secondary, .btn-danger, .btn-ghost, .primary-btn, .secondary-btn, .danger-btn, .ghost-btn):hover:not(:disabled) {
     transform: none;
+}
+
+.ibems-modern .app-brand-mark .secondary-btn.sidebar-toggle-in-sidebar {
+    gap: 0;
+    padding: 0;
 }
 
 .ibems-modern :is(.btn-primary, .primary-btn) {
@@ -961,6 +988,36 @@ body.ibems-modern {
 }
 
 /* Tables and semantic status */
+.ibems-modern .data-panel {
+    border-color: #e2e8f0;
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+
+.ibems-modern .record-panel {
+    border-color: #e2e8f0;
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+
+.ibems-modern .record-list-item + .record-list-item {
+    border-top-color: #e2e8f0;
+}
+
+.ibems-modern .data-panel-head {
+    min-height: 56px;
+    padding: 15px 20px;
+    border-bottom-color: #e2e8f0;
+}
+
+.ibems-modern .data-panel-head h4 {
+    color: #0f172a;
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
 .ibems-modern :is(.table-standard-wrap, .overview-table-wrap) {
     padding: 0;
     overflow: auto;
@@ -968,6 +1025,12 @@ body.ibems-modern {
     border-radius: 16px;
     background: #fff;
     box-shadow: 0 1px 3px rgba(15, 23, 42, 0.05);
+}
+
+.ibems-modern .data-panel > .data-panel-body.table-standard-wrap {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
 }
 
 .ibems-modern .table {

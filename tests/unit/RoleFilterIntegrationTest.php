@@ -18,7 +18,13 @@ final class RoleFilterIntegrationTest extends CIUnitTestCase
         $this->withRoutes([
             ['GET', 'test/admin-only', static fn () => service('response')->setJSON([
                 'status' => 'success',
-            ]), ['filter' => 'role:ADMIN']],
+            ]), ['filter' => 'access:system.manage']],
+            ['GET', 'test/store-admin-only', static fn () => service('response')->setJSON([
+                'status' => 'success',
+            ]), ['filter' => 'access:store.review_assigned']],
+            ['GET', 'test/unknown-policy', static fn () => service('response')->setJSON([
+                'status' => 'success',
+            ]), ['filter' => 'access:not.a.policy']],
         ]);
     }
 
@@ -81,6 +87,74 @@ final class RoleFilterIntegrationTest extends CIUnitTestCase
         ])->get('test/admin-only');
 
         $result->assertRedirectTo('/store/dashboard');
+    }
+
+    public function testStoreAdministratorReachesScopedPortalButNotSystemAdministration(): void
+    {
+        $this->seedUser(8, 'STORE_SUPERVISOR');
+        $session = [
+            'logged_in' => true,
+            'user_id' => 8,
+            'role' => 'STORE_SUPERVISOR',
+            'available_roles' => ['STORE_SUPERVISOR'],
+        ];
+
+        $this->withSession($session)
+            ->withHeaders(['Accept' => 'application/json'])
+            ->get('test/store-admin-only')
+            ->assertOK();
+
+        $this->withSession($session)
+            ->withHeaders(['Accept' => 'application/json'])
+            ->get('test/admin-only')
+            ->assertStatus(403);
+    }
+
+    public function testSystemAdministratorDoesNotEnterStoreAdministratorPortalImplicitly(): void
+    {
+        $this->seedUser(1, 'ADMIN');
+
+        $this->withSession([
+            'logged_in' => true,
+            'user_id' => 1,
+            'role' => 'ADMIN',
+            'available_roles' => ['ADMIN'],
+        ])->withHeaders(['Accept' => 'application/json'])
+            ->get('test/store-admin-only')
+            ->assertStatus(403);
+    }
+
+    public function testAssignedAdminRoleDoesNotOverrideTheSelectedOperationalRole(): void
+    {
+        $this->seedUser(9, 'STORE_SYSTEM');
+        Database::connect()->table('user_roles')->insert([
+            'user_id' => 9,
+            'role' => 'ADMIN',
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $this->withSession([
+            'logged_in' => true,
+            'user_id' => 9,
+            'role' => 'STORE_SYSTEM',
+            'available_roles' => ['STORE_SYSTEM', 'ADMIN'],
+        ])->withHeaders(['Accept' => 'application/json'])
+            ->get('test/admin-only')
+            ->assertStatus(403);
+    }
+
+    public function testUnknownPolicyFailsClosed(): void
+    {
+        $this->seedUser(10, 'ADMIN');
+
+        $this->withSession([
+            'logged_in' => true,
+            'user_id' => 10,
+            'role' => 'ADMIN',
+            'available_roles' => ['ADMIN'],
+        ])->withHeaders(['Accept' => 'application/json'])
+            ->get('test/unknown-policy')
+            ->assertStatus(403);
     }
 
     private function seedUser(int $id, string $role): void

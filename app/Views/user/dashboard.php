@@ -6,10 +6,12 @@
 
 <?= $this->section('content') ?>
 <section class="dashboard-shell">
-    <div class="dashboard-title">
-        <h3>User Dashboard</h3>
-        <p>Welcome, <?= esc(session()->get('name') ?? 'User') ?>.</p>
-    </div>
+    <?= view('components/page_header', [
+        'eyebrow' => 'Personal account',
+        'title' => 'User dashboard',
+        'description' => 'Welcome, ' . (string) (session()->get('name') ?? 'User') . '.',
+        'icon' => 'bi bi-person-circle',
+    ]) ?>
 
     <div class="dashboard-grid dashboard-grid-single">
         <article id="u-debt-status-card" class="user-status-card user-status-card--info">
@@ -18,7 +20,7 @@
                 <h4 id="u-debt-status-title">Debt Status</h4>
                 <p id="u-debt-status-message">Checking your current debt balance.</p>
             </div>
-            <a href="<?= site_url('user/history') ?>" class="history-action">
+            <a href="<?= site_url('user/history') ?>" class="secondary-btn">
                 <i class="bi bi-clock-history"></i> View History
             </a>
         </article>
@@ -33,7 +35,7 @@
             <strong id="u-credit-used-percent">0%</strong>
             <small id="u-credit-used-amount">Used: PHP 0.00 of PHP 0.00</small>
             <div class="credit-meter-track" aria-hidden="true">
-                <i id="u-credit-meter-fill" class="credit-meter-fill" style="width: 0%;"></i>
+                <i id="u-credit-meter-fill" class="credit-meter-fill"></i>
             </div>
             <small id="u-credit-meter-status">Remaining: PHP 0.00</small>
         </article>
@@ -72,7 +74,9 @@
         </article>
         <article class="dash-panel">
             <h4><i class="bi bi-clock-history"></i> Recent Debt Cashbook</h4>
-            <div id="u-recent-cashbook" class="stack-list"></div>
+            <div id="u-recent-cashbook" class="stack-list">
+                <?= view('components/data_state', ['type' => 'loading', 'message' => 'Loading recent cashbook...']) ?>
+            </div>
         </article>
     </div>
 
@@ -90,18 +94,18 @@
                     </tr>
                 </thead>
                 <tbody id="u-recent-transactions-body">
-                    <tr><td colspan="5">Loading...</td></tr>
+                    <?= view('components/data_state', ['tag' => 'tr', 'colspan' => 5, 'type' => 'loading', 'message' => 'Loading recent transactions...']) ?>
                 </tbody>
             </table>
         </div>
     </div>
 </section>
 
-<div id="u-debt-pin-modal" class="app-modal is-hidden">
+<div id="u-debt-pin-modal" class="app-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="u-debt-pin-title">
     <div class="app-modal-card">
         <div class="app-modal-head">
-            <h4><i class="bi bi-shield-lock"></i> Debt Authorization PIN</h4>
-            <button id="u-pin-modal-close" type="button" class="app-modal-close">x</button>
+            <h4 id="u-debt-pin-title"><i class="bi bi-shield-lock"></i> Debt Authorization PIN</h4>
+            <button id="u-pin-modal-close" type="button" class="app-modal-close" aria-label="Close debt authorization PIN form">x</button>
         </div>
         <form id="u-debt-pin-form" class="user-pin-form">
             <p id="u-pin-form-help">Use a 4 to 6 digit PIN. Stores will ask for this only when charging purchases to debt.</p>
@@ -119,7 +123,7 @@
             </label>
             <p id="u-pin-form-result" class="user-pin-result"></p>
             <div class="app-modal-actions">
-                <button id="u-pin-modal-cancel" type="button" class="scan-btn">Cancel</button>
+                <button id="u-pin-modal-cancel" type="button" class="secondary-btn">Cancel</button>
                 <button id="u-save-pin" type="submit" class="primary-btn"><i class="bi bi-check2-circle"></i> Save PIN</button>
             </div>
         </form>

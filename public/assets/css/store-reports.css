@@ -73,6 +73,17 @@
 .reports-custom-range {
     display: flex;
     gap: 8px;
+    align-items: end;
+}
+
+.reports-date-field {
+    display: grid;
+    gap: 4px;
+    color: #64748b;
+    font-size: 0.72rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
 }
 
 .reports-custom-range input {

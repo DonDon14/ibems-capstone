@@ -124,10 +124,22 @@ function setQuickChipState(chip, active) {
     chip.classList.toggle("border-slate-200", !active);
 }
 
+function renderUvDataState(type, message) {
+    const safeType = ["loading", "empty", "error", "success"].includes(type) ? type : "loading";
+    const icons = {
+        loading: "bi bi-arrow-repeat",
+        empty: "bi bi-inbox",
+        error: "bi bi-exclamation-circle",
+        success: "bi bi-check-circle",
+    };
+    const role = safeType === "error" ? "alert" : "status";
+    return `<div class="data-state data-state--${safeType}" role="${role}" aria-live="polite"><i class="${icons[safeType]}" aria-hidden="true"></i><div><strong>${aEscape(message)}</strong></div></div>`;
+}
+
 function renderUserTable(rows) {
     const body = document.getElementById("uv-body");
     if (!Array.isArray(rows) || rows.length === 0) {
-        body.innerHTML = '<div class="uv-empty rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">No users found.</div>';
+        body.innerHTML = renderUvDataState("empty", "No users found.");
         return;
     }
 
@@ -143,7 +155,7 @@ function renderUserTable(rows) {
             .map((part) => part.charAt(0).toUpperCase())
             .join("") || "U";
         return `
-        <article class="uv-record-row flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:shadow-sm" data-user-id="${row.id}">
+        <article class="record-list-item uv-record-row flex flex-wrap items-center justify-between gap-3" data-user-id="${row.id}">
             <button class="uv-row-view flex min-w-0 grow items-center gap-3 text-left" type="button" data-view-user="${row.id}" title="View employee details">
                 <div class="uv-avatar inline-flex h-11 w-11 flex-none items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-sm font-bold text-blue-700">${aEscape(initials)}</div>
                 <div class="uv-person-meta min-w-0">
@@ -190,7 +202,7 @@ async function loadUserView() {
     const data = await response.json();
     const body = document.getElementById("uv-body");
     if (!data || data.status !== "success") {
-        body.innerHTML = '<div class="uv-empty">Unable to load users.</div>';
+        body.innerHTML = renderUvDataState("error", data?.message || "Unable to load users.");
         const countText = document.getElementById("uv-count-text");
         if (countText) countText.textContent = "Showing 0 of 0 records";
         renderTopSummary([]);

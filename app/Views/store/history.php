@@ -7,12 +7,12 @@
 
 <?= $this->section('content') ?>
 <section class="history-shell">
-    <div class="history-toolbar">
-        <div>
-            <h3>Store Transaction History</h3>
-            <p>View past transactions and reprint receipts.</p>
-        </div>
-    </div>
+    <?= view('components/page_header', [
+        'eyebrow' => 'Store records',
+        'title' => 'Transaction history',
+        'description' => 'View past transactions and reprint receipts.',
+        'icon' => 'bi bi-receipt-cutoff',
+    ]) ?>
 
     <div class="history-filters">
         <div class="history-filter-field">
@@ -37,8 +37,8 @@
             </select>
         </div>
         <div class="history-filter-actions">
-            <button id="history-apply-filters" class="history-action" type="button">Apply Filters</button>
-            <button id="history-clear-filters" class="history-action alt" type="button">Clear</button>
+            <button id="history-apply-filters" class="primary-btn" type="button">Apply Filters</button>
+            <button id="history-clear-filters" class="secondary-btn" type="button">Clear</button>
         </div>
     </div>
 
@@ -60,9 +60,12 @@
                 </tr>
             </thead>
             <tbody id="history-body">
-                <tr>
-                    <td colspan="6">Loading transactions...</td>
-                </tr>
+                <?= view('components/data_state', [
+                    'tag' => 'tr',
+                    'colspan' => 6,
+                    'type' => 'loading',
+                    'message' => 'Loading transactions...',
+                ]) ?>
             </tbody>
         </table>
     </div>
@@ -70,17 +73,17 @@
     <p id="history-result" class="history-result"></p>
 </section>
 
-<div id="history-receipt-modal" class="receipt-modal is-hidden">
+<div id="history-receipt-modal" class="receipt-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="history-receipt-title">
     <div class="receipt-card">
         <div class="receipt-head">
-            <h3>Transaction Receipt</h3>
-            <button id="history-receipt-close" type="button" class="receipt-close">&times;</button>
+            <h3 id="history-receipt-title">Transaction Receipt</h3>
+            <button id="history-receipt-close" type="button" class="receipt-close" aria-label="Close transaction receipt">&times;</button>
         </div>
 
         <div id="history-receipt-content"></div>
 
         <div class="receipt-actions">
-            <button id="history-receipt-view" type="button" class="history-action alt"><i class="bi bi-box-arrow-up-right"></i> View Receipt</button>
+            <button id="history-receipt-view" type="button" class="secondary-btn"><i class="bi bi-box-arrow-up-right"></i> View Receipt</button>
             <button id="history-receipt-print" type="button" class="primary-btn"><i class="bi bi-printer"></i> Print Receipt</button>
         </div>
     </div>

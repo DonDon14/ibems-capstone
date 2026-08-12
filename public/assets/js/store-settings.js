@@ -11,6 +11,18 @@ function settingsEscape(value) {
         .replace(/'/g, "&#39;");
 }
 
+function settingsDataState(type, message, colspan) {
+    const safeType = ["loading", "empty", "error", "success"].includes(type) ? type : "loading";
+    const icons = {
+        loading: "bi bi-arrow-repeat",
+        empty: "bi bi-inbox",
+        error: "bi bi-exclamation-circle",
+        success: "bi bi-check-circle",
+    };
+    const role = safeType === "error" ? "alert" : "status";
+    return `<tr class="data-state-row"><td colspan="${Number(colspan)}"><div class="data-state data-state--${safeType}" role="${role}" aria-live="polite"><i class="${icons[safeType]}" aria-hidden="true"></i><div><strong>${settingsEscape(message)}</strong></div></div></td></tr>`;
+}
+
 function settingsSetResult(message, isError = false) {
     const el = document.getElementById("settings-result");
     el.textContent = message || "";
@@ -27,7 +39,7 @@ function renderCategories() {
     const body = document.getElementById("category-body");
 
     if (!Array.isArray(settingsCategories) || settingsCategories.length === 0) {
-        body.innerHTML = '<tr><td colspan="2">No categories found.</td></tr>';
+        body.innerHTML = settingsDataState("empty", "No categories found.", 2);
         return;
     }
 
@@ -51,7 +63,7 @@ function renderPaymentMethods() {
     const body = document.getElementById("payment-method-body");
 
     if (!Array.isArray(settingsPaymentMethods) || settingsPaymentMethods.length === 0) {
-        body.innerHTML = '<tr><td colspan="4">No payment methods found.</td></tr>';
+        body.innerHTML = settingsDataState("empty", "No payment methods found.", 4);
         return;
     }
 
@@ -91,7 +103,9 @@ async function loadCategories() {
     const response = await fetch(`/store/categories?store_id=${settingsStoreId}`);
     const data = await response.json();
     if (!data || data.status !== "success") {
-        throw new Error(data?.message || "Unable to load categories.");
+        const message = data?.message || "Unable to load categories.";
+        document.getElementById("category-body").innerHTML = settingsDataState("error", message, 2);
+        throw new Error(message);
     }
     settingsCategories = Array.isArray(data.categories) ? data.categories : [];
     renderCategories();
@@ -101,7 +115,9 @@ async function loadPaymentMethods() {
     const response = await fetch(`/store/payment-methods?store_id=${settingsStoreId}`);
     const data = await response.json();
     if (!data || data.status !== "success") {
-        throw new Error(data?.message || "Unable to load payment methods.");
+        const message = data?.message || "Unable to load payment methods.";
+        document.getElementById("payment-method-body").innerHTML = settingsDataState("error", message, 4);
+        throw new Error(message);
     }
     settingsPaymentMethods = Array.isArray(data.methods) ? data.methods : [];
     renderPaymentMethods();
@@ -370,7 +386,14 @@ document.getElementById("payment-method-body").addEventListener("click", (event)
         await loadCategories();
         await loadPaymentMethods();
     } catch (error) {
-        settingsSetResult(error.message || "Unable to initialize settings.", true);
-        settingsSetMethodResult(error.message || "Unable to initialize payment methods.", true);
+        const message = error.message || "Unable to initialize store settings.";
+        if (document.querySelector("#category-body .data-state--loading")) {
+            document.getElementById("category-body").innerHTML = settingsDataState("error", message, 2);
+        }
+        if (document.querySelector("#payment-method-body .data-state--loading")) {
+            document.getElementById("payment-method-body").innerHTML = settingsDataState("error", message, 4);
+        }
+        settingsSetResult(message, true);
+        settingsSetMethodResult(message, true);
     }
 })();

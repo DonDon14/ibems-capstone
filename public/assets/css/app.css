@@ -162,6 +162,17 @@ a {
     margin: 0;
 }
 
+.app-brand-mark {
+    position: relative;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+}
+
+.app-brand-mark .app-brand-logo {
+    transition: opacity 0.14s ease;
+}
+
 .sidebar-logout a,
 .sidebar-logout button {
     display: flex;
@@ -211,7 +222,8 @@ a {
 }
 
 .app-shell.sidebar-collapsed .app-brand {
-    display: none;
+    flex: 0 0 auto;
+    padding: 4px;
 }
 
 .app-shell.sidebar-collapsed .app-brand-text,
@@ -347,27 +359,31 @@ a {
 }
 
 .sidebar-toggle-in-sidebar {
-    align-self: auto;
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    min-height: 100%;
     margin: 0;
-    width: 32px;
-    height: 32px;
-    min-height: 32px;
-    border-radius: 9px;
+    padding: 0;
+    border-radius: 10px;
     opacity: 0;
-    visibility: hidden;
     pointer-events: none;
-    transition: opacity 0.14s ease, visibility 0.14s ease, transform 0.14s ease, background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+    transition: opacity 0.14s ease, background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease;
 }
 
 .app-shell.sidebar-collapsed .sidebar-toggle-in-sidebar {
-    align-self: center;
-    margin: 0 auto 10px;
+    margin: 0;
 }
 
-.app-sidebar:hover .sidebar-toggle-in-sidebar,
-.app-sidebar:focus-within .sidebar-toggle-in-sidebar {
+.app-brand-mark:hover .app-brand-logo,
+.app-brand-mark:has(.sidebar-toggle-in-sidebar:focus-visible) .app-brand-logo {
+    opacity: 0;
+}
+
+.app-brand-mark:hover .sidebar-toggle-in-sidebar,
+.app-brand-mark:has(.sidebar-toggle-in-sidebar:focus-visible) .sidebar-toggle-in-sidebar {
     opacity: 1;
-    visibility: visible;
     pointer-events: auto;
 }
 
@@ -383,6 +399,27 @@ a {
 
 .sidebar-toggle i {
     font-size: 1rem;
+}
+
+.sidebar-toggle-glyph {
+    position: relative;
+    display: block;
+    width: 20px;
+    height: 17px;
+    flex: 0 0 20px;
+    border: 1.8px solid currentColor;
+    border-radius: 5px;
+}
+
+.sidebar-toggle-glyph::before {
+    content: "";
+    position: absolute;
+    top: -1px;
+    bottom: -1px;
+    left: 6px;
+    width: 1.8px;
+    border-radius: 999px;
+    background: currentColor;
 }
 
 .topbar-profile {
@@ -488,6 +525,76 @@ a {
     color: #0f2745;
     font-weight: 700;
     letter-spacing: 0.12px;
+}
+
+/* Standard reusable titled data panel */
+.data-panel {
+    overflow: hidden;
+    background: #fff;
+    border: 1px solid var(--line-soft);
+    border-radius: 14px;
+    box-shadow: var(--shadow-soft);
+}
+
+.data-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    min-height: 52px;
+    padding: 14px 18px;
+    border-bottom: 1px solid var(--line-soft);
+}
+
+.data-panel-head h4 {
+    margin: 0;
+    color: #0f2745;
+    font-size: 1rem;
+    font-weight: 700;
+}
+
+.data-panel-body {
+    min-width: 0;
+    overflow: auto;
+}
+
+.data-panel-body.table-standard-wrap {
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+}
+
+/* Standard reusable record-list boundary */
+.record-panel {
+    overflow: hidden;
+    background: #fff;
+    border: 1px solid var(--line-soft);
+    border-radius: 14px;
+    box-shadow: var(--shadow-soft);
+}
+
+.record-list {
+    display: grid;
+    min-width: 0;
+}
+
+.record-list-item {
+    min-width: 0;
+    padding: 16px;
+    background: #fff;
+    transition: background-color 0.15s ease;
+}
+
+.record-list-item + .record-list-item {
+    border-top: 1px solid var(--line-soft);
+}
+
+.record-list-item:hover {
+    background: #f8fafc;
+}
+
+.record-list > .data-state {
+    margin: 16px;
 }
 
 /* Standard reusable data-table layout */
@@ -636,6 +743,10 @@ textarea:focus {
 
 /* Unified button system (backward compatible with existing classes) */
 .btn,
+.btn-primary,
+.btn-secondary,
+.btn-danger,
+.btn-ghost,
 .primary-btn,
 .secondary-btn,
 .danger-btn,
@@ -659,6 +770,10 @@ textarea:focus {
 }
 
 .btn:disabled,
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.btn-danger:disabled,
+.btn-ghost:disabled,
 .primary-btn:disabled,
 .secondary-btn:disabled,
 .danger-btn:disabled,
@@ -670,11 +785,25 @@ textarea:focus {
 }
 
 .btn:hover:not(:disabled),
+.btn-primary:hover:not(:disabled),
+.btn-secondary:hover:not(:disabled),
+.btn-danger:hover:not(:disabled),
+.btn-ghost:hover:not(:disabled),
 .primary-btn:hover:not(:disabled),
 .secondary-btn:hover:not(:disabled),
 .danger-btn:hover:not(:disabled),
 .ghost-btn:hover:not(:disabled) {
     transform: translateY(-1px);
+}
+
+:where(button, [role="button"], .btn, .btn-primary, .btn-secondary, .btn-danger, .btn-ghost):focus-visible {
+    outline: 3px solid rgba(37, 99, 235, 0.32);
+    outline-offset: 2px;
+}
+
+:where(button, [role="button"]):disabled,
+:where(button, [role="button"])[aria-disabled="true"] {
+    cursor: not-allowed;
 }
 
 .btn-primary,
@@ -972,6 +1101,13 @@ textarea:focus {
     margin: 7px 0 0;
     color: #5f738a;
     font-size: 0.9rem;
+}
+
+.btn-icon {
+    width: 38px;
+    min-width: 38px;
+    min-height: 38px;
+    padding: 0;
 }
 
 .panel-heading-line {

@@ -8,9 +8,19 @@
 
 <?= $this->section('content') ?>
 <section class="pos-shell" data-user-role="<?= esc((string) session()->get('role')) ?>">
+    <div class="pos-page-header">
+        <?= view('components/page_header', [
+            'eyebrow' => 'Point of sale',
+            'title' => 'Store checkout',
+            'description' => 'Search products, manage the current order, and complete store transactions.',
+            'icon' => 'bi bi-cart-check',
+        ]) ?>
+    </div>
+
     <div class="pos-left panel">
         <header class="pos-toolbar">
             <div class="search-wrap">
+                <label for="product-search">Search Products</label>
                 <input id="product-search" type="search" placeholder="Search product, SKU, barcode, supplier, or bin">
             </div>
         </header>
@@ -20,7 +30,11 @@
         </div>
 
         <div id="product-grid" class="product-grid">
-            <div class="empty-state">Loading products...</div>
+            <?= view('components/data_state', [
+                'type' => 'loading',
+                'message' => 'Loading products...',
+                'detail' => 'Preparing the active store catalog.',
+            ]) ?>
         </div>
     </div>
 
@@ -35,10 +49,10 @@
                 <small id="opening-balance-guidance">Transactions stay locked until today&apos;s store day is open.</small>
             </div>
             <div class="opening-balance-actions">
-                <button id="opening-balance-open-btn" type="button" class="scan-btn">
+                <button id="opening-balance-open-btn" type="button" class="secondary-btn">
                     <i class="bi bi-pencil-square"></i> Open Store Day
                 </button>
-                <button id="store-day-close-btn" type="button" class="scan-btn is-hidden">
+                <button id="store-day-close-btn" type="button" class="secondary-btn is-hidden">
                     <i class="bi bi-door-closed"></i> Close Day
                 </button>
             </div>
@@ -49,22 +63,27 @@
                 <strong><i class="bi bi-cash-coin"></i> Debt Payment</strong>
                 <small>Record direct payment toward an employee&apos;s existing debt.</small>
             </div>
-            <button id="open-debt-payment-modal" type="button" class="scan-btn">
+            <button id="open-debt-payment-modal" type="button" class="secondary-btn">
                 <i class="bi bi-plus-circle"></i> Record Payment
             </button>
         </div>
 
         <div class="scan-quick-wrap">
-            <label for="scan-code-input"><i class="bi bi-upc-scan"></i> Scan QR/Barcode</label>
             <div class="scan-quick-row">
-                <div class="scan-code-wrap">
-                    <input id="scan-code-input" type="text" placeholder="Scan or type SKU/barcode then press Enter">
-                    <button id="open-scanner-btn" type="button" class="scan-inline-btn" title="Scan product QR/barcode">
-                        <i class="bi bi-qr-code-scan"></i>
-                    </button>
-                    <div id="scan-product-suggestions" class="scan-suggestions is-hidden"></div>
+                <div class="scan-code-field">
+                    <label for="scan-code-input"><i class="bi bi-upc-scan"></i> Scan QR/Barcode</label>
+                    <div class="scan-code-wrap">
+                        <input id="scan-code-input" type="text" placeholder="Scan or type SKU/barcode then press Enter">
+                        <button id="open-scanner-btn" type="button" class="scan-inline-btn" title="Scan product QR/barcode">
+                            <i class="bi bi-qr-code-scan"></i>
+                        </button>
+                        <div id="scan-product-suggestions" class="scan-suggestions is-hidden"></div>
+                    </div>
                 </div>
-                <input id="scan-qty-input" type="number" min="1" step="1" value="1" title="Quantity">
+                <label class="scan-qty-field" for="scan-qty-input">
+                    <span>Quantity</span>
+                    <input id="scan-qty-input" type="number" min="1" step="1" value="1">
+                </label>
                 <button id="scan-add-btn" type="button" class="scan-add-btn"><i class="bi bi-plus-circle"></i> Add</button>
             </div>
         </div>
@@ -87,7 +106,7 @@
         </div>
 
         <div class="payment-wrap">
-            <label><i class="bi bi-credit-card-2-front"></i> Payment Method</label>
+            <label for="payment-method"><i class="bi bi-credit-card-2-front"></i> Payment Method</label>
             <div class="payment-quick" id="payment-quick"></div>
             <select id="payment-method" class="is-hidden"></select>
         </div>
@@ -104,7 +123,7 @@
             <div id="debt-pin-wrap" class="debt-pin-wrap is-hidden">
                 <label><i class="bi bi-shield-lock"></i> Debt Authorization PIN</label>
                 <small id="debt-pin-help">PIN is verified securely when the transaction is submitted.</small>
-                <button id="open-debt-pin-modal" type="button" class="scan-btn debt-pin-open-btn">
+                <button id="open-debt-pin-modal" type="button" class="secondary-btn debt-pin-open-btn">
                     <i class="bi bi-key"></i> Enter PIN
                 </button>
             </div>
@@ -116,27 +135,27 @@
     </aside>
 </section>
 
-<div id="barcode-scanner-modal" class="receipt-modal is-hidden">
+<div id="barcode-scanner-modal" class="receipt-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="scanner-title">
     <div class="receipt-card scanner-card">
         <div class="receipt-head">
             <h3 id="scanner-title"><i class="bi bi-upc-scan"></i> Barcode Scanner</h3>
-            <button id="scanner-close" type="button" class="receipt-close">x</button>
+            <button id="scanner-close" type="button" class="receipt-close" aria-label="Close barcode scanner">x</button>
         </div>
         <div class="scanner-body">
             <div id="scanner-reader"></div>
             <p id="scanner-status" class="scanner-status">Ready to scan.</p>
             <div class="scanner-actions">
-                <button id="scanner-stop" type="button" class="scan-btn"><i class="bi bi-stop-fill"></i> Stop</button>
+                <button id="scanner-stop" type="button" class="secondary-btn"><i class="bi bi-stop-fill"></i> Stop</button>
             </div>
         </div>
     </div>
 </div>
 
-<div id="debt-pin-modal" class="receipt-modal is-hidden">
+<div id="debt-pin-modal" class="receipt-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="debt-pin-modal-title">
     <div class="receipt-card debt-pin-modal-card">
         <div class="receipt-head">
-            <h3><i class="bi bi-shield-lock"></i> Debt Authorization PIN</h3>
-            <button id="debt-pin-close" type="button" class="receipt-close">&times;</button>
+            <h3 id="debt-pin-modal-title"><i class="bi bi-shield-lock"></i> Debt Authorization PIN</h3>
+            <button id="debt-pin-close" type="button" class="receipt-close" aria-label="Close debt authorization PIN">&times;</button>
         </div>
         <p id="debt-pin-modal-summary" class="scanner-status">Ask the debtor to enter their PIN.</p>
         <div class="payment-wrap">
@@ -145,50 +164,50 @@
         </div>
         <p id="debt-pin-modal-result" class="result-msg"></p>
         <div class="confirm-actions">
-            <button id="debt-pin-cancel" type="button" class="scan-btn">Cancel</button>
+            <button id="debt-pin-cancel" type="button" class="secondary-btn">Cancel</button>
             <button id="debt-pin-save" type="button" class="primary-btn"><i class="bi bi-check2-circle"></i> Use PIN</button>
         </div>
     </div>
 </div>
 
-<div id="confirm-transaction-modal" class="receipt-modal is-hidden">
+<div id="confirm-transaction-modal" class="receipt-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="confirm-transaction-title">
     <div class="receipt-card confirm-card">
         <div class="receipt-head">
-            <h3><i class="bi bi-check2-square"></i> Confirm Transaction</h3>
-            <button id="confirm-close" type="button" class="receipt-close">x</button>
+            <h3 id="confirm-transaction-title"><i class="bi bi-check2-square"></i> Confirm Transaction</h3>
+            <button id="confirm-close" type="button" class="receipt-close" aria-label="Close transaction confirmation">x</button>
         </div>
 
         <div id="confirm-transaction-content"></div>
 
         <div class="confirm-actions">
-            <button id="confirm-cancel" type="button" class="scan-btn">Cancel</button>
+            <button id="confirm-cancel" type="button" class="secondary-btn">Cancel</button>
             <button id="confirm-proceed" type="button" class="primary-btn"><i class="bi bi-check2-circle"></i> Proceed</button>
         </div>
     </div>
 </div>
 
-<div id="receipt-modal" class="receipt-modal is-hidden">
+<div id="receipt-modal" class="receipt-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="receipt-modal-title">
     <div class="receipt-card">
         <div class="receipt-head">
-            <h3>Transaction Receipt</h3>
-            <button id="receipt-close" type="button" class="receipt-close">&times;</button>
+            <h3 id="receipt-modal-title">Transaction Receipt</h3>
+            <button id="receipt-close" type="button" class="receipt-close" aria-label="Close transaction receipt">&times;</button>
         </div>
 
         <div id="receipt-content"></div>
 
         <div class="receipt-actions">
-            <button id="receipt-new" type="button" class="scan-btn"><i class="bi bi-plus-circle"></i> New Transaction</button>
-            <button id="receipt-view" type="button" class="scan-btn"><i class="bi bi-box-arrow-up-right"></i> View Receipt</button>
+            <button id="receipt-new" type="button" class="secondary-btn"><i class="bi bi-plus-circle"></i> New Transaction</button>
+            <button id="receipt-view" type="button" class="secondary-btn"><i class="bi bi-box-arrow-up-right"></i> View Receipt</button>
             <button id="receipt-print" type="button" class="primary-btn"><i class="bi bi-printer"></i> Print Receipt</button>
         </div>
     </div>
 </div>
 
-<div id="debt-payment-modal" class="receipt-modal is-hidden">
+<div id="debt-payment-modal" class="receipt-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="debt-payment-title">
     <div class="receipt-card confirm-card debt-payment-modal-card">
         <div class="receipt-head">
-            <h3><i class="bi bi-cash-coin"></i> Direct Debt Payment</h3>
-            <button id="debt-payment-close" type="button" class="receipt-close">&times;</button>
+            <h3 id="debt-payment-title"><i class="bi bi-cash-coin"></i> Direct Debt Payment</h3>
+            <button id="debt-payment-close" type="button" class="receipt-close" aria-label="Close direct debt payment">&times;</button>
         </div>
         <p class="scanner-status">Use this only when the debtor pays the store directly. It reduces their existing debt and records cash/e-cash in the store day.</p>
         <div class="payment-wrap">
@@ -222,17 +241,17 @@
         </div>
         <p id="debt-payment-result" class="result-msg"></p>
         <div class="confirm-actions">
-            <button id="debt-payment-cancel" type="button" class="scan-btn">Cancel</button>
+            <button id="debt-payment-cancel" type="button" class="secondary-btn">Cancel</button>
             <button id="debt-payment-save" type="button" class="primary-btn"><i class="bi bi-check2-circle"></i> Record Payment</button>
         </div>
     </div>
 </div>
 
-<div id="opening-balance-modal" class="receipt-modal is-hidden">
+<div id="opening-balance-modal" class="receipt-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="opening-balance-title">
     <div class="receipt-card confirm-card opening-balance-card">
         <div class="receipt-head">
             <h3 id="opening-balance-title"><i class="bi bi-safe2"></i> Open Store Day</h3>
-            <button id="opening-balance-close" type="button" class="receipt-close">&times;</button>
+            <button id="opening-balance-close" type="button" class="receipt-close" aria-label="Close store-day opening form">&times;</button>
         </div>
         <p id="opening-balance-description" class="scanner-status">Enter today&apos;s starting cash and e-cash before accepting POS transactions.</p>
         <div class="opening-balance-fields">
@@ -251,17 +270,17 @@
         </div>
         <p id="opening-balance-result" class="result-msg"></p>
         <div class="confirm-actions">
-            <button id="opening-balance-cancel" type="button" class="scan-btn">Later</button>
+            <button id="opening-balance-cancel" type="button" class="secondary-btn">Later</button>
             <button id="opening-balance-save" type="button" class="primary-btn"><i class="bi bi-check2-circle"></i> Open Store Day</button>
         </div>
     </div>
 </div>
 
-<div id="store-day-close-modal" class="receipt-modal is-hidden">
+<div id="store-day-close-modal" class="receipt-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="store-day-close-title">
     <div class="receipt-card confirm-card store-day-close-card">
         <div class="receipt-head">
-            <h3><i class="bi bi-door-closed"></i> Close Store Day</h3>
-            <button id="store-day-close-x" type="button" class="receipt-close">&times;</button>
+            <h3 id="store-day-close-title"><i class="bi bi-door-closed"></i> Close Store Day</h3>
+            <button id="store-day-close-x" type="button" class="receipt-close" aria-label="Close store-day closing form">&times;</button>
         </div>
         <p id="store-day-close-summary" class="scanner-status store-day-close-summary">Review expected cash and enter counted totals.</p>
         <div id="store-day-close-reconcile" class="store-day-close-reconcile"></div>
@@ -283,7 +302,7 @@
         </div>
         <p id="store-day-close-result" class="result-msg"></p>
         <div class="confirm-actions">
-            <button id="store-day-close-cancel" type="button" class="scan-btn">Cancel</button>
+            <button id="store-day-close-cancel" type="button" class="secondary-btn">Cancel</button>
             <button id="store-day-close-save" type="button" class="primary-btn"><i class="bi bi-check2-circle"></i> Close Store Day</button>
         </div>
     </div>

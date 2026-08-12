@@ -6,10 +6,14 @@
 
 <?= $this->section('content') ?>
 <section class="admin-overview-shell" data-store-id="<?= (int) $storeId ?>">
-    <div class="admin-overview-head">
-        <h3 id="sd-store-name">Store Details</h3>
-        <p id="sd-store-meta">Loading store profile...</p>
-    </div>
+    <?= view('components/page_header', [
+        'eyebrow' => 'Store operations',
+        'title' => 'Store details',
+        'titleId' => 'sd-store-name',
+        'description' => 'Loading store profile...',
+        'descriptionId' => 'sd-store-meta',
+        'icon' => 'bi bi-shop-window',
+    ]) ?>
 
     <div class="summary-grid">
         <?= view('components/stat_card', ['title' => 'Total Transactions', 'value' => '0', 'valueId' => 'sd-txn-count', 'icon' => 'bi bi-receipt-cutoff', 'tone' => 'users']) ?>
@@ -22,25 +26,26 @@
         <?= view('components/stat_card', ['title' => 'Low Stock', 'value' => '0', 'valueId' => 'sd-low-stock', 'icon' => 'bi bi-exclamation-triangle', 'tone' => 'warning']) ?>
     </div>
 
-    <div class="overview-grid">
-        <article class="overview-table-wrap">
+    <div class="overview-grid store-detail-overview-grid">
+        <article class="dash-panel">
             <h4>Store Day</h4>
             <div id="sd-day-session" class="stack-list">
-                <div class="mini-bar-empty">Loading store day status...</div>
+                <?= view('components/data_state', ['type' => 'loading', 'message' => 'Loading store day status...']) ?>
             </div>
         </article>
 
-        <article class="overview-table-wrap">
+        <article class="dash-panel">
             <h4>Assigned Officers</h4>
             <div id="sd-officers" class="stack-list">
-                <div class="mini-bar-empty">Loading officers...</div>
+                <?= view('components/data_state', ['type' => 'loading', 'message' => 'Loading officers...']) ?>
             </div>
         </article>
     </div>
 
-    <div class="overview-table-wrap">
-        <h4>Inventory</h4>
-        <table class="table">
+    <section class="data-panel">
+        <header class="data-panel-head"><h4>Inventory</h4></header>
+        <div class="data-panel-body table-standard-wrap">
+        <table class="table table-standard">
             <thead>
                 <tr>
                     <th>Product</th>
@@ -49,14 +54,16 @@
                 </tr>
             </thead>
             <tbody id="sd-inventory-body">
-                <tr><td colspan="3">Loading inventory...</td></tr>
+                <?= view('components/data_state', ['tag' => 'tr', 'colspan' => 3, 'type' => 'loading', 'message' => 'Loading inventory...']) ?>
             </tbody>
         </table>
-    </div>
+        </div>
+    </section>
 
-    <div class="overview-table-wrap">
-        <h4>Recent Transactions</h4>
-        <table class="table">
+    <section class="data-panel">
+        <header class="data-panel-head"><h4>Recent Transactions</h4></header>
+        <div class="data-panel-body table-standard-wrap">
+        <table class="table table-standard">
             <thead>
                 <tr>
                     <th>Date</th>
@@ -66,10 +73,11 @@
                 </tr>
             </thead>
             <tbody id="sd-transactions-body">
-                <tr><td colspan="4">Loading transactions...</td></tr>
+                <?= view('components/data_state', ['tag' => 'tr', 'colspan' => 4, 'type' => 'loading', 'message' => 'Loading transactions...']) ?>
             </tbody>
         </table>
-    </div>
+        </div>
+    </section>
 </section>
 <?= $this->endSection() ?>
 

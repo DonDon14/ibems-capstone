@@ -75,19 +75,41 @@ Use `app/Views/components/data_state.php` for initial loading, empty, error, and
 
 ### Buttons
 
-Use the shared button system:
+Use the shared button system. All ordinary action buttons must use one semantic variant; page styles must not redefine these classes:
 
 - `.btn-primary` or `.primary-btn` for the main action
 - `.btn-secondary` or `.secondary-btn` for neutral actions
 - `.btn-danger` or `.danger-btn` for destructive actions
 - `.btn-ghost` for low-emphasis actions
 - `.btn-sm` for compact table actions
+- `.btn-icon` with a semantic variant for icon-only actions
 
 Buttons must use an actual `<button>` for actions and an `<a>` for navigation. Icon-only controls require an accessible label.
+Tabs, segmented filters, calendar navigation, suggestion options, quantity steppers, and other specialized controls may retain their component class, but they must inherit the global focus and disabled behavior. Do not use page-specific color, radius, hover, or loading rules for ordinary actions.
 
 ### Tables
 
 Use `.table.table-standard` inside `.table-standard-wrap`.
+
+When a table needs a visible section title, use the shared panel anatomy rather
+than placing a heading directly inside the scroll wrapper:
+
+```html
+<section class="data-panel">
+    <header class="data-panel-head"><h4>Section title</h4></header>
+    <div class="data-panel-body table-standard-wrap">
+        <table class="table table-standard">...</table>
+    </div>
+</section>
+```
+
+Use `.dash-panel` for non-table content cards. Do not use a table wrapper as a
+generic content panel.
+
+For repeated rich records that are not tabular, use one `.record-panel`
+containing `.record-list`; each generated record uses `.record-list-item`.
+The panel owns the outside boundary and items use internal separators. Do not
+give every record its own rounded outer border.
 
 - Put search and filters before the table.
 - Give sortable or interactive rows a visible hover/focus state.

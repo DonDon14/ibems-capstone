@@ -20,6 +20,18 @@ function srMoney(value) {
     return window.IbemsFormat?.money(value) || `PHP ${Number(value || 0).toFixed(2)}`;
 }
 
+function srDebtDataState(type, message) {
+    const safeType = ["loading", "empty", "error", "success"].includes(type) ? type : "loading";
+    const icons = {
+        loading: "bi bi-arrow-repeat",
+        empty: "bi bi-inbox",
+        error: "bi bi-exclamation-circle",
+        success: "bi bi-check-circle",
+    };
+    const role = safeType === "error" ? "alert" : "status";
+    return `<div class="data-state data-state--${safeType}" role="${role}" aria-live="polite"><i class="${icons[safeType]}" aria-hidden="true"></i><div><strong>${srEscape(message)}</strong></div></div>`;
+}
+
 function srDateTime(value) {
     return window.IbemsFormat?.dateTime(value) || new Date(value).toLocaleString();
 }
@@ -205,7 +217,7 @@ function srRenderDebts(rows) {
     const body = document.getElementById("debt-body");
     const countText = document.getElementById("staff-count-text");
     if (!Array.isArray(rows) || rows.length === 0) {
-        body.innerHTML = '<div class="staff-empty rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">No debt records found.</div>';
+        body.innerHTML = srDebtDataState("empty", "No debt records found.");
         if (countText) countText.textContent = "Showing 0 records";
         return;
     }
@@ -271,11 +283,26 @@ async function srLoadDebtRecords() {
     const params = new URLSearchParams();
     if (q) params.set("q", q);
 
-    const response = await fetch(`/store/debt-customers?${params.toString()}`);
-    const data = await response.json();
+    const body = document.getElementById("debt-body");
+    const countText = document.getElementById("staff-count-text");
+    body.innerHTML = srDebtDataState("loading", "Loading debt records...");
+
+    let data;
+    try {
+        const response = await fetch(`/store/debt-customers?${params.toString()}`);
+        data = await response.json();
+    } catch (error) {
+        const message = error?.message || "Unable to load debt records.";
+        body.innerHTML = srDebtDataState("error", message);
+        if (countText) countText.textContent = "Showing 0 records";
+        srSetResult(message, "error");
+        return;
+    }
     if (!data || data.status !== "success") {
-        srSetResult(data?.message || "Unable to load debt records.", "error");
-        srRenderDebts([]);
+        const message = data?.message || "Unable to load debt records.";
+        body.innerHTML = srDebtDataState("error", message);
+        if (countText) countText.textContent = "Showing 0 records";
+        srSetResult(message, "error");
         return;
     }
     srRenderDebts(data.customers);
@@ -499,6 +526,9 @@ window.addEventListener("beforeunload", () => {
         await srLoadStores();
         await srLoadDebtRecords();
     } catch (error) {
-        srSetResult(error.message || "Unable to load staff records.", "error");
+        const message = error.message || "Unable to load staff records.";
+        document.getElementById("debt-body").innerHTML = srDebtDataState("error", message);
+        document.getElementById("staff-count-text").textContent = "Showing 0 records";
+        srSetResult(message, "error");
     }
 })();

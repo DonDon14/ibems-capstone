@@ -66,7 +66,7 @@
         </div>
         <div class="audit-filter-actions">
             <button id="audit-search-btn" class="primary-btn" type="button"><i class="bi bi-search"></i> Search</button>
-            <button id="audit-refresh-btn" class="history-action alt" type="button"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+            <button id="audit-refresh-btn" class="secondary-btn" type="button"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
         </div>
     </div>
 
@@ -96,7 +96,7 @@
     </div>
 </section>
 
-<div id="audit-view-modal" class="admin-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="audit-view-title">
+<div id="audit-view-modal" class="admin-modal admin-overview-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="audit-view-title">
     <div class="admin-modal-card max-h-[92vh] w-[min(840px,95vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
         <div class="admin-modal-head">
             <div>

@@ -24,6 +24,19 @@ function sdInitials(text) {
         .join("") || "PR";
 }
 
+function sdDataState(type, message, colspan = 0) {
+    const safeType = ["loading", "empty", "error", "success"].includes(type) ? type : "loading";
+    const icons = {
+        loading: "bi bi-arrow-repeat",
+        empty: "bi bi-inbox",
+        error: "bi bi-exclamation-circle",
+        success: "bi bi-check-circle",
+    };
+    const role = safeType === "error" ? "alert" : "status";
+    const content = `<div class="data-state data-state--${safeType}" role="${role}" aria-live="polite"><i class="${icons[safeType]}" aria-hidden="true"></i><div><strong>${sdEscape(message)}</strong></div></div>`;
+    return colspan > 0 ? `<tr class="data-state-row"><td colspan="${Number(colspan)}">${content}</td></tr>` : content;
+}
+
 function sdReviewLabel(value) {
     const labels = {
         not_required: "No Review Needed",
@@ -69,7 +82,7 @@ function sdRenderDaySession(session) {
     if (!wrap) return;
 
     if (!session) {
-        wrap.innerHTML = '<div class="mini-bar-empty">No store day session recorded yet.</div>';
+        wrap.innerHTML = sdDataState("empty", "No store day session recorded yet.");
         return;
     }
 
@@ -84,10 +97,10 @@ function sdRenderDaySession(session) {
     const canReview = isClosed && reviewStatus !== "not_required" && !["approved", "waived", "corrected"].includes(reviewStatus);
     const reviewActions = canReview ? `
         <div class="variance-actions">
-            ${varianceStatus === "shortage" ? `<button type="button" class="admin-action-btn danger" data-variance-action="approve_shortage" data-session-id="${Number(session.id || 0)}">Approve Shortage</button>` : ""}
-            <button type="button" class="admin-action-btn" data-variance-action="waive" data-session-id="${Number(session.id || 0)}">Waive</button>
-            <button type="button" class="admin-action-btn" data-variance-action="corrected" data-session-id="${Number(session.id || 0)}">Corrected</button>
-            <button type="button" class="admin-action-btn" data-variance-action="needs_investigation" data-session-id="${Number(session.id || 0)}">Investigate</button>
+            ${varianceStatus === "shortage" ? `<button type="button" class="danger-btn btn-sm" data-variance-action="approve_shortage" data-session-id="${Number(session.id || 0)}">Approve Shortage</button>` : ""}
+            <button type="button" class="secondary-btn btn-sm" data-variance-action="waive" data-session-id="${Number(session.id || 0)}">Waive</button>
+            <button type="button" class="secondary-btn btn-sm" data-variance-action="corrected" data-session-id="${Number(session.id || 0)}">Corrected</button>
+            <button type="button" class="secondary-btn btn-sm" data-variance-action="needs_investigation" data-session-id="${Number(session.id || 0)}">Investigate</button>
         </div>
     ` : "";
     const reviewCopy = canReview && varianceStatus === "shortage"
@@ -189,7 +202,7 @@ function sdRenderOfficers(officers) {
 
     const rows = Array.isArray(officers) ? officers : [];
     if (rows.length === 0) {
-        wrap.innerHTML = '<div class="mini-bar-empty">No assigned officer.</div>';
+        wrap.innerHTML = sdDataState("empty", "No assigned officer.");
         return;
     }
 
@@ -213,7 +226,15 @@ async function loadStoreDetails() {
     const detailsUrl = root.getAttribute("data-details-url") || `/admin/stores/${storeId}/data`;
     const response = await fetch(detailsUrl);
     const data = await response.json();
-    if (!data || data.status !== "success") return;
+    if (!data || data.status !== "success") {
+        const message = data?.message || "Unable to load store details.";
+        document.getElementById("sd-store-meta").textContent = message;
+        document.getElementById("sd-day-session").innerHTML = sdDataState("error", message);
+        document.getElementById("sd-officers").innerHTML = sdDataState("error", message);
+        document.getElementById("sd-inventory-body").innerHTML = sdDataState("error", message, 3);
+        document.getElementById("sd-transactions-body").innerHTML = sdDataState("error", message, 4);
+        return;
+    }
 
     const store = data.store || {};
     const summary = data.summary || {};
@@ -236,7 +257,7 @@ async function loadStoreDetails() {
     const inventory = Array.isArray(data.inventory) ? data.inventory : [];
     const inventoryBody = document.getElementById("sd-inventory-body");
     if (inventory.length === 0) {
-        inventoryBody.innerHTML = '<tr><td colspan="3">No products in this store.</td></tr>';
+        inventoryBody.innerHTML = sdDataState("empty", "No products in this store.", 3);
     } else {
         inventoryBody.innerHTML = inventory.map((row) => `
             <tr>
@@ -261,7 +282,7 @@ async function loadStoreDetails() {
     const txns = Array.isArray(data.recent_transactions) ? data.recent_transactions : [];
     const txnBody = document.getElementById("sd-transactions-body");
     if (txns.length === 0) {
-        txnBody.innerHTML = '<tr><td colspan="4">No transactions yet.</td></tr>';
+        txnBody.innerHTML = sdDataState("empty", "No transactions yet.", 4);
     } else {
         txnBody.innerHTML = txns.map((row) => `
             <tr>

@@ -28,7 +28,7 @@
             </select>
         </div>
         <button id="store-search-btn" class="primary-btn" type="button">Search</button>
-        <button id="store-refresh-btn" class="history-action alt" type="button">Refresh</button>
+        <button id="store-refresh-btn" class="secondary-btn" type="button">Refresh</button>
     </div>
 
     <div id="stores-gallery" class="stores-gallery">

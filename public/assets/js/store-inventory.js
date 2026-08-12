@@ -31,6 +31,19 @@ function invMoney(value) {
     return window.IbemsFormat?.money(value) || `PHP ${Number(value || 0).toFixed(2)}`;
 }
 
+function invDataState(type, message, colspan = 0) {
+    const safeType = ["loading", "empty", "error", "success"].includes(type) ? type : "loading";
+    const icons = {
+        loading: "bi bi-arrow-repeat",
+        empty: "bi bi-inbox",
+        error: "bi bi-exclamation-circle",
+        success: "bi bi-check-circle",
+    };
+    const role = safeType === "error" ? "alert" : "status";
+    const content = `<div class="data-state data-state--${safeType}" role="${role}" aria-live="polite"><i class="${icons[safeType]}" aria-hidden="true"></i><div><strong>${invEscape(message)}</strong></div></div>`;
+    return colspan > 0 ? `<tr class="data-state-row"><td colspan="${Number(colspan)}">${content}</td></tr>` : content;
+}
+
 function invSkuExists(sku, excludeProductId = 0) {
     const normalizedSku = String(sku || "").trim().toLowerCase();
     const excludedId = Number(excludeProductId || 0);
@@ -159,7 +172,7 @@ function invRenderProductTable() {
     invRenderStockSummary(rows);
 
     if (rows.length === 0) {
-        body.innerHTML = '<tr><td colspan="5" class="inventory-empty">No products found.</td></tr>';
+        body.innerHTML = invDataState("empty", "No products found.", 5);
         return;
     }
 
@@ -197,7 +210,7 @@ function invRenderProductTable() {
                     </div>
                 </td>
                 <td>
-                    <button class="inventory-manage-btn" type="button" data-product-action="${product.id}">Manage</button>
+                    <button class="secondary-btn btn-sm" type="button" data-product-action="${product.id}">Manage</button>
                 </td>
             </tr>
         `;
@@ -250,7 +263,7 @@ function invRenderMovements() {
     if (!list) return;
 
     if (invMovements.length === 0) {
-        list.innerHTML = '<div class="inventory-movement-empty">No stock activity recorded yet.</div>';
+        list.innerHTML = invDataState("empty", "No stock activity recorded yet.");
         return;
     }
 
@@ -451,13 +464,28 @@ async function invLoadStores() {
 }
 
 async function invLoadProducts() {
-    const response = await fetch(`/store/products?store_id=${invActiveStoreId}`);
-    const data = await response.json();
+    const body = document.getElementById("inventory-product-body");
+    const summary = document.getElementById("inventory-stock-summary");
+    body.innerHTML = invDataState("loading", "Loading products...", 5);
+    summary.innerHTML = invDataState("loading", "Loading stock summary...");
+
+    let data;
+    try {
+        const response = await fetch(`/store/products?store_id=${invActiveStoreId}`);
+        data = await response.json();
+    } catch (error) {
+        const message = error?.message || "Unable to load products.";
+        body.innerHTML = invDataState("error", message, 5);
+        summary.innerHTML = invDataState("error", message);
+        throw new Error(message);
+    }
 
     if (!data || data.status !== "success") {
         invProducts = [];
-        invRenderProductTable();
-        throw new Error(data?.message || "Unable to load products.");
+        const message = data?.message || "Unable to load products.";
+        body.innerHTML = invDataState("error", message, 5);
+        summary.innerHTML = invDataState("error", message);
+        throw new Error(message);
     }
 
     invProducts = Array.isArray(data.products) ? data.products : [];
@@ -481,13 +509,24 @@ async function invLoadMovements() {
 
     const movementType = encodeURIComponent(invGetElementValue("inventory-movement-type").trim());
     const typeQuery = movementType ? `&type=${movementType}` : "";
-    const response = await fetch(`/store/inventory/movements?store_id=${invActiveStoreId}&limit=8${typeQuery}`);
-    const data = await response.json();
+    const list = document.getElementById("inventory-movement-list");
+    list.innerHTML = invDataState("loading", "Loading stock activity...");
+
+    let data;
+    try {
+        const response = await fetch(`/store/inventory/movements?store_id=${invActiveStoreId}&limit=8${typeQuery}`);
+        data = await response.json();
+    } catch (error) {
+        const message = error?.message || "Unable to load stock activity.";
+        list.innerHTML = invDataState("error", message);
+        throw new Error(message);
+    }
 
     if (!data || data.status !== "success") {
         invMovements = [];
-        invRenderMovements();
-        throw new Error(data?.message || "Unable to load stock activity.");
+        const message = data?.message || "Unable to load stock activity.";
+        list.innerHTML = invDataState("error", message);
+        throw new Error(message);
     }
 
     invMovements = Array.isArray(data.movements) ? data.movements : [];
@@ -1101,6 +1140,16 @@ document.getElementById("modal-save-product").addEventListener("click", async ()
         invToggleProductImageInput();
         invUpdateCreateProductProjection();
     } catch (error) {
-        invSetResult(error.message || "Unable to initialize inventory page.", "error");
+        const message = error.message || "Unable to initialize inventory page.";
+        if (document.querySelector("#inventory-product-body .data-state--loading")) {
+            document.getElementById("inventory-product-body").innerHTML = invDataState("error", message, 5);
+        }
+        if (document.querySelector("#inventory-stock-summary .data-state--loading")) {
+            document.getElementById("inventory-stock-summary").innerHTML = invDataState("error", message);
+        }
+        if (document.querySelector("#inventory-movement-list .data-state--loading")) {
+            document.getElementById("inventory-movement-list").innerHTML = invDataState("error", message);
+        }
+        invSetResult(message, "error");
     }
 })();

@@ -143,10 +143,22 @@ function toggleLogoSourceUI() {
     document.getElementById("store-logo-url-wrap").style.display = logoInputMode === "url" ? "" : "none";
 }
 
+function renderStoresDataState(type, message) {
+    const safeType = ["loading", "empty", "error", "success"].includes(type) ? type : "loading";
+    const icons = {
+        loading: "bi bi-arrow-repeat",
+        empty: "bi bi-inbox",
+        error: "bi bi-exclamation-circle",
+        success: "bi bi-check-circle",
+    };
+    const role = safeType === "error" ? "alert" : "status";
+    return `<div class="data-state data-state--${safeType}" role="${role}" aria-live="polite"><i class="${icons[safeType]}" aria-hidden="true"></i><div><strong>${sEscape(message)}</strong></div></div>`;
+}
+
 function renderStores(rows) {
     const gallery = document.getElementById("stores-gallery");
     if (!Array.isArray(rows) || rows.length === 0) {
-        gallery.innerHTML = '<div class="store-card-empty">No stores found.</div>';
+        gallery.innerHTML = renderStoresDataState("empty", "No stores found.");
         return;
     }
 
@@ -172,7 +184,7 @@ function renderStores(rows) {
                     <small>${row.created_at ? sEscape(sDateTime(row.created_at)) : "-"}</small>
                 </div>
                 <div class="store-card-right">
-                    ${canManageStores ? `<button class="card-action-btn" type="button" data-edit-store="${row.id}"><i class="bi bi-pencil"></i> Edit</button>` : ""}
+                    ${canManageStores ? `<button class="secondary-btn btn-sm" type="button" data-edit-store="${row.id}"><i class="bi bi-pencil"></i> Edit</button>` : ""}
                 </div>
             </a>
         `;
@@ -199,7 +211,7 @@ async function loadStores() {
     const data = await response.json();
     if (!data || data.status !== "success") {
         storesData = [];
-        renderStores([]);
+        document.getElementById("stores-gallery").innerHTML = renderStoresDataState("error", data?.message || "Unable to load stores.");
         setStoresResult(data?.message || "Unable to load stores.", "error");
         return;
     }
@@ -428,6 +440,7 @@ document.addEventListener("click", (event) => {
         }
         await loadStores();
     } catch (error) {
+        document.getElementById("stores-gallery").innerHTML = renderStoresDataState("error", error.message || "Failed to initialize store management.");
         setStoresResult(error.message || "Failed to initialize store management.", "error");
     }
 })();

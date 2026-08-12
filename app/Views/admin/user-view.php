@@ -2,10 +2,12 @@
 
 <?= $this->section('content') ?>
 <section class="admin-overview-shell space-y-5">
-    <div class="admin-overview-head">
-        <h3 class="text-3xl font-bold tracking-tight text-slate-900">Employee Records</h3>
-        <p class="mt-1 text-base text-slate-600">Manage employee and student profiles, roles, salary, credit, and account status.</p>
-    </div>
+    <?= view('components/page_header', [
+        'eyebrow' => 'Identity administration',
+        'title' => 'Employee records',
+        'description' => 'Manage employee and student profiles, roles, salary, credit, and account status.',
+        'icon' => 'bi bi-people',
+    ]) ?>
 
     <div class="summary-grid grid gap-3 md:grid-cols-2 xl:grid-cols-4">
         <?= view('components/stat_card', ['title' => 'Total Users', 'value' => '0', 'valueId' => 'uv-total-users', 'icon' => 'bi bi-people', 'tone' => 'users']) ?>
@@ -23,10 +25,13 @@
 
     <div class="overview-filter uv-filter-panel rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div class="uv-filter-main flex flex-wrap items-end gap-3">
-            <div class="uv-search-wrap relative min-w-[260px] grow">
-                <i class="bi bi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                <input id="uv-search" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm text-slate-700 outline-none ring-0 transition focus:border-blue-300 focus:bg-white" type="search" placeholder="Search name, ID, office...">
-            </div>
+            <label class="uv-search-field min-w-[260px] grow">
+                <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Search users</span>
+                <span class="uv-search-wrap relative block">
+                    <i class="bi bi-search pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" aria-hidden="true"></i>
+                    <input id="uv-search" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm text-slate-700 outline-none ring-0 transition focus:border-blue-300 focus:bg-white" type="search" placeholder="Search name, ID, office...">
+                </span>
+            </label>
             <label class="uv-select-field min-w-[170px] grow basis-[170px]">
                 <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Role</span>
                 <select id="uv-role-filter" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300">
@@ -49,29 +54,32 @@
             </label>
         </div>
         <div class="uv-filter-actions mt-3 flex flex-wrap gap-2">
-            <button id="uv-search-btn" class="history-action alt inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="button"><i class="bi bi-search"></i> Search</button>
-            <button id="uv-refresh-btn" class="history-action alt inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="button"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
-            <button id="uv-import-btn" class="secondary-btn inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50" type="button"><i class="bi bi-upload"></i> Import CSV</button>
-            <button id="uv-export-btn" class="primary-btn inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-blue-700" type="button"><i class="bi bi-download"></i> Export CSV</button>
-            <button id="uv-add-btn" class="primary-btn inline-flex h-10 items-center gap-2 rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-blue-700" type="button"><i class="bi bi-plus-lg"></i> Add User</button>
+            <button id="uv-search-btn" class="secondary-btn" type="button"><i class="bi bi-search"></i> Search</button>
+            <button id="uv-refresh-btn" class="secondary-btn" type="button"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+            <button id="uv-import-btn" class="secondary-btn" type="button"><i class="bi bi-upload"></i> Import CSV</button>
+            <button id="uv-export-btn" class="primary-btn" type="button"><i class="bi bi-download"></i> Export CSV</button>
+            <button id="uv-add-btn" class="primary-btn" type="button"><i class="bi bi-plus-lg"></i> Add User</button>
         </div>
     </div>
 
     <p id="uv-result" class="stores-result text-sm font-semibold"></p>
     <p id="uv-count-text" class="uv-count-text text-sm text-slate-500">Showing 0 of 0 records</p>
 
-    <div class="overview-table-wrap uv-list-wrap rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
-        <div id="uv-body" class="uv-record-list grid gap-2">
-            <div class="uv-empty rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">Loading records...</div>
+    <section class="record-panel uv-list-wrap">
+        <div id="uv-body" class="record-list uv-record-list">
+            <?= view('components/data_state', [
+                'type' => 'loading',
+                'message' => 'Loading employee records...',
+            ]) ?>
         </div>
-    </div>
+    </section>
 </section>
 
-<div id="uv-edit-modal" class="admin-modal is-hidden">
+<div id="uv-edit-modal" class="admin-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="uv-edit-title">
     <div class="admin-modal-card max-h-[92vh] w-[min(980px,95vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
         <div class="admin-modal-head">
-            <h4 class="text-lg font-bold text-slate-900">Edit User</h4>
-            <button id="uv-edit-close" type="button" class="admin-modal-close">x</button>
+            <h4 id="uv-edit-title" class="text-lg font-bold text-slate-900">Edit User</h4>
+            <button id="uv-edit-close" type="button" class="admin-modal-close" aria-label="Close edit user dialog">x</button>
         </div>
         <div class="form-grid grid gap-3 md:grid-cols-2">
             <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-e-employee-id">Employee ID</label><input id="uv-e-employee-id" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="text"></div>
@@ -104,40 +112,40 @@
             </div>
         </div>
         <div class="admin-modal-actions">
-            <button id="uv-edit-save" class="primary-btn inline-flex h-10 items-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700" type="button">Save Changes</button>
+            <button id="uv-edit-save" class="primary-btn" type="button">Save Changes</button>
         </div>
     </div>
 </div>
 
-<div id="uv-view-modal" class="admin-modal is-hidden">
+<div id="uv-view-modal" class="admin-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="uv-view-title">
     <div class="admin-modal-card max-h-[92vh] w-[min(980px,95vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
         <div class="admin-modal-head">
-            <h4 class="text-lg font-bold text-slate-900">Employee Details</h4>
-            <button id="uv-view-close" type="button" class="admin-modal-close">x</button>
+            <h4 id="uv-view-title" class="text-lg font-bold text-slate-900">Employee Details</h4>
+            <button id="uv-view-close" type="button" class="admin-modal-close" aria-label="Close employee details dialog">x</button>
         </div>
         <div class="form-grid grid gap-3 md:grid-cols-2">
-            <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Employee ID</label><input id="uv-v-employee-id" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
-            <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Name</label><input id="uv-v-name" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
-            <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Email</label><input id="uv-v-email" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
-            <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Roles</label><input id="uv-v-roles" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
-            <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Category</label><input id="uv-v-type" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
-            <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Status</label><input id="uv-v-status" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
-            <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Base Salary</label><input id="uv-v-salary" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
-            <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Credit Limit</label><input id="uv-v-credit-limit" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
-            <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Current Debt</label><input id="uv-v-current-debt" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
-            <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500">Created At</label><input id="uv-v-created-at" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
+            <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-v-employee-id">Employee ID</label><input id="uv-v-employee-id" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
+            <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-v-name">Name</label><input id="uv-v-name" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
+            <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-v-email">Email</label><input id="uv-v-email" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
+            <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-v-roles">Roles</label><input id="uv-v-roles" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
+            <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-v-type">Category</label><input id="uv-v-type" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
+            <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-v-status">Status</label><input id="uv-v-status" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
+            <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-v-salary">Base Salary</label><input id="uv-v-salary" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
+            <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-v-credit-limit">Credit Limit</label><input id="uv-v-credit-limit" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
+            <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-v-current-debt">Current Debt</label><input id="uv-v-current-debt" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
+            <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-v-created-at">Created At</label><input id="uv-v-created-at" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
         </div>
         <div class="admin-modal-actions">
-            <button id="uv-view-edit" class="primary-btn inline-flex h-10 items-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700" type="button">Edit User</button>
+            <button id="uv-view-edit" class="primary-btn" type="button">Edit User</button>
         </div>
     </div>
 </div>
 
-<div id="uv-add-modal" class="admin-modal is-hidden">
+<div id="uv-add-modal" class="admin-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="uv-add-title">
     <div class="admin-modal-card max-h-[92vh] w-[min(980px,95vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
         <div class="admin-modal-head">
-            <h4 class="text-lg font-bold text-slate-900">Add User</h4>
-            <button id="uv-add-close" type="button" class="admin-modal-close">x</button>
+            <h4 id="uv-add-title" class="text-lg font-bold text-slate-900">Add User</h4>
+            <button id="uv-add-close" type="button" class="admin-modal-close" aria-label="Close add user dialog">x</button>
         </div>
         <div class="form-grid grid gap-3 md:grid-cols-2">
             <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-a-employee-id">Employee ID</label><input id="uv-a-employee-id" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="text"></div>
@@ -165,16 +173,16 @@
             <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-a-credit-limit">Credit Limit</label><input id="uv-a-credit-limit" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="number" step="0.01" min="0"></div>
         </div>
         <div class="admin-modal-actions">
-            <button id="uv-add-save" class="primary-btn inline-flex h-10 items-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700" type="button">Create User</button>
+            <button id="uv-add-save" class="primary-btn" type="button">Create User</button>
         </div>
     </div>
 </div>
 
-<div id="uv-import-modal" class="admin-modal is-hidden">
+<div id="uv-import-modal" class="admin-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="uv-import-title">
     <div class="admin-modal-card max-h-[92vh] w-[min(720px,95vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
         <div class="admin-modal-head">
-            <h4 class="text-lg font-bold text-slate-900">Import Users CSV</h4>
-            <button id="uv-import-close" type="button" class="admin-modal-close">x</button>
+            <h4 id="uv-import-title" class="text-lg font-bold text-slate-900">Import Users CSV</h4>
+            <button id="uv-import-close" type="button" class="admin-modal-close" aria-label="Close import users dialog">x</button>
         </div>
         <div class="field space-y-1">
             <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-import-file">CSV File</label>
@@ -182,7 +190,7 @@
             <small class="text-sm text-slate-500">Required columns: name, email, role, user_type. Use comma, pipe, semicolon, or spaces for multiple roles. Optional: employee_id, base_salary, credit_limit, is_active.</small>
         </div>
         <div class="admin-modal-actions">
-            <button id="uv-import-submit" class="primary-btn inline-flex h-10 items-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700" type="button">Import</button>
+            <button id="uv-import-submit" class="primary-btn" type="button">Import</button>
         </div>
     </div>
 </div>

@@ -6,39 +6,48 @@
 
 <?= $this->section('content') ?>
 <section class="inventory-shell">
-    <div class="inventory-top">
-        <div>
-            <h3>Inventory Management</h3>
-            <p>View all products, adjust real stock counts, and add new stock.</p>
-        </div>
+    <?php ob_start(); ?>
         <div class="inventory-top-actions">
             <a href="/store/settings" class="secondary-btn link-reset">Manage Categories</a>
             <button id="open-product-modal-top" class="primary-btn inventory-add-btn" type="button"><span class="plus">+</span> Add New Product</button>
         </div>
-    </div>
+    <?php $inventoryHeaderActions = ob_get_clean(); ?>
+    <?= view('components/page_header', [
+        'eyebrow' => 'Stock operations',
+        'title' => 'Inventory management',
+        'description' => 'View all products, adjust real stock counts, and add new stock.',
+        'icon' => 'bi bi-box-seam',
+        'actions' => $inventoryHeaderActions,
+    ]) ?>
 
     <article class="inventory-card">
         <div class="inventory-list-head">
             <h4>Products</h4>
             <div class="inventory-filter-controls">
-                <input id="inventory-search" type="search" placeholder="Search product, SKU, barcode, supplier, or bin">
-                <select id="inventory-category-filter" aria-label="Filter by category">
-                    <option value="">All Categories</option>
-                </select>
-                <select id="inventory-stock-filter" aria-label="Filter by stock status">
-                    <option value="">All Stock</option>
-                    <option value="in">In Stock</option>
-                    <option value="low">Low Stock</option>
-                    <option value="out">Out of Stock</option>
-                </select>
+                <label class="inventory-filter-field" for="inventory-search">
+                    <span>Search</span>
+                    <input id="inventory-search" type="search" placeholder="Product, SKU, barcode, supplier, or bin">
+                </label>
+                <label class="inventory-filter-field" for="inventory-category-filter">
+                    <span>Category</span>
+                    <select id="inventory-category-filter">
+                        <option value="">All Categories</option>
+                    </select>
+                </label>
+                <label class="inventory-filter-field" for="inventory-stock-filter">
+                    <span>Stock</span>
+                    <select id="inventory-stock-filter">
+                        <option value="">All Stock</option>
+                        <option value="in">In Stock</option>
+                        <option value="low">Low Stock</option>
+                        <option value="out">Out of Stock</option>
+                    </select>
+                </label>
                 <button id="inventory-clear-filters" class="secondary-btn" type="button">Clear</button>
             </div>
         </div>
         <div id="inventory-stock-summary" class="inventory-stock-summary" aria-live="polite">
-            <div class="inventory-summary-pill">
-                <span>Products</span>
-                <strong>Loading...</strong>
-            </div>
+            <?= view('components/data_state', ['type' => 'loading', 'message' => 'Loading stock summary...']) ?>
         </div>
         <div class="inventory-table-wrap">
             <table class="table">
@@ -52,7 +61,7 @@
                     </tr>
                 </thead>
                 <tbody id="inventory-product-body">
-                    <tr><td colspan="5">Loading products...</td></tr>
+                    <?= view('components/data_state', ['tag' => 'tr', 'colspan' => 5, 'type' => 'loading', 'message' => 'Loading products...']) ?>
                 </tbody>
             </table>
         </div>
@@ -76,18 +85,18 @@
             </div>
         </div>
         <div id="inventory-movement-list" class="inventory-movement-list">
-            <div class="inventory-movement-empty">Loading stock activity...</div>
+            <?= view('components/data_state', ['type' => 'loading', 'message' => 'Loading stock activity...']) ?>
         </div>
     </article>
 
     <p id="inventory-result" class="inventory-result"></p>
 </section>
 
-<div id="inventory-product-modal" class="inv-modal is-hidden">
+<div id="inventory-product-modal" class="inv-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="inventory-product-modal-title">
     <div class="inv-modal-card">
         <div class="inv-modal-head">
-            <h4>Add New Product</h4>
-            <button id="close-product-modal" type="button" class="inv-modal-close">x</button>
+            <h4 id="inventory-product-modal-title">Add New Product</h4>
+            <button id="close-product-modal" type="button" class="inv-modal-close" aria-label="Close new product form">x</button>
         </div>
 
         <div class="create-product-layout">
@@ -209,11 +218,11 @@
     </div>
 </div>
 
-<div id="inventory-product-action-modal" class="inv-modal is-hidden">
+<div id="inventory-product-action-modal" class="inv-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="inventory-product-action-title">
     <div class="inv-modal-card">
         <div class="inv-modal-head">
-            <h4>Manage Product</h4>
-            <button id="close-product-action-modal" type="button" class="inv-modal-close">x</button>
+            <h4 id="inventory-product-action-title">Manage Product</h4>
+            <button id="close-product-action-modal" type="button" class="inv-modal-close" aria-label="Close product management">x</button>
         </div>
 
         <div class="product-actions-body">

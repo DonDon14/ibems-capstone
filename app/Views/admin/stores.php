@@ -7,15 +7,17 @@
 <?= $this->section('content') ?>
 <?php $canManageStores = (bool) ($canManageStores ?? false); ?>
 <section class="admin-stores-shell" data-can-manage-stores="<?= $canManageStores ? '1' : '0' ?>">
-    <div class="admin-stores-head">
-        <div>
-            <h3><?= $canManageStores ? 'Store Management' : 'Assigned Stores' ?></h3>
-            <p><?= $canManageStores ? 'Create stores, assign officers, and manage store status.' : 'Review store-day variances for stores assigned to you.' ?></p>
-        </div>
-        <?php if ($canManageStores): ?>
-            <button id="open-store-modal" class="primary-btn" type="button">+ Add Store</button>
-        <?php endif; ?>
-    </div>
+    <?= view('components/page_header', [
+        'eyebrow' => $canManageStores ? 'Store administration' : 'Store supervision',
+        'title' => $canManageStores ? 'Store management' : 'Assigned stores',
+        'description' => $canManageStores
+            ? 'Create stores, assign officers, and manage store status.'
+            : 'Review store-day variances for stores assigned to you.',
+        'icon' => 'bi bi-shop',
+        'actions' => $canManageStores
+            ? '<button id="open-store-modal" class="primary-btn" type="button">+ Add Store</button>'
+            : null,
+    ]) ?>
 
     <div class="admin-stores-filters">
         <div class="field">
@@ -32,21 +34,24 @@
             </select>
         </div>
         <button id="store-search-btn" class="primary-btn" type="button">Search</button>
-        <button id="store-refresh-btn" class="history-action alt" type="button">Refresh</button>
+        <button id="store-refresh-btn" class="secondary-btn" type="button">Refresh</button>
     </div>
 
     <div id="stores-gallery" class="stores-gallery">
-        <div class="store-card-empty">Loading stores...</div>
+        <?= view('components/data_state', [
+            'type' => 'loading',
+            'message' => 'Loading stores...',
+        ]) ?>
     </div>
 
     <p id="stores-result" class="stores-result"></p>
 </section>
 
-<div id="store-modal" class="admin-modal is-hidden">
+<div id="store-modal" class="admin-modal admin-stores-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="store-modal-title">
     <div class="admin-modal-card">
         <div class="admin-modal-head">
             <h4 id="store-modal-title">Add Store</h4>
-            <button id="close-store-modal" type="button" class="admin-modal-close">x</button>
+            <button id="close-store-modal" type="button" class="admin-modal-close" aria-label="Close store form">x</button>
         </div>
 
         <div class="form-grid">
@@ -66,7 +71,7 @@
                 <div id="store-officer-suggestions" class="officer-suggestions is-hidden"></div>
                 <small id="store-officer-help" class="field-help">Stores can be created first and assigned to an officer later.</small>
             </div>
-            <div class="field">
+            <div class="field store-supervisors-field">
                 <label for="store-supervisor-search">Store Supervisors</label>
                 <div class="officer-picker-row">
                     <input id="store-supervisor-search" type="search" placeholder="Optional: type name, email, or employee ID">

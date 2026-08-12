@@ -6,10 +6,12 @@
 
 <?= $this->section('content') ?>
 <section class="admin-overview-shell">
-    <div class="admin-overview-head">
-        <h3>Accounting Debts Oversight</h3>
-        <p>Read-only debt and deduction visibility for admin audit.</p>
-    </div>
+    <?= view('components/page_header', [
+        'eyebrow' => 'Financial oversight',
+        'title' => 'Accounting debts oversight',
+        'description' => 'Read-only debt and deduction visibility for admin audit.',
+        'icon' => 'bi bi-cash-stack',
+    ]) ?>
 
     <div class="summary-grid">
         <?= view('components/stat_card', ['title' => 'Accounts', 'value' => '0', 'valueId' => 'ad-account-count', 'icon' => 'bi bi-people', 'tone' => 'users']) ?>
@@ -18,8 +20,9 @@
         <?= view('components/stat_card', ['title' => 'Today Deducted', 'value' => 'PHP 0.00', 'valueId' => 'ad-today-deducted', 'icon' => 'bi bi-cash-coin', 'tone' => 'finance']) ?>
     </div>
 
-    <div class="overview-table-wrap table-standard-wrap">
-        <h4>Top Debt Accounts</h4>
+    <section class="data-panel">
+        <header class="data-panel-head"><h4>Top Debt Accounts</h4></header>
+        <div class="data-panel-body table-standard-wrap">
         <table class="table table-standard">
             <thead>
                 <tr>
@@ -31,10 +34,16 @@
                 </tr>
             </thead>
             <tbody id="ad-top-body">
-                <tr><td colspan="5">Loading...</td></tr>
+                <?= view('components/data_state', [
+                    'tag' => 'tr',
+                    'colspan' => 5,
+                    'type' => 'loading',
+                    'message' => 'Loading debt records...',
+                ]) ?>
             </tbody>
         </table>
-    </div>
+        </div>
+    </section>
 </section>
 <?= $this->endSection() ?>
 

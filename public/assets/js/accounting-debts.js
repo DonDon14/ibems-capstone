@@ -1116,12 +1116,12 @@ function renderWorkflowResults(items, batchStatus, batchCreatedBy) {
     const canConfirm = ["submitted", "partially_processed"].includes(String(batchStatus || ""));
     section.classList.remove("hidden");
     if (batchStatus === "prepared") {
-        actions.innerHTML = '<button type="button" data-workflow-batch-action="submit" class="inline-flex h-10 items-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700">Submit for payroll processing</button>';
+        actions.innerHTML = '<button type="button" data-workflow-batch-action="submit" class="primary-btn">Submit for payroll processing</button>';
     } else if (batchStatus === "processed") {
-        actions.innerHTML = '<button type="button" data-workflow-batch-action="reconcile" class="inline-flex h-10 items-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700">Reconcile batch totals</button>';
+        actions.innerHTML = '<button type="button" data-workflow-batch-action="reconcile" class="primary-btn">Reconcile batch totals</button>';
     } else if (batchStatus === "reconciled") {
         actions.innerHTML = currentRole === "ACCOUNTING_OFFICE" && Number(batchCreatedBy || 0) !== currentUser
-            ? '<button type="button" data-workflow-batch-action="finalize" class="inline-flex h-10 items-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700">Finalize period</button>'
+            ? '<button type="button" data-workflow-batch-action="finalize" class="primary-btn">Finalize period</button>'
             : '<span class="inline-flex rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">Awaiting a different Accounting user for finalization</span>';
     } else if (batchStatus === "finalized") {
         actions.innerHTML = '<span class="inline-flex rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">Finalized and locked</span>';
@@ -1156,7 +1156,7 @@ function renderWorkflowResults(items, batchStatus, batchCreatedBy) {
                             <option value="returned_for_correction">Returned for correction</option>
                         </select>
                         <input class="workflow-reference h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm" maxlength="120" placeholder="Official payroll reference" aria-label="Official payroll reference">
-                        <button type="button" class="workflow-confirm-result inline-flex h-10 items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700">Confirm</button>
+                        <button type="button" class="workflow-confirm-result primary-btn btn-sm">Confirm</button>
                     </div>
                 ` : pending ? `
                     <div class="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-2 text-sm text-blue-800">Submit this prepared batch before recording results.</div>
@@ -1377,7 +1377,7 @@ function renderInvestigations(rows) {
                                 <option value="full_reversal">Full reversal</option>
                             </select>
                             <input class="investigation-amount h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm" type="number" min="0" step="0.01" value="0.00" aria-label="Recommended reversal amount">
-                            <button type="button" class="investigation-recommend inline-flex h-10 items-center justify-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700">Submit recommendation</button>
+                            <button type="button" class="investigation-recommend primary-btn">Submit recommendation</button>
                         </div>
                     </div>
                 ` : ""}
@@ -1386,7 +1386,7 @@ function renderInvestigations(rows) {
                         <strong>${aEscape(investigationLabel(row.recommended_action))} · ${aEscape(aMoney(row.recommended_amount || 0))}</strong>
                         <p class="mt-1">Recommended by ${aEscape(row.recommended_by_name || "Unknown")}.</p>
                         ${canApprove
-                            ? '<button type="button" class="investigation-approve mt-2 inline-flex h-10 items-center rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white hover:bg-emerald-700">Approve and post correction</button>'
+                            ? '<button type="button" class="investigation-approve primary-btn">Approve and post correction</button>'
                             : '<p class="mt-2 font-semibold">Awaiting approval by a different Accounting user.</p>'}
                     </div>
                 ` : ""}

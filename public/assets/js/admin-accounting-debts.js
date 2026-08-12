@@ -11,6 +11,18 @@ function aEscape(value) {
         .replace(/'/g, "&#39;");
 }
 
+function adDebtDataState(type, message) {
+    const safeType = ["loading", "empty", "error", "success"].includes(type) ? type : "loading";
+    const icons = {
+        loading: "bi bi-arrow-repeat",
+        empty: "bi bi-inbox",
+        error: "bi bi-exclamation-circle",
+        success: "bi bi-check-circle",
+    };
+    const role = safeType === "error" ? "alert" : "status";
+    return `<tr class="data-state-row"><td colspan="5"><div class="data-state data-state--${safeType}" role="${role}" aria-live="polite"><i class="${icons[safeType]}" aria-hidden="true"></i><div><strong>${aEscape(message)}</strong></div></div></td></tr>`;
+}
+
 function debtPercent(currentDebt, creditLimit) {
     const current = Number(currentDebt || 0);
     const limit = Number(creditLimit || 0);
@@ -21,7 +33,10 @@ function debtPercent(currentDebt, creditLimit) {
 async function loadAdminDebtOverview() {
     const response = await fetch("/admin/accounting-debts/data");
     const data = await response.json();
-    if (!data || data.status !== "success") return;
+    if (!data || data.status !== "success") {
+        document.getElementById("ad-top-body").innerHTML = adDebtDataState("error", data?.message || "Unable to load debt records.");
+        return;
+    }
 
     const summary = data.summary || {};
     document.getElementById("ad-account-count").textContent = String(summary.account_count || 0);
@@ -32,7 +47,7 @@ async function loadAdminDebtOverview() {
     const rows = Array.isArray(data.top_debts) ? data.top_debts : [];
     const body = document.getElementById("ad-top-body");
     if (rows.length === 0) {
-        body.innerHTML = '<tr><td colspan="5">No debt records.</td></tr>';
+        body.innerHTML = adDebtDataState("empty", "No debt records.");
         return;
     }
 

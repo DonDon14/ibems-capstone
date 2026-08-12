@@ -6,30 +6,33 @@
 
 <?= $this->section('content') ?>
 <section class="staff-shell space-y-5">
-    <div class="staff-head">
-        <div>
-            <h3 class="text-3xl font-bold tracking-tight text-slate-900">Employee Records</h3>
-            <p class="mt-1 text-base text-slate-600">Review overall employee debt balances and this store's employee transactions.</p>
-        </div>
-    </div>
+    <?= view('components/page_header', [
+        'eyebrow' => 'Employee accounts',
+        'title' => 'Employee records',
+        'description' => "Review overall employee debt balances and this store's employee transactions.",
+        'icon' => 'bi bi-person-vcard',
+    ]) ?>
 
     <article class="staff-card">
         <h4 class="text-lg font-bold text-slate-900">Overall Debt Balances</h4>
         <div class="staff-filters staff-filter-panel">
             <div class="staff-filter-main">
-                <div class="staff-search-wrap">
-                    <svg class="staff-search-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
-                        <circle cx="11" cy="11" r="6.5"></circle>
-                        <path d="m16 16 4 4"></path>
-                    </svg>
-                    <input id="debt-search" type="search" placeholder="Search name, ID, office...">
-                    <button id="debt-search-scan-btn" type="button" class="staff-scan-btn" title="Scan employee QR/ID">
-                        <i class="bi bi-qr-code-scan"></i>
-                    </button>
+                <div class="staff-search-field">
+                    <label for="debt-search">Search Employees</label>
+                    <div class="staff-search-wrap">
+                        <svg class="staff-search-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+                            <circle cx="11" cy="11" r="6.5"></circle>
+                            <path d="m16 16 4 4"></path>
+                        </svg>
+                        <input id="debt-search" type="search" placeholder="Name, ID, or office">
+                        <button id="debt-search-scan-btn" type="button" class="staff-scan-btn" title="Scan employee QR/ID">
+                            <i class="bi bi-qr-code-scan"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
             <div class="staff-filter-actions">
-                <button id="debt-search-btn" class="history-action alt" type="button"><i class="bi bi-search"></i> Search</button>
+                <button id="debt-search-btn" class="secondary-btn" type="button"><i class="bi bi-search"></i> Search</button>
             </div>
         </div>
         <p class="staff-scope-note">Debt figures are the employee's total balance across all stores. Click an employee to view transactions from the current store only.</p>
@@ -37,7 +40,7 @@
 
         <div class="staff-record-list-wrap">
             <div id="debt-body" class="staff-record-list grid gap-2">
-                <div class="staff-empty rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">Loading debt records...</div>
+                <?= view('components/data_state', ['type' => 'loading', 'message' => 'Loading debt records...']) ?>
             </div>
         </div>
     </article>
@@ -45,11 +48,11 @@
     <p id="staff-result" class="staff-result text-sm font-semibold"></p>
 </section>
 
-<div id="staff-employee-modal" class="receipt-modal is-hidden">
+<div id="staff-employee-modal" class="receipt-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="staff-employee-title">
     <div class="receipt-card staff-employee-card max-h-[92vh] w-[min(1200px,96vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
         <div class="receipt-head">
             <h3 id="staff-employee-title" class="text-lg font-bold text-slate-900">Employee Transactions</h3>
-            <button id="staff-employee-close" type="button" class="receipt-close">x</button>
+            <button id="staff-employee-close" type="button" class="receipt-close" aria-label="Close employee transactions">x</button>
         </div>
 
         <div id="staff-employee-summary" class="receipt-content-head mb-3 space-y-1 text-sm text-slate-700"></div>
@@ -66,7 +69,7 @@
             <div class="field checkbox-field">
                 <label class="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700"><input id="txn-debt-only" class="h-4 w-4" type="checkbox"> Debt only</label>
             </div>
-            <button id="txn-search-btn" class="primary-btn inline-flex h-10 items-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700" type="button">Apply</button>
+            <button id="txn-search-btn" class="primary-btn" type="button">Apply</button>
         </div>
 
         <div class="table-wrap table-standard-wrap overflow-auto rounded-xl border border-slate-200">
@@ -87,32 +90,32 @@
     </div>
 </div>
 
-<div id="staff-receipt-modal" class="receipt-modal is-hidden">
+<div id="staff-receipt-modal" class="receipt-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="staff-receipt-title">
     <div class="receipt-card max-h-[92vh] w-[min(760px,95vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
         <div class="receipt-head">
-            <h3 class="text-lg font-bold text-slate-900">Transaction Receipt</h3>
-            <button id="staff-receipt-close" type="button" class="receipt-close">x</button>
+            <h3 id="staff-receipt-title" class="text-lg font-bold text-slate-900">Transaction Receipt</h3>
+            <button id="staff-receipt-close" type="button" class="receipt-close" aria-label="Close transaction receipt">x</button>
         </div>
 
         <div id="staff-receipt-content"></div>
 
         <div class="receipt-actions">
-            <button id="staff-receipt-print" type="button" class="primary-btn inline-flex h-10 items-center rounded-xl bg-blue-600 px-4 text-sm font-semibold text-white transition hover:bg-blue-700">Print Receipt</button>
+            <button id="staff-receipt-print" type="button" class="primary-btn">Print Receipt</button>
         </div>
     </div>
 </div>
 
-<div id="staff-scanner-modal" class="receipt-modal is-hidden">
+<div id="staff-scanner-modal" class="receipt-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="staff-scanner-title">
     <div class="receipt-card scanner-card max-h-[92vh] w-[min(760px,95vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
         <div class="receipt-head">
-            <h3 class="text-lg font-bold text-slate-900"><i class="bi bi-person-badge"></i> Employee QR Scanner</h3>
-            <button id="staff-scanner-close" type="button" class="receipt-close">x</button>
+            <h3 id="staff-scanner-title" class="text-lg font-bold text-slate-900"><i class="bi bi-person-badge"></i> Employee QR Scanner</h3>
+            <button id="staff-scanner-close" type="button" class="receipt-close" aria-label="Close employee QR scanner">x</button>
         </div>
         <div class="scanner-body">
             <div id="staff-scanner-reader" class="w-full overflow-hidden rounded-xl border border-slate-200 bg-slate-900"></div>
             <p id="staff-scanner-status" class="scanner-status mt-3 text-sm text-slate-600">Ready to scan.</p>
             <div class="scanner-actions">
-                <button id="staff-scanner-stop" type="button" class="scan-btn inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"><i class="bi bi-stop-fill"></i> Stop</button>
+                <button id="staff-scanner-stop" type="button" class="secondary-btn"><i class="bi bi-stop-fill"></i> Stop</button>
             </div>
         </div>
     </div>

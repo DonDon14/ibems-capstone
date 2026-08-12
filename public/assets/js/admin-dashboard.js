@@ -115,10 +115,23 @@ function adRenderTopItemsChart(rows) {
     });
 }
 
+function adDataState(type, message, colspan = 0) {
+    const safeType = ["loading", "empty", "error", "success"].includes(type) ? type : "loading";
+    const icons = {
+        loading: "bi bi-arrow-repeat",
+        empty: "bi bi-inbox",
+        error: "bi bi-exclamation-circle",
+        success: "bi bi-check-circle",
+    };
+    const role = safeType === "error" ? "alert" : "status";
+    const content = `<div class="data-state data-state--${safeType}" role="${role}" aria-live="polite"><i class="${icons[safeType]}" aria-hidden="true"></i><div><strong>${adEscape(message)}</strong></div></div>`;
+    return colspan > 0 ? `<tr class="data-state-row"><td colspan="${Number(colspan)}">${content}</td></tr>` : content;
+}
+
 function adRenderTopStores(rows) {
     const body = document.getElementById("ad-top-stores-body");
     if (!Array.isArray(rows) || rows.length === 0) {
-        body.innerHTML = '<tr><td colspan="3">No store sales yet.</td></tr>';
+        body.innerHTML = adDataState("empty", "No store sales yet.", 3);
         return;
     }
 
@@ -161,7 +174,7 @@ function adRenderAlerts(rows) {
     if (!container) return;
 
     if (!Array.isArray(rows) || rows.length === 0) {
-        container.innerHTML = '<div class="admin-empty-state"><i class="bi bi-check2-circle"></i><span>No operational alerts right now.</span></div>';
+        container.innerHTML = adDataState("success", "No operational alerts right now.");
         return;
     }
 
@@ -187,7 +200,7 @@ function adRenderPaymentBreakdown(rows) {
     if (!container) return;
 
     if (!Array.isArray(rows) || rows.length === 0) {
-        container.innerHTML = '<div class="admin-empty-state">No payments recorded in the last 7 days.</div>';
+        container.innerHTML = adDataState("empty", "No payments recorded in the last 7 days.");
         return;
     }
 
@@ -257,10 +270,10 @@ async function adLoadDashboard() {
         healthMessageEl.textContent = "Unable to load operations status right now.";
         healthBreakdownEl.textContent = "";
         adRenderStoreDayStatus({});
-        adRenderAlerts([]);
-        adRenderPaymentBreakdown([]);
+        document.getElementById("ad-alerts-list").innerHTML = adDataState("error", "Unable to load operational alerts.");
+        document.getElementById("ad-payment-breakdown").innerHTML = adDataState("error", "Unable to load payment breakdown.");
         adDestroyCharts();
-        adRenderTopStores([]);
+        document.getElementById("ad-top-stores-body").innerHTML = adDataState("error", "Unable to load top stores.", 3);
     }
 }
 

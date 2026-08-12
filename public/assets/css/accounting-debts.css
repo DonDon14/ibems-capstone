@@ -255,8 +255,7 @@
     box-shadow: 0 12px 22px rgba(15, 23, 42, 0.12);
 }
 
-.history-action:hover,
-.primary-btn:hover {
+.history-action:hover {
     transform: translateY(-1px);
     filter: brightness(1.05);
     box-shadow: 0 10px 18px rgba(15, 23, 42, 0.16);

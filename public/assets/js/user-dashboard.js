@@ -24,6 +24,19 @@ function uEntryLabel(value) {
     return key.replace(/_/g, " ").replace(/\b\w/g, (m) => m.toUpperCase());
 }
 
+function uDataState(type, message, colspan = 0) {
+    const safeType = ["loading", "empty", "error", "success"].includes(type) ? type : "loading";
+    const icons = {
+        loading: "bi bi-arrow-repeat",
+        empty: "bi bi-inbox",
+        error: "bi bi-exclamation-circle",
+        success: "bi bi-check-circle",
+    };
+    const role = safeType === "error" ? "alert" : "status";
+    const content = `<div class="data-state data-state--${safeType}" role="${role}" aria-live="polite"><i class="${icons[safeType]}" aria-hidden="true"></i><div><strong>${uEscape(message)}</strong></div></div>`;
+    return colspan > 0 ? `<tr class="data-state-row"><td colspan="${Number(colspan)}">${content}</td></tr>` : content;
+}
+
 let uTrendChart = null;
 let uHasDebtPin = false;
 
@@ -267,7 +280,7 @@ function uRenderRecentCashbook(rows) {
     if (!container) return;
 
     if (!Array.isArray(rows) || rows.length === 0) {
-        container.innerHTML = '<div class="mini-bar-empty">No debt cashbook entries yet.</div>';
+        container.innerHTML = uDataState("empty", "No debt cashbook entries yet.");
         return;
     }
 
@@ -293,7 +306,7 @@ function uRenderRecentTransactions(rows) {
     if (!body) return;
 
     if (!Array.isArray(rows) || rows.length === 0) {
-        body.innerHTML = '<tr><td colspan="5">No transactions yet.</td></tr>';
+        body.innerHTML = uDataState("empty", "No transactions yet.", 5);
         return;
     }
 
@@ -339,8 +352,8 @@ async function loadUserDashboard() {
         });
         uRenderCreditMeter({});
         uRenderTrend([]);
-        uRenderRecentCashbook([]);
-        uRenderRecentTransactions([]);
+        document.getElementById("u-recent-cashbook").innerHTML = uDataState("error", error.message || "Unable to load recent cashbook.");
+        document.getElementById("u-recent-transactions-body").innerHTML = uDataState("error", error.message || "Unable to load recent transactions.", 5);
     }
 }
 

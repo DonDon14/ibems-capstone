@@ -6,11 +6,7 @@
 
 <?= $this->section('content') ?>
 <section class="dashboard-shell reports-shell">
-    <div class="dashboard-title reports-top">
-        <div>
-            <h3>Store Financial Reports</h3>
-            <p>Track sales, estimated cost, and profit by period.</p>
-        </div>
+    <?php ob_start(); ?>
         <div class="reports-controls">
             <div class="reports-period-chips">
                 <button type="button" class="period-chip is-active" data-period="today">Today</button>
@@ -19,12 +15,19 @@
                 <button type="button" class="period-chip" data-period="custom">Custom</button>
             </div>
             <div id="reports-custom-range" class="reports-custom-range hidden">
-                <input id="reports-date-from" type="date">
-                <input id="reports-date-to" type="date">
+                <label class="reports-date-field" for="reports-date-from"><span>From</span><input id="reports-date-from" type="date"></label>
+                <label class="reports-date-field" for="reports-date-to"><span>To</span><input id="reports-date-to" type="date"></label>
             </div>
             <button id="reports-refresh-btn" class="primary-btn" type="button">Refresh</button>
         </div>
-    </div>
+    <?php $reportsHeaderActions = ob_get_clean(); ?>
+    <?= view('components/page_header', [
+        'eyebrow' => 'Store analytics',
+        'title' => 'Financial reports',
+        'description' => 'Track sales, estimated cost, and profit by period.',
+        'icon' => 'bi bi-graph-up-arrow',
+        'actions' => $reportsHeaderActions,
+    ]) ?>
 
     <div class="dashboard-grid reports-summary-grid">
         <?= view('components/stat_card', ['title' => 'Total Sales', 'value' => 'PHP 0.00', 'valueId' => 'sum-sales', 'icon' => 'bi bi-graph-up-arrow', 'tone' => 'sales']) ?>
@@ -109,7 +112,7 @@
                 </tr>
                 </thead>
                 <tbody id="cash-movements-body">
-                <tr><td colspan="5">Loading...</td></tr>
+                <?= view('components/data_state', ['tag' => 'tr', 'colspan' => 5, 'type' => 'loading', 'message' => 'Loading cash movements...']) ?>
                 </tbody>
             </table>
         </div>
@@ -128,7 +131,7 @@
                     </tr>
                     </thead>
                     <tbody id="payment-body">
-                    <tr><td colspan="3">Loading...</td></tr>
+                    <?= view('components/data_state', ['tag' => 'tr', 'colspan' => 3, 'type' => 'loading', 'message' => 'Loading payment breakdown...']) ?>
                     </tbody>
                 </table>
             </div>
@@ -147,7 +150,7 @@
                     </tr>
                     </thead>
                     <tbody id="products-body">
-                    <tr><td colspan="4">Loading...</td></tr>
+                    <?= view('components/data_state', ['tag' => 'tr', 'colspan' => 4, 'type' => 'loading', 'message' => 'Loading product sales...']) ?>
                     </tbody>
                 </table>
             </div>
@@ -166,7 +169,7 @@
                 </tr>
                 </thead>
                 <tbody id="trend-body">
-                <tr><td colspan="3">Loading...</td></tr>
+                <?= view('components/data_state', ['tag' => 'tr', 'colspan' => 3, 'type' => 'loading', 'message' => 'Loading daily trend...']) ?>
                 </tbody>
             </table>
         </div>

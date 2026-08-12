@@ -8,6 +8,7 @@
     <meta name="csrf-header-name" content="<?= esc(config('Security')->headerName) ?>">
     <meta name="csrf-cookie-name" content="<?= esc(config('Security')->cookieName) ?>">
     <title>IBEMS Login</title>
+    <link rel="icon" type="image/jpeg" href="<?= base_url('assets/images/ustp_claveria_logo.jpg') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.css') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/auth-login.css') ?>">
 </head>
@@ -34,6 +35,7 @@
             <div class="demo-creds">
                 <strong>Demo Credentials</strong>
                 <span>Admin: admin@ibems.local / 123456</span>
+                <span>Store Admin: store.admin@ibems.local / 123456</span>
                 <span>Store: store.main@ibems.local / 123456</span>
                 <span>Accounting: accounting@ibems.local / 123456</span>
                 <span>User: maria.santos@ibems.local / 123456</span>

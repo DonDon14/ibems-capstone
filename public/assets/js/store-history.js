@@ -20,6 +20,18 @@ function hMoney(value) {
     return window.IbemsFormat?.money(value) || `PHP ${Number(value || 0).toFixed(2)}`;
 }
 
+function hDataState(type, message) {
+    const safeType = ["loading", "empty", "error", "success"].includes(type) ? type : "loading";
+    const icons = {
+        loading: "bi bi-arrow-repeat",
+        empty: "bi bi-inbox",
+        error: "bi bi-exclamation-circle",
+        success: "bi bi-check-circle",
+    };
+    const role = safeType === "error" ? "alert" : "status";
+    return `<tr class="data-state-row"><td colspan="6"><div class="data-state data-state--${safeType}" role="${role}" aria-live="polite"><i class="${icons[safeType]}" aria-hidden="true"></i><div><strong>${hEscape(message)}</strong></div></div></td></tr>`;
+}
+
 function hDateTime(value) {
     return window.IbemsFormat?.dateTime(value) || new Date(value).toLocaleString();
 }
@@ -50,7 +62,7 @@ function renderTransactions(transactions) {
     const body = document.getElementById("history-body");
 
     if (!Array.isArray(transactions) || transactions.length === 0) {
-        body.innerHTML = '<tr><td colspan="6">No transactions found.</td></tr>';
+        body.innerHTML = hDataState("empty", "No transactions found.");
         renderSummary([]);
         return;
     }
@@ -66,8 +78,8 @@ function renderTransactions(transactions) {
                 <td><strong class="history-amount">${hEscape(hMoney(txn.amount))}</strong></td>
                 <td>
                     <div class="history-row-actions">
-                        <button type="button" data-history-action="view" data-txn-id="${txn.id}"><i class="bi bi-eye"></i> View</button>
-                        <button type="button" data-history-action="print" data-txn-id="${txn.id}"><i class="bi bi-printer"></i> Print</button>
+                        <button type="button" class="secondary-btn btn-sm" data-history-action="view" data-txn-id="${txn.id}"><i class="bi bi-eye"></i> View</button>
+                        <button type="button" class="primary-btn btn-sm" data-history-action="print" data-txn-id="${txn.id}"><i class="bi bi-printer"></i> Print</button>
                     </div>
                 </td>
             </tr>
@@ -92,7 +104,7 @@ async function loadStores() {
 
 async function loadTransactions() {
     const body = document.getElementById("history-body");
-    body.innerHTML = '<tr><td colspan="6">Loading transactions...</td></tr>';
+    body.innerHTML = hDataState("loading", "Loading transactions...");
 
     const params = new URLSearchParams({
         store_id: String(historyActiveStoreId),
@@ -113,8 +125,10 @@ async function loadTransactions() {
     const data = await response.json();
 
     if (!data || data.status !== "success") {
-        renderTransactions([]);
-        setHistoryResult(data?.message || "Unable to load transactions.", "error");
+        const message = data?.message || "Unable to load transactions.";
+        body.innerHTML = hDataState("error", message);
+        renderSummary([]);
+        setHistoryResult(message, "error");
         return;
     }
 
@@ -222,6 +236,9 @@ document.getElementById("history-receipt-modal").addEventListener("click", (even
         await loadStores();
         await loadTransactions();
     } catch (error) {
-        setHistoryResult(error.message || "Unable to load transaction history.", "error");
+        const message = error.message || "Unable to load transaction history.";
+        document.getElementById("history-body").innerHTML = hDataState("error", message);
+        renderSummary([]);
+        setHistoryResult(message, "error");
     }
 })();

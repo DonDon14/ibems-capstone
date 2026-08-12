@@ -18,6 +18,25 @@ function rEscape(value) {
         .replace(/'/g, "&#39;");
 }
 
+function rDataState(type, message, colspan) {
+    const safeType = ["loading", "empty", "error", "success"].includes(type) ? type : "loading";
+    const icons = {
+        loading: "bi bi-arrow-repeat",
+        empty: "bi bi-inbox",
+        error: "bi bi-exclamation-circle",
+        success: "bi bi-check-circle",
+    };
+    const role = safeType === "error" ? "alert" : "status";
+    return `<tr class="data-state-row"><td colspan="${Number(colspan)}"><div class="data-state data-state--${safeType}" role="${role}" aria-live="polite"><i class="${icons[safeType]}" aria-hidden="true"></i><div><strong>${rEscape(message)}</strong></div></div></td></tr>`;
+}
+
+function rRenderTableStates(type, message) {
+    document.getElementById("payment-body").innerHTML = rDataState(type, message, 3);
+    document.getElementById("cash-movements-body").innerHTML = rDataState(type, message, 5);
+    document.getElementById("products-body").innerHTML = rDataState(type, message, 4);
+    document.getElementById("trend-body").innerHTML = rDataState(type, message, 3);
+}
+
 function rSetResult(message, type) {
     const el = document.getElementById("reports-result");
     el.textContent = message || "";
@@ -186,7 +205,7 @@ function rRenderSummary(data) {
 function rRenderPaymentRows(rows) {
     const body = document.getElementById("payment-body");
     if (!Array.isArray(rows) || rows.length === 0) {
-        body.innerHTML = '<tr><td colspan="3">No payment data for this period.</td></tr>';
+        body.innerHTML = rDataState("empty", "No payment data for this period.", 3);
         return;
     }
 
@@ -250,7 +269,7 @@ function rRenderPaymentRecords(rows, data) {
 function rRenderCashMovements(rows) {
     const body = document.getElementById("cash-movements-body");
     if (!Array.isArray(rows) || rows.length === 0) {
-        body.innerHTML = '<tr><td colspan="5">No cash movement records for this range.</td></tr>';
+        body.innerHTML = rDataState("empty", "No cash movement records for this range.", 5);
         return;
     }
 
@@ -334,7 +353,7 @@ async function rCreateCashMovement() {
 function rRenderProductRows(rows) {
     const body = document.getElementById("products-body");
     if (!Array.isArray(rows) || rows.length === 0) {
-        body.innerHTML = '<tr><td colspan="4">No product sales for this period.</td></tr>';
+        body.innerHTML = rDataState("empty", "No product sales for this period.", 4);
         return;
     }
 
@@ -351,7 +370,7 @@ function rRenderProductRows(rows) {
 function rRenderTrendRows(rows) {
     const body = document.getElementById("trend-body");
     if (!Array.isArray(rows) || rows.length === 0) {
-        body.innerHTML = '<tr><td colspan="3">No trend data for this period.</td></tr>';
+        body.innerHTML = rDataState("empty", "No trend data for this period.", 3);
         return;
     }
 
@@ -394,15 +413,26 @@ async function rLoadSummary() {
         params.set("date_to", to);
     }
 
-    const response = await fetch(`/store/reports/summary?${params.toString()}`);
-    const data = await response.json();
-    if (!data || data.status !== "success") {
-        rSetResult(data?.message || "Unable to load report summary.", "error");
+    rRenderTableStates("loading", "Loading report data...");
+
+    let data;
+    try {
+        const response = await fetch(`/store/reports/summary?${params.toString()}`);
+        data = await response.json();
+    } catch (error) {
+        const message = error?.message || "Unable to load report summary.";
         reportsSummaryData = null;
-        rRenderPaymentRows([]);
-        rRenderCashMovements([]);
-        rRenderProductRows([]);
-        rRenderTrendRows([]);
+        rRenderTableStates("error", message);
+        rRenderTrendBars([]);
+        rRenderPaymentMix([]);
+        rSetResult(message, "error");
+        return;
+    }
+    if (!data || data.status !== "success") {
+        const message = data?.message || "Unable to load report summary.";
+        rSetResult(message, "error");
+        reportsSummaryData = null;
+        rRenderTableStates("error", message);
         rRenderTrendBars([]);
         rRenderPaymentMix([]);
         return;
@@ -449,6 +479,8 @@ document.getElementById("cash-movement-save").addEventListener("click", async ()
         rSetPeriod("today");
         await rLoadSummary();
     } catch (error) {
-        rSetResult(error?.message || "Failed to initialize reports.", "error");
+        const message = error?.message || "Failed to initialize reports.";
+        rRenderTableStates("error", message);
+        rSetResult(message, "error");
     }
 })();

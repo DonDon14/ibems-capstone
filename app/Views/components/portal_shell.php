@@ -31,6 +31,7 @@ $ustpLogoUrl = base_url('assets/images/ustp_claveria_logo.jpg');
     <meta name="csrf-header-name" content="<?= esc(config('Security')->headerName) ?>">
     <meta name="csrf-cookie-name" content="<?= esc(config('Security')->cookieName) ?>">
     <title><?= esc($pageTitle) ?></title>
+    <link rel="icon" type="image/jpeg" href="<?= esc($ustpLogoUrl) ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.css') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/app.css') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/modern-ui.css') ?>">
@@ -42,15 +43,17 @@ $ustpLogoUrl = base_url('assets/images/ustp_claveria_logo.jpg');
     <aside class="app-sidebar">
         <div class="app-sidebar-header">
             <div class="app-brand">
-                <img src="<?= esc($ustpLogoUrl) ?>" alt="USTP Logo" class="app-brand-logo">
+                <div class="app-brand-mark">
+                    <img src="<?= esc($ustpLogoUrl) ?>" alt="USTP Logo" class="app-brand-logo">
+                    <button id="sidebar-toggle" type="button" class="secondary-btn sidebar-toggle sidebar-toggle-in-sidebar" aria-label="Toggle Sidebar">
+                        <i class="sidebar-toggle-glyph" aria-hidden="true"></i>
+                    </button>
+                </div>
                 <div class="app-brand-text">
                     <h1>IBEMS</h1>
                     <p><?= esc($portalTitle) ?></p>
                 </div>
             </div>
-            <button id="sidebar-toggle" type="button" class="secondary-btn sidebar-toggle sidebar-toggle-in-sidebar" aria-label="Toggle Sidebar">
-                <i class="bi bi-layout-sidebar"></i>
-            </button>
         </div>
 
         <nav class="app-menu" aria-label="<?= esc($portalTitle) ?> navigation">

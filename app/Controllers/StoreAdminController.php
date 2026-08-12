@@ -4,9 +4,11 @@ namespace App\Controllers;
 
 use App\Models\StoreSupervisorModel;
 use App\Models\StoreModel;
+use App\Services\StoreOversightService;
+use CodeIgniter\Controller;
 use Config\Database;
 
-class StoreAdminController extends AdminController
+class StoreAdminController extends Controller
 {
     public function dashboard()
     {
@@ -181,7 +183,7 @@ class StoreAdminController extends AdminController
 
     public function storesData()
     {
-        return parent::storesData();
+        return (new StoreOversightService())->storesData($this->request, $this->response);
     }
 
     public function storeDetails(int $storeId)
@@ -195,11 +197,11 @@ class StoreAdminController extends AdminController
 
     public function storeDetailsData(int $storeId)
     {
-        return parent::storeDetailsData($storeId);
+        return (new StoreOversightService())->storeDetailsData($this->request, $this->response, $storeId);
     }
 
     public function reviewStoreDayVariance(int $sessionId)
     {
-        return parent::reviewStoreDayVariance($sessionId);
+        return (new StoreOversightService())->reviewStoreDayVariance($this->request, $this->response, $sessionId);
     }
 }

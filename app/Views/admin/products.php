@@ -22,30 +22,45 @@
 
     <div class="overview-filter ap-filter-panel rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
         <div class="ap-filter-main grid gap-3 lg:grid-cols-[minmax(240px,1fr)_180px_180px_180px_180px_auto]">
-            <input id="ap-search" class="h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" type="search" placeholder="Search product, SKU, barcode, supplier, bin, or store">
-            <select id="ap-store-filter" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm">
-                <option value="">All Stores</option>
-            </select>
-            <select id="ap-stock-filter" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm">
-                <option value="">All Stock</option>
-                <option value="healthy">Healthy</option>
-                <option value="low">Low Stock</option>
-                <option value="out">Out of Stock</option>
-            </select>
-            <select id="ap-category-filter" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm">
-                <option value="">All Categories</option>
-            </select>
-            <select id="ap-supplier-filter" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm">
-                <option value="">All Suppliers</option>
-            </select>
-            <label class="util-inline-flex-gap-6 h-11 items-center rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
+            <label class="ap-filter-field" for="ap-search">
+                <span>Search</span>
+                <input id="ap-search" class="h-11 rounded-xl border border-slate-200 bg-slate-50 px-3 text-sm" type="search" placeholder="Product, SKU, barcode, supplier, bin, or store">
+            </label>
+            <label class="ap-filter-field" for="ap-store-filter">
+                <span>Store</span>
+                <select id="ap-store-filter" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm">
+                    <option value="">All Stores</option>
+                </select>
+            </label>
+            <label class="ap-filter-field" for="ap-stock-filter">
+                <span>Stock</span>
+                <select id="ap-stock-filter" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm">
+                    <option value="">All Stock</option>
+                    <option value="healthy">Healthy</option>
+                    <option value="low">Low Stock</option>
+                    <option value="out">Out of Stock</option>
+                </select>
+            </label>
+            <label class="ap-filter-field" for="ap-category-filter">
+                <span>Category</span>
+                <select id="ap-category-filter" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm">
+                    <option value="">All Categories</option>
+                </select>
+            </label>
+            <label class="ap-filter-field" for="ap-supplier-filter">
+                <span>Supplier</span>
+                <select id="ap-supplier-filter" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm">
+                    <option value="">All Suppliers</option>
+                </select>
+            </label>
+            <label class="ap-filter-check util-inline-flex-gap-6 h-11 items-center rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
                 <input id="ap-include-inactive" type="checkbox">
                 Inactive
             </label>
         </div>
         <div class="ap-filter-actions">
             <button id="ap-search-btn" class="primary-btn" type="button"><i class="bi bi-search"></i> Search</button>
-            <button id="ap-refresh-btn" class="history-action alt" type="button"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
+            <button id="ap-refresh-btn" class="secondary-btn" type="button"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
         </div>
     </div>
 
@@ -78,15 +93,15 @@
     </div>
 </section>
 
-<div id="ap-view-modal" class="admin-modal is-hidden">
+<div id="ap-view-modal" class="admin-modal admin-overview-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="ap-view-title">
     <div class="admin-modal-card max-h-[92vh] w-[min(760px,95vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
         <div class="admin-modal-head">
-            <h4 class="text-lg font-bold text-slate-900">Product Snapshot</h4>
-            <button id="ap-view-close" type="button" class="admin-modal-close">x</button>
+            <h4 id="ap-view-title" class="text-lg font-bold text-slate-900">Product Snapshot</h4>
+            <button id="ap-view-close" type="button" class="admin-modal-close" aria-label="Close product snapshot">x</button>
         </div>
         <div id="ap-view-content" class="ap-detail-grid"></div>
         <div class="admin-modal-actions">
-            <a id="ap-store-link" class="secondary-btn inline-flex h-10 items-center rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700" href="<?= site_url('admin/stores') ?>">Open Store Details</a>
+            <a id="ap-store-link" class="secondary-btn" href="<?= site_url('admin/stores') ?>">Open Store Details</a>
         </div>
     </div>
 </div>
