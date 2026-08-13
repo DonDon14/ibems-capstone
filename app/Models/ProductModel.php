@@ -14,6 +14,7 @@ class ProductModel extends Model
 
     protected $allowedFields = [
         'store_id',
+        'family_id',
         'sku',
         'name',
         'variant_label',

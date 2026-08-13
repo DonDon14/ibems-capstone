@@ -42,6 +42,8 @@ if ($CredentialDialog) {
     $securePassword = Read-Host 'Supabase staging database password' -AsSecureString
 }
 $passwordPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
+$secureStorageKey = Read-Host 'Supabase server secret key for Storage' -AsSecureString
+$storageKeyPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureStorageKey)
 $environmentKeys = @(
     'IBEMS_BASE_URL',
     'IBEMS_DATABASE_HOSTNAME',
@@ -52,11 +54,16 @@ $environmentKeys = @(
     'IBEMS_DATABASE_PORT',
     'IBEMS_DATABASE_SCHEMA',
     'IBEMS_DATABASE_SSLMODE',
-    'IBEMS_ALLOW_STAGING_RESET'
+    'IBEMS_ALLOW_STAGING_RESET',
+    'IBEMS_ASSET_STORAGE_DRIVER',
+    'IBEMS_SUPABASE_URL',
+    'IBEMS_SUPABASE_SECRET_KEY',
+    'IBEMS_SUPABASE_STORAGE_BUCKET'
 )
 
 try {
     $plainPassword = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($passwordPointer)
+    $plainStorageKey = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($storageKeyPointer)
     Set-Location -LiteralPath $projectRoot
 
     [Environment]::SetEnvironmentVariable('IBEMS_BASE_URL', "http://localhost:$Port/", 'Process')
@@ -69,6 +76,10 @@ try {
     [Environment]::SetEnvironmentVariable('IBEMS_DATABASE_SCHEMA', 'public', 'Process')
     [Environment]::SetEnvironmentVariable('IBEMS_DATABASE_SSLMODE', 'require', 'Process')
     [Environment]::SetEnvironmentVariable('IBEMS_ALLOW_STAGING_RESET', '1', 'Process')
+    [Environment]::SetEnvironmentVariable('IBEMS_ASSET_STORAGE_DRIVER', 'supabase', 'Process')
+    [Environment]::SetEnvironmentVariable('IBEMS_SUPABASE_URL', 'https://pukjmscgjtmqvhdncjpo.supabase.co', 'Process')
+    [Environment]::SetEnvironmentVariable('IBEMS_SUPABASE_SECRET_KEY', $plainStorageKey, 'Process')
+    [Environment]::SetEnvironmentVariable('IBEMS_SUPABASE_STORAGE_BUCKET', 'ibems-assets', 'Process')
 
     function Invoke-LoggedPhpAction {
         param(
@@ -173,7 +184,11 @@ finally {
     if ($null -ne $plainPassword) {
         $plainPassword = $null
     }
+    if ($null -ne $plainStorageKey) {
+        $plainStorageKey = $null
+    }
     [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordPointer)
+    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($storageKeyPointer)
     foreach ($key in $environmentKeys) {
         [Environment]::SetEnvironmentVariable($key, $null, 'Process')
     }

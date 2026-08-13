@@ -39,6 +39,7 @@ class TransactionService
         $customerUserId = isset($request['customer_user_id']) ? (int) $request['customer_user_id'] : null;
         $customerType = (string) ($request['customer_type'] ?? 'walk_in');
         $debtPin = trim((string) ($request['debt_pin'] ?? ''));
+        $cashReceived = isset($request['cash_received']) ? (float) $request['cash_received'] : null;
         $items = $request['items'] ?? [];
 
         if (!is_array($items) || $items === []) {
@@ -114,6 +115,14 @@ class TransactionService
                 'unit_price' => $price,
                 'line_total' => $lineTotal,
             ];
+        }
+
+        $changeDue = null;
+        if ($paymentMethod === 'cash') {
+            if ($cashReceived === null || !is_finite($cashReceived) || $cashReceived < $totalAmount) {
+                return $this->error('Cash received must cover the transaction total.');
+            }
+            $changeDue = round($cashReceived - $totalAmount, 2);
         }
 
         $balanceModel = new BalanceModel();
@@ -229,6 +238,8 @@ class TransactionService
                     'store_id' => $storeId,
                     'payment_method' => $paymentMethod,
                     'amount' => $totalAmount,
+                    'cash_received' => $cashReceived,
+                    'change_due' => $changeDue,
                     'items' => array_values(array_map(static function (int $productId, int $qty): array {
                         return ['product_id' => $productId, 'qty' => $qty];
                     }, array_keys($aggregatedItems), $aggregatedItems)),
@@ -288,6 +299,8 @@ class TransactionService
             'client_txn_id' => $clientTxnId,
             'created_at' => $createdAt,
             'total_amount' => $totalAmount,
+            'cash_received' => $cashReceived,
+            'change_due' => $changeDue,
             'code' => 200,
         ];
     }

@@ -12,6 +12,74 @@ let invModalPreviewObjectUrl = null;
 let invCategories = [];
 let invCreateSnapshot = null;
 let invMovements = [];
+let invVariantSequence = 0;
+let invBarcodeCamera = null;
+let invBarcodeCameraTarget = null;
+const invSelectedFamilyVariants = new Map();
+const invExpandedFamilies = new Set();
+
+function invProductFamilyKey(product) {
+    const familyId = Number(product?.family_id || 0);
+    if (familyId > 0) return `family-${familyId}`;
+    const name = String(product?.name || "").trim().toLowerCase();
+    const category = String(product?.category || "General").trim().toLowerCase();
+    return name ? `legacy-${name}-${category}` : `product-${Number(product?.id || 0)}`;
+}
+
+function invGroupProducts(products) {
+    const groups = new Map();
+    products.forEach((product) => {
+        const key = invProductFamilyKey(product);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(product);
+    });
+    return Array.from(groups, ([key, variants]) => ({key, variants}));
+}
+
+function invSkuToken(value, fallback = "ITEM") {
+    return String(value || "").toUpperCase().replace(/[^A-Z0-9]+/g, "-").replace(/^-+|-+$/g, "") || fallback;
+}
+function invGeneratedSku(name, variant, position = 1) {
+    const base = invSkuToken(name).split("-").slice(0, 2).join("-");
+    return `${base}-${invSkuToken(variant, `V${position}`)}`.slice(0, 50);
+}
+function invSyncFirstVariantSku() {
+    const sku = document.getElementById("new-product-sku");
+    if (!sku || sku.dataset.manual === "true") return;
+    sku.value = invGeneratedSku(invGetElementValue("new-product-name"), invGetElementValue("new-product-variant-label"), 1);
+}
+function invAddVariantRow() {
+    const position = ++invVariantSequence + 1;
+    const row = document.createElement("div");
+    row.className = "variant-builder-row"; row.dataset.variantRow = String(position);
+    row.innerHTML = `<label>Variant/Size<input data-v="label" placeholder="e.g. 1L"></label><label>SKU<input data-v="sku" placeholder="Generated"></label><label>Barcode<div class="barcode-entry-row"><input data-v="barcode" inputmode="numeric" placeholder="Optional"><button class="secondary-btn barcode-camera-btn" type="button" data-variant-camera title="Scan barcode with camera"><i class="bi bi-camera"></i></button></div></label><label>Unit Cost<input data-v="cost" type="number" min="0" step=".01" value="0"></label><label>Sell Price<input data-v="price" type="number" min="0" step=".01" value="0"></label><label>Stock<input data-v="stock" type="number" min="0" step="1" value="0"></label><label>Low Stock<input data-v="low" type="number" min="0" step="1" value="0"></label><button class="secondary-btn variant-remove" type="button" aria-label="Remove variant"><i class="bi bi-trash"></i></button><label class="variant-image-override">Variant Image Override<input data-v="image" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label>`;
+    document.getElementById("new-product-variants").appendChild(row);
+    const label = row.querySelector('[data-v="label"]'), sku = row.querySelector('[data-v="sku"]');
+    label.addEventListener("input", () => { if (sku.dataset.manual !== "true") sku.value = invGeneratedSku(invGetElementValue("new-product-name"), label.value, position); invUpdateCreateProductProjection(); });
+    sku.addEventListener("input", () => { sku.dataset.manual = "true"; invUpdateCreateProductProjection(); });
+    row.querySelectorAll("input").forEach(input => input.addEventListener("input", invUpdateCreateProductProjection));
+    row.querySelector(".variant-remove").addEventListener("click", () => { row.remove(); invUpdateVariantCount(); invUpdateCreateProductProjection(); });
+    row.querySelector("[data-variant-camera]").addEventListener("click", () => invOpenBarcodeCamera(row.querySelector('[data-v="barcode"]')));
+    invUpdateVariantCount();
+    row.scrollIntoView({block:"nearest",behavior:"smooth"});
+}
+function invUpdateVariantCount() { const count=document.querySelectorAll("[data-variant-row]").length; const el=document.getElementById("product-variant-count"); if(el) el.textContent=`(${count})`; }
+
+async function invCloseBarcodeCamera() {
+    if (invBarcodeCamera) { try { await invBarcodeCamera.stop(); } catch (error) {} try { await invBarcodeCamera.clear(); } catch (error) {} }
+    invBarcodeCamera = null; invBarcodeCameraTarget = null; document.getElementById("inventory-barcode-camera-modal").style.display = "none";
+}
+async function invOpenBarcodeCamera(target) {
+    if (!window.Html5Qrcode) { invSetResult("Camera scanner could not load. Type the barcode manually or use a USB scanner.", "error"); return; }
+    invBarcodeCameraTarget = target; document.getElementById("inventory-barcode-camera-modal").style.display = "grid";
+    document.getElementById("inventory-barcode-camera-status").textContent = "Starting camera...";
+    invBarcodeCamera = new Html5Qrcode("inventory-barcode-camera-reader");
+    try { await invBarcodeCamera.start({facingMode:"environment"},{fps:10,qrbox:{width:280,height:140}},async code => { if(invBarcodeCameraTarget){invBarcodeCameraTarget.value=code;invBarcodeCameraTarget.dispatchEvent(new Event("input",{bubbles:true}));} await invCloseBarcodeCamera(); invSetResult(`Barcode captured: ${code}`,"ok"); },()=>{}); document.getElementById("inventory-barcode-camera-status").textContent="Camera ready. Center the barcode inside the frame."; }
+    catch(error){ document.getElementById("inventory-barcode-camera-status").textContent="Camera unavailable. Allow camera access, type the barcode, or connect a USB scanner."; }
+}
+function invAdditionalVariants() {
+    return Array.from(document.querySelectorAll("[data-variant-row]")).map(row => ({row,label:row.querySelector('[data-v="label"]').value.trim(),sku:row.querySelector('[data-v="sku"]').value.trim(),barcode:row.querySelector('[data-v="barcode"]').value.trim(),cost:Number(row.querySelector('[data-v="cost"]').value||0),price:Number(row.querySelector('[data-v="price"]').value||0),stock:Number(row.querySelector('[data-v="stock"]').value||0),low:Number(row.querySelector('[data-v="low"]').value||0),image:row.querySelector('[data-v="image"]').files[0]||null}));
+}
 
 function invGetElementValue(id, fallback = "") {
     const el = document.getElementById(id);
@@ -169,14 +237,16 @@ function invRenderProductTable() {
         return true;
     });
 
-    invRenderStockSummary(rows);
+    const groups = invGroupProducts(rows);
+    invRenderStockSummary(groups);
 
     if (rows.length === 0) {
         body.innerHTML = invDataState("empty", "No products found.", 5);
         return;
     }
 
-    body.innerHTML = rows.map((product) => {
+    body.innerHTML = groups.map(({key, variants}) => {
+        const product = variants[0];
         const stock = invStockState(product);
         const variant = product.variant_label ? `<span>${invEscape(product.variant_label)}</span>` : "";
         const sku = product.sku ? `<span>SKU ${invEscape(product.sku)}</span>` : "";
@@ -188,50 +258,70 @@ function invRenderProductTable() {
         const thumb = product.image_url
             ? `<img src="${invEscape(product.image_url)}" alt="${invEscape(product.name)}" class="prod-thumb">`
             : `<div class="prod-thumb-fallback">No Img</div>`;
+        const isFamily = variants.length > 1;
+        const expanded = invExpandedFamilies.has(key);
+        const totalStock = variants.reduce((sum, item) => sum + Number(item.stock_qty || 0), 0);
+        const prices = variants.map((item) => Number(item.price || 0));
+        const familyStockStates = variants.map((item) => invStockState(item));
+        const familyState = familyStockStates.some((item) => item.key === "out") ? "out" : familyStockStates.some((item) => item.key === "low") ? "low" : "in";
+        const familyStatus = familyState === "out" ? "Needs attention" : familyState === "low" ? "Some low stock" : "All in stock";
+        const childRows = expanded ? variants.map((item) => {
+            const itemStock = invStockState(item);
+            return `<tr class="inventory-variant-row inventory-row-${itemStock.key}">
+                <td><div class="inventory-variant-indent"><span class="inventory-variant-line"></span><div><strong>${invEscape(item.variant_label || "Default")}</strong><small>SKU ${invEscape(item.sku || "-")}${item.barcode ? ` · Barcode ${invEscape(item.barcode)}` : ""}</small></div></div></td>
+                <td>${invEscape(item.category || "-")}</td>
+                <td>${invEscape(invMoney(item.price))}</td>
+                <td><div class="inv-stock-block"><span class="inv-stock-badge inv-stock-${itemStock.key}">${itemStock.label}</span><span class="inv-stock-detail">${itemStock.qty} item${itemStock.qty === 1 ? "" : "s"} - ${invEscape(itemStock.detail)}</span></div></td>
+                <td><button class="secondary-btn btn-sm" type="button" data-product-action="${item.id}">Manage</button></td>
+            </tr>`;
+        }).join("") : "";
 
-        return `
-            <tr class="product-row inventory-row-${stock.key}">
+        return `${`<tr class="product-row inventory-family-row inventory-row-${isFamily ? familyState : stock.key}">
                 <td>
                     <div class="inventory-product-cell">
                         ${thumb}
                         <div class="inventory-product-copy">
                             <strong>${invEscape(product.name || "Unnamed product")}</strong>
-                            <div class="inventory-product-meta">${sku}${variant}</div>
+                            ${variants.length > 1 ? `<span class="inventory-family-count">${variants.length} variants</span>` : ""}
+                            <div class="inventory-product-meta">${isFamily ? `<span>${totalStock} total units</span><span>${invMoney(Math.min(...prices))} - ${invMoney(Math.max(...prices))}</span>` : `${sku}${variant}`}</div>
                             ${operationalMeta}
                         </div>
                     </div>
                 </td>
                 <td>${invEscape(product.category || "-")}</td>
-                <td>${invEscape(invMoney(product.price))}</td>
+                <td>${isFamily ? `${invEscape(invMoney(Math.min(...prices)))} - ${invEscape(invMoney(Math.max(...prices)))}` : invEscape(invMoney(product.price))}</td>
                 <td>
                     <div class="inv-stock-block">
-                        <span class="inv-stock-badge inv-stock-${stock.key}">${stock.label}</span>
-                        <span class="inv-stock-detail">${stock.qty} item${stock.qty === 1 ? "" : "s"} - ${invEscape(stock.detail)}</span>
+                        <span class="inv-stock-badge inv-stock-${isFamily ? familyState : stock.key}">${isFamily ? familyStatus : stock.label}</span>
+                        <span class="inv-stock-detail">${isFamily ? `${totalStock} units across ${variants.length} variants` : `${stock.qty} item${stock.qty === 1 ? "" : "s"} - ${invEscape(stock.detail)}`}</span>
                     </div>
                 </td>
                 <td>
-                    <button class="secondary-btn btn-sm" type="button" data-product-action="${product.id}">Manage</button>
+                    ${isFamily ? `<button class="secondary-btn btn-sm inventory-family-toggle" type="button" data-family-toggle="${invEscape(key)}" aria-expanded="${expanded}"><i class="bi bi-chevron-${expanded ? "up" : "down"}"></i> ${expanded ? "Hide" : "View"} variants</button>` : `<button class="secondary-btn btn-sm" type="button" data-product-action="${product.id}">Manage</button>`}
                 </td>
-            </tr>
-        `;
+            </tr>`}${childRows}`;
     }).join("");
 }
 
-function invRenderStockSummary(rows) {
+function invRenderStockSummary(groups) {
     const summary = document.getElementById("inventory-stock-summary");
     if (!summary) return;
 
-    const counts = rows.reduce((acc, product) => {
-        const state = invStockState(product).key;
+    const counts = groups.reduce((acc, group) => {
+        const states = group.variants.map((product) => invStockState(product).key);
         acc.total += 1;
-        acc[state] += 1;
+        acc.variants += group.variants.length;
+        if (states.includes("out")) acc.out += 1;
+        else if (states.includes("low")) acc.low += 1;
+        else acc.in += 1;
         return acc;
-    }, { total: 0, in: 0, low: 0, out: 0 });
+    }, { total: 0, variants: 0, in: 0, low: 0, out: 0 });
 
     summary.innerHTML = `
         <div class="inventory-summary-pill">
-            <span>Visible Products</span>
+            <span>Visible Families</span>
             <strong>${counts.total}</strong>
+            <small>${counts.variants} variants</small>
         </div>
         <div class="inventory-summary-pill inventory-summary-in">
             <span>In Stock</span>
@@ -772,6 +862,8 @@ function invCaptureCreateFormState() {
         reason: invGetElementValue("new-product-reason", "Initial stock").trim(),
         imageFileName: imageFile ? imageFile.name : "",
         imageFileSize: imageFile ? Number(imageFile.size || 0) : 0,
+        imageMode: invGetElementValue("new-product-image-mode", "shared"),
+        variants: invAdditionalVariants().map(({row, image, ...variant}) => ({...variant, imageName:image?.name || "", imageSize:Number(image?.size || 0)})),
     };
 }
 
@@ -815,6 +907,7 @@ async function invCreateProduct() {
     const locationBin = (document.getElementById("new-product-location").value || "").trim();
     const reason = (invGetElementValue("new-product-reason", "Initial stock") || "Initial stock").trim();
     const button = document.getElementById("new-product-submit");
+    const additionalVariants = invAdditionalVariants();
 
     if (!invActiveStoreId || !sku || !name || sellPrice < 0 || initialStock < 0 || unitCost < 0 || lowStock < 0) {
         invSetResult("Please complete valid product details.", "error");
@@ -829,6 +922,15 @@ async function invCreateProduct() {
         return;
     }
 
+    const familySkus = [sku, ...additionalVariants.map(v => v.sku)].map(v => v.toLowerCase());
+    const familyBarcodes = [barcode, ...additionalVariants.map(v => v.barcode)].filter(Boolean).map(v => v.toLowerCase());
+    if (additionalVariants.some(v => !v.label || !v.sku || v.cost < 0 || v.price < 0 || v.stock < 0 || v.low < 0)) {
+        invSetResult("Complete every variant with valid size, SKU, pricing, and stock.", "error"); return;
+    }
+    if (new Set(familySkus).size !== familySkus.length || new Set(familyBarcodes).size !== familyBarcodes.length) {
+        invSetResult("Each variant must have a unique SKU and barcode.", "error"); return;
+    }
+
     try {
         invIsCreatingProduct = true;
         button.disabled = true;
@@ -836,25 +938,25 @@ async function invCreateProduct() {
 
         const formData = new FormData();
         formData.append("store_id", String(invActiveStoreId));
-        formData.append("sku", sku);
         formData.append("name", name);
-        formData.append("variant_label", variantLabel);
         formData.append("category", category);
         formData.append("supplier", supplier);
-        formData.append("barcode", barcode);
-        formData.append("sell_price", String(sellPrice));
-        formData.append("initial_stock", String(initialStock));
-        formData.append("unit_cost", String(unitCost));
-        formData.append("low_stock_threshold", String(lowStock));
         formData.append("location_bin", locationBin);
         formData.append("reason", reason);
+        formData.append("variants", JSON.stringify([
+            {sku, label:variantLabel || "Default", barcode, price:sellPrice, stock:initialStock, cost:unitCost, low:lowStock},
+            ...additionalVariants.map(({row,image,...variant}) => variant),
+        ]));
         if (imageSource === "url") {
             formData.append("image_url", imageUrl);
         } else if (imageFile) {
             formData.append("image_file", imageFile);
         }
+        if (document.getElementById("new-product-image-mode").value === "per_variant") {
+            additionalVariants.forEach((variant, index) => { if (variant.image) formData.append(`variant_image_${index + 1}`, variant.image); });
+        }
 
-        const response = await fetch("/store/inventory/add-product", {
+        const response = await fetch("/store/inventory/add-product-family", {
             method: "POST",
             body: formData,
         });
@@ -865,13 +967,13 @@ async function invCreateProduct() {
             return;
         }
 
-        invSetResult(`Product created: ${data.product?.name || name}`, "ok");
+        invSetResult(`${data.variant_count} variant${data.variant_count === 1 ? "" : "s"} created atomically for ${name}.`, "ok");
         invCloseProductModal();
         await invLoadCategories();
         await invLoadProducts();
         await invLoadMovements();
     } catch (error) {
-        invSetResult("Product creation request failed.", "error");
+        invSetResult(error.message || "Product creation request failed.", "error");
     } finally {
         invIsCreatingProduct = false;
         button.textContent = "Create Product";
@@ -1020,12 +1122,18 @@ async function invUpdateProduct(productId) {
 async function invOpenProductModal() {
     await invLoadCategories();
     document.getElementById("new-product-sku").value = "";
+    delete document.getElementById("new-product-sku").dataset.manual;
     document.getElementById("new-product-name").value = "";
     document.getElementById("new-product-variant-label").value = "";
     document.getElementById("new-product-category").value = "General";
     document.getElementById("new-product-supplier").value = "";
     document.getElementById("new-product-barcode").value = "";
     document.getElementById("new-product-image-source").value = "upload";
+    document.getElementById("new-product-image-mode").value = "shared";
+    document.getElementById("new-product-variants").innerHTML = "";
+    document.getElementById("new-product-variants").classList.remove("is-per-variant");
+    invVariantSequence = 0;
+    invUpdateVariantCount();
     document.getElementById("new-product-image-file").value = "";
     document.getElementById("new-product-image-url").value = "";
     document.getElementById("new-product-sell-price").value = "0";
@@ -1071,8 +1179,15 @@ document.getElementById("open-product-modal-top").addEventListener("click", () =
 document.getElementById("close-product-modal").addEventListener("click", invRequestCloseProductModal);
 document.getElementById("new-product-cancel").addEventListener("click", invRequestCloseProductModal);
 document.getElementById("close-product-action-modal").addEventListener("click", invCloseProductActionModal);
-document.getElementById("new-product-sku").addEventListener("input", invUpdateCreateProductProjection);
-document.getElementById("new-product-name").addEventListener("input", invUpdateCreateProductProjection);
+document.getElementById("new-product-sku").addEventListener("input", (event) => { event.target.dataset.manual = "true"; invUpdateCreateProductProjection(); });
+document.getElementById("new-product-name").addEventListener("input", () => { invSyncFirstVariantSku(); document.querySelectorAll("[data-variant-row]").forEach((row,index) => { const sku=row.querySelector('[data-v="sku"]'); if(sku.dataset.manual!=="true") sku.value=invGeneratedSku(invGetElementValue("new-product-name"),row.querySelector('[data-v="label"]').value,index+2); }); invUpdateCreateProductProjection(); });
+document.getElementById("new-product-variant-label").addEventListener("input", () => { invSyncFirstVariantSku(); invUpdateCreateProductProjection(); });
+document.getElementById("add-product-variant").addEventListener("click", () => { invAddVariantRow(); invUpdateCreateProductProjection(); });
+document.getElementById("new-product-image-mode").addEventListener("change", (event) => { document.getElementById("new-product-variants").classList.toggle("is-per-variant", event.target.value === "per_variant"); });
+document.querySelector('[data-barcode-camera-target="new-product-barcode"]').addEventListener("click", () => invOpenBarcodeCamera(document.getElementById("new-product-barcode")));
+document.getElementById("inventory-barcode-camera-close").addEventListener("click", invCloseBarcodeCamera);
+document.getElementById("inventory-barcode-camera-cancel").addEventListener("click", invCloseBarcodeCamera);
+document.getElementById("inventory-barcode-camera-modal").addEventListener("click", (event) => { if (event.target.id === "inventory-barcode-camera-modal") invCloseBarcodeCamera(); });
 document.getElementById("new-product-barcode").addEventListener("input", invUpdateCreateProductProjection);
 document.getElementById("new-product-image-source").addEventListener("change", invToggleProductImageInput);
 document.getElementById("new-product-image-file").addEventListener("change", invUpdateCreateProductImagePreview);
@@ -1114,6 +1229,14 @@ document.getElementById("inventory-product-body").addEventListener("click", (eve
     const action = event.target.closest("[data-product-action]");
     if (!action) return;
     invOpenProductActionModal(action.getAttribute("data-product-action"));
+});
+document.getElementById("inventory-product-body").addEventListener("click", (event) => {
+    const toggle = event.target.closest("[data-family-toggle]");
+    if (!toggle) return;
+    const key = toggle.dataset.familyToggle;
+    if (invExpandedFamilies.has(key)) invExpandedFamilies.delete(key);
+    else invExpandedFamilies.add(key);
+    invRenderProductTable();
 });
 
 document.getElementById("modal-restock-qty").addEventListener("input", invUpdateModalRestockProjection);

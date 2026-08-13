@@ -103,6 +103,14 @@
             ? `<div><span>Customer</span><strong>${esc(receipt.customerName)}</strong></div>`
             : "";
 
+        const cashTenderLines = String(receipt.paymentMethod ?? receipt.payment_method ?? "").toLowerCase() === "cash"
+            && Number.isFinite(Number(receipt.cashReceived))
+            ? `
+                <div><span>Cash Received</span><strong>${money(receipt.cashReceived)}</strong></div>
+                <div><span>Change</span><strong>${money(receipt.changeDue || 0)}</strong></div>
+            `
+            : "";
+
         return `
             <div class="ibems-receipt">
                 <div class="ibems-receipt-center">
@@ -117,6 +125,7 @@
                     <div><span>Payment</span><strong>${esc(paymentLabel || "N/A")}</strong></div>
                     ${customerLine}
                     ${debtorLine}
+                    ${cashTenderLines}
                 </div>
                 <div class="ibems-receipt-divider"></div>
                 <table class="ibems-receipt-lines">

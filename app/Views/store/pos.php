@@ -113,14 +113,15 @@
         </div>
 
         <div id="debt-customer-wrap" class="payment-wrap is-hidden">
-            <label for="debt-customer-search">Debt Customer (Faculty/Staff)</label>
+            <label id="checkout-customer-label" for="debt-customer-search">Customer (optional)</label>
             <div class="debt-search-wrap">
-                <input id="debt-customer-search" type="search" placeholder="Search by name, email, or employee ID">
+                <input id="debt-customer-search" type="search" placeholder="Walk-in or search employee name / ID">
                 <button id="open-debt-scanner-btn" type="button" class="debt-scan-btn" title="Scan employee QR/ID">
                     <i class="bi bi-qr-code-scan"></i>
                 </button>
                 <div id="debt-customer-suggestions" class="debt-suggestions is-hidden"></div>
             </div>
+            <small id="checkout-customer-help">Leave blank for a walk-in sale, or select an employee to record this transaction in their history.</small>
             <div id="debt-pin-wrap" class="debt-pin-wrap is-hidden">
                 <label><i class="bi bi-shield-lock"></i> Debt Authorization PIN</label>
                 <small id="debt-pin-help">PIN is verified securely when the transaction is submitted.</small>
@@ -135,6 +136,22 @@
         <div id="pos-success-strip" class="pos-success-strip is-hidden"></div>
     </aside>
 </section>
+
+<div id="product-variant-modal" class="receipt-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="product-variant-title">
+    <div class="receipt-card product-variant-modal-card">
+        <div class="receipt-head">
+            <div>
+                <h3 id="product-variant-title">Choose a variant</h3>
+                <p id="product-variant-guidance">Select a size to add it to the current order.</p>
+            </div>
+            <button id="product-variant-close" type="button" class="receipt-close" aria-label="Close variant picker">&times;</button>
+        </div>
+        <div id="product-variant-options" class="product-variant-options"></div>
+        <div class="confirm-actions">
+            <button id="product-variant-cancel" type="button" class="secondary-btn">Cancel</button>
+        </div>
+    </div>
+</div>
 
 <div id="barcode-scanner-modal" class="receipt-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="scanner-title">
     <div class="receipt-card scanner-card">

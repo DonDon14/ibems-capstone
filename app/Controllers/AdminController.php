@@ -13,6 +13,7 @@ use App\Models\UserModel;
 use App\Models\UserRoleModel;
 use App\Models\DebtCashbookEntryModel;
 use App\Services\StoreOversightService;
+use App\Services\AssetStorageService;
 use CodeIgniter\Controller;
 use Config\Database;
 
@@ -1837,32 +1838,7 @@ class AdminController extends Controller
                 throw new \RuntimeException('Invalid uploaded logo file.');
             }
 
-            $allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-            if (!in_array((string) $logoFile->getMimeType(), $allowedMimeTypes, true)) {
-                throw new \RuntimeException('Logo must be JPG, PNG, WEBP, or GIF.');
-            }
-
-            if ((int) $logoFile->getSize() > 2 * 1024 * 1024) {
-                throw new \RuntimeException('Logo file size must be 2MB or less.');
-            }
-
-            $uploadDir = FCPATH . 'uploads/store-logos';
-            if (!is_dir($uploadDir) && !mkdir($uploadDir, 0775, true) && !is_dir($uploadDir)) {
-                throw new \RuntimeException('Failed to prepare upload directory.');
-            }
-
-            $newName = $logoFile->getRandomName();
-            $logoFile->move($uploadDir, $newName);
-            $storedPath = '/uploads/store-logos/' . $newName;
-
-            if ($currentUrl && strpos($currentUrl, '/uploads/store-logos/') === 0) {
-                $oldFile = FCPATH . ltrim($currentUrl, '/');
-                if (is_file($oldFile)) {
-                    @unlink($oldFile);
-                }
-            }
-
-            return $storedPath;
+            return (new AssetStorageService())->storeImage($logoFile, 'store-logos', $currentUrl);
         }
 
         if ($inputUrl !== '') {
@@ -1950,32 +1926,7 @@ class AdminController extends Controller
                 throw new \RuntimeException('Invalid uploaded image file.');
             }
 
-            $allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-            if (!in_array((string) $imageFile->getMimeType(), $allowedMimeTypes, true)) {
-                throw new \RuntimeException('Product image must be JPG, PNG, WEBP, or GIF.');
-            }
-
-            if ((int) $imageFile->getSize() > 2 * 1024 * 1024) {
-                throw new \RuntimeException('Product image size must be 2MB or less.');
-            }
-
-            $uploadDir = FCPATH . 'uploads/product-images';
-            if (!is_dir($uploadDir) && !mkdir($uploadDir, 0775, true) && !is_dir($uploadDir)) {
-                throw new \RuntimeException('Failed to prepare product image upload directory.');
-            }
-
-            $newName = $imageFile->getRandomName();
-            $imageFile->move($uploadDir, $newName);
-            $storedPath = '/uploads/product-images/' . $newName;
-
-            if ($currentUrl && strpos($currentUrl, '/uploads/product-images/') === 0) {
-                $oldFile = FCPATH . ltrim($currentUrl, '/');
-                if (is_file($oldFile)) {
-                    @unlink($oldFile);
-                }
-            }
-
-            return $storedPath;
+            return (new AssetStorageService())->storeImage($imageFile, 'product-images', $currentUrl);
         }
 
         if ($inputUrl !== '') {

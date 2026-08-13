@@ -29,6 +29,7 @@ final class TransactionServiceTest extends CIUnitTestCase
         $result = $service->createTransaction([
             'store_id' => 1,
             'payment_method' => 'cash',
+            'cash_received' => 500,
             'customer_type' => 'walk_in',
             'items' => [
                 ['product_id' => 101, 'qty' => 2],
@@ -38,6 +39,7 @@ final class TransactionServiceTest extends CIUnitTestCase
         $this->assertSame('success', $result['status']);
         $this->assertArrayHasKey('transaction_id', $result);
         $this->assertSame(100.0, (float) $result['total_amount']);
+        $this->assertSame(400.0, (float) $result['change_due']);
 
         $product = $db->table('products')->where('id', 101)->get()->getRowArray();
         $this->assertNotNull($product);
@@ -68,6 +70,7 @@ final class TransactionServiceTest extends CIUnitTestCase
         $result = $service->createTransaction([
             'store_id' => 1,
             'payment_method' => 'cash',
+            'cash_received' => 100,
             'customer_type' => 'walk_in',
             'items' => [
                 ['product_id' => 101, 'qty' => 2],
@@ -86,6 +89,34 @@ final class TransactionServiceTest extends CIUnitTestCase
         $this->assertSame(1, (int) ($product['stock_qty'] ?? 0));
     }
 
+    public function testCashTransactionCanBeRecordedForEmployeeCustomer(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+
+        $this->seedStore($now);
+        $this->seedOpenStoreDay($now);
+        $this->seedPaymentMethod('cash', true, $now);
+        $this->seedProduct(101, 3, 50, $now);
+        $this->seedDebtCustomer(501, 'faculty', 500, 0, '1234', $now);
+
+        $result = (new TransactionService())->createTransaction([
+            'store_id' => 1,
+            'payment_method' => 'cash',
+            'cash_received' => 100,
+            'customer_user_id' => 501,
+            'items' => [
+                ['product_id' => 101, 'qty' => 1],
+            ],
+        ], 7, 'STORE_SYSTEM');
+
+        $this->assertSame('success', $result['status']);
+        $transaction = $db->table('transactions')->where('id', $result['transaction_id'])->get()->getRowArray();
+        $this->assertSame(501, (int) ($transaction['user_id'] ?? 0));
+        $this->assertSame('faculty', $transaction['customer_type'] ?? null);
+        $this->assertSame(50.0, (float) $result['change_due']);
+    }
+
     public function testDisabledPaymentMethodIsRejectedBeforeWritingTransaction(): void
     {
         $db = Database::connect();
@@ -100,6 +131,7 @@ final class TransactionServiceTest extends CIUnitTestCase
         $result = $service->createTransaction([
             'store_id' => 1,
             'payment_method' => 'cash',
+            'cash_received' => 500,
             'customer_type' => 'walk_in',
             'items' => [
                 ['product_id' => 101, 'qty' => 1],
@@ -124,6 +156,7 @@ final class TransactionServiceTest extends CIUnitTestCase
         $result = $service->createTransaction([
             'store_id' => 1,
             'payment_method' => 'cash',
+            'cash_received' => 100,
             'customer_type' => 'walk_in',
             'items' => [
                 ['product_id' => 101, 'qty' => 1],
@@ -352,6 +385,7 @@ final class TransactionServiceTest extends CIUnitTestCase
         $result = (new TransactionService())->createTransaction([
             'store_id' => 1,
             'payment_method' => 'cash',
+            'cash_received' => 100,
             'customer_type' => 'walk_in',
             'items' => [
                 ['product_id' => 101, 'qty' => 1],
@@ -382,6 +416,7 @@ final class TransactionServiceTest extends CIUnitTestCase
         $result = (new TransactionService())->createTransaction([
             'store_id' => 1,
             'payment_method' => 'cash',
+            'cash_received' => 100,
             'customer_type' => 'walk_in',
             'items' => [
                 ['product_id' => 101, 'qty' => 1],

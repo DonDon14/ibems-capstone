@@ -1656,8 +1656,8 @@ body .app-modal .app-modal-actions {
 
 .toast-stack {
     position: fixed;
+    top: 18px;
     right: 18px;
-    bottom: 18px;
     z-index: 2000;
     display: flex;
     flex-direction: column;
@@ -1870,7 +1870,7 @@ body .app-modal .app-modal-actions {
 @keyframes toast-in {
     from {
         opacity: 0;
-        transform: translateY(8px);
+        transform: translateY(-8px);
     }
 
     to {

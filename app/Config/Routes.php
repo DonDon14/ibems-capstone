@@ -99,6 +99,7 @@ $routes->get('store/inventory/movements', 'StoreController::inventoryMovements',
 $routes->post('store/inventory/restock', 'StoreController::restock', ['filter' => 'access:store.operate']);
 $routes->post('store/inventory/adjust-stock', 'StoreController::adjustStock', ['filter' => 'access:store.operate']);
 $routes->post('store/inventory/add-product', 'StoreController::addProduct', ['filter' => 'access:store.operate']);
+$routes->post('store/inventory/add-product-family', 'StoreController::addProductFamily', ['filter' => 'access:store.operate']);
 $routes->post('store/inventory/update-product', 'StoreController::updateProduct', ['filter' => 'access:store.operate']);
 
 $routes->get('user/dashboard', 'UserController::dashboard', ['filter' => 'access:user.self']);

@@ -28,6 +28,59 @@ const currentUserRole = String(document.querySelector(".pos-shell")?.dataset.use
 const isAdminUser = currentUserRole === "ADMIN";
 let openingBalanceMode = "create";
 let currentDaySession = null;
+const selectedCatalogVariants = new Map();
+let activeVariantFamilyKey = null;
+
+function getProductFamilyKey(product) {
+    const familyId = Number(product?.family_id || 0);
+    if (familyId > 0) return `family-${familyId}`;
+    const name = String(product?.name || "").trim().toLowerCase();
+    const category = String(product?.category || "General").trim().toLowerCase();
+    return name ? `legacy-${name}-${category}` : `product-${Number(product?.id || 0)}`;
+}
+
+function groupCatalogProducts(products) {
+    const groups = new Map();
+    products.forEach((product) => {
+        const key = getProductFamilyKey(product);
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(product);
+    });
+    return Array.from(groups, ([key, variants]) => ({key, variants}));
+}
+
+function closeProductVariantPicker() {
+    activeVariantFamilyKey = null;
+    document.getElementById("product-variant-modal").style.display = "none";
+}
+
+function openProductVariantPicker(familyKey) {
+    const group = groupCatalogProducts(productsCache).find((item) => item.key === familyKey);
+    if (!group || group.variants.length < 2) return;
+    activeVariantFamilyKey = familyKey;
+    const productName = String(group.variants[0]?.name || "Product");
+    const familyImage = String(group.variants.find((variant) => String(variant.image_url || "").trim() !== "")?.image_url || "").trim();
+    document.getElementById("product-variant-title").textContent = productName;
+    document.getElementById("product-variant-guidance").textContent = `Choose one of ${group.variants.length} available variants. Selection adds it directly to the order.`;
+    document.getElementById("product-variant-options").innerHTML = group.variants.map((variant) => {
+        const stock = Number(variant.stock_qty || 0);
+        const inCart = getCartQty(variant.id);
+        const canAdd = inCart < stock;
+        const stockState = getStockState(stock, inCart, variant.low_stock_threshold ?? variant.reorder_level ?? 10);
+        const variantImage = String(variant.image_url || familyImage).trim();
+        const variantLabel = String(variant.variant_label || "Default");
+        const imageHtml = variantImage
+            ? `<img class="product-variant-option-image" src="${escapeHtml(variantImage)}" alt="${escapeHtml(`${productName} ${variantLabel}`)}">`
+            : `<span class="product-variant-option-image placeholder" aria-hidden="true">${escapeHtml(getInitials(variantLabel))}</span>`;
+        return `<button class="product-variant-option stock-${stockState.key}" type="button" data-pick-variant="${Number(variant.id)}" ${canAdd ? "" : "disabled"}>
+            ${imageHtml}
+            <span class="product-variant-option-main"><strong>${escapeHtml(variantLabel)}</strong><small>SKU: ${escapeHtml(variant.sku || "-")}</small></span>
+            <span class="product-variant-option-side"><strong>${formatMoney(variant.price)}</strong><small>${stock} available</small></span>
+        </button>`;
+    }).join("");
+    document.getElementById("product-variant-modal").style.display = "grid";
+    document.querySelector("[data-pick-variant]:not(:disabled)")?.focus();
+}
 
 function setOpeningReadinessState(state, message = "") {
     const shell = document.querySelector(".pos-shell");
@@ -793,7 +846,8 @@ function autoSelectDebtCustomerByCode(rawCode) {
     document.getElementById("debt-customer-suggestions").style.display = "none";
     updateDebtPinUi();
     updateCheckoutState();
-    setResult(`Debt customer selected: ${exact.name}`, "ok");
+    const selectionKind = document.getElementById("payment-method")?.value === "debt" ? "Debt customer" : "Employee customer";
+    setResult(`${selectionKind} selected: ${exact.name}`, "ok");
     return true;
 }
 
@@ -923,6 +977,25 @@ function buildConfirmTransactionHtml(data) {
             </div>
         `
         : "";
+    const cashTenderBlock = data.paymentMethod === "cash"
+        ? `
+            <section class="confirm-section confirm-cash-tender">
+                <h4><i class="bi bi-cash-stack"></i> Cash Tender</h4>
+                <div class="confirm-cash-grid">
+                    <label class="payment-wrap" for="confirm-cash-received">
+                        <span>Cash Received</span>
+                        <input id="confirm-cash-received" type="number" min="${Number(data.totalAmount || 0).toFixed(2)}" step="0.01" inputmode="decimal" placeholder="0.00" autocomplete="off">
+                    </label>
+                    <div class="confirm-change-due" aria-live="polite">
+                        <span>Change Due</span>
+                        <strong id="confirm-change-due">${formatMoney(0)}</strong>
+                    </div>
+                </div>
+                <small id="confirm-cash-help">Enter at least ${formatMoney(data.totalAmount)} to continue.</small>
+            </section>
+        `
+        : "";
+    const checkoutCustomer = data.checkoutCustomer || null;
     const customerBlock = data.paymentMethod === "debt"
         ? `
             <section class="confirm-section">
@@ -937,7 +1010,18 @@ function buildConfirmTransactionHtml(data) {
                 </div>
             </section>
         `
-        : `
+        : checkoutCustomer
+            ? `
+            <section class="confirm-section">
+                <h4><i class="bi bi-person-check"></i> Customer</h4>
+                <div class="confirm-meta-grid">
+                    <div class="confirm-meta-item"><span>Name</span><strong>${escapeHtml(checkoutCustomer.name || data.customerLabel)}</strong></div>
+                    <div class="confirm-meta-item"><span>Customer Type</span><strong>${escapeHtml(String(checkoutCustomer.user_type || "Employee").replace(/\b\w/g, (letter) => letter.toUpperCase()))}</strong></div>
+                    <div class="confirm-meta-item confirm-meta-wide"><span>Transaction Record</span><strong>Saved to this employee&apos;s purchase history</strong></div>
+                </div>
+            </section>
+        `
+            : `
             <section class="confirm-section">
                 <h4><i class="bi bi-person"></i> Customer</h4>
                 <div class="confirm-meta-grid">
@@ -964,6 +1048,7 @@ function buildConfirmTransactionHtml(data) {
                 <div class="confirm-meta-item"><span>Payment Method</span><strong>${escapeHtml(paymentLabel)}</strong></div>
             </div>
         </section>
+        ${cashTenderBlock}
         ${customerBlock}
         <section class="confirm-section">
             <h4><i class="bi bi-basket"></i> Items</h4>
@@ -982,11 +1067,51 @@ function buildConfirmTransactionHtml(data) {
     `;
 }
 
+function updateConfirmCashTender() {
+    if (!pendingTransaction || pendingTransaction.paymentMethod !== "cash") return true;
+
+    const input = document.getElementById("confirm-cash-received");
+    const changeEl = document.getElementById("confirm-change-due");
+    const helpEl = document.getElementById("confirm-cash-help");
+    const proceedBtn = document.getElementById("confirm-proceed");
+    const received = Number(input?.value || 0);
+    const total = Number(pendingTransaction.totalAmount || 0);
+    const valid = Number.isFinite(received) && received >= total;
+    const changeDue = valid ? Math.max(0, received - total) : 0;
+
+    pendingTransaction.cashReceived = valid ? received : null;
+    pendingTransaction.changeDue = changeDue;
+    pendingTransaction.payload.cash_received = valid ? received : null;
+    pendingTransaction.payload.change_due = changeDue;
+    if (changeEl) changeEl.textContent = formatMoney(changeDue);
+    if (helpEl) {
+        helpEl.textContent = valid
+            ? `${formatMoney(received)} received; return ${formatMoney(changeDue)} change.`
+            : `Enter at least ${formatMoney(total)} to continue.`;
+        helpEl.classList.toggle("is-error", !valid && String(input?.value || "") !== "");
+    }
+    if (proceedBtn) proceedBtn.disabled = !valid;
+    return valid;
+}
+
 function openConfirmTransactionModal(data) {
     pendingTransaction = data;
     const content = document.getElementById("confirm-transaction-content");
     content.innerHTML = buildConfirmTransactionHtml(data);
     document.getElementById("confirm-transaction-modal").style.display = "grid";
+    if (data.paymentMethod === "cash") {
+        const input = document.getElementById("confirm-cash-received");
+        input?.addEventListener("input", updateConfirmCashTender);
+        input?.addEventListener("keydown", (event) => {
+            if (event.key !== "Enter" || !updateConfirmCashTender()) return;
+            event.preventDefault();
+            document.getElementById("confirm-proceed")?.click();
+        });
+        updateConfirmCashTender();
+        setTimeout(() => input?.focus(), 30);
+    } else {
+        document.getElementById("confirm-proceed").disabled = false;
+    }
 }
 
 function closeConfirmTransactionModal(force = false) {
@@ -1258,14 +1383,18 @@ function renderProducts() {
         return;
     }
 
-    grid.innerHTML = filteredProducts
-        .map((product) => {
+    grid.innerHTML = groupCatalogProducts(filteredProducts)
+        .map(({key, variants}) => {
+            const product = variants[0];
             const stock = Number(product.stock_qty || 0);
             const inCart = getCartQty(product.id);
             const canAdd = inCart < stock;
             const stockState = getStockState(stock, inCart, product.low_stock_threshold ?? product.reorder_level ?? 10);
+            const availableVariants = variants.filter((variant) => getCartQty(variant.id) < Number(variant.stock_qty || 0));
+            const canOpenOrAdd = variants.length > 1 ? availableVariants.length > 0 : canAdd;
+            const familyStockLabel = variants.length > 1 ? `${availableVariants.length}/${variants.length} available` : stockState.label;
             const category = String(product.category || "General");
-            const displayName = getProductDisplayName(product);
+            const displayName = variants.length > 1 ? String(product.name || "Unnamed product") : getProductDisplayName(product);
             const imageUrl = String(product.image_url || "").trim();
             const supplier = String(product.supplier || "").trim();
             const locationBin = String(product.location_bin || "").trim();
@@ -1282,23 +1411,28 @@ function renderProducts() {
                     </div>
                 `
                 : "";
+            const priceValues = variants.map((variant) => Number(variant.price || 0));
+            const priceLabel = variants.length > 1 ? `From ${formatMoney(Math.min(...priceValues))}` : formatMoney(product.price);
+            const actionLabel = variants.length > 1 ? `Choose from ${variants.length} variants` : "Tap to add";
 
             return `
-                <article class="product-card stock-${stockState.key} ${canAdd ? "" : "out-of-stock"}" data-product-card="${product.id}" aria-disabled="${canAdd ? "false" : "true"}">
+                <article class="product-card product-family-card stock-${stockState.key} ${canOpenOrAdd ? "" : "out-of-stock"}" data-family-card="${escapeHtml(key)}" data-direct-product="${variants.length === 1 ? Number(product.id) : ""}" tabindex="0" role="button" aria-label="${escapeHtml(variants.length > 1 ? `Choose ${product.name} variant` : `Add ${displayName} to order`)}" aria-disabled="${canOpenOrAdd ? "false" : "true"}">
                     <div class="product-card-top">
                         ${visualHtml}
-                        <span class="stock-badge stock-${stockState.key}">${escapeHtml(stockState.label)}</span>
+                        <span class="stock-badge stock-${stockState.key}">${escapeHtml(familyStockLabel)}</span>
                     </div>
                     <h5 class="product-name">${escapeHtml(displayName)}</h5>
-                    <p class="product-meta">${escapeHtml(category)} | SKU: ${escapeHtml(product.sku)}</p>
+                    <p class="product-meta">${escapeHtml(category)} | ${variants.length} ${variants.length === 1 ? "variant" : "variants"}</p>
+                    <p class="product-meta product-selected-sku">${variants.length > 1 ? "Tap to view sizes" : `SKU: ${escapeHtml(product.sku)}`}</p>
                     ${operationsMeta}
                     <div class="product-bottom">
                         <div>
-                            <div class="product-price">${formatMoney(product.price)}</div>
-                            <div class="product-stock">${escapeHtml(stockState.detail)} | Stock: ${stock}</div>
+                            <div class="product-price">${priceLabel}</div>
+                            <div class="product-stock">${variants.length > 1 ? `${variants.length} choices available` : `${escapeHtml(stockState.detail)} | Stock: ${stock}`}</div>
                         </div>
                         ${inCartHtml}
                     </div>
+                    <span class="product-card-action"><i class="bi bi-hand-index-thumb"></i>${actionLabel}</span>
                 </article>
             `;
         })
@@ -1596,25 +1730,29 @@ async function submitDebtPayment() {
 function updateDebtCustomerVisibility() {
     const paymentMethod = document.getElementById("payment-method").value;
     const wrap = document.getElementById("debt-customer-wrap");
+    const label = document.getElementById("checkout-customer-label");
+    const help = document.getElementById("checkout-customer-help");
 
-    if (paymentMethod === "debt") {
-        wrap.style.display = "flex";
-        updateDebtPinUi();
-        if (debtCustomers.length === 0) {
-            loadDebtCustomers().catch(() => setResult("Unable to load debt customers.", "error"));
-        }
-        return;
+    wrap.style.display = "flex";
+    if (label) {
+        label.textContent = paymentMethod === "debt"
+            ? "Debt Customer (required)"
+            : "Customer (optional)";
     }
-
-    wrap.style.display = "none";
-    selectedDebtCustomerId = null;
-    selectedDebtCustomer = null;
-    selectedDebtPin = "";
-    document.getElementById("debt-customer-search").value = "";
-    const debtPinInput = document.getElementById("debt-pin-input");
-    if (debtPinInput) debtPinInput.value = "";
-    document.getElementById("debt-customer-suggestions").style.display = "none";
+    if (help) {
+        help.textContent = paymentMethod === "debt"
+            ? "Select the faculty or staff member who is authorizing this debt purchase."
+            : "Leave blank for a walk-in sale, or select an employee to record this transaction in their history.";
+    }
+    if (paymentMethod !== "debt") {
+        selectedDebtPin = "";
+        const debtPinInput = document.getElementById("debt-pin-input");
+        if (debtPinInput) debtPinInput.value = "";
+    }
     updateDebtPinUi();
+    if (debtCustomers.length === 0) {
+        loadDebtCustomers().catch(() => setResult("Unable to load employee customers.", "error"));
+    }
 }
 
 function renderPaymentMethods() {
@@ -1961,8 +2099,8 @@ function buildPendingTransaction() {
     if (paymentMethod === "debt" && (!selectedDebtCustomerId || !selectedDebtPin)) return null;
 
     const payload = {
-        customer_type: "walk_in",
-        customer_user_id: paymentMethod === "debt" ? selectedDebtCustomerId : null,
+        customer_type: selectedDebtCustomer?.user_type || "walk_in",
+        customer_user_id: selectedDebtCustomerId || null,
         store_id: activeStoreId,
         payment_method: paymentMethod,
         debt_pin: paymentMethod === "debt" ? selectedDebtPin : "",
@@ -1981,6 +2119,7 @@ function buildPendingTransaction() {
     const debtCustomer = paymentMethod === "debt" && selectedDebtCustomerId
         ? getDebtCustomerById(selectedDebtCustomerId)
         : null;
+    const checkoutCustomer = selectedDebtCustomerId ? getDebtCustomerById(selectedDebtCustomerId) : null;
 
     return {
         payload,
@@ -1993,11 +2132,17 @@ function buildPendingTransaction() {
                 ? getDebtCustomerLabelById(selectedDebtCustomerId)
                 : "N/A",
         debtCustomer,
+        checkoutCustomer,
+        customerLabel: checkoutCustomer?.name || "Walk-in",
     };
 }
 
 async function processConfirmedTransaction(dataToProcess) {
     if (isSubmitting || !dataToProcess) return;
+    if (dataToProcess.paymentMethod === "cash" && !updateConfirmCashTender()) {
+        document.getElementById("confirm-cash-received")?.focus();
+        return;
+    }
     const submitBtn = document.getElementById("submit-transaction");
     const confirmBtn = document.getElementById("confirm-proceed");
 
@@ -2028,9 +2173,11 @@ async function processConfirmedTransaction(dataToProcess) {
                 createdAt: data.created_at || new Date().toISOString(),
                 storeName: dataToProcess.storeName,
                 paymentMethod: dataToProcess.paymentMethod,
-                customerName: dataToProcess.paymentMethod === "debt" ? dataToProcess.debtCustomerLabel : "Walk-in",
+                customerName: dataToProcess.customerLabel || "Walk-in",
                 debtCustomerLabel: dataToProcess.debtCustomerLabel,
                 totalAmount: Number(data.total_amount ?? dataToProcess.totalAmount),
+                cashReceived: dataToProcess.paymentMethod === "cash" ? Number(data.cash_received ?? dataToProcess.cashReceived ?? 0) : null,
+                changeDue: dataToProcess.paymentMethod === "cash" ? Number(data.change_due ?? dataToProcess.changeDue ?? 0) : null,
                 items: dataToProcess.cartSnapshot,
                 lookupUrl: `${window.location.origin}/store/receipt/${encodeURIComponent(String(data.transaction_id))}`,
             };
@@ -2128,14 +2275,18 @@ async function submitTransaction() {
 }
 
 document.getElementById("product-grid").addEventListener("click", (event) => {
-    const card = event.target.closest("[data-product-card]");
-    if (!card) return;
+    const card = event.target.closest("[data-family-card]");
+    if (!card || card.getAttribute("aria-disabled") === "true") return;
 
     const now = Date.now();
     if (now - lastCardAddAt < 220) return;
     lastCardAddAt = now;
 
-    const productId = Number(card.getAttribute("data-product-card") || 0);
+    const productId = Number(card.getAttribute("data-direct-product") || 0);
+    if (productId <= 0) {
+        openProductVariantPicker(card.getAttribute("data-family-card"));
+        return;
+    }
     const product = getProductById(productId);
     if (!product) return;
 
@@ -2251,6 +2402,26 @@ document.getElementById("debt-customer-search").addEventListener("input", async 
     updateCheckoutState();
     await loadDebtCustomers(query);
 });
+document.getElementById("product-grid").addEventListener("keydown", (event) => {
+    if (event.key !== "Enter" && event.key !== " ") return;
+    const card = event.target.closest("[data-family-card]");
+    if (!card) return;
+    event.preventDefault();
+    card.click();
+});
+document.getElementById("product-variant-options").addEventListener("click", (event) => {
+    const option = event.target.closest("[data-pick-variant]");
+    if (!option) return;
+    const product = getProductById(Number(option.dataset.pickVariant || 0));
+    if (!product) return;
+    addToCart(product.id, getProductDisplayName(product), Number(product.price || 0));
+    closeProductVariantPicker();
+});
+document.getElementById("product-variant-close").addEventListener("click", closeProductVariantPicker);
+document.getElementById("product-variant-cancel").addEventListener("click", closeProductVariantPicker);
+document.getElementById("product-variant-modal").addEventListener("click", (event) => {
+    if (event.target.id === "product-variant-modal") closeProductVariantPicker();
+});
 
 document.getElementById("debt-customer-suggestions").addEventListener("click", (event) => {
     const btn = event.target.closest("[data-customer-id]");
@@ -2269,7 +2440,8 @@ document.getElementById("debt-customer-suggestions").addEventListener("click", (
     document.getElementById("debt-customer-suggestions").style.display = "none";
     updateDebtPinUi();
     updateCheckoutState();
-    setResult(`Debt customer selected: ${picked.name}`, "ok");
+    const selectionKind = document.getElementById("payment-method")?.value === "debt" ? "Debt customer" : "Employee customer";
+    setResult(`${selectionKind} selected: ${picked.name}`, "ok");
 });
 
 document.getElementById("open-debt-payment-modal").addEventListener("click", openDebtPaymentModal);

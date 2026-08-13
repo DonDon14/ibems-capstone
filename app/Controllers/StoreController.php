@@ -16,6 +16,7 @@ use App\Models\DebtCashbookEntryModel;
 use App\Services\StoreAccessService;
 use App\Services\StoreDayVarianceCaseService;
 use App\Services\StoreDayExpectedService;
+use App\Services\AssetStorageService;
 use Config\Database;
 
 class StoreController extends BaseController
@@ -2716,6 +2717,77 @@ class StoreController extends BaseController
         ];
     }
 
+    public function addProductFamily()
+    {
+        $request = $this->request->getPost();
+        $variants = json_decode((string) ($request['variants'] ?? '[]'), true);
+        $storeId = (int) ($request['store_id'] ?? 0);
+        $name = trim((string) ($request['name'] ?? ''));
+        $category = trim((string) ($request['category'] ?? 'General')) ?: 'General';
+        $supplier = trim((string) ($request['supplier'] ?? ''));
+        $location = trim((string) ($request['location_bin'] ?? ''));
+        $reason = trim((string) ($request['reason'] ?? 'Initial stock')) ?: 'Initial stock';
+        $actorId = (int) session()->get('user_id');
+        $role = (string) session()->get('role');
+
+        if ($storeId <= 0 || $name === '' || !is_array($variants) || $variants === []) {
+            return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => 'Product name and at least one variant are required.']);
+        }
+        if (!(new StoreModel())->canUserAccessStore($actorId, $role, $storeId)) {
+            return $this->response->setStatusCode(403)->setJSON(['status' => 'error', 'message' => 'You cannot add products to this store.']);
+        }
+
+        $skus = []; $barcodes = [];
+        foreach ($variants as $index => $variant) {
+            $sku = trim((string) ($variant['sku'] ?? '')); $label = trim((string) ($variant['label'] ?? ''));
+            $barcode = trim((string) ($variant['barcode'] ?? ''));
+            if ($sku === '' || $label === '' || (float) ($variant['price'] ?? -1) < 0 || (int) ($variant['stock'] ?? -1) < 0 || (float) ($variant['cost'] ?? -1) < 0) {
+                return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => 'Invalid variant at row ' . ($index + 1) . '.']);
+            }
+            $skuKey = strtolower($sku); $barcodeKey = strtolower($barcode);
+            if (isset($skus[$skuKey]) || ($barcode !== '' && isset($barcodes[$barcodeKey]))) {
+                return $this->response->setStatusCode(409)->setJSON(['status' => 'error', 'message' => 'Variant SKUs and barcodes must be unique.']);
+            }
+            $skus[$skuKey] = true; if ($barcode !== '') $barcodes[$barcodeKey] = true;
+        }
+
+        $db = Database::connect();
+        if ($db->table('products')->where('store_id', $storeId)->whereIn('sku', array_column($variants, 'sku'))->countAllResults() > 0) {
+            return $this->response->setStatusCode(409)->setJSON(['status' => 'error', 'message' => 'One or more SKUs already exist in this store.']);
+        }
+        $nonEmptyBarcodes = array_values(array_filter(array_column($variants, 'barcode')));
+        if ($nonEmptyBarcodes !== [] && $db->table('products')->where('store_id', $storeId)->whereIn('barcode', $nonEmptyBarcodes)->countAllResults() > 0) {
+            return $this->response->setStatusCode(409)->setJSON(['status' => 'error', 'message' => 'One or more barcodes already exist in this store.']);
+        }
+
+        try { $sharedImage = $this->resolveProductImageUrl(trim((string) ($request['image_url'] ?? '')), null); }
+        catch (\RuntimeException $e) { return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => $e->getMessage()]); }
+
+        $db->transBegin();
+        try {
+            $now = date('Y-m-d H:i:s');
+            $db->table('product_families')->insert(['store_id'=>$storeId,'name'=>$name,'category'=>$category,'supplier'=>$supplier ?: null,'image_url'=>$sharedImage,'option_name'=>'Size / Variant','created_at'=>$now,'updated_at'=>$now]);
+            $familyId = (int) $db->insertID(); $productIds = [];
+            foreach ($variants as $variantIndex => $variant) {
+                $variantImage = $sharedImage;
+                if ($variantIndex > 0) {
+                    $override = $this->request->getFile('variant_image_' . $variantIndex);
+                    if ($override && $override->getError() !== UPLOAD_ERR_NO_FILE) $variantImage = (new AssetStorageService())->storeImage($override, 'product-images', null);
+                }
+                $db->table('products')->insert(['store_id'=>$storeId,'family_id'=>$familyId,'sku'=>trim((string)$variant['sku']),'name'=>$name,'variant_label'=>trim((string)$variant['label']),'category'=>$category,'supplier'=>$supplier ?: null,'image_url'=>$variantImage,'barcode'=>trim((string)($variant['barcode']??'')) ?: null,'price'=>(float)$variant['price'],'stock_qty'=>(int)$variant['stock'],'low_stock_threshold'=>max(0,(int)($variant['low']??0)),'location_bin'=>$location ?: null,'is_active'=>true,'updated_at'=>$now]);
+                $productId = (int) $db->insertID(); $productIds[] = $productId;
+                if ((int)$variant['stock'] > 0) $db->table('inventory_movements')->insert(['product_id'=>$productId,'store_id'=>$storeId,'type'=>'restock','qty'=>(int)$variant['stock'],'unit_cost'=>(float)$variant['cost'],'total_cost'=>(float)$variant['cost']*(int)$variant['stock'],'expected_profit'=>((float)$variant['price']-(float)$variant['cost'])*(int)$variant['stock'],'reason'=>$reason,'created_at'=>$now]);
+            }
+            $db->table('audit_logs')->insert(['actor_id'=>$actorId,'action'=>'CREATE_PRODUCT_FAMILY','entity'=>'product_families','entity_id'=>$familyId,'payload_json'=>json_encode(['store_id'=>$storeId,'name'=>$name,'variant_count'=>count($variants),'product_ids'=>$productIds]),'created_at'=>$now]);
+            if (!$db->transStatus()) throw new \RuntimeException('Failed to create product family.');
+            $db->transCommit();
+            return $this->response->setJSON(['status'=>'success','family_id'=>$familyId,'product_ids'=>$productIds,'variant_count'=>count($variants)]);
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            return $this->response->setStatusCode(500)->setJSON(['status'=>'error','message'=>$e->getMessage() ?: 'Failed to create product family.']);
+        }
+    }
+
     private function calculateStoreSessionExpected(int $storeId, array $session): array
     {
         return (new StoreDayExpectedService())->calculate($storeId, $session);
@@ -2740,32 +2812,7 @@ class StoreController extends BaseController
                 throw new \RuntimeException('Invalid uploaded image file.');
             }
 
-            $allowedMimeTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-            if (!in_array((string) $imageFile->getMimeType(), $allowedMimeTypes, true)) {
-                throw new \RuntimeException('Product image must be JPG, PNG, WEBP, or GIF.');
-            }
-
-            if ((int) $imageFile->getSize() > 2 * 1024 * 1024) {
-                throw new \RuntimeException('Product image size must be 2MB or less.');
-            }
-
-            $uploadDir = FCPATH . 'uploads/product-images';
-            if (!is_dir($uploadDir) && !mkdir($uploadDir, 0775, true) && !is_dir($uploadDir)) {
-                throw new \RuntimeException('Failed to prepare product image upload directory.');
-            }
-
-            $newName = $imageFile->getRandomName();
-            $imageFile->move($uploadDir, $newName);
-            $storedPath = '/uploads/product-images/' . $newName;
-
-            if ($currentUrl && strpos($currentUrl, '/uploads/product-images/') === 0) {
-                $oldFile = FCPATH . ltrim($currentUrl, '/');
-                if (is_file($oldFile)) {
-                    @unlink($oldFile);
-                }
-            }
-
-            return $storedPath;
+            return (new AssetStorageService())->storeImage($imageFile, 'product-images', $currentUrl);
         }
 
         if ($inputUrl !== '') {

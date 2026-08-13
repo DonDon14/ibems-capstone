@@ -104,15 +104,15 @@
                 <h5>Product Information</h5>
                 <div class="form-grid">
                     <div class="field">
-                        <label for="new-product-sku">SKU</label>
-                        <input id="new-product-sku" type="text" placeholder="e.g. SNACK-001">
+                        <label for="new-product-sku">First Variant SKU</label>
+                        <input id="new-product-sku" type="text" placeholder="Generated from name and variant">
                     </div>
                     <div class="field">
                         <label for="new-product-name">Product Name</label>
                         <input id="new-product-name" type="text" placeholder="Product name">
                     </div>
                     <div class="field">
-                        <label for="new-product-variant-label">Variant/Size (optional)</label>
+                        <label for="new-product-variant-label">First Variant/Size</label>
                         <input id="new-product-variant-label" type="text" placeholder="e.g. 1.5L, 750ml, Can">
                     </div>
                     <div class="field">
@@ -124,8 +124,9 @@
                         <input id="new-product-supplier" type="text" placeholder="Search...">
                     </div>
                     <div class="field field-wide">
-                        <label for="new-product-barcode">Barcode (optional)</label>
-                        <input id="new-product-barcode" type="text" placeholder="Scan or barcode or entry">
+                        <label for="new-product-barcode">Barcode / Product Code (optional)</label>
+                        <div class="barcode-entry-row"><input id="new-product-barcode" type="text" inputmode="numeric" autocomplete="off" placeholder="Type the barcode digits manually"><button class="secondary-btn barcode-camera-btn" type="button" data-barcode-camera-target="new-product-barcode" title="Scan barcode with camera"><i class="bi bi-camera"></i><span>Camera</span></button></div>
+                        <small>No scanner required. Type the number printed below the barcode; a USB scanner can use this same field later.</small>
                     </div>
                 </div>
             </div>
@@ -138,6 +139,13 @@
                         <select id="new-product-image-source">
                             <option value="upload">Upload File</option>
                             <option value="url">Use Image URL</option>
+                        </select>
+                    </div>
+                    <div class="field">
+                        <label for="new-product-image-mode">Variant Image Mode</label>
+                        <select id="new-product-image-mode">
+                            <option value="shared">One image for all variants</option>
+                            <option value="per_variant">Different image per variant</option>
                         </select>
                     </div>
                     <div class="field" id="new-product-image-upload-wrap">
@@ -198,6 +206,11 @@
                         <input id="new-product-reason" type="text" value="Initial stock">
                     </div>
                 </div>
+                <div class="variant-builder-head">
+                    <div><strong>Additional Variants <span id="product-variant-count">0</span></strong><small>Add sizes without repeating shared product information.</small></div>
+                    <button id="add-product-variant" class="secondary-btn" type="button"><i class="bi bi-plus-circle"></i> Add Variant</button>
+                </div>
+                <div id="new-product-variants" class="variant-builder-list"></div>
             </div>
 
             <div class="create-product-section section-review">
@@ -412,8 +425,18 @@
         </div>
     </div>
 </div>
+
+<div id="inventory-barcode-camera-modal" class="inv-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="inventory-barcode-camera-title">
+    <div class="inv-modal-card barcode-camera-card">
+        <div class="inv-modal-head"><h4 id="inventory-barcode-camera-title"><i class="bi bi-upc-scan"></i> Scan Product Barcode</h4><button id="inventory-barcode-camera-close" class="inv-modal-close" type="button" aria-label="Close barcode camera">x</button></div>
+        <div id="inventory-barcode-camera-reader"></div>
+        <p id="inventory-barcode-camera-status" class="inventory-result">Point the camera at the barcode. Manual entry and USB scanners remain supported.</p>
+        <div class="inv-modal-actions"><button id="inventory-barcode-camera-cancel" class="secondary-btn" type="button">Cancel</button></div>
+    </div>
+</div>
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
+<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="<?= base_url('assets/js/store-inventory.js') ?>"></script>
 <?= $this->endSection() ?>
