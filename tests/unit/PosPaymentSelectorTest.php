@@ -45,6 +45,11 @@ final class PosPaymentSelectorTest extends TestCase
         $this->assertStringContainsString('Debt Exceeds Credit', $js);
         $this->assertStringContainsString('Debt allocation exceeds available credit by', $js);
         $this->assertStringContainsString('.debt-credit-meter.is-over', $css);
+        $this->assertStringContainsString('id="opening-ecash-input" type="hidden"', $view);
+        $this->assertStringContainsString('id="closing-ecash-input" type="hidden"', $view);
+        $this->assertStringContainsString('accountOpenings.reduce', $js);
+        $this->assertStringContainsString('accountCounts.reduce', $js);
+        $this->assertStringContainsString('Count cash and every receiving account independently.', $view);
     }
 
     public function testSplitTenderPersistenceAndLegacyFallbackAreDefined(): void
@@ -62,5 +67,7 @@ final class PosPaymentSelectorTest extends TestCase
         $this->assertStringContainsString("in_array('transaction_payments'", $controller);
         $this->assertStringContainsString('COALESCE(tp.amount, t.amount)', $controller);
         $this->assertStringContainsString('SPLIT PAYMENT', $receipt);
+        $this->assertStringContainsString('payments.length > 1 || payments.some', $receipt);
+        $this->assertStringContainsString('destination_account_name', $receipt);
     }
 }

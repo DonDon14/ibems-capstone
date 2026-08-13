@@ -278,11 +278,14 @@
                 <input id="debt-payment-amount" type="number" min="0" step="0.01" placeholder="0.00">
             </div>
             <div class="payment-wrap">
-                <label for="debt-payment-channel">Channel</label>
+                <label for="debt-payment-channel">Payment Method</label>
                 <select id="debt-payment-channel">
                     <option value="cash">Cash</option>
-                    <option value="ecash">E-Cash / Bank / Wallet</option>
                 </select>
+            </div>
+            <div id="debt-payment-destination-wrap" class="payment-wrap is-hidden">
+                <label for="debt-payment-destination">Receiving Account</label>
+                <select id="debt-payment-destination"></select>
             </div>
         </div>
         <div class="payment-wrap">
@@ -307,24 +310,27 @@
             <h3 id="opening-balance-title"><i class="bi bi-safe2"></i> Open Store Day</h3>
             <button id="opening-balance-close" type="button" class="receipt-close" aria-label="Close store-day opening form">&times;</button>
         </div>
-        <p id="opening-balance-description" class="scanner-status">Enter today&apos;s starting cash and e-cash before accepting POS transactions.</p>
+        <div class="opening-balance-body">
+        <p id="opening-balance-description" class="scanner-status">Count the opening balance held in cash and in every receiving account.</p>
+        <div id="store-day-reopen-preview" class="store-day-reopen-preview is-hidden"></div>
         <div class="opening-balance-fields">
             <div class="payment-wrap">
                 <label id="opening-balance-label" for="opening-balance-input">Opening Cash</label>
-                <input id="opening-balance-input" type="number" min="0" step="0.01" value="0">
+                <div class="cash-count-input-row">
+                    <input id="opening-balance-input" type="number" min="0" step="0.01" value="0">
+                    <button type="button" class="secondary-btn cash-denomination-toggle" data-denomination-target="opening" aria-expanded="false"><i class="bi bi-calculator"></i> Count denominations</button>
+                </div>
+                <div id="opening-denomination-counter" class="cash-denomination-counter is-hidden"></div>
             </div>
+            <input id="opening-ecash-input" type="hidden" value="0">
             <div class="payment-wrap">
-                <label for="opening-ecash-input">Opening E-Cash</label>
-                <input id="opening-ecash-input" type="number" min="0" step="0.01" value="0">
-                <small>Compatibility total. Individual electronic accounts are reconciled separately at close.</small>
-            </div>
-            <div class="payment-wrap">
-                <label for="opening-balance-note">Note (optional)</label>
+                <label id="opening-balance-note-label" for="opening-balance-note">Note (optional)</label>
                 <input id="opening-balance-note" type="text" placeholder="e.g. Start of day float">
             </div>
             <div id="opening-payment-account-balances" class="opening-payment-account-balances"></div>
         </div>
         <p id="opening-balance-result" class="result-msg"></p>
+        </div>
         <div class="confirm-actions">
             <button id="opening-balance-cancel" type="button" class="secondary-btn">Later</button>
             <button id="opening-balance-save" type="button" class="primary-btn"><i class="bi bi-check2-circle"></i> Open Store Day</button>
@@ -338,26 +344,30 @@
             <h3 id="store-day-close-title"><i class="bi bi-door-closed"></i> Close Store Day</h3>
             <button id="store-day-close-x" type="button" class="receipt-close" aria-label="Close store-day closing form">&times;</button>
         </div>
-        <p id="store-day-close-summary" class="scanner-status store-day-close-summary">Review expected cash and enter counted totals.</p>
+        <div class="store-day-close-body">
+        <p id="store-day-close-summary" class="scanner-status store-day-close-summary">Count cash and every receiving account independently.</p>
         <div id="store-day-close-reconcile" class="store-day-close-reconcile"></div>
         <div id="store-day-account-counts" class="store-day-account-counts"></div>
+        <div id="store-day-unassigned-counts" class="store-day-account-counts"></div>
         <div class="store-day-close-fields">
             <div class="payment-wrap">
                 <label for="closing-cash-input">Counted Cash</label>
-                <input id="closing-cash-input" type="number" min="0" step="0.01" value="0">
+                <div class="cash-count-input-row">
+                    <input id="closing-cash-input" type="number" min="0" step="0.01" value="0">
+                    <button type="button" class="secondary-btn cash-denomination-toggle" data-denomination-target="closing" aria-expanded="false"><i class="bi bi-calculator"></i> Count denominations</button>
+                </div>
+                <div id="closing-denomination-counter" class="cash-denomination-counter is-hidden"></div>
                 <small id="closing-cash-variance" class="closing-variance">Variance PHP 0.00</small>
             </div>
-            <div class="payment-wrap">
-                <label for="closing-ecash-input">Counted E-Cash</label>
-                <input id="closing-ecash-input" type="number" min="0" step="0.01" value="0">
-                <small id="closing-ecash-variance" class="closing-variance">Variance PHP 0.00</small>
-            </div>
+            <input id="closing-ecash-input" type="hidden" value="0">
+            <small id="closing-ecash-variance" class="closing-variance is-hidden">Variance PHP 0.00</small>
             <div class="payment-wrap">
                 <label id="closing-note-label" for="closing-note-input">Closing Note (optional)</label>
                 <input id="closing-note-input" type="text" placeholder="e.g. Cash count verified">
             </div>
         </div>
         <p id="store-day-close-result" class="result-msg"></p>
+        </div>
         <div class="confirm-actions">
             <button id="store-day-close-cancel" type="button" class="secondary-btn">Cancel</button>
             <button id="store-day-close-save" type="button" class="primary-btn"><i class="bi bi-check2-circle"></i> Close Store Day</button>
@@ -368,7 +378,7 @@
 
 <?= $this->section('scripts') ?>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260813i"></script>
-<script src="<?= base_url('assets/js/store-pos.js') ?>?v=20260813t"></script>
+<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260813j"></script>
+<script src="<?= base_url('assets/js/store-pos.js') ?>?v=20260813w"></script>
 <?= $this->endSection() ?>
 

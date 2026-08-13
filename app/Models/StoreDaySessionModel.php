@@ -104,4 +104,32 @@ class StoreDaySessionModel extends Model
         $id = (int) $this->insert($payload);
         return $this->find($id) ?? $payload;
     }
+
+    public function reopenDay(int $sessionId, int $openedBy): array
+    {
+        $now = date('Y-m-d H:i:s');
+        $this->update($sessionId, [
+            'status' => 'open',
+            'opened_by' => $openedBy > 0 ? $openedBy : null,
+            'opened_at' => $now,
+            'expected_cash' => null,
+            'expected_ecash' => null,
+            'counted_cash' => null,
+            'counted_ecash' => null,
+            'variance_cash' => null,
+            'variance_ecash' => null,
+            'variance_status' => 'balanced',
+            'review_status' => 'not_required',
+            'reviewed_by' => null,
+            'reviewed_at' => null,
+            'review_note' => null,
+            'accountability_user_id' => null,
+            'accountability_amount' => 0,
+            'closing_note' => null,
+            'closed_by' => null,
+            'closed_at' => null,
+            'updated_at' => $now,
+        ]);
+        return $this->find($sessionId) ?? [];
+    }
 }

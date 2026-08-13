@@ -19,7 +19,7 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260813i"></script>
+<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260813j"></script>
 <script>
     (async function () {
         const transactionId = <?= (int) ($transaction_id ?? 0) ?>;

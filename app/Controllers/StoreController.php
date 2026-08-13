@@ -774,14 +774,15 @@ class StoreController extends BaseController
         $storeId = (int) ($request['store_id'] ?? 0);
         $openingCash = (float) ($request['opening_cash'] ?? $request['opening_balance'] ?? 0);
         $openingEcash = (float) ($request['opening_ecash'] ?? 0);
+        $legacyOpeningEcash = $openingEcash;
         $paymentAccountOpenings = is_array($request['payment_account_openings'] ?? null) ? $request['payment_account_openings'] : [];
         $note = trim((string) ($request['note'] ?? ''));
         $businessDate = date('Y-m-d');
 
-        if ($openingCash < 0 || $openingEcash < 0) {
+        if ($openingCash < 0) {
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
-                'message' => 'Opening cash and e-cash must be 0 or greater.',
+                'message' => 'Opening cash must be 0 or greater.',
             ]);
         }
 
@@ -792,6 +793,24 @@ class StoreController extends BaseController
                 'message' => 'You cannot access this store.',
             ]);
         }
+
+        $db = Database::connect();
+        $validatedAccountOpenings = [];
+        $openingEcash = 0.0;
+        if ($db->tableExists('payment_destination_accounts')) {
+            foreach ($paymentAccountOpenings as $opening) {
+                $accountId = (int) ($opening['destination_account_id'] ?? 0);
+                $amount = round((float) ($opening['opening_balance'] ?? 0), 2);
+                $account = $accountId > 0 ? (new PaymentDestinationAccountModel())->find($accountId) : null;
+                if (!$account || (int) $account['store_id'] !== (int) $store['id'] || !ibems_bool($account['is_active'] ?? false) || $amount < 0) {
+                    return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => 'Every receiving-account opening balance must be valid and 0 or greater.']);
+                }
+                $validatedAccountOpenings[] = ['destination_account_id' => $accountId, 'opening_balance' => $amount];
+                $openingEcash += $amount;
+            }
+        }
+        if ($validatedAccountOpenings === []) $openingEcash = max(0, $legacyOpeningEcash);
+        $paymentAccountOpenings = $validatedAccountOpenings;
 
         $model = new StoreDaySessionModel();
         $openSession = $model->getOpenByStore((int) $store['id']);
@@ -818,9 +837,32 @@ class StoreController extends BaseController
         }
 
         $actorId = (int) session()->get('user_id');
-        $session = $model->openDay((int) $store['id'], $businessDate, $openingCash, $openingEcash, $actorId, $note);
-        $db = Database::connect();
-        if ($db->tableExists('store_day_payment_account_balances')) {
+        $isReopen = $existing && (string) ($existing['status'] ?? '') === 'closed';
+        $previousClose = null;
+        if ($isReopen) {
+            if ($note === '') {
+                return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => 'A reopen reason is required.']);
+            }
+            $previousClose = [
+                'expected_cash' => ($existing['expected_cash'] ?? null) !== null ? (float) $existing['expected_cash'] : null,
+                'expected_ecash' => ($existing['expected_ecash'] ?? null) !== null ? (float) $existing['expected_ecash'] : null,
+                'counted_cash' => ($existing['counted_cash'] ?? null) !== null ? (float) $existing['counted_cash'] : null,
+                'counted_ecash' => ($existing['counted_ecash'] ?? null) !== null ? (float) $existing['counted_ecash'] : null,
+                'variance_cash' => ($existing['variance_cash'] ?? null) !== null ? (float) $existing['variance_cash'] : null,
+                'variance_ecash' => ($existing['variance_ecash'] ?? null) !== null ? (float) $existing['variance_ecash'] : null,
+                'variance_status' => (string) ($existing['variance_status'] ?? ''),
+                'review_status' => (string) ($existing['review_status'] ?? ''),
+                'closing_note' => (string) ($existing['closing_note'] ?? ''),
+                'closed_by' => ($existing['closed_by'] ?? null) !== null ? (int) $existing['closed_by'] : null,
+                'closed_at' => (string) ($existing['closed_at'] ?? ''),
+            ];
+            $openingCash = (float) ($existing['opening_cash'] ?? 0);
+            $openingEcash = (float) ($existing['opening_ecash'] ?? 0);
+            $session = $model->reopenDay((int) $existing['id'], $actorId);
+        } else {
+            $session = $model->openDay((int) $store['id'], $businessDate, $openingCash, $openingEcash, $actorId, $note);
+        }
+        if (!$isReopen && $db->tableExists('store_day_payment_account_balances')) {
             foreach ($paymentAccountOpenings as $opening) {
                 $accountId = (int) ($opening['destination_account_id'] ?? 0);
                 $account = $accountId > 0 ? (new PaymentDestinationAccountModel())->find($accountId) : null;
@@ -839,7 +881,7 @@ class StoreController extends BaseController
         $auditLogModel = new AuditLogModel();
         $auditLogModel->insert([
             'actor_id' => $actorId > 0 ? $actorId : null,
-            'action' => $existing ? 'REOPEN_STORE_DAY_SESSION' : 'OPEN_STORE_DAY_SESSION',
+            'action' => $isReopen ? 'REOPEN_STORE_DAY_SESSION' : 'OPEN_STORE_DAY_SESSION',
             'entity' => 'store_day_sessions',
             'entity_id' => (int) ($session['id'] ?? 0),
             'payload_json' => json_encode([
@@ -847,6 +889,9 @@ class StoreController extends BaseController
                 'business_date' => $businessDate,
                 'opening_cash' => $openingCash,
                 'opening_ecash' => $openingEcash,
+                'reason' => $isReopen ? $note : null,
+                'previous_close' => $previousClose,
+                'original_opening_balances_preserved' => $isReopen,
             ]),
             'created_at' => date('Y-m-d H:i:s'),
         ]);
@@ -863,13 +908,16 @@ class StoreController extends BaseController
         $storeId = (int) ($request['store_id'] ?? 0);
         $countedCash = (float) ($request['counted_cash'] ?? 0);
         $countedEcash = (float) ($request['counted_ecash'] ?? 0);
+        $legacyCountedEcash = $countedEcash;
         $paymentAccountCounts = is_array($request['payment_account_counts'] ?? null) ? $request['payment_account_counts'] : [];
+        $unassignedPaymentCounts = is_array($request['unassigned_payment_counts'] ?? null) ? $request['unassigned_payment_counts'] : [];
+        $hasStructuredElectronicCounts = array_key_exists('payment_account_counts', $request) || array_key_exists('unassigned_payment_counts', $request);
         $note = trim((string) ($request['note'] ?? ''));
 
-        if ($countedCash < 0 || $countedEcash < 0) {
+        if ($countedCash < 0) {
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
-                'message' => 'Counted cash and e-cash must be 0 or greater.',
+                'message' => 'Counted cash must be 0 or greater.',
             ]);
         }
 
@@ -900,6 +948,40 @@ class StoreController extends BaseController
         $expected = $this->calculateStoreSessionExpected((int) $store['id'], $session);
         $expectedCash = (float) ($expected['expected_cash_on_hand'] ?? 0);
         $expectedEcash = (float) ($expected['expected_ecash_on_hand'] ?? 0);
+        $expectedAccounts = [];
+        foreach (($expected['payment_account_balances'] ?? []) as $account) $expectedAccounts[(int) $account['id']] = $account;
+        $validatedAccountCounts = [];
+        $countedEcash = 0.0;
+        foreach ($paymentAccountCounts as $count) {
+            $accountId = (int) ($count['destination_account_id'] ?? 0);
+            $counted = round((float) ($count['counted_balance'] ?? 0), 2);
+            if (!isset($expectedAccounts[$accountId]) || $counted < 0) {
+                return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => 'Every receiving-account ending balance must be valid and 0 or greater.']);
+            }
+            $validatedAccountCounts[] = ['destination_account_id' => $accountId, 'counted_balance' => $counted];
+            $countedEcash += $counted;
+        }
+        $expectedUnassigned = [];
+        foreach (($expected['unassigned_payment_balances'] ?? []) as $row) $expectedUnassigned[(string) $row['key']] = $row;
+        $validatedUnassignedCounts = [];
+        foreach ($unassignedPaymentCounts as $count) {
+            $key = (string) ($count['key'] ?? '');
+            $counted = round((float) ($count['counted_balance'] ?? 0), 2);
+            if (!isset($expectedUnassigned[$key]) || $counted < 0) {
+                return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => 'Every legacy payment ending balance must be valid and 0 or greater.']);
+            }
+            $validatedUnassignedCounts[] = ['key' => $key, 'counted_balance' => $counted];
+            $countedEcash += $counted;
+        }
+        if ($hasStructuredElectronicCounts && count($validatedUnassignedCounts) !== count($expectedUnassigned)) {
+            return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => 'Count every legacy payment bucket before closing the store day.']);
+        }
+        $unassignedPaymentCounts = $validatedUnassignedCounts;
+        if (!$hasStructuredElectronicCounts || ($expectedAccounts === [] && $expectedUnassigned === [])) $countedEcash = max(0, $legacyCountedEcash);
+        if ($hasStructuredElectronicCounts && count($validatedAccountCounts) !== count($expectedAccounts)) {
+            return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => 'Count every receiving account before closing the store day.']);
+        }
+        $paymentAccountCounts = $validatedAccountCounts;
         $varianceCash = round($countedCash - $expectedCash, 2);
         $varianceEcash = round($countedEcash - $expectedEcash, 2);
         $totalVariance = round($varianceCash + $varianceEcash, 2);
@@ -939,8 +1021,6 @@ class StoreController extends BaseController
 
         $db = Database::connect();
         if ($db->tableExists('store_day_payment_account_balances')) {
-            $expectedAccounts = [];
-            foreach (($expected['payment_account_balances'] ?? []) as $account) $expectedAccounts[(int) $account['id']] = $account;
             foreach ($paymentAccountCounts as $count) {
                 $accountId = (int) ($count['destination_account_id'] ?? 0);
                 if (!isset($expectedAccounts[$accountId])) continue;
@@ -985,6 +1065,7 @@ class StoreController extends BaseController
                 'variance_ecash' => $varianceEcash,
                 'variance_status' => $varianceStatus,
                 'review_status' => $reviewStatus,
+                'unassigned_payment_counts' => $unassignedPaymentCounts,
                 'note' => $note,
             ]),
             'created_at' => $now,
@@ -1340,7 +1421,10 @@ class StoreController extends BaseController
         $storeId = (int) ($request['store_id'] ?? 0);
         $debtorId = (int) ($request['user_id'] ?? 0);
         $amount = round((float) ($request['amount'] ?? 0), 2);
-        $channel = strtolower(trim((string) ($request['channel'] ?? 'cash')));
+        $hasExplicitPaymentMethod = array_key_exists('payment_method', $request);
+        $paymentMethod = strtolower(trim((string) ($request['payment_method'] ?? $request['channel'] ?? 'cash')));
+        $channel = $paymentMethod === 'cash' ? 'cash' : 'ecash';
+        $destinationAccountId = (int) ($request['destination_account_id'] ?? 0);
         $referenceNo = trim((string) ($request['reference_no'] ?? ''));
         $remarks = trim((string) ($request['remarks'] ?? ''));
         $businessDate = date('Y-m-d');
@@ -1359,10 +1443,10 @@ class StoreController extends BaseController
             ]);
         }
 
-        if (!in_array($channel, ['cash', 'ecash'], true)) {
+        if ($paymentMethod === 'debt' || $paymentMethod === '') {
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
-                'message' => 'Payment channel must be cash or e-cash.',
+                'message' => 'Select a valid collection payment method.',
             ]);
         }
 
@@ -1372,6 +1456,19 @@ class StoreController extends BaseController
                 'status' => 'error',
                 'message' => 'You cannot access this store.',
             ]);
+        }
+
+        $methodRow = $hasExplicitPaymentMethod
+            ? (new StorePaymentMethodModel())->where('store_id', (int) $store['id'])->where('code', $paymentMethod)->where('is_active', true)->first()
+            : ['code' => $paymentMethod];
+        if (!$methodRow || $paymentMethod === 'debt') {
+            return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => 'Select an active cash or electronic payment method.']);
+        }
+        if ($channel === 'ecash' && $hasExplicitPaymentMethod) {
+            $destination = $destinationAccountId > 0 ? (new PaymentDestinationAccountModel())->find($destinationAccountId) : null;
+            if (!$destination || (int) ($destination['store_id'] ?? 0) !== (int) $store['id'] || (int) ($destination['payment_method_id'] ?? 0) !== (int) ($methodRow['id'] ?? 0) || !ibems_bool($destination['is_active'] ?? false)) {
+                return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => 'Select an active receiving account for this electronic collection.']);
+            }
         }
 
         $sessionModel = new StoreDaySessionModel();
@@ -1421,6 +1518,8 @@ class StoreController extends BaseController
         $now = date('Y-m-d H:i:s');
         $reasonParts = [
             'Debt repayment',
+            'Method: ' . ($paymentMethod === 'ecash' ? 'electronic' : $paymentMethod),
+            $destinationAccountId > 0 ? 'Account: ' . $destinationAccountId : '',
             (string) ($debtor['employee_id'] ?? ''),
             (string) ($debtor['name'] ?? ''),
         ];
@@ -1468,6 +1567,8 @@ class StoreController extends BaseController
                 'store_id' => (int) $store['id'],
                 'store_name' => (string) ($store['store_name'] ?? 'Store'),
                 'channel' => $channel,
+                'payment_method' => $paymentMethod,
+                'destination_account_id' => $destinationAccountId > 0 ? $destinationAccountId : null,
                 'reference_no' => $referenceNo,
             ]
         );
@@ -1484,6 +1585,8 @@ class StoreController extends BaseController
                 'paid_amount' => $amount,
                 'new_debt' => $newDebt,
                 'channel' => $channel,
+                'payment_method' => $paymentMethod,
+                'destination_account_id' => $destinationAccountId > 0 ? $destinationAccountId : null,
                 'reference_no' => $referenceNo,
                 'cash_movement_id' => $movementId ? (int) $movementId : null,
             ]),
@@ -1508,6 +1611,8 @@ class StoreController extends BaseController
                 'debtor_name' => (string) ($debtor['name'] ?? ''),
                 'employee_id' => (string) ($debtor['employee_id'] ?? ''),
                 'channel' => $channel,
+                'payment_method' => $paymentMethod,
+                'destination_account_id' => $destinationAccountId > 0 ? $destinationAccountId : null,
                 'amount' => $amount,
                 'previous_debt' => $currentDebt,
                 'new_debt' => $newDebt,
@@ -2988,6 +3093,10 @@ class StoreController extends BaseController
             'expected_cash_on_hand' => (float) ($expected['expected_cash_on_hand'] ?? 0),
             'expected_ecash_on_hand' => (float) ($expected['expected_ecash_on_hand'] ?? 0),
             'expected_total_on_hand' => (float) ($expected['expected_total_on_hand'] ?? 0),
+            'payment_account_balances' => array_values($expected['payment_account_balances'] ?? []),
+            'unassigned_payment_balances' => array_values($expected['unassigned_payment_balances'] ?? []),
+            'payment_method_sales' => array_values($expected['payment_method_sales'] ?? []),
+            'payment_method_collections' => array_values($expected['payment_method_collections'] ?? []),
         ];
     }
 

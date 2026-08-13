@@ -131,6 +131,6 @@
 
 <?= $this->section('scripts') ?>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260813i"></script>
+<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260813j"></script>
 <script src="<?= base_url('assets/js/store-staff-records.js') ?>?v=20260813d"></script>
 <?= $this->endSection() ?>

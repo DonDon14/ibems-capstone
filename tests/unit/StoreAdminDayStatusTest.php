@@ -98,6 +98,10 @@ final class StoreAdminDayStatusTest extends CIUnitTestCase
         $this->assertStringContainsString('StoreDayExpectedService', $storeController);
         $this->assertStringContainsString('StoreDayExpectedService', $oversight);
         $this->assertStringContainsString("where('business_date', \$businessDate)", $calculator);
+        $this->assertStringContainsString("join('transaction_payments tp'", $calculator);
+        $this->assertStringContainsString('CASE WHEN tp.id IS NOT NULL THEN tp.amount ELSE t.amount END', $calculator);
+        $this->assertStringContainsString('m.code, m.label, m.sort_order, a.image_url', $calculator);
+        $this->assertStringContainsString("'payment_account_balances' => array_values", $storeController);
         $this->assertStringContainsString("\$actorId === (int) (\$session['opened_by']", $oversight);
         $this->assertStringContainsString('RESOLVE_STALE_STORE_DAY_SESSION', $oversight);
         $this->assertStringContainsString('StoreDayVarianceCaseService', $oversight);

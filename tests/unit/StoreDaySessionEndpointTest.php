@@ -54,7 +54,7 @@ final class StoreDaySessionEndpointTest extends CIUnitTestCase
 
         $result->assertStatus(400);
         $body = $this->jsonBody($result);
-        $this->assertSame('Opening cash and e-cash must be 0 or greater.', $body['message'] ?? null);
+        $this->assertSame('Opening cash must be 0 or greater.', $body['message'] ?? null);
         $this->assertSame(0, Database::connect()->table('store_day_sessions')->countAllResults());
     }
 
@@ -125,6 +125,42 @@ final class StoreDaySessionEndpointTest extends CIUnitTestCase
         $this->assertSame(0, $db->table('audit_logs')->countAllResults());
     }
 
+    public function testAdminReopenRequiresReasonAndPreservesOriginalOpeningAndPreviousCloseAudit(): void
+    {
+        $this->seedOpenSession(1000, 350);
+        $db = Database::connect();
+        $db->table('store_day_sessions')->where('store_id', 1)->update([
+            'status' => 'closed', 'expected_cash' => 1200, 'expected_ecash' => 400,
+            'counted_cash' => 1190, 'counted_ecash' => 400, 'variance_cash' => -10,
+            'variance_ecash' => 0, 'variance_status' => 'short', 'review_status' => 'pending',
+            'closing_note' => 'Ten peso shortage', 'closed_by' => 7, 'closed_at' => date('Y-m-d H:i:s'),
+        ]);
+
+        $missingReason = $this->adminPost('store/day-session/open', [
+            'store_id' => 1, 'opening_cash' => 9999, 'opening_ecash' => 9999, 'note' => '',
+        ]);
+        $missingReason->assertStatus(400);
+        $this->assertSame('closed', $db->table('store_day_sessions')->where('store_id', 1)->get()->getRowArray()['status'] ?? null);
+
+        $result = $this->adminPost('store/day-session/open', [
+            'store_id' => 1, 'opening_cash' => 9999, 'opening_ecash' => 9999,
+            'note' => 'Late approved transaction must be entered',
+        ]);
+        $result->assertOK();
+        $session = $db->table('store_day_sessions')->where('store_id', 1)->get()->getRowArray();
+        $this->assertSame('open', $session['status'] ?? null);
+        $this->assertSame(1000.0, (float) ($session['opening_cash'] ?? 0));
+        $this->assertSame(350.0, (float) ($session['opening_ecash'] ?? 0));
+        $this->assertNull($session['counted_cash'] ?? null);
+
+        $audit = $db->table('audit_logs')->where('action', 'REOPEN_STORE_DAY_SESSION')->get()->getRowArray();
+        $payload = json_decode((string) ($audit['payload_json'] ?? ''), true);
+        $this->assertSame('Late approved transaction must be entered', $payload['reason'] ?? null);
+        $this->assertSame(1190.0, (float) ($payload['previous_close']['counted_cash'] ?? 0));
+        $this->assertSame(-10.0, (float) ($payload['previous_close']['variance_cash'] ?? 0));
+        $this->assertTrue((bool) ($payload['original_opening_balances_preserved'] ?? false));
+    }
+
     public function testOfficerCannotCloseAStaleStoreDay(): void
     {
         $this->seedOpenSession(1000, 350);
@@ -154,6 +190,15 @@ final class StoreDaySessionEndpointTest extends CIUnitTestCase
             'user_id' => 7,
             'role' => 'STORE_SYSTEM',
             'available_roles' => ['STORE_SYSTEM'],
+        ])->withBodyFormat('json')->post($path, $payload);
+    }
+
+    private function adminPost(string $path, array $payload)
+    {
+        $security = service('security');
+        $payload[$security->getTokenName()] = $security->getHash();
+        return $this->withSession([
+            'logged_in' => true, 'user_id' => 7, 'role' => 'ADMIN', 'available_roles' => ['ADMIN'],
         ])->withBodyFormat('json')->post($path, $payload);
     }
 

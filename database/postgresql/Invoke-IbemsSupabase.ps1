@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('validate', 'reconcile', 'migrate', 'payment-accounts', 'credit-boundary-test', 'preflight', 'smoke', 'seed', 'snapshot', 'serve', 'serve-background')]
+    [ValidateSet('validate', 'reconcile', 'migrate', 'payment-accounts', 'credit-boundary-test', 'one-day-operations', 'preflight', 'smoke', 'seed', 'snapshot', 'serve', 'serve-background')]
     [string] $Action = 'preflight',
 
     [ValidateRange(1024, 65535)]
@@ -44,7 +44,7 @@ if ($CredentialDialog) {
 $passwordPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
 $storageKeyPointer = [IntPtr]::Zero
 $plainStorageKey = $null
-if ($Action -notin @('payment-accounts', 'credit-boundary-test')) {
+if ($Action -notin @('payment-accounts', 'credit-boundary-test', 'one-day-operations')) {
     $secureStorageKey = Read-Host 'Supabase server secret key for Storage' -AsSecureString
     $storageKeyPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureStorageKey)
 }
@@ -173,6 +173,7 @@ try {
         'migrate' { $actionOutput = & php spark migrate --all 2>&1; $actionExitCode = $LASTEXITCODE; $actionOutput | Tee-Object -FilePath $validationLogPath }
         'payment-accounts' { $actionOutput = & php spark ibems:payment-accounts-migrate 2>&1; $actionExitCode = $LASTEXITCODE; $actionOutput | Tee-Object -FilePath $validationLogPath }
         'credit-boundary-test' { $actionOutput = & php spark ibems:verify-live-credit-boundary 2>&1; $actionExitCode = $LASTEXITCODE; $actionOutput | Tee-Object -FilePath $validationLogPath }
+        'one-day-operations' { $actionOutput = & php spark ibems:verify-live-one-day-operations 2>&1; $actionExitCode = $LASTEXITCODE; $actionOutput | Tee-Object -FilePath $validationLogPath }
         'smoke' { $actionOutput = & php spark ibems:smoke 2>&1; $actionExitCode = $LASTEXITCODE; $actionOutput | Tee-Object -FilePath $logPath }
         'seed' { $actionOutput = & php spark db:seed InitialSeeder 2>&1; $actionExitCode = $LASTEXITCODE; $actionOutput | Tee-Object -FilePath $seedLogPath }
         'snapshot' { $actionOutput = & php spark ibems:financial-snapshot --output $snapshotPath 2>&1; $actionExitCode = $LASTEXITCODE; $actionOutput | Tee-Object -FilePath $snapshotLogPath }

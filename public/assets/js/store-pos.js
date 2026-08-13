@@ -205,7 +205,8 @@ function updateOpeningBalanceDisplay(opening = null, businessDate = null) {
     const status = String(opening.status || "").toLowerCase();
     const cash = Number(opening.opening_cash || 0);
     const ecash = Number(opening.opening_ecash || 0);
-    displayEl.textContent = `Cash ${formatMoney(cash)} | E-Cash ${formatMoney(ecash)}`;
+    const accountCount = Array.isArray(opening.payment_account_balances) ? opening.payment_account_balances.length : 0;
+    displayEl.textContent = `Cash ${formatMoney(cash)} | ${accountCount} receiving account${accountCount === 1 ? "" : "s"} ${formatMoney(ecash)}`;
     dateEl.textContent = `Business date: ${businessDate || opening.business_date || "-"}${opening.opened_at ? ` | Opened ${formatDateTime(opening.opened_at)}` : ""}`;
 
     if (opening.is_stale_open) {
@@ -395,23 +396,44 @@ function openOpeningBalanceModal(prefill = null) {
     const descEl = document.getElementById("opening-balance-description");
     const labelEl = document.getElementById("opening-balance-label");
     const saveBtn = document.getElementById("opening-balance-save");
+    const previewEl = document.getElementById("store-day-reopen-preview");
+    const noteLabel = document.getElementById("opening-balance-note-label");
     if (!modal) return;
     const accountWrap = document.getElementById("opening-payment-account-balances");
     const accounts = paymentMethodsCache.flatMap((method) => (method.destination_accounts || []).map((account) => ({...account, payment_method_label: method.label})));
     if (accountWrap) accountWrap.innerHTML = accounts.length ? `<div class="opening-account-head"><strong>Electronic receiving accounts</strong><small>Enter the verified starting balance of each account.</small></div>${accounts.map((account) => `<label class="store-day-account-count"><span><strong>${escapeHtml(account.payment_method_label)} · ${escapeHtml(account.account_name)}</strong><small>${escapeHtml(account.masked_number)}</small></span><input type="number" min="0" step="0.01" value="0.00" data-opening-account-id="${Number(account.id)}"></label>`).join("")}` : "";
     if (prefill && typeof prefill.opening_cash !== "undefined") {
         document.getElementById("opening-balance-input").value = Number(prefill.opening_cash || 0).toFixed(2);
-        document.getElementById("opening-ecash-input").value = Number(prefill.opening_ecash || 0).toFixed(2);
         document.getElementById("opening-balance-note").value = String(prefill.opening_note || "");
+        document.querySelectorAll("[data-opening-account-id]").forEach((input) => {
+            const prior = Array.isArray(prefill.payment_account_balances) ? prefill.payment_account_balances.find((row) => Number(row.id) === Number(input.dataset.openingAccountId)) : null;
+            input.value = Number(prior?.opening_balance || 0).toFixed(2);
+        });
     }
     if (openingBalanceMode === "reopen") {
         if (titleEl) titleEl.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Admin Reopen Store Day';
-        if (descEl) descEl.textContent = "Admin action: reopen today's closed store day and replace the opening cash values.";
-        if (labelEl) labelEl.textContent = "Opening Cash";
+        if (descEl) descEl.textContent = "Review the previous close and explain why more transactions must be added. Original opening balances will not change.";
+        if (labelEl) labelEl.textContent = "Original Opening Cash (preserved)";
+        document.getElementById("opening-balance-input").disabled = true;
+        document.querySelectorAll("[data-opening-account-id]").forEach((input) => { input.disabled = true; });
+        if (noteLabel) noteLabel.textContent = "Reopen Reason (required)";
+        document.getElementById("opening-balance-note").value = "";
+        document.getElementById("opening-balance-note").required = true;
+        document.getElementById("opening-balance-note").placeholder = "Explain why this closed day must be reopened";
+        if (previewEl) {
+            previewEl.classList.remove("is-hidden");
+            previewEl.innerHTML = `<strong>Previous close</strong><div><span>Closed at</span><b>${escapeHtml(prefill?.closed_at ? formatDateTime(prefill.closed_at) : "-")}</b></div><div><span>Expected total</span><b>${escapeHtml(formatMoney(Number(prefill?.expected_cash || 0) + Number(prefill?.expected_ecash || 0)))}</b></div><div><span>Counted total</span><b>${escapeHtml(formatMoney(Number(prefill?.counted_cash || 0) + Number(prefill?.counted_ecash || 0)))}</b></div><div><span>Variance</span><b>${escapeHtml(formatMoney(Number(prefill?.variance_cash || 0) + Number(prefill?.variance_ecash || 0)))}</b></div>${prefill?.closing_note ? `<small>Closing note: ${escapeHtml(prefill.closing_note)}</small>` : ""}`;
+        }
         if (saveBtn) saveBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Reopen Store Day';
     } else {
+        document.getElementById("opening-balance-input").disabled = false;
+        document.querySelectorAll("[data-opening-account-id]").forEach((input) => { input.disabled = false; });
+        if (previewEl) { previewEl.classList.add("is-hidden"); previewEl.innerHTML = ""; }
+        if (noteLabel) noteLabel.textContent = "Note (optional)";
+        document.getElementById("opening-balance-note").required = false;
+        document.getElementById("opening-balance-note").placeholder = "e.g. Start of day float";
         if (titleEl) titleEl.innerHTML = '<i class="bi bi-safe2"></i> Open Store Day';
-        if (descEl) descEl.textContent = "Enter today's starting cash and e-cash before accepting POS transactions.";
+        if (descEl) descEl.textContent = "Count today's starting cash and every electronic receiving account.";
         if (labelEl) labelEl.textContent = "Opening Cash";
         if (saveBtn) saveBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Open Store Day';
     }
@@ -458,12 +480,19 @@ async function saveOpeningBalance() {
     if (!activeStoreId) return;
 
     const amount = Number(document.getElementById("opening-balance-input").value || 0);
-    const ecashAmount = Number(document.getElementById("opening-ecash-input").value || 0);
+    const accountOpenings = Array.from(document.querySelectorAll("[data-opening-account-id]")).map((input) => ({destination_account_id: Number(input.dataset.openingAccountId), opening_balance: Number(input.value || 0)}));
+    const ecashAmount = accountOpenings.reduce((sum, row) => sum + row.opening_balance, 0);
     const note = String(document.getElementById("opening-balance-note").value || "").trim();
     const saveBtn = document.getElementById("opening-balance-save");
 
-    if (amount < 0 || ecashAmount < 0) {
-        setOpeningBalanceResult("Opening cash and e-cash must be 0 or greater.", "error");
+    if (openingBalanceMode === "reopen" && note === "") {
+        setOpeningBalanceResult("Enter a reason before reopening the store day.", "error");
+        document.getElementById("opening-balance-note").focus();
+        return;
+    }
+
+    if (amount < 0 || accountOpenings.some((row) => row.opening_balance < 0)) {
+        setOpeningBalanceResult("Every opening balance must be 0 or greater.", "error");
         return;
     }
 
@@ -479,7 +508,7 @@ async function saveOpeningBalance() {
                     store_id: activeStoreId,
                     opening_cash: amount,
                     opening_ecash: ecashAmount,
-                    payment_account_openings: Array.from(document.querySelectorAll("[data-opening-account-id]")).map((input) => ({destination_account_id: Number(input.dataset.openingAccountId), opening_balance: Number(input.value || 0)})),
+                    payment_account_openings: accountOpenings,
                     note,
                 }),
             },
@@ -496,8 +525,8 @@ async function saveOpeningBalance() {
         closeOpeningBalanceModal();
         setResult(
             openingBalanceMode === "reopen"
-                ? `Store day reopened: cash ${formatMoney(amount)}, e-cash ${formatMoney(ecashAmount)}`
-                : `Store day opened: cash ${formatMoney(amount)}, e-cash ${formatMoney(ecashAmount)}`,
+                ? `Store day reopened: cash ${formatMoney(amount)} and ${accountOpenings.length} receiving account${accountOpenings.length === 1 ? "" : "s"} counted.`
+                : `Store day opened: cash ${formatMoney(amount)} and ${accountOpenings.length} receiving account${accountOpenings.length === 1 ? "" : "s"} counted.`,
             "ok"
         );
     } catch (error) {
@@ -538,6 +567,43 @@ function closeDayReconcileRow(label, value, className = "") {
     return `<div class="close-reconcile-row${safeClass}"><span>${escapeHtml(label)}</span><strong>${escapeHtml(formatMoney(value))}</strong></div>`;
 }
 
+const CASH_DENOMINATIONS = [1000, 500, 200, 100, 50, 20, 10, 5, 1];
+
+function denominationCounterMarkup(target) {
+    return `<div class="cash-denomination-grid">${CASH_DENOMINATIONS.map((denomination) => `<label class="cash-denomination-item"><strong>PHP ${denomination.toLocaleString()}</strong><input type="number" min="0" step="1" inputmode="numeric" value="" data-denomination="${denomination}" data-denomination-scope="${target}" aria-label="PHP ${denomination.toLocaleString()} quantity"><small data-denomination-subtotal="${denomination}">PHP 0.00</small></label>`).join("")}</div><div class="cash-denomination-total"><span>Counted amount</span><strong data-denomination-total="${target}">PHP 0.00</strong></div><button type="button" class="primary-btn cash-denomination-apply" data-denomination-apply="${target}"><i class="bi bi-check2"></i> Use counted amount</button>`;
+}
+
+function updateDenominationCounter(target) {
+    const counter = document.getElementById(`${target}-denomination-counter`);
+    if (!counter) return 0;
+    let total = 0;
+    counter.querySelectorAll(`[data-denomination-scope="${target}"]`).forEach((input) => {
+        const denomination = Number(input.dataset.denomination || 0);
+        const quantity = Math.max(0, Math.floor(Number(input.value) || 0));
+        if (Number(input.value) !== quantity && input.value !== "") input.value = String(quantity);
+        const subtotal = denomination * quantity;
+        total += subtotal;
+        const subtotalEl = counter.querySelector(`[data-denomination-subtotal="${denomination}"]`);
+        if (subtotalEl) subtotalEl.textContent = formatMoney(subtotal);
+    });
+    const totalEl = counter.querySelector(`[data-denomination-total="${target}"]`);
+    if (totalEl) totalEl.textContent = formatMoney(total);
+    return total;
+}
+
+function toggleDenominationCounter(button) {
+    const target = String(button.dataset.denominationTarget || "");
+    const counter = document.getElementById(`${target}-denomination-counter`);
+    if (!counter) return;
+    if (!counter.dataset.ready) {
+        counter.innerHTML = denominationCounterMarkup(target);
+        counter.dataset.ready = "true";
+    }
+    const willOpen = counter.classList.contains("is-hidden");
+    counter.classList.toggle("is-hidden", !willOpen);
+    button.setAttribute("aria-expanded", String(willOpen));
+}
+
 function renderStoreDayCloseReconciliation() {
     const wrap = document.getElementById("store-day-close-reconcile");
     if (!wrap || !currentDaySession) return;
@@ -545,43 +611,74 @@ function renderStoreDayCloseReconciliation() {
     const expectedCash = closeDayValue("expected_cash_on_hand") || closeDayValue("expected_cash");
     const expectedEcash = closeDayValue("expected_ecash_on_hand") || closeDayValue("expected_ecash");
     const expectedTotal = expectedCash + expectedEcash;
+    const salesRows = Array.isArray(currentDaySession.payment_method_sales) ? currentDaySession.payment_method_sales : [];
+    const collectionRows = Array.isArray(currentDaySession.payment_method_collections) ? currentDaySession.payment_method_collections : [];
+    const receivedSalesRows = salesRows.filter((row) => row.is_collected);
+    const creditSalesRows = salesRows.filter((row) => !row.is_collected);
+    const receivedSalesMarkup = receivedSalesRows.length
+        ? receivedSalesRows.map((row) => closeDayReconcileRow(`${row.payment_method_label} sales`, Number(row.amount || 0))).join("")
+        : closeDayReconcileRow("No paid sales", 0, "is-muted");
+    const creditSalesMarkup = creditSalesRows.length
+        ? creditSalesRows.map((row) => closeDayReconcileRow(`${row.payment_method_label} sales`, Number(row.amount || 0), "is-muted")).join("")
+        : closeDayReconcileRow("No employee-credit sales", 0, "is-muted");
+    const collectionsMarkup = collectionRows.length
+        ? collectionRows.map((row) => closeDayReconcileRow(`${row.payment_method_label} debt collections`, Number(row.amount || 0))).join("")
+        : closeDayReconcileRow("No debt collections", 0, "is-muted");
     const collectedCash = closeDayValue("cash_sales") + closeDayValue("cash_debt_payments");
     const collectedEcash = closeDayValue("ecash_sales") + closeDayValue("ecash_debt_payments");
 
     wrap.innerHTML = `
         <section class="close-reconcile-section">
-            <h4>Sales and Collections</h4>
-            ${closeDayReconcileRow("Cash product sales", closeDayValue("cash_sales"))}
-            ${closeDayReconcileRow("E-cash product sales", closeDayValue("ecash_sales"))}
-            ${closeDayReconcileRow("Debt sales (not collected)", closeDayValue("debt_sales"), "is-muted")}
-            ${closeDayReconcileRow("Cash debt payments", closeDayValue("cash_debt_payments"))}
-            ${closeDayReconcileRow("E-cash debt payments", closeDayValue("ecash_debt_payments"))}
+            <h4>Today&apos;s Activity</h4>
+            <div class="close-reconcile-group">
+                <h5>Money received today</h5>
+                ${receivedSalesMarkup}
+                ${collectionsMarkup}
+            </div>
+            <div class="close-reconcile-group is-credit-group">
+                <h5>Sold on employee credit</h5>
+                ${creditSalesMarkup}
+                <small>Recorded as employee debt; no cash or wallet balance was received today.</small>
+            </div>
         </section>
         <section class="close-reconcile-section">
-            <h4>Expected Money</h4>
+            <h4>Expected Ending Balances</h4>
+            <div class="close-reconcile-group">
+                <h5>Physical cash</h5>
             ${closeDayReconcileRow("Opening cash", closeDayValue("opening_cash"))}
-            ${closeDayReconcileRow("Cash collected", collectedCash)}
-            ${closeDayReconcileRow("Other cash in", closeDayOtherCashIn())}
+            ${closeDayReconcileRow("Cash sales + debt collections", collectedCash)}
+            ${closeDayReconcileRow("Other cash added", closeDayOtherCashIn())}
             ${closeDayReconcileRow("Cash out", -closeDayValue("cash_out"), "is-muted")}
             ${closeDayReconcileRow("Expected cash", expectedCash, "is-total")}
-            ${closeDayReconcileRow("Opening e-cash", closeDayValue("opening_ecash"))}
-            ${closeDayReconcileRow("E-cash collected", collectedEcash)}
-            ${closeDayReconcileRow("Other e-cash in", closeDayOtherEcashIn())}
-            ${closeDayReconcileRow("E-cash out", -closeDayValue("ecash_out"), "is-muted")}
-            ${closeDayReconcileRow("Expected e-cash", expectedEcash, "is-total")}
-            ${closeDayReconcileRow("Expected total", expectedTotal, "is-grand")}
+            </div>
+            <div class="close-reconcile-group">
+                <h5>Electronic accounts</h5>
+                ${closeDayReconcileRow("Opening account balances", closeDayValue("opening_ecash"))}
+                ${closeDayReconcileRow("Wallet sales + debt collections", collectedEcash)}
+                ${closeDayReconcileRow("Other electronic money added", closeDayOtherEcashIn())}
+                ${closeDayReconcileRow("Electronic money out", -closeDayValue("ecash_out"), "is-muted")}
+                ${closeDayReconcileRow("Expected electronic total", expectedEcash, "is-total")}
+            </div>
+            ${closeDayReconcileRow("Cash + electronic accounts", expectedTotal, "is-grand")}
         </section>
     `;
     const accountWrap = document.getElementById("store-day-account-counts");
     const accounts = Array.isArray(currentDaySession.payment_account_balances) ? currentDaySession.payment_account_balances : [];
-    if (accountWrap) accountWrap.innerHTML = accounts.length ? `<h4>Receiving Account Reconciliation</h4>${accounts.map((account) => `<label class="store-day-account-count"><span><strong>${escapeHtml(account.payment_method_label)} · ${escapeHtml(account.account_name)}</strong><small>${escapeHtml(String(account.account_number || "").slice(-4).padStart(String(account.account_number || "").length, "•"))} · Expected inflow ${escapeHtml(formatMoney(account.expected_balance))}</small></span><input type="number" min="0" step="0.01" value="${Number(account.expected_balance || 0).toFixed(2)}" data-closing-account-id="${Number(account.id)}"></label>`).join("")}` : "";
+    if (accountWrap) accountWrap.innerHTML = accounts.length ? `<h4>Receiving Account Ending Balances</h4>${accounts.map((account) => `<label class="store-day-account-count"><span><strong>${escapeHtml(account.payment_method_label)} · ${escapeHtml(account.account_name)}</strong><small>${escapeHtml(String(account.account_number || "").slice(-4).padStart(String(account.account_number || "").length, "•"))} · Opening ${escapeHtml(formatMoney(account.opening_balance))} · Sales ${escapeHtml(formatMoney(account.sales))} · Collections ${escapeHtml(formatMoney(account.collections || 0))} · Expected ending ${escapeHtml(formatMoney(account.expected_balance))}</small></span><input type="number" min="0" step="0.01" value="${Number(account.expected_balance || 0).toFixed(2)}" data-closing-account-id="${Number(account.id)}"></label>`).join("")}` : "";
+    const unassignedWrap = document.getElementById("store-day-unassigned-counts");
+    const unassigned = Array.isArray(currentDaySession.unassigned_payment_balances) ? currentDaySession.unassigned_payment_balances : [];
+    if (unassignedWrap) unassignedWrap.innerHTML = unassigned.length ? `<h4>Legacy Payments Without a Destination</h4>${unassigned.map((row) => `<label class="store-day-account-count"><span><strong>${escapeHtml(row.payment_method_label)}</strong><small>No receiving account was recorded. Expected ${escapeHtml(formatMoney(row.expected_balance))}</small></span><input type="number" min="0" step="0.01" value="${Number(row.expected_balance || 0).toFixed(2)}" data-closing-unassigned-key="${escapeHtml(row.key)}"></label>`).join("")}` : "";
 }
 
 function updateStoreDayCloseVariance() {
     const expectedCash = closeDayValue("expected_cash_on_hand") || closeDayValue("expected_cash");
     const expectedEcash = closeDayValue("expected_ecash_on_hand") || closeDayValue("expected_ecash");
     const countedCash = Number(document.getElementById("closing-cash-input")?.value || 0);
-    const countedEcash = Number(document.getElementById("closing-ecash-input")?.value || 0);
+    const closingAccountInputs = Array.from(document.querySelectorAll("[data-closing-account-id], [data-closing-unassigned-key]"));
+    const countedEcash = closingAccountInputs.length
+        ? closingAccountInputs.reduce((sum, input) => sum + Number(input.value || 0), 0)
+        : Number(document.getElementById("closing-ecash-input")?.value || 0);
+    document.getElementById("closing-ecash-input").value = countedEcash.toFixed(2);
     const cashVariance = countedCash - expectedCash;
     const ecashVariance = countedEcash - expectedEcash;
     const cashEl = document.getElementById("closing-cash-variance");
@@ -628,7 +725,7 @@ async function openStoreDayCloseModal() {
     document.getElementById("closing-ecash-input").value = expectedEcash.toFixed(2);
     document.getElementById("closing-note-input").value = "";
     if (summary) {
-        summary.textContent = "Expected totals are calculated from opening balance, sales, direct debt payments, and cash movements. Enter the actual counted cash/e-cash to record any variance.";
+        summary.textContent = "Expected totals are calculated from opening balances and routed transactions. Count cash and every receiving account independently.";
     }
     renderStoreDayCloseReconciliation();
     updateStoreDayCloseVariance();
@@ -648,12 +745,14 @@ async function saveStoreDayClose() {
     if (!activeStoreId) return;
 
     const countedCash = Number(document.getElementById("closing-cash-input").value || 0);
-    const countedEcash = Number(document.getElementById("closing-ecash-input").value || 0);
+    const accountCounts = Array.from(document.querySelectorAll("[data-closing-account-id]")).map((input) => ({destination_account_id: Number(input.dataset.closingAccountId), counted_balance: Number(input.value || 0)}));
+    const unassignedPaymentCounts = Array.from(document.querySelectorAll("[data-closing-unassigned-key]")).map((input) => ({key: String(input.dataset.closingUnassignedKey), counted_balance: Number(input.value || 0)}));
+    const countedEcash = accountCounts.reduce((sum, row) => sum + row.counted_balance, 0) + unassignedPaymentCounts.reduce((sum, row) => sum + row.counted_balance, 0);
     const note = String(document.getElementById("closing-note-input").value || "").trim();
     const saveBtn = document.getElementById("store-day-close-save");
 
-    if (countedCash < 0 || countedEcash < 0) {
-        setStoreDayCloseResult("Counted cash and e-cash must be 0 or greater.", "error");
+    if (countedCash < 0 || accountCounts.some((row) => row.counted_balance < 0) || unassignedPaymentCounts.some((row) => row.counted_balance < 0)) {
+        setStoreDayCloseResult("Every counted ending balance must be 0 or greater.", "error");
         return;
     }
 
@@ -678,7 +777,8 @@ async function saveStoreDayClose() {
                     store_id: activeStoreId,
                     counted_cash: countedCash,
                     counted_ecash: countedEcash,
-                    payment_account_counts: Array.from(document.querySelectorAll("[data-closing-account-id]")).map((input) => ({destination_account_id: Number(input.dataset.closingAccountId), counted_balance: Number(input.value || 0)})),
+                    payment_account_counts: accountCounts,
+                    unassigned_payment_counts: unassignedPaymentCounts,
                     note,
                 }),
             },
@@ -1967,6 +2067,18 @@ function resetDebtPaymentModal() {
     setDebtPaymentResult("");
 }
 
+function renderDebtPaymentDestinations() {
+    const methodCode = String(document.getElementById("debt-payment-channel")?.value || "cash");
+    const method = paymentMethodsCache.find((row) => String(row.code) === methodCode);
+    const accounts = Array.isArray(method?.destination_accounts) ? method.destination_accounts : [];
+    const wrap = document.getElementById("debt-payment-destination-wrap");
+    const select = document.getElementById("debt-payment-destination");
+    if (!wrap || !select) return;
+    wrap.classList.toggle("is-hidden", methodCode === "cash");
+    select.innerHTML = accounts.map((account) => `<option value="${Number(account.id)}">${escapeHtml(account.account_name)} · ${escapeHtml(account.masked_number)}</option>`).join("");
+    select.disabled = methodCode === "cash" || accounts.length === 0;
+}
+
 function openDebtPaymentModal() {
     if (!activeStoreId) {
         setResult("No active store selected.", "error");
@@ -1979,6 +2091,13 @@ function openDebtPaymentModal() {
     }
 
     resetDebtPaymentModal();
+    const methodSelect = document.getElementById("debt-payment-channel");
+    if (methodSelect) {
+        const methods = paymentMethodsCache.filter((method) => String(method.code || "").toLowerCase() !== "debt");
+        methodSelect.innerHTML = methods.map((method) => `<option value="${escapeHtml(method.code)}">${escapeHtml(method.label)}</option>`).join("");
+        methodSelect.value = methods.some((method) => String(method.code) === "cash") ? "cash" : String(methods[0]?.code || "cash");
+        renderDebtPaymentDestinations();
+    }
     const modal = document.getElementById("debt-payment-modal");
     const input = document.getElementById("debt-payment-search");
     if (modal) modal.style.display = "grid";
@@ -2013,7 +2132,8 @@ async function submitDebtPayment() {
         store_id: activeStoreId,
         user_id: Number(selectedRepaymentCustomer.id),
         amount,
-        channel: document.getElementById("debt-payment-channel")?.value || "cash",
+        payment_method: document.getElementById("debt-payment-channel")?.value || "cash",
+        destination_account_id: Number(document.getElementById("debt-payment-destination")?.value || 0) || null,
         reference_no: document.getElementById("debt-payment-reference")?.value || "",
         remarks: document.getElementById("debt-payment-remarks")?.value || "",
     };
@@ -2890,6 +3010,7 @@ document.getElementById("debt-payment-suggestions").addEventListener("click", (e
 document.getElementById("debt-payment-save").addEventListener("click", () => {
     submitDebtPayment().catch((error) => setDebtPaymentResult(error.message || "Unable to record debt payment.", "error"));
 });
+document.getElementById("debt-payment-channel").addEventListener("change", renderDebtPaymentDestinations);
 
 document.getElementById("debt-pin-input").addEventListener("input", (event) => {
     event.target.value = String(event.target.value || "").replace(/\D/g, "").slice(0, 6);
@@ -2981,6 +3102,27 @@ document.getElementById("opening-balance-modal").addEventListener("click", (even
         closeOpeningBalanceModal();
     }
 });
+document.addEventListener("click", (event) => {
+    const toggle = event.target.closest("[data-denomination-target]");
+    if (toggle) {
+        toggleDenominationCounter(toggle);
+        return;
+    }
+    const apply = event.target.closest("[data-denomination-apply]");
+    if (!apply) return;
+    const target = String(apply.dataset.denominationApply || "");
+    const total = updateDenominationCounter(target);
+    const input = document.getElementById(target === "opening" ? "opening-balance-input" : "closing-cash-input");
+    if (input) {
+        input.value = total.toFixed(2);
+        input.dispatchEvent(new Event("input", {bubbles: true}));
+        input.focus();
+    }
+}, true);
+document.addEventListener("input", (event) => {
+    const input = event.target.closest("[data-denomination-scope]");
+    if (input) updateDenominationCounter(String(input.dataset.denominationScope || ""));
+});
 document.getElementById("opening-balance-open-btn").addEventListener("click", () => {
     if (openingBalanceMode === "locked") return;
     openOpeningBalanceModal(currentDaySession);
@@ -3024,6 +3166,12 @@ document.getElementById("closing-ecash-input").addEventListener("keydown", (even
     event.preventDefault();
 });
 document.getElementById("closing-ecash-input").addEventListener("input", updateStoreDayCloseVariance);
+document.getElementById("store-day-account-counts").addEventListener("input", (event) => {
+    if (event.target.matches("[data-closing-account-id]")) updateStoreDayCloseVariance();
+});
+document.getElementById("store-day-unassigned-counts").addEventListener("input", (event) => {
+    if (event.target.matches("[data-closing-unassigned-key]")) updateStoreDayCloseVariance();
+});
 
 (async () => {
     try {

@@ -108,7 +108,8 @@
             ? `<div><span>Customer</span><strong>${esc(receipt.customerName)}</strong></div>`
             : "";
 
-        const paymentLines = payments.length > 1
+        const showPaymentLines = payments.length > 1 || payments.some((payment) => String(payment.destination_account_name || "").trim() !== "");
+        const paymentLines = showPaymentLines
             ? payments.map((payment) => `<div><span>${esc(String(payment.payment_method || "").replace(/_/g, " ").toUpperCase())}${payment.destination_account_name ? `<small style="display:block">${esc(payment.destination_account_name)}${payment.destination_account_number ? ` · ending ${esc(String(payment.destination_account_number).slice(-4))}` : ""}</small>` : ""}</span><strong>${money(payment.amount)}</strong></div>`).join("")
             : "";
         const cashPayment = payments.find((payment) => String(payment.payment_method || "").toLowerCase() === "cash");
