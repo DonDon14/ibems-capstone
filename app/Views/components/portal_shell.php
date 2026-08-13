@@ -18,6 +18,8 @@ $initials = (string) ($initials ?? 'IB');
 $availableRoles = is_array($availableRoles ?? null) ? $availableRoles : [];
 $navigation = is_array($navigation ?? null) ? $navigation : [];
 $profileImageUrl = trim((string) ($profileImageUrl ?? ''));
+$bodyClass = trim((string) ($bodyClass ?? ''));
+$bodyClasses = trim('ibems-modern ' . $bodyClass);
 $roleLabels = [
     'ADMIN' => 'Administrator',
     'ACCOUNTING_OFFICE' => 'Accounting Office',
@@ -44,12 +46,13 @@ $ustpLogoUrl = base_url('assets/images/ustp_claveria_logo.jpg');
     <title><?= esc($pageTitle) ?></title>
     <link rel="icon" type="image/jpeg" href="<?= esc($ustpLogoUrl) ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.css') ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/css/app.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/app.css') ?>?v=20260813c">
     <link rel="stylesheet" href="<?= base_url('assets/css/modern-ui.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/password-visibility.css') ?>?v=20260813a">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <?= $this->renderSection('styles') ?>
 </head>
-<body class="ibems-modern">
+<body class="<?= esc($bodyClasses) ?>">
 <div class="app-shell">
     <aside class="app-sidebar">
         <div class="app-sidebar-header">
@@ -152,6 +155,7 @@ $ustpLogoUrl = base_url('assets/images/ustp_claveria_logo.jpg');
 <script src="<?= base_url('assets/js/app-layout.js') ?>"></script>
 <script src="<?= base_url('assets/js/modern-controls.js') ?>"></script>
 <script src="<?= base_url('assets/js/app-dialog.js') ?>"></script>
+<script src="<?= base_url('assets/js/password-visibility.js') ?>?v=20260813a"></script>
 <?= $this->renderSection('scripts') ?>
 </body>
 </html>

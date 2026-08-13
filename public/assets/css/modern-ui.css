@@ -1120,7 +1120,7 @@ body.ibems-modern :is(
 .app-dialog {
     position: fixed;
     inset: 0;
-    z-index: 1200;
+    z-index: 3000;
     display: grid;
     place-items: center;
     padding: 1.5rem;

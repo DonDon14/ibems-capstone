@@ -153,6 +153,7 @@ async function openReceipt(transactionId) {
         storeName: tx.store_name,
         customerName: tx.customer_name,
         paymentMethod: tx.payment_method,
+        payments: tx.payments,
         totalAmount: tx.amount,
         items: tx.items,
         lookupUrl: `${window.location.origin}/store/receipt/${encodeURIComponent(String(tx.id))}`,

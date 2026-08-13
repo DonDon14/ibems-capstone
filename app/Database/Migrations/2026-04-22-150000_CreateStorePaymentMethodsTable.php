@@ -66,11 +66,6 @@ class CreateStorePaymentMethodsTable extends Migration
 
         $defaults = [
             ['cash', 'Cash', 'bi bi-cash', 10, 0],
-            ['gcash', 'GCash', 'bi bi-wallet2', 20, 0],
-            ['card', 'Card', 'bi bi-credit-card-2-front', 30, 0],
-            ['bank_transfer', 'Bank Transfer', 'bi bi-bank', 40, 0],
-            ['advance_payment', 'Advance Payment', 'bi bi-cash-coin', 50, 0],
-            ['other', 'Other', 'bi bi-three-dots', 90, 0],
             ['debt', 'Debt', 'bi bi-credit-card', 100, 1],
         ];
 

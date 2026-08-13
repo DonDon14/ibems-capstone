@@ -1,15 +1,15 @@
 <?= $this->extend('layouts/store') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/store-inventory.css') ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/store-inventory.css') ?>?v=20260813a">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
 <section class="inventory-shell">
     <?php ob_start(); ?>
         <div class="inventory-top-actions">
-            <a href="/store/settings" class="secondary-btn link-reset">Manage Categories</a>
-            <button id="open-product-modal-top" class="primary-btn inventory-add-btn" type="button"><span class="plus">+</span> Add New Product</button>
+            <a href="/store/settings" class="secondary-btn link-reset"><i class="bi bi-tags"></i> Manage Categories</a>
+            <button id="open-product-modal-top" class="primary-btn inventory-add-btn" type="button"><i class="bi bi-plus-circle"></i> Add New Product</button>
         </div>
     <?php $inventoryHeaderActions = ob_get_clean(); ?>
     <?= view('components/page_header', [
@@ -22,7 +22,10 @@
 
     <article class="inventory-card">
         <div class="inventory-list-head">
-            <h4>Products</h4>
+            <div>
+                <h4>Products</h4>
+                <p class="inventory-card-subtitle">Families stay grouped; expand them to manage exact variants.</p>
+            </div>
             <div class="inventory-filter-controls">
                 <label class="inventory-filter-field" for="inventory-search">
                     <span>Search</span>
@@ -43,11 +46,15 @@
                         <option value="out">Out of Stock</option>
                     </select>
                 </label>
-                <button id="inventory-clear-filters" class="secondary-btn" type="button">Clear</button>
+                <button id="inventory-clear-filters" class="secondary-btn" type="button"><i class="bi bi-x-circle"></i> Clear</button>
             </div>
         </div>
         <div id="inventory-stock-summary" class="inventory-stock-summary" aria-live="polite">
             <?= view('components/data_state', ['type' => 'loading', 'message' => 'Loading stock summary...']) ?>
+        </div>
+        <div class="inventory-results-toolbar">
+            <p id="inventory-results-count" aria-live="polite">Preparing inventory results...</p>
+            <button id="inventory-toggle-families" class="secondary-btn btn-sm is-hidden" type="button"><i class="bi bi-arrows-expand"></i> Expand all variants</button>
         </div>
         <div class="inventory-table-wrap">
             <table class="table">
@@ -81,7 +88,7 @@
                     <option value="adjustment">Adjustments</option>
                     <option value="sale">Sales</option>
                 </select>
-                <button id="refresh-inventory-movements" class="secondary-btn" type="button">Refresh</button>
+                <button id="refresh-inventory-movements" class="secondary-btn" type="button"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
             </div>
         </div>
         <div id="inventory-movement-list" class="inventory-movement-list">
@@ -438,5 +445,5 @@
 
 <?= $this->section('scripts') ?>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script src="<?= base_url('assets/js/store-inventory.js') ?>"></script>
+<script src="<?= base_url('assets/js/store-inventory.js') ?>?v=20260813a"></script>
 <?= $this->endSection() ?>

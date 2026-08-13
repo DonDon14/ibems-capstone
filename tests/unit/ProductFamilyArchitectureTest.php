@@ -31,6 +31,9 @@ final class ProductFamilyArchitectureTest extends TestCase
         $this->assertStringContainsString('function groupCatalogProducts', $posJs);
         $this->assertStringContainsString('function openProductVariantPicker', $posJs);
         $this->assertStringContainsString('data-direct-product', $posJs);
+        $this->assertStringContainsString('data-direct-product="${isFamily ? "" : Number(product.id)}"', $posJs);
+        $this->assertStringContainsString('const actionHtml = isFamily', $posJs);
+        $this->assertStringContainsString(': "";', $posJs);
         $this->assertStringContainsString('data-pick-variant', $posJs);
         $this->assertStringContainsString('const familyImage =', $posJs);
         $this->assertStringContainsString('product-variant-option-image', $posJs);

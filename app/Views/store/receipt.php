@@ -19,7 +19,7 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/receipt-standard.js') ?>"></script>
+<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260813i"></script>
 <script>
     (async function () {
         const transactionId = <?= (int) ($transaction_id ?? 0) ?>;
@@ -39,6 +39,7 @@
                 storeName: tx.store_name,
                 customerName: tx.customer_name,
                 paymentMethod: tx.payment_method,
+                payments: tx.payments,
                 totalAmount: tx.amount,
                 items: tx.items,
             };

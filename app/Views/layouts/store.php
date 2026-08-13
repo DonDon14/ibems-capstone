@@ -16,13 +16,15 @@ $portalTitle = $storeName;
 $portalSubtitle = 'School Store Operations';
 $footerText = 'USTP IBEMS Store System';
 $profileDetail = $role . ($email !== '' ? ' | ' . $email : '');
+$requestPath = trim(service('uri')->getPath(), '/');
+$bodyClass = str_ends_with($requestPath, 'store/pos') ? 'pos-fullscreen' : '';
 $navigation = [
     ['path' => 'store/dashboard', 'label' => 'Dashboard', 'icon' => 'bi bi-speedometer2'],
     ['path' => 'store/pos', 'label' => 'POS', 'icon' => 'bi bi-cart3'],
     ['path' => 'store/inventory', 'label' => 'Inventory', 'icon' => 'bi bi-box-seam'],
     ['path' => 'store/reports', 'label' => 'Reports', 'icon' => 'bi bi-bar-chart-line'],
     ['path' => 'store/history', 'label' => 'History', 'icon' => 'bi bi-clock-history'],
-    ['path' => 'store/staff-records', 'label' => 'Employee Records', 'icon' => 'bi bi-person-vcard'],
+    ['path' => 'store/staff-records', 'label' => 'Employee Accounts', 'icon' => 'bi bi-person-vcard'],
     ['path' => 'store/settings', 'label' => 'Settings', 'icon' => 'bi bi-gear'],
 ];
 

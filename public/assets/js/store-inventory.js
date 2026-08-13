@@ -99,6 +99,16 @@ function invMoney(value) {
     return window.IbemsFormat?.money(value) || `PHP ${Number(value || 0).toFixed(2)}`;
 }
 
+function invInitials(value) {
+    return String(value || "Product")
+        .trim()
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((part) => part.charAt(0))
+        .join("")
+        .toUpperCase() || "PR";
+}
+
 function invDataState(type, message, colspan = 0) {
     const safeType = ["loading", "empty", "error", "success"].includes(type) ? type : "loading";
     const icons = {
@@ -226,22 +236,29 @@ function invRenderProductTable() {
     const categoryFilter = (document.getElementById("inventory-category-filter").value || "").trim().toLowerCase();
     const stockFilter = (document.getElementById("inventory-stock-filter").value || "").trim();
 
-    const rows = invProducts.filter((product) => {
+    const contextualRows = invProducts.filter((product) => {
         const haystack = `${product.name || ""} ${product.variant_label || ""} ${product.sku || ""} ${product.barcode || ""} ${product.supplier || ""} ${product.location_bin || ""}`.toLowerCase();
         const category = String(product.category || "").trim().toLowerCase();
-        const stock = invStockState(product).key;
 
         if (search && !haystack.includes(search)) return false;
         if (categoryFilter && category !== categoryFilter) return false;
-        if (stockFilter && stock !== stockFilter) return false;
         return true;
     });
 
-    const groups = invGroupProducts(rows);
-    invRenderStockSummary(groups);
+    const contextualGroups = invGroupProducts(contextualRows);
+    const groups = stockFilter
+        ? contextualGroups.filter((group) => {
+            const states = group.variants.map((product) => invStockState(product).key);
+            const familyState = states.includes("out") ? "out" : states.includes("low") ? "low" : "in";
+            return familyState === stockFilter;
+        })
+        : contextualGroups;
+    const rows = groups.flatMap((group) => group.variants);
+    invRenderStockSummary(contextualGroups, stockFilter);
+    invRenderResultsContext(groups, contextualGroups, search, categoryFilter, stockFilter);
 
     if (rows.length === 0) {
-        body.innerHTML = invDataState("empty", "No products found.", 5);
+        body.innerHTML = invDataState("empty", "No products match these filters. Clear a filter or try another search.", 5);
         return;
     }
 
@@ -257,7 +274,7 @@ function invRenderProductTable() {
             : "";
         const thumb = product.image_url
             ? `<img src="${invEscape(product.image_url)}" alt="${invEscape(product.name)}" class="prod-thumb">`
-            : `<div class="prod-thumb-fallback">No Img</div>`;
+            : `<div class="prod-thumb-fallback" aria-label="No product image">${invEscape(invInitials(product.name))}</div>`;
         const isFamily = variants.length > 1;
         const expanded = invExpandedFamilies.has(key);
         const totalStock = variants.reduce((sum, item) => sum + Number(item.stock_qty || 0), 0);
@@ -272,7 +289,7 @@ function invRenderProductTable() {
                 <td>${invEscape(item.category || "-")}</td>
                 <td>${invEscape(invMoney(item.price))}</td>
                 <td><div class="inv-stock-block"><span class="inv-stock-badge inv-stock-${itemStock.key}">${itemStock.label}</span><span class="inv-stock-detail">${itemStock.qty} item${itemStock.qty === 1 ? "" : "s"} - ${invEscape(itemStock.detail)}</span></div></td>
-                <td><button class="secondary-btn btn-sm" type="button" data-product-action="${item.id}">Manage</button></td>
+                <td><button class="secondary-btn btn-sm" type="button" data-product-action="${item.id}"><i class="bi bi-sliders"></i> Manage</button></td>
             </tr>`;
         }).join("") : "";
 
@@ -297,13 +314,13 @@ function invRenderProductTable() {
                     </div>
                 </td>
                 <td>
-                    ${isFamily ? `<button class="secondary-btn btn-sm inventory-family-toggle" type="button" data-family-toggle="${invEscape(key)}" aria-expanded="${expanded}"><i class="bi bi-chevron-${expanded ? "up" : "down"}"></i> ${expanded ? "Hide" : "View"} variants</button>` : `<button class="secondary-btn btn-sm" type="button" data-product-action="${product.id}">Manage</button>`}
+                    ${isFamily ? `<button class="secondary-btn btn-sm inventory-family-toggle" type="button" data-family-toggle="${invEscape(key)}" aria-expanded="${expanded}"><i class="bi bi-chevron-${expanded ? "up" : "down"}"></i> ${expanded ? "Hide" : "View"} variants</button>` : `<button class="secondary-btn btn-sm" type="button" data-product-action="${product.id}"><i class="bi bi-sliders"></i> Manage</button>`}
                 </td>
             </tr>`}${childRows}`;
     }).join("");
 }
 
-function invRenderStockSummary(groups) {
+function invRenderStockSummary(groups, selectedStock = "") {
     const summary = document.getElementById("inventory-stock-summary");
     if (!summary) return;
 
@@ -318,24 +335,48 @@ function invRenderStockSummary(groups) {
     }, { total: 0, variants: 0, in: 0, low: 0, out: 0 });
 
     summary.innerHTML = `
-        <div class="inventory-summary-pill">
-            <span>Visible Families</span>
+        <button class="inventory-summary-pill ${selectedStock === "" ? "is-active" : ""}" type="button" data-stock-summary="" aria-pressed="${selectedStock === ""}">
+            <span>All Families</span>
             <strong>${counts.total}</strong>
             <small>${counts.variants} variants</small>
-        </div>
-        <div class="inventory-summary-pill inventory-summary-in">
+        </button>
+        <button class="inventory-summary-pill inventory-summary-in ${selectedStock === "in" ? "is-active" : ""}" type="button" data-stock-summary="in" aria-pressed="${selectedStock === "in"}">
             <span>In Stock</span>
             <strong>${counts.in}</strong>
-        </div>
-        <div class="inventory-summary-pill inventory-summary-low">
+        </button>
+        <button class="inventory-summary-pill inventory-summary-low ${selectedStock === "low" ? "is-active" : ""}" type="button" data-stock-summary="low" aria-pressed="${selectedStock === "low"}">
             <span>Low Stock</span>
             <strong>${counts.low}</strong>
-        </div>
-        <div class="inventory-summary-pill inventory-summary-out">
+        </button>
+        <button class="inventory-summary-pill inventory-summary-out ${selectedStock === "out" ? "is-active" : ""}" type="button" data-stock-summary="out" aria-pressed="${selectedStock === "out"}">
             <span>Out</span>
             <strong>${counts.out}</strong>
-        </div>
+        </button>
     `;
+}
+
+function invRenderResultsContext(groups, contextualGroups, search, categoryFilter, stockFilter) {
+    const count = document.getElementById("inventory-results-count");
+    const toggle = document.getElementById("inventory-toggle-families");
+    const clear = document.getElementById("inventory-clear-filters");
+    const activeFilters = [
+        search ? `Search: “${search}”` : "",
+        categoryFilter ? `Category: ${categoryFilter}` : "",
+        stockFilter ? `Stock: ${stockFilter === "in" ? "In Stock" : stockFilter === "low" ? "Low Stock" : "Out of Stock"}` : "",
+    ].filter(Boolean);
+    const totalFamilies = invGroupProducts(invProducts).length;
+    const familyWord = totalFamilies === 1 ? "family" : "families";
+    count.textContent = `Showing ${groups.length} of ${totalFamilies} ${familyWord}${activeFilters.length ? ` · ${activeFilters.join(" · ")}` : ""}`;
+    clear.disabled = activeFilters.length === 0;
+
+    const multiVariantKeys = groups.filter((group) => group.variants.length > 1).map((group) => group.key);
+    const allExpanded = multiVariantKeys.length > 0 && multiVariantKeys.every((key) => invExpandedFamilies.has(key));
+    toggle.classList.toggle("is-hidden", multiVariantKeys.length === 0);
+    toggle.dataset.familyKeys = JSON.stringify(multiVariantKeys);
+    toggle.dataset.expand = allExpanded ? "false" : "true";
+    toggle.innerHTML = allExpanded
+        ? '<i class="bi bi-arrows-collapse"></i> Collapse all variants'
+        : '<i class="bi bi-arrows-expand"></i> Expand all variants';
 }
 
 function invMovementMeta(type) {
@@ -880,6 +921,7 @@ async function invRequestCloseProductModal() {
         const confirmed = await window.IbemsDialog.confirm("Your unsaved product details will be lost.", {
             title: "Discard product changes?",
             confirmLabel: "Discard changes",
+            cancelLabel: "Continue editing",
             tone: "danger",
         });
         if (!confirmed) return;
@@ -1160,6 +1202,27 @@ function invCloseProductModal() {
 document.getElementById("inventory-search").addEventListener("input", invRenderProductTable);
 document.getElementById("inventory-category-filter").addEventListener("change", invRenderProductTable);
 document.getElementById("inventory-stock-filter").addEventListener("change", invRenderProductTable);
+document.getElementById("inventory-stock-summary").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-stock-summary]");
+    if (!button) return;
+    document.getElementById("inventory-stock-filter").value = button.dataset.stockSummary || "";
+    invRenderProductTable();
+});
+document.getElementById("inventory-toggle-families").addEventListener("click", (event) => {
+    const button = event.currentTarget;
+    let keys = [];
+    try {
+        keys = JSON.parse(button.dataset.familyKeys || "[]");
+    } catch (error) {
+        keys = [];
+    }
+    const shouldExpand = button.dataset.expand === "true";
+    keys.forEach((key) => {
+        if (shouldExpand) invExpandedFamilies.add(key);
+        else invExpandedFamilies.delete(key);
+    });
+    invRenderProductTable();
+});
 document.getElementById("inventory-clear-filters").addEventListener("click", () => {
     document.getElementById("inventory-search").value = "";
     document.getElementById("inventory-category-filter").value = "";

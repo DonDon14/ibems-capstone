@@ -11,8 +11,8 @@ final class PosCashTenderTest extends TestCase
 
         $this->assertStringContainsString('id="confirm-cash-received"', $js);
         $this->assertStringContainsString('id="confirm-change-due"', $js);
-        $this->assertStringContainsString('received >= total', $js);
-        $this->assertStringContainsString('received - total', $js);
+        $this->assertStringContainsString('received >= cashAmount', $js);
+        $this->assertStringContainsString('received - cashAmount', $js);
         $this->assertStringContainsString('payload.cash_received', $js);
         $this->assertStringContainsString('Cash Received', $receipt);
         $this->assertStringContainsString('Change', $receipt);

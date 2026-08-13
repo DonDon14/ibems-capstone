@@ -152,6 +152,7 @@ class DebtPinAuthorizationService
             'code' => 423,
             'message' => 'Debt PIN is temporarily locked. Try again in ' . (int) ceil($seconds / 60) . ' minute(s).',
             'locked_until' => $lockedUntil->format('Y-m-d H:i:s'),
+            'locked_until_epoch' => $lockedUntil->getTimestamp(),
         ];
     }
 

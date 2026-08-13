@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/store') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/store-pos.css') ?>?v=20260813d">
+<link rel="stylesheet" href="<?= base_url('assets/css/store-pos.css') ?>?v=20260813l">
 <link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <?= $this->endSection() ?>
@@ -14,6 +14,7 @@
             'title' => 'Store checkout',
             'description' => 'Search products, manage the current order, and complete store transactions.',
             'icon' => 'bi bi-cart-check',
+            'actions' => '<a class="secondary-btn pos-back-btn" href="' . site_url('store/dashboard') . '"><i class="bi bi-arrow-left" aria-hidden="true"></i> Back to dashboard</a>',
         ]) ?>
     </div>
 
@@ -106,22 +107,33 @@
         </div>
 
         <div class="payment-wrap">
-            <label for="payment-method"><i class="bi bi-credit-card-2-front"></i> Payment Method</label>
-            <div class="payment-quick" id="payment-quick"></div>
+            <label id="payment-method-label" for="payment-method"><i class="bi bi-credit-card-2-front"></i> Payment Method</label>
+            <div class="payment-selector" id="payment-quick" role="group" aria-labelledby="payment-method-label"></div>
             <select id="payment-method" class="is-hidden" data-no-enhance aria-hidden="true" tabindex="-1"></select>
-            <small class="payment-method-help">Methods are loaded from this store&apos;s active payment settings. Advance Payment classifies a prepaid sale; debt collections are recorded separately above.</small>
+            <small id="payment-method-help" class="payment-method-help" aria-live="polite">Choose how this sale will be settled.</small>
+            <div id="payment-account-picker" class="payment-account-picker is-hidden" aria-live="polite"></div>
+            <button id="split-payment-toggle" type="button" class="secondary-btn split-payment-toggle" aria-pressed="false">
+                <i class="bi bi-intersect" aria-hidden="true"></i> Split payment
+            </button>
+            <div id="split-payment-editor" class="split-payment-editor is-hidden" aria-live="polite"></div>
         </div>
 
         <div id="debt-customer-wrap" class="payment-wrap is-hidden">
             <label id="checkout-customer-label" for="debt-customer-search">Customer (optional)</label>
             <div class="debt-search-wrap">
                 <input id="debt-customer-search" type="search" placeholder="Walk-in or search employee name / ID">
-                <button id="open-debt-scanner-btn" type="button" class="debt-scan-btn" title="Scan employee QR/ID">
+                <button id="open-debt-scanner-btn" type="button" class="debt-scan-btn search-scan-btn" aria-label="Scan employee QR or ID" title="Scan employee QR/ID">
                     <i class="bi bi-qr-code-scan"></i>
                 </button>
                 <div id="debt-customer-suggestions" class="debt-suggestions is-hidden"></div>
             </div>
             <small id="checkout-customer-help">Leave blank for a walk-in sale, or select an employee to record this transaction in their history.</small>
+            <section id="debt-credit-meter" class="debt-credit-meter is-hidden" aria-live="polite">
+                <div class="debt-credit-head"><div><span>Employee credit</span><strong id="debt-credit-status">Select an employee</strong></div><strong id="debt-credit-available">PHP 0.00 available</strong></div>
+                <div class="debt-credit-track" role="progressbar" aria-label="Employee credit used" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="debt-credit-fill"></span></div>
+                <div class="debt-credit-values"><span id="debt-credit-current">Current debt PHP 0.00</span><span id="debt-credit-limit">Limit PHP 0.00</span></div>
+                <p id="debt-credit-message">The Debt portion of this checkout will appear here.</p>
+            </section>
             <div id="debt-pin-wrap" class="debt-pin-wrap is-hidden">
                 <label><i class="bi bi-shield-lock"></i> Debt Authorization PIN</label>
                 <small id="debt-pin-help">PIN is verified securely when the transaction is submitted.</small>
@@ -136,6 +148,30 @@
         <div id="pos-success-strip" class="pos-success-strip is-hidden"></div>
     </aside>
 </section>
+
+<div id="customer-qr-modal" class="receipt-modal customer-qr-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="customer-qr-title">
+    <div class="receipt-card customer-qr-card">
+        <div class="receipt-head">
+            <div>
+                <span class="customer-qr-eyebrow">Customer payment</span>
+                <h3 id="customer-qr-title">Scan to pay</h3>
+            </div>
+            <button id="customer-qr-close" type="button" class="receipt-close" aria-label="Close customer payment QR">&times;</button>
+        </div>
+        <div class="customer-qr-content">
+            <img id="customer-qr-image" alt="Customer payment QR">
+            <div class="customer-qr-details">
+                <span id="customer-qr-method">Payment method</span>
+                <strong id="customer-qr-account">Receiving account</strong>
+                <small id="customer-qr-number"></small>
+            </div>
+            <p>Scan this QR using your payment app. Confirm the receiving account before sending payment.</p>
+        </div>
+        <div class="confirm-actions customer-qr-actions">
+            <button id="customer-qr-done" type="button" class="primary-btn"><i class="bi bi-check2-circle"></i> Done</button>
+        </div>
+    </div>
+</div>
 
 <div id="product-variant-modal" class="receipt-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="product-variant-title">
     <div class="receipt-card product-variant-modal-card">
@@ -280,11 +316,13 @@
             <div class="payment-wrap">
                 <label for="opening-ecash-input">Opening E-Cash</label>
                 <input id="opening-ecash-input" type="number" min="0" step="0.01" value="0">
+                <small>Compatibility total. Individual electronic accounts are reconciled separately at close.</small>
             </div>
             <div class="payment-wrap">
                 <label for="opening-balance-note">Note (optional)</label>
                 <input id="opening-balance-note" type="text" placeholder="e.g. Start of day float">
             </div>
+            <div id="opening-payment-account-balances" class="opening-payment-account-balances"></div>
         </div>
         <p id="opening-balance-result" class="result-msg"></p>
         <div class="confirm-actions">
@@ -302,6 +340,7 @@
         </div>
         <p id="store-day-close-summary" class="scanner-status store-day-close-summary">Review expected cash and enter counted totals.</p>
         <div id="store-day-close-reconcile" class="store-day-close-reconcile"></div>
+        <div id="store-day-account-counts" class="store-day-account-counts"></div>
         <div class="store-day-close-fields">
             <div class="payment-wrap">
                 <label for="closing-cash-input">Counted Cash</label>
@@ -329,7 +368,7 @@
 
 <?= $this->section('scripts') ?>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script src="<?= base_url('assets/js/receipt-standard.js') ?>"></script>
-<script src="<?= base_url('assets/js/store-pos.js') ?>"></script>
+<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260813i"></script>
+<script src="<?= base_url('assets/js/store-pos.js') ?>?v=20260813t"></script>
 <?= $this->endSection() ?>
 

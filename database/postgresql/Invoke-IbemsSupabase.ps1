@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('validate', 'reconcile', 'preflight', 'smoke', 'seed', 'snapshot', 'serve', 'serve-background')]
+    [ValidateSet('validate', 'reconcile', 'migrate', 'payment-accounts', 'credit-boundary-test', 'preflight', 'smoke', 'seed', 'snapshot', 'serve', 'serve-background')]
     [string] $Action = 'preflight',
 
     [ValidateRange(1024, 65535)]
@@ -42,8 +42,12 @@ if ($CredentialDialog) {
     $securePassword = Read-Host 'Supabase staging database password' -AsSecureString
 }
 $passwordPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
-$secureStorageKey = Read-Host 'Supabase server secret key for Storage' -AsSecureString
-$storageKeyPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureStorageKey)
+$storageKeyPointer = [IntPtr]::Zero
+$plainStorageKey = $null
+if ($Action -notin @('payment-accounts', 'credit-boundary-test')) {
+    $secureStorageKey = Read-Host 'Supabase server secret key for Storage' -AsSecureString
+    $storageKeyPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureStorageKey)
+}
 $environmentKeys = @(
     'IBEMS_BASE_URL',
     'IBEMS_DATABASE_HOSTNAME',
@@ -63,7 +67,9 @@ $environmentKeys = @(
 
 try {
     $plainPassword = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($passwordPointer)
-    $plainStorageKey = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($storageKeyPointer)
+    if ($storageKeyPointer -ne [IntPtr]::Zero) {
+        $plainStorageKey = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($storageKeyPointer)
+    }
     Set-Location -LiteralPath $projectRoot
 
     [Environment]::SetEnvironmentVariable('IBEMS_BASE_URL', "http://localhost:$Port/", 'Process')
@@ -78,7 +84,9 @@ try {
     [Environment]::SetEnvironmentVariable('IBEMS_ALLOW_STAGING_RESET', '1', 'Process')
     [Environment]::SetEnvironmentVariable('IBEMS_ASSET_STORAGE_DRIVER', 'supabase', 'Process')
     [Environment]::SetEnvironmentVariable('IBEMS_SUPABASE_URL', 'https://pukjmscgjtmqvhdncjpo.supabase.co', 'Process')
-    [Environment]::SetEnvironmentVariable('IBEMS_SUPABASE_SECRET_KEY', $plainStorageKey, 'Process')
+    if ($null -ne $plainStorageKey) {
+        [Environment]::SetEnvironmentVariable('IBEMS_SUPABASE_SECRET_KEY', $plainStorageKey, 'Process')
+    }
     [Environment]::SetEnvironmentVariable('IBEMS_SUPABASE_STORAGE_BUCKET', 'ibems-assets', 'Process')
 
     function Invoke-LoggedPhpAction {
@@ -162,6 +170,9 @@ try {
             Invoke-LoggedPhpAction -Name 'final-preflight' -Arguments @('spark', 'ibems:preflight') -OutputPath $reconcileLogPath -Append
         }
         'preflight' { $actionOutput = & php spark ibems:preflight 2>&1; $actionExitCode = $LASTEXITCODE; $actionOutput | Tee-Object -FilePath $logPath }
+        'migrate' { $actionOutput = & php spark migrate --all 2>&1; $actionExitCode = $LASTEXITCODE; $actionOutput | Tee-Object -FilePath $validationLogPath }
+        'payment-accounts' { $actionOutput = & php spark ibems:payment-accounts-migrate 2>&1; $actionExitCode = $LASTEXITCODE; $actionOutput | Tee-Object -FilePath $validationLogPath }
+        'credit-boundary-test' { $actionOutput = & php spark ibems:verify-live-credit-boundary 2>&1; $actionExitCode = $LASTEXITCODE; $actionOutput | Tee-Object -FilePath $validationLogPath }
         'smoke' { $actionOutput = & php spark ibems:smoke 2>&1; $actionExitCode = $LASTEXITCODE; $actionOutput | Tee-Object -FilePath $logPath }
         'seed' { $actionOutput = & php spark db:seed InitialSeeder 2>&1; $actionExitCode = $LASTEXITCODE; $actionOutput | Tee-Object -FilePath $seedLogPath }
         'snapshot' { $actionOutput = & php spark ibems:financial-snapshot --output $snapshotPath 2>&1; $actionExitCode = $LASTEXITCODE; $actionOutput | Tee-Object -FilePath $snapshotLogPath }
@@ -188,7 +199,9 @@ finally {
         $plainStorageKey = $null
     }
     [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($passwordPointer)
-    [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($storageKeyPointer)
+    if ($storageKeyPointer -ne [IntPtr]::Zero) {
+        [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($storageKeyPointer)
+    }
     foreach ($key in $environmentKeys) {
         [Environment]::SetEnvironmentVariable($key, $null, 'Process')
     }

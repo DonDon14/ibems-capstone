@@ -6,6 +6,11 @@ let srScannerEngine = null;
 let srScannerRunning = false;
 let srScannerLastDetected = "";
 let srScannerLastDetectedAt = 0;
+let srEmployeeTrigger = null;
+let srReceiptTrigger = null;
+let srScannerTrigger = null;
+let srDebtRequestSequence = 0;
+let srTransactionRequestSequence = 0;
 
 function srEscape(value) {
     return String(value ?? "")
@@ -30,6 +35,17 @@ function srDebtDataState(type, message) {
     };
     const role = safeType === "error" ? "alert" : "status";
     return `<div class="data-state data-state--${safeType}" role="${role}" aria-live="polite"><i class="${icons[safeType]}" aria-hidden="true"></i><div><strong>${srEscape(message)}</strong></div></div>`;
+}
+
+function srTransactionDataState(type, message) {
+    const safeType = ["loading", "empty", "error"].includes(type) ? type : "loading";
+    const icons = {
+        loading: "bi bi-arrow-repeat",
+        empty: "bi bi-receipt",
+        error: "bi bi-exclamation-circle",
+    };
+    const role = safeType === "error" ? "alert" : "status";
+    return `<tr><td colspan="5"><div class="data-state data-state--${safeType}" role="${role}" aria-live="polite"><i class="${icons[safeType]}" aria-hidden="true"></i><div><strong>${srEscape(message)}</strong></div></div></td></tr>`;
 }
 
 function srDateTime(value) {
@@ -101,6 +117,7 @@ function srExtractScanCode(rawValue) {
 }
 
 async function srOpenScannerModal() {
+    srScannerTrigger = document.activeElement;
     document.getElementById("staff-scanner-modal").style.display = "grid";
     srSetScannerUiState(srScannerRunning);
     srSetScannerStatus("Starting scanner...");
@@ -110,6 +127,8 @@ async function srOpenScannerModal() {
 async function srCloseScannerModal() {
     await srStopScanner();
     document.getElementById("staff-scanner-modal").style.display = "none";
+    srScannerTrigger?.focus?.();
+    srScannerTrigger = null;
 }
 
 async function srStartScanner() {
@@ -208,9 +227,34 @@ async function srLoadStores() {
     srStoreId = Number(data.default_store_id || data.stores[0].id);
 }
 
+function srIsActive(value) {
+    return value === true || value === 1 || value === "1" || value === "t" || value === "true";
+}
+
+function srSetTransactionResult(message, type = "ok") {
+    const el = document.getElementById("txn-filter-result");
+    if (!el) return;
+    el.textContent = message || "";
+    el.classList.toggle("is-error", type === "error");
+    el.setAttribute("role", type === "error" ? "alert" : "status");
+}
+
 function srActiveStoreName() {
     const store = srStores.find((row) => Number(row.id) === Number(srStoreId));
     return String(store?.store_name || "current store");
+}
+
+function srRenderTransactionStores() {
+    const select = document.getElementById("txn-store-select");
+    select.innerHTML = srStores.map((store) => `<option value="${Number(store.id)}">${srEscape(store.store_name || "Store")}</option>`).join("");
+    select.value = String(srStoreId);
+}
+
+function srUpdateTransactionScope() {
+    const storeName = srActiveStoreName();
+    document.getElementById("staff-employee-title").textContent = `Transactions at ${storeName}`;
+    const scope = document.querySelector("[data-staff-transaction-scope]");
+    if (scope) scope.innerHTML = `<strong>Scope:</strong> Purchases and receipts recorded at ${srEscape(storeName)}. Credit and debt above remain totals across all stores.`;
 }
 
 function srRenderDebts(rows) {
@@ -222,7 +266,7 @@ function srRenderDebts(rows) {
         return;
     }
 
-    if (countText) countText.textContent = `Showing ${rows.length} records`;
+    if (countText) countText.textContent = `Showing ${rows.length} ${rows.length === 1 ? "record" : "records"}`;
 
     body.innerHTML = rows.map((row) => `
         <article class="staff-record-row sr-row-clickable flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:shadow-sm"
@@ -237,7 +281,7 @@ function srRenderDebts(rows) {
                     <div class="staff-name-line flex flex-wrap items-center gap-2">
                         <strong class="text-base font-bold text-slate-900">${srEscape(row.name)}</strong>
                         <span class="table-chip">${srEscape(srCategory(row.user_type))}</span>
-                        <span class="table-status ${Number(row.is_active || 0) === 1 ? "is-active" : "is-inactive"}">${Number(row.is_active || 0) === 1 ? "Active" : "Inactive"}</span>
+                        <span class="table-status ${srIsActive(row.is_active) ? "is-active" : "is-inactive"}">${srIsActive(row.is_active) ? "Active" : "Inactive"}</span>
                     </div>
                     <div class="staff-subline truncate text-sm text-slate-500">${srEscape(row.employee_id || "-")} | ${srEscape(row.email)}</div>
                 </div>
@@ -256,6 +300,7 @@ function srRenderDebts(rows) {
                     <span class="text-xs text-slate-500">Overall Available Credit</span>
                     <strong class="text-sm font-semibold text-slate-900">${srEscape(srMoney(row.available_credit))}</strong>
                 </div>
+                <button class="secondary-btn btn-sm staff-view-transactions" type="button"><i class="bi bi-receipt"></i> View transactions</button>
             </div>
         </article>
     `).join("");
@@ -264,7 +309,7 @@ function srRenderDebts(rows) {
 function srRenderTransactions(rows) {
     const body = document.getElementById("txn-body");
     if (!Array.isArray(rows) || rows.length === 0) {
-        body.innerHTML = '<tr><td class="px-3 py-4 text-sm text-slate-500" colspan="4">No employee transactions found.</td></tr>';
+        body.innerHTML = srTransactionDataState("empty", "No employee transactions match these filters.");
         return;
     }
 
@@ -273,39 +318,49 @@ function srRenderTransactions(rows) {
             <td class="border border-slate-200 px-3 py-2 text-sm text-slate-700">${srEscape(srDateTime(row.created_at))}</td>
             <td class="border border-slate-200 px-3 py-2 text-sm text-slate-700">${srEscape(String(row.payment_method || "").toUpperCase())}</td>
             <td class="border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-900">${srEscape(srMoney(row.amount))}</td>
-            <td class="border border-slate-200 px-3 py-2 text-sm text-slate-700">${srEscape(srMoney(row.staff.current_debt))}</td>
+            <td class="border border-slate-200 px-3 py-2 text-sm text-slate-700">${srEscape(srMoney(row.staff?.current_debt))}</td>
+            <td class="border border-slate-200 px-3 py-2 text-sm"><button class="secondary-btn btn-sm" type="button"><i class="bi bi-receipt"></i> View receipt</button></td>
         </tr>
     `).join("");
 }
 
 async function srLoadDebtRecords() {
+    const requestId = ++srDebtRequestSequence;
     const q = document.getElementById("debt-search").value.trim();
     const params = new URLSearchParams();
     if (q) params.set("q", q);
 
     const body = document.getElementById("debt-body");
     const countText = document.getElementById("staff-count-text");
+    const searchButton = document.getElementById("debt-search-btn");
     body.innerHTML = srDebtDataState("loading", "Loading debt records...");
+    if (countText) countText.textContent = q ? "Searching employee records..." : "Loading employee records...";
+    searchButton.disabled = true;
 
     let data;
     try {
         const response = await fetch(`/store/debt-customers?${params.toString()}`);
         data = await response.json();
     } catch (error) {
+        if (requestId !== srDebtRequestSequence) return;
         const message = error?.message || "Unable to load debt records.";
         body.innerHTML = srDebtDataState("error", message);
         if (countText) countText.textContent = "Showing 0 records";
         srSetResult(message, "error");
+        searchButton.disabled = false;
         return;
     }
+    if (requestId !== srDebtRequestSequence) return;
     if (!data || data.status !== "success") {
         const message = data?.message || "Unable to load debt records.";
         body.innerHTML = srDebtDataState("error", message);
         if (countText) countText.textContent = "Showing 0 records";
         srSetResult(message, "error");
+        searchButton.disabled = false;
         return;
     }
     srRenderDebts(data.customers);
+    searchButton.disabled = false;
 }
 
 async function srLoadStaffTransactions() {
@@ -323,31 +378,67 @@ async function srLoadStaffTransactions() {
     const dateFrom = document.getElementById("txn-date-from").value || "";
     const dateTo = document.getElementById("txn-date-to").value || "";
     const debtOnly = document.getElementById("txn-debt-only").checked;
+    const dateFromInput = document.getElementById("txn-date-from");
+    const dateToInput = document.getElementById("txn-date-to");
+    dateFromInput.removeAttribute("aria-invalid");
+    dateToInput.removeAttribute("aria-invalid");
+
+    if (dateFrom && dateTo && dateFrom > dateTo) {
+        srSetTransactionResult("From date cannot be later than To date.", "error");
+        dateFromInput.setAttribute("aria-invalid", "true");
+        dateToInput.setAttribute("aria-invalid", "true");
+        dateFromInput.focus();
+        return;
+    }
+    const requestId = ++srTransactionRequestSequence;
 
     if (dateFrom) params.set("date_from", dateFrom);
     if (dateTo) params.set("date_to", dateTo);
     if (debtOnly) params.set("debt_only", "1");
 
-    const response = await fetch(`/store/staff-transactions?${params.toString()}`);
-    const data = await response.json();
+    const body = document.getElementById("txn-body");
+    const applyButton = document.getElementById("txn-search-btn");
+    body.innerHTML = srTransactionDataState("loading", "Loading employee transactions...");
+    applyButton.disabled = true;
+    srSetTransactionResult("");
+
+    let data;
+    try {
+        const response = await fetch(`/store/staff-transactions?${params.toString()}`);
+        data = await response.json();
+    } catch (error) {
+        if (requestId !== srTransactionRequestSequence) return;
+        const message = error?.message || "Unable to load employee transactions.";
+        body.innerHTML = srTransactionDataState("error", message);
+        srSetTransactionResult(message, "error");
+        applyButton.disabled = false;
+        return;
+    }
+    if (requestId !== srTransactionRequestSequence) return;
     if (!data || data.status !== "success") {
-        srSetResult(data?.message || "Unable to load employee transactions.", "error");
-        srRenderTransactions([]);
+        const message = data?.message || "Unable to load employee transactions.";
+        body.innerHTML = srTransactionDataState("error", message);
+        srSetTransactionResult(message, "error");
+        applyButton.disabled = false;
         return;
     }
     srRenderTransactions(data.transactions);
+    srSetTransactionResult(`${data.transactions.length} transaction${data.transactions.length === 1 ? "" : "s"} shown for ${srActiveStoreName()}.`);
+    applyButton.disabled = false;
 }
 
 function srOpenEmployeeModal(employee) {
+    srEmployeeTrigger = document.activeElement;
     srSelectedEmployee = employee;
-    const title = document.getElementById("staff-employee-title");
-    if (title) title.textContent = `Transactions in ${srActiveStoreName()}`;
+    srRenderTransactionStores();
     document.getElementById("staff-employee-summary").innerHTML = `
         <div><strong>Employee:</strong> ${srEscape(employee.name)}</div>
         <div><strong>Employee ID:</strong> ${srEscape(employee.employeeId || "-")} | <strong>Email:</strong> ${srEscape(employee.email || "-")} | <strong>Category:</strong> ${srEscape(srCategory(employee.userType))}</div>
-        <div><strong>Scope:</strong> Showing transactions recorded in ${srEscape(srActiveStoreName())}. Debt balance above is overall across stores.</div>
+        <div data-staff-transaction-scope></div>
     `;
+    srUpdateTransactionScope();
     document.getElementById("staff-employee-modal").style.display = "grid";
+    window.requestAnimationFrame(() => document.getElementById("staff-employee-close").focus());
 }
 
 function srCloseEmployeeModal() {
@@ -356,7 +447,10 @@ function srCloseEmployeeModal() {
     document.getElementById("txn-date-from").value = "";
     document.getElementById("txn-date-to").value = "";
     document.getElementById("txn-debt-only").checked = false;
-    document.getElementById("txn-body").innerHTML = '<tr><td class="px-3 py-4 text-sm text-slate-500" colspan="4">Select an employee to load transactions.</td></tr>';
+    srSetTransactionResult("");
+    document.getElementById("txn-body").innerHTML = '<tr><td class="px-3 py-4 text-sm text-slate-500" colspan="5">Select an employee to load transactions.</td></tr>';
+    srEmployeeTrigger?.focus?.();
+    srEmployeeTrigger = null;
 }
 
 function srBuildReceiptHtml(receipt) {
@@ -395,57 +489,40 @@ function srBuildReceiptHtml(receipt) {
 }
 
 async function srOpenReceipt(transactionId) {
-    const response = await fetch(`/store/transactions/${transactionId}`);
-    const data = await response.json();
+    srReceiptTrigger = document.activeElement;
+    let data;
+    try {
+        const response = await fetch(`/store/transactions/${transactionId}`);
+        data = await response.json();
+    } catch (error) {
+        srSetTransactionResult(error?.message || "Unable to load receipt.", "error");
+        return;
+    }
     if (!data || data.status !== "success" || !data.transaction) {
-        srSetResult(data?.message || "Unable to load receipt.", "error");
+        srSetTransactionResult(data?.message || "Unable to load receipt.", "error");
         return;
     }
 
-    srSelectedReceipt = data.transaction;
-    document.getElementById("staff-receipt-content").innerHTML = srBuildReceiptHtml(srSelectedReceipt);
+    const tx = data.transaction;
+    srSelectedReceipt = {transactionId:tx.id,clientTxnId:tx.client_txn_id,createdAt:tx.created_at,storeName:tx.store_name,customerName:tx.customer_name,paymentMethod:tx.payment_method,payments:tx.payments,totalAmount:tx.amount,items:tx.items,lookupUrl:`${window.location.origin}/store/receipt/${encodeURIComponent(String(tx.id))}`};
+    if (!window.IbemsReceipt) throw new Error("Standard receipt renderer is unavailable.");
+    window.IbemsReceipt.renderReceipt("staff-receipt-content", srSelectedReceipt);
+    document.getElementById("staff-receipt-view").href = srSelectedReceipt.lookupUrl;
     document.getElementById("staff-receipt-modal").style.display = "grid";
+    window.requestAnimationFrame(() => document.getElementById("staff-receipt-close").focus());
 }
 
 function srCloseReceipt() {
     document.getElementById("staff-receipt-modal").style.display = "none";
+    srReceiptTrigger?.focus?.();
+    srReceiptTrigger = null;
 }
 
 function srPrintReceipt() {
     if (!srSelectedReceipt) return;
-
-    const printWindow = window.open("", "_blank", "width=800,height=900");
-    if (!printWindow) {
+    if (!window.IbemsReceipt || !window.IbemsReceipt.printReceipt(srSelectedReceipt)) {
         srSetResult("Popup blocked. Please allow popups.", "error");
-        return;
     }
-
-    const html = `
-        <!DOCTYPE html>
-        <html>
-        <head>
-            <title>Receipt ${srEscape(srSelectedReceipt.client_txn_id)}</title>
-            <style>
-                body { font-family: Arial, sans-serif; padding: 20px; color: #111; }
-                h2 { margin-top: 0; color: #003366; }
-                table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-                th, td { border: 1px solid #ddd; padding: 8px; font-size: 13px; }
-                th { background: #f4f4f4; text-align: left; }
-                .receipt-total { margin-top: 12px; text-align: right; font-weight: bold; font-size: 16px; }
-            </style>
-        </head>
-        <body>
-            <h2>USTP Store Receipt</h2>
-            ${srBuildReceiptHtml(srSelectedReceipt)}
-        </body>
-        </html>
-    `;
-
-    printWindow.document.open();
-    printWindow.document.write(html);
-    printWindow.document.close();
-    printWindow.focus();
-    printWindow.print();
 }
 
 document.getElementById("debt-search-btn").addEventListener("click", async () => {
@@ -484,6 +561,46 @@ document.getElementById("txn-search-btn").addEventListener("click", async () => 
     await srLoadStaffTransactions();
 });
 
+document.getElementById("txn-store-select").addEventListener("change", async (event) => {
+    const requestedStoreId = Number(event.target.value || 0);
+    if (!srStores.some((store) => Number(store.id) === requestedStoreId)) {
+        event.target.value = String(srStoreId);
+        srSetTransactionResult("That store is not available to this account.", "error");
+        return;
+    }
+    srStoreId = requestedStoreId;
+    srUpdateTransactionScope();
+    await srLoadStaffTransactions();
+});
+
+document.getElementById("debt-search").addEventListener("input", (event) => {
+    document.getElementById("debt-clear-btn").classList.toggle("is-hidden", String(event.target.value || "").trim() === "");
+});
+
+document.getElementById("debt-clear-btn").addEventListener("click", async () => {
+    const search = document.getElementById("debt-search");
+    search.value = "";
+    document.getElementById("debt-clear-btn").classList.add("is-hidden");
+    srSetResult("", "ok");
+    await srLoadDebtRecords();
+    search.focus();
+});
+
+document.getElementById("debt-search").addEventListener("search", async (event) => {
+    if (String(event.target.value || "").trim() !== "") return;
+    srSetResult("", "ok");
+    await srLoadDebtRecords();
+});
+
+document.getElementById("txn-clear-btn").addEventListener("click", async () => {
+    document.getElementById("txn-date-from").value = "";
+    document.getElementById("txn-date-to").value = "";
+    document.getElementById("txn-debt-only").checked = false;
+    document.getElementById("txn-date-from").removeAttribute("aria-invalid");
+    document.getElementById("txn-date-to").removeAttribute("aria-invalid");
+    await srLoadStaffTransactions();
+});
+
 document.getElementById("debt-body").addEventListener("click", async (event) => {
     const row = event.target.closest("[data-debt-user-id]");
     if (!row) return;
@@ -519,6 +636,24 @@ document.getElementById("staff-receipt-modal").addEventListener("click", (event)
 
 window.addEventListener("beforeunload", () => {
     srStopScanner();
+});
+
+document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    if (document.getElementById("staff-receipt-modal").style.display === "grid") {
+        event.preventDefault();
+        srCloseReceipt();
+        return;
+    }
+    if (document.getElementById("staff-scanner-modal").style.display === "grid") {
+        event.preventDefault();
+        srCloseScannerModal();
+        return;
+    }
+    if (document.getElementById("staff-employee-modal").style.display === "grid") {
+        event.preventDefault();
+        srCloseEmployeeModal();
+    }
 });
 
 (async () => {

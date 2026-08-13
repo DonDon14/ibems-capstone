@@ -4,6 +4,9 @@ let reportsPeriod = "today";
 let reportsSummaryData = null;
 let reportsTrendChart = null;
 let reportsPaymentMixChart = null;
+let reportsSelectedReceipt = null;
+let reportsReceiptTrigger = null;
+let reportsRequestSequence = 0;
 
 function rMoney(value) {
     return window.IbemsFormat?.money(value) || `PHP ${Number(value || 0).toFixed(2)}`;
@@ -16,6 +19,10 @@ function rEscape(value) {
         .replace(/>/g, "&gt;")
         .replace(/"/g, "&quot;")
         .replace(/'/g, "&#39;");
+}
+
+function rDateTime(value) {
+    return window.IbemsFormat?.dateTime(value) || new Date(value).toLocaleString();
 }
 
 function rDataState(type, message, colspan) {
@@ -35,6 +42,8 @@ function rRenderTableStates(type, message) {
     document.getElementById("cash-movements-body").innerHTML = rDataState(type, message, 5);
     document.getElementById("products-body").innerHTML = rDataState(type, message, 4);
     document.getElementById("trend-body").innerHTML = rDataState(type, message, 3);
+    document.getElementById("reports-transactions-body").innerHTML = rDataState(type, message, 6);
+    document.getElementById("reports-transaction-count").textContent = message;
 }
 
 function rSetResult(message, type) {
@@ -47,6 +56,7 @@ function rSetPeriod(nextPeriod) {
     reportsPeriod = nextPeriod;
     document.querySelectorAll(".period-chip").forEach((chip) => {
         chip.classList.toggle("is-active", chip.dataset.period === reportsPeriod);
+        chip.setAttribute("aria-pressed", chip.dataset.period === reportsPeriod ? "true" : "false");
     });
     document.getElementById("reports-custom-range").classList.toggle("hidden", reportsPeriod !== "custom");
 }
@@ -383,6 +393,48 @@ function rRenderTrendRows(rows) {
     `).join("");
 }
 
+function rRenderPaymentAccountRows(rows) {
+    const body = document.getElementById("payment-account-body"); if (!body) return;
+    if (!Array.isArray(rows) || !rows.length) { body.innerHTML = rDataState("empty", "No account-specific payments for this period.", 4); return; }
+    body.innerHTML = rows.map((row) => `<tr><td>${rEscape(String(row.payment_method || "-").toUpperCase())}</td><td><strong>${rEscape(row.account_name || "-")}</strong><small class="table-cell-note">ending ${rEscape(String(row.account_number || "").slice(-4))}</small></td><td>${Number(row.transactions || 0)}</td><td>${rEscape(rMoney(row.sales || 0))}</td></tr>`).join("");
+}
+
+function rPaymentLabel(row) {
+    const lines = Array.isArray(row.payments) ? row.payments : [];
+    return (lines.length ? lines.map((line) => line.payment_method) : [row.payment_method])
+        .filter(Boolean).map((value) => String(value).replace(/_/g, " ").toUpperCase()).join(" + ") || "-";
+}
+
+function rRenderTransactions(rows) {
+    const body = document.getElementById("reports-transactions-body");
+    const safeRows = Array.isArray(rows) ? rows : [];
+    document.getElementById("reports-transaction-count").textContent = `${safeRows.length} receipt${safeRows.length === 1 ? "" : "s"} shown`;
+    if (!safeRows.length) { body.innerHTML = rDataState("empty", "No transactions in this report period.", 6); return; }
+    body.innerHTML = safeRows.map((row) => `<tr>
+        <td>${rEscape(rDateTime(row.created_at))}</td><td><code>${rEscape(row.client_txn_id || `#${row.id}`)}</code></td>
+        <td>${rEscape(row.customer_name || "Walk-in")}</td><td>${rEscape(rPaymentLabel(row))}</td><td>${rEscape(rMoney(row.amount))}</td>
+        <td><button class="secondary-btn btn-sm" type="button" data-report-receipt="${Number(row.id)}"><i class="bi bi-receipt"></i> View receipt</button></td></tr>`).join("");
+}
+
+async function rLoadTransactions(from, to) {
+    const params = new URLSearchParams({store_id:String(reportsActiveStoreId),limit:"100",date_from:from,date_to:to});
+    const response = await fetch(`/store/transactions?${params}`); const data = await response.json();
+    if (!data || data.status !== "success") throw new Error(data?.message || "Unable to load report transactions.");
+    rRenderTransactions(data.transactions);
+}
+
+async function rOpenReceipt(id, trigger) {
+    reportsReceiptTrigger = trigger;
+    const response = await fetch(`/store/transactions/${id}`); const data = await response.json();
+    if (!data?.transaction) throw new Error(data?.message || "Unable to load receipt.");
+    const tx=data.transaction; reportsSelectedReceipt={transactionId:tx.id,clientTxnId:tx.client_txn_id,createdAt:tx.created_at,storeName:tx.store_name,customerName:tx.customer_name,paymentMethod:tx.payment_method,payments:tx.payments,totalAmount:tx.amount,items:tx.items,lookupUrl:`${location.origin}/store/receipt/${tx.id}`};
+    window.IbemsReceipt.renderReceipt("reports-receipt-content",reportsSelectedReceipt);
+    document.getElementById("reports-receipt-view").href=reportsSelectedReceipt.lookupUrl;
+    document.getElementById("reports-receipt-modal").style.display="grid";
+    requestAnimationFrame(()=>document.getElementById("reports-receipt-close").focus());
+}
+function rCloseReceipt(){document.getElementById("reports-receipt-modal").style.display="none";reportsReceiptTrigger?.focus?.();reportsReceiptTrigger=null;}
+
 async function rLoadStores() {
     const response = await fetch("/store/my-stores");
     const data = await response.json();
@@ -395,6 +447,7 @@ async function rLoadStores() {
 }
 
 async function rLoadSummary() {
+    const requestId = ++reportsRequestSequence;
     if (!reportsActiveStoreId) return;
 
     const params = new URLSearchParams({
@@ -406,9 +459,10 @@ async function rLoadSummary() {
         const from = (document.getElementById("reports-date-from").value || "").trim();
         const to = (document.getElementById("reports-date-to").value || "").trim();
         if (!from || !to) {
-            rSetResult("Please select date_from and date_to for custom range.", "error");
+            rSetResult("Choose both From and To dates, then select Refresh.", "ok");
             return;
         }
+        if (from > to) { rSetResult("From date cannot be later than To date.", "error"); return; }
         params.set("date_from", from);
         params.set("date_to", to);
     }
@@ -437,22 +491,26 @@ async function rLoadSummary() {
         rRenderPaymentMix([]);
         return;
     }
+    if (requestId !== reportsRequestSequence) return;
 
     reportsSummaryData = data;
     rRenderSummary(data);
     rRenderPaymentRows(data.payment_breakdown || []);
+    rRenderPaymentAccountRows(data.payment_account_breakdown || []);
     rRenderPaymentRecords(data.payment_breakdown || [], data);
     rRenderCashMovements(data.cash_movements || []);
     rRenderProductRows(data.top_products || []);
     rRenderTrendRows(data.trend || []);
     rRenderTrendBars(data.trend || []);
     rRenderPaymentMix(data.payment_breakdown || []);
+    try { await rLoadTransactions(data.range.from, data.range.to); } catch(error) { document.getElementById("reports-transactions-body").innerHTML=rDataState("error",error.message,6); }
     rSetResult("", "ok");
 }
 
 document.querySelectorAll(".period-chip").forEach((chip) => {
     chip.addEventListener("click", async () => {
         rSetPeriod(chip.dataset.period || "today");
+        if (reportsPeriod === "custom") { rSetResult("Choose both dates, then select Refresh.", "ok"); return; }
         await rLoadSummary();
     });
 });
@@ -461,13 +519,12 @@ document.getElementById("reports-refresh-btn").addEventListener("click", async (
     await rLoadSummary();
 });
 
-document.getElementById("reports-date-from").addEventListener("change", async () => {
-    if (reportsPeriod === "custom") await rLoadSummary();
-});
-
-document.getElementById("reports-date-to").addEventListener("change", async () => {
-    if (reportsPeriod === "custom") await rLoadSummary();
-});
+document.getElementById("reports-custom-clear").addEventListener("click",()=>{document.getElementById("reports-date-from").value="";document.getElementById("reports-date-to").value="";rSetResult("Custom dates cleared.","ok");});
+document.getElementById("reports-transactions-body").addEventListener("click",async(event)=>{const button=event.target.closest("[data-report-receipt]");if(!button)return;try{await rOpenReceipt(button.dataset.reportReceipt,button);}catch(error){rSetResult(error.message,"error");}});
+document.getElementById("reports-receipt-close").addEventListener("click",rCloseReceipt);
+document.getElementById("reports-receipt-modal").addEventListener("click",event=>{if(event.target.id==="reports-receipt-modal")rCloseReceipt();});
+document.getElementById("reports-receipt-print").addEventListener("click",()=>{if(reportsSelectedReceipt&&!window.IbemsReceipt.printReceipt(reportsSelectedReceipt))rSetResult("Popup blocked. Please allow popups.","error");});
+document.addEventListener("keydown",event=>{if(event.key==="Escape"&&document.getElementById("reports-receipt-modal").style.display==="grid"){event.preventDefault();rCloseReceipt();}});
 
 document.getElementById("cash-movement-save").addEventListener("click", async () => {
     await rCreateCashMovement();

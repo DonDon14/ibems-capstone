@@ -30,6 +30,12 @@ let openingBalanceMode = "create";
 let currentDaySession = null;
 const selectedCatalogVariants = new Map();
 let activeVariantFamilyKey = null;
+let splitTenderEnabled = false;
+let splitTenderSupported = false;
+const splitTenderAmounts = new Map();
+const selectedPaymentAccounts = new Map();
+let debtPinLockoutTimer = null;
+const debtPinLockouts = new Map();
 
 function getProductFamilyKey(product) {
     const familyId = Number(product?.family_id || 0);
@@ -164,7 +170,10 @@ async function requestJson(url, options = {}, fallbackMessage = "Request failed.
     }
 
     if (!response.ok) {
-        throw new Error(data?.message || fallbackMessage);
+        const requestError = new Error(data?.message || fallbackMessage);
+        requestError.data = data || {};
+        requestError.status = response.status;
+        throw requestError;
     }
 
     return data || {};
@@ -387,6 +396,9 @@ function openOpeningBalanceModal(prefill = null) {
     const labelEl = document.getElementById("opening-balance-label");
     const saveBtn = document.getElementById("opening-balance-save");
     if (!modal) return;
+    const accountWrap = document.getElementById("opening-payment-account-balances");
+    const accounts = paymentMethodsCache.flatMap((method) => (method.destination_accounts || []).map((account) => ({...account, payment_method_label: method.label})));
+    if (accountWrap) accountWrap.innerHTML = accounts.length ? `<div class="opening-account-head"><strong>Electronic receiving accounts</strong><small>Enter the verified starting balance of each account.</small></div>${accounts.map((account) => `<label class="store-day-account-count"><span><strong>${escapeHtml(account.payment_method_label)} · ${escapeHtml(account.account_name)}</strong><small>${escapeHtml(account.masked_number)}</small></span><input type="number" min="0" step="0.01" value="0.00" data-opening-account-id="${Number(account.id)}"></label>`).join("")}` : "";
     if (prefill && typeof prefill.opening_cash !== "undefined") {
         document.getElementById("opening-balance-input").value = Number(prefill.opening_cash || 0).toFixed(2);
         document.getElementById("opening-ecash-input").value = Number(prefill.opening_ecash || 0).toFixed(2);
@@ -467,6 +479,7 @@ async function saveOpeningBalance() {
                     store_id: activeStoreId,
                     opening_cash: amount,
                     opening_ecash: ecashAmount,
+                    payment_account_openings: Array.from(document.querySelectorAll("[data-opening-account-id]")).map((input) => ({destination_account_id: Number(input.dataset.openingAccountId), opening_balance: Number(input.value || 0)})),
                     note,
                 }),
             },
@@ -559,6 +572,9 @@ function renderStoreDayCloseReconciliation() {
             ${closeDayReconcileRow("Expected total", expectedTotal, "is-grand")}
         </section>
     `;
+    const accountWrap = document.getElementById("store-day-account-counts");
+    const accounts = Array.isArray(currentDaySession.payment_account_balances) ? currentDaySession.payment_account_balances : [];
+    if (accountWrap) accountWrap.innerHTML = accounts.length ? `<h4>Receiving Account Reconciliation</h4>${accounts.map((account) => `<label class="store-day-account-count"><span><strong>${escapeHtml(account.payment_method_label)} · ${escapeHtml(account.account_name)}</strong><small>${escapeHtml(String(account.account_number || "").slice(-4).padStart(String(account.account_number || "").length, "•"))} · Expected inflow ${escapeHtml(formatMoney(account.expected_balance))}</small></span><input type="number" min="0" step="0.01" value="${Number(account.expected_balance || 0).toFixed(2)}" data-closing-account-id="${Number(account.id)}"></label>`).join("")}` : "";
 }
 
 function updateStoreDayCloseVariance() {
@@ -662,6 +678,7 @@ async function saveStoreDayClose() {
                     store_id: activeStoreId,
                     counted_cash: countedCash,
                     counted_ecash: countedEcash,
+                    payment_account_counts: Array.from(document.querySelectorAll("[data-closing-account-id]")).map((input) => ({destination_account_id: Number(input.dataset.closingAccountId), counted_balance: Number(input.value || 0)})),
                     note,
                 }),
             },
@@ -909,6 +926,169 @@ function formatPaymentLabel(method) {
     return key.replace(/_/g, " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
+function isAccountPaymentMethod(method) {
+    return String(method || "").toLowerCase() === "debt";
+}
+
+function requiresCheckoutCustomer(method) {
+    return isAccountPaymentMethod(method);
+}
+
+function getPaymentOptionLabel(method) {
+    const code = String(method?.code || "").toLowerCase();
+    if (code === "debt") return "Charge to employee account";
+    return String(method?.label || formatPaymentLabel(code));
+}
+
+function getPaymentMethodGuidance(method) {
+    const code = String(method || "").toLowerCase();
+    if (code === "debt") return "Select an employee customer. This sale will increase their outstanding debt after PIN authorization.";
+    return "Customer selection is optional. Leave it blank for a walk-in sale.";
+}
+
+function getCartTotal() {
+    return cart.reduce((sum, item) => sum + Number(item.qty || 0) * Number(item.price || 0), 0);
+}
+
+function getImmediatePaymentMethods() {
+    return paymentMethodsCache.filter((method) => !isAccountPaymentMethod(method.code));
+}
+
+function splitIncludesMethod(method) {
+    return splitTenderEnabled && splitTenderAmounts.has(String(method || "").toLowerCase());
+}
+
+function splitIncludesDebt() {
+    return splitIncludesMethod("debt");
+}
+
+function getSplitPaymentLines() {
+    return Array.from(splitTenderAmounts, ([payment_method, amount]) => ({
+        payment_method,
+        amount: Math.round(Number(amount || 0) * 100) / 100,
+        destination_account_id: selectedPaymentAccounts.get(payment_method) || null,
+    }));
+}
+
+function getPaymentMethod(methodCode) { return paymentMethodsCache.find((row) => String(row.code) === String(methodCode)); }
+
+function ensurePaymentAccountSelection(methodCode) {
+    const method = getPaymentMethod(methodCode);
+    const accounts = Array.isArray(method?.destination_accounts) ? method.destination_accounts : [];
+    if (accounts.length && !accounts.some((row) => Number(row.id) === Number(selectedPaymentAccounts.get(methodCode)))) {
+        selectedPaymentAccounts.set(String(methodCode), Number(accounts[0].id));
+    }
+}
+
+let customerQrTrigger = null;
+
+function openCustomerQrModal(methodCode, accountId, trigger) {
+    const method = getPaymentMethod(methodCode);
+    const account = method?.destination_accounts?.find((row) => Number(row.id) === Number(accountId));
+    if (!method || !account?.image_url) return;
+
+    customerQrTrigger = trigger || null;
+    document.getElementById("customer-qr-title").textContent = `Scan to pay with ${method.label}`;
+    document.getElementById("customer-qr-image").src = String(account.image_url);
+    document.getElementById("customer-qr-image").alt = `Payment QR for ${account.account_name}`;
+    document.getElementById("customer-qr-method").textContent = String(method.label || "Payment");
+    document.getElementById("customer-qr-account").textContent = String(account.account_name || "Receiving account");
+    document.getElementById("customer-qr-number").textContent = String(account.masked_number || "");
+    document.getElementById("customer-qr-modal").classList.remove("is-hidden");
+    document.body.classList.add("modal-open");
+    document.getElementById("customer-qr-close").focus();
+}
+
+function closeCustomerQrModal() {
+    const modal = document.getElementById("customer-qr-modal");
+    if (!modal || modal.classList.contains("is-hidden")) return;
+    modal.classList.add("is-hidden");
+    document.body.classList.remove("modal-open");
+    document.getElementById("customer-qr-image").removeAttribute("src");
+    customerQrTrigger?.focus();
+    customerQrTrigger = null;
+}
+
+function renderPaymentAccountPicker() {
+    const picker = document.getElementById("payment-account-picker"); if (!picker) return;
+    const codes = splitTenderEnabled ? Array.from(splitTenderAmounts.keys()) : [document.getElementById("payment-method")?.value || ""];
+    const methods = codes.map(getPaymentMethod).filter((method) => Array.isArray(method?.destination_accounts) && method.destination_accounts.length);
+    picker.classList.toggle("is-hidden", methods.length === 0);
+    picker.innerHTML = methods.map((method) => {
+        ensurePaymentAccountSelection(String(method.code));
+        const selectedId = Number(selectedPaymentAccounts.get(String(method.code)) || 0);
+        const selected = method.destination_accounts.find((row) => Number(row.id) === selectedId) || method.destination_accounts[0];
+        const qr = selected?.image_url
+            ? `<div class="pos-payment-qr-preview"><img src="${escapeHtml(selected.image_url)}" alt="QR code for ${escapeHtml(selected.account_name)}"><button type="button" class="secondary-btn pos-show-qr-btn" data-show-payment-qr="${Number(selected.id)}" data-payment-method-code="${escapeHtml(method.code)}"><i class="bi bi-arrows-fullscreen" aria-hidden="true"></i> Show QR</button></div>`
+            : method.image_url
+                ? `<img src="${escapeHtml(method.image_url)}" alt="${escapeHtml(method.label)} payment image">`
+                : '<span class="payment-account-standard"><i class="bi bi-wallet2"></i></span>';
+        return `<section class="pos-payment-account"><div class="pos-payment-account-head"><strong>Pay ${escapeHtml(method.label)} to</strong><small>Select the exact receiving account</small></div><div class="pos-payment-account-body">${qr}<label><span>Receiving account</span><select data-payment-account-method="${escapeHtml(method.code)}">${method.destination_accounts.map((account) => `<option value="${Number(account.id)}" ${Number(account.id) === selectedId ? "selected" : ""}>${escapeHtml(account.account_name)} · ${escapeHtml(account.masked_number)}</option>`).join("")}</select></label></div>${selected?.image_url ? '<small class="pos-qr-guidance">Open the large QR and turn the screen toward the customer.</small>' : '<small class="pos-qr-guidance">No QR uploaded. Account details remain available for manual payment.</small>'}</section>`;
+    }).join("");
+}
+
+function renderSplitPaymentEditor() {
+    const editor = document.getElementById("split-payment-editor");
+    const toggle = document.getElementById("split-payment-toggle");
+    if (!editor || !toggle) return;
+    toggle.classList.toggle("is-active", splitTenderEnabled);
+    toggle.setAttribute("aria-pressed", splitTenderEnabled ? "true" : "false");
+    editor.classList.toggle("is-hidden", !splitTenderEnabled);
+    if (!splitTenderEnabled) {
+        editor.innerHTML = "";
+        return;
+    }
+
+    const total = getCartTotal();
+    const lines = getSplitPaymentLines();
+    const allocated = lines.reduce((sum, line) => sum + Number(line.amount || 0), 0);
+    const remaining = Math.round((total - allocated) * 100) / 100;
+    editor.innerHTML = `
+        <div class="split-payment-head"><strong>Split allocation</strong><small>Select any active tender. Debt posts only its allocated remainder to the employee account.</small></div>
+        <div class="split-payment-lines">
+            ${lines.map((line) => {
+                const method = paymentMethodsCache.find((item) => String(item.code) === line.payment_method);
+                return `<label class="split-payment-line"><span>${escapeHtml(getPaymentOptionLabel(method || {code: line.payment_method}))}</span><input type="number" min="0.01" step="0.01" inputmode="decimal" value="${Number(line.amount || 0).toFixed(2)}" data-split-amount="${escapeHtml(line.payment_method)}"></label>`;
+            }).join("")}
+        </div>
+        <div class="split-payment-summary ${Math.abs(remaining) < 0.005 ? "is-balanced" : ""}">
+            <span>Allocated <strong>${formatMoney(allocated)}</strong></span>
+            <span>${remaining >= 0 ? "Remaining" : "Over"} <strong>${formatMoney(Math.abs(remaining))}</strong></span>
+        </div>
+    `;
+}
+
+function refreshSplitPaymentSummary() {
+    const summary = document.querySelector("#split-payment-editor .split-payment-summary");
+    if (!summary) return;
+    const total = getCartTotal();
+    const allocated = getSplitPaymentLines().reduce((sum, line) => sum + Number(line.amount || 0), 0);
+    const remaining = Math.round((total - allocated) * 100) / 100;
+    summary.classList.toggle("is-balanced", Math.abs(remaining) < 0.005);
+    summary.innerHTML = `
+        <span>Allocated <strong>${formatMoney(allocated)}</strong></span>
+        <span>${remaining >= 0 ? "Remaining" : "Over"} <strong>${formatMoney(Math.abs(remaining))}</strong></span>
+    `;
+}
+
+function setSplitTenderEnabled(enabled) {
+    splitTenderEnabled = !!enabled;
+    splitTenderAmounts.clear();
+    if (splitTenderEnabled) {
+        const immediate = getImmediatePaymentMethods();
+        const selected = document.getElementById("payment-method")?.value || "cash";
+        const first = immediate.find((method) => method.code === selected) || immediate[0];
+        const second = immediate.find((method) => method.code !== first?.code);
+        if (first) splitTenderAmounts.set(String(first.code), getCartTotal());
+        if (second) splitTenderAmounts.set(String(second.code), 0);
+    }
+    renderPaymentMethods();
+    renderSplitPaymentEditor();
+    renderPaymentAccountPicker();
+    updateDebtCustomerVisibility();
+    updateCheckoutState();
+}
+
 function openReceiptModal(receipt) {
     lastReceipt = receipt;
     const modal = document.getElementById("receipt-modal");
@@ -958,45 +1138,52 @@ function buildConfirmTransactionHtml(data) {
         `)
         .join("");
 
-    const paymentLabel = formatPaymentLabel(data.paymentMethod);
+    const paymentLabel = data.paymentMethod === "split" ? "Split payment" : formatPaymentLabel(data.paymentMethod);
+    const paymentLines = Array.isArray(data.payments) ? data.payments : [];
+    const cashPayment = paymentLines.find((line) => String(line.payment_method) === "cash") || null;
+    const paymentBreakdownHtml = paymentLines.length > 1
+        ? `<div class="confirm-payment-breakdown">${paymentLines.map((line) => `<div><span>${escapeHtml(formatPaymentLabel(line.payment_method))}</span><strong>${formatMoney(line.amount)}</strong></div>`).join("")}</div>`
+        : "";
     const totalItems = data.cartSnapshot.reduce((sum, item) => sum + Number(item.qty || 0), 0);
     const debt = data.debtCustomer || null;
+    const debtPayment = paymentLines.find((line) => String(line.payment_method) === "debt") || null;
+    const debtAmount = Number(debtPayment?.amount || 0);
     const currentDebt = Number(debt?.current_debt || 0);
     const availableCredit = Number(debt?.available_credit || 0);
     const creditLimit = currentDebt + availableCredit;
-    const projectedDebt = currentDebt + Number(data.totalAmount || 0);
+    const projectedDebt = currentDebt + debtAmount;
     const projectedRemainingCredit = Math.max(0, creditLimit - projectedDebt);
-    const debtWarning = data.paymentMethod === "debt"
+    const debtWarning = debtPayment
         ? `
             <div class="confirm-warning">
                 <i class="bi bi-exclamation-triangle"></i>
                 <div>
-                    <strong>Debt transaction</strong>
-                    <span>This sale will be charged to ${escapeHtml(data.debtCustomerLabel)}. Projected remaining credit: ${formatMoney(projectedRemainingCredit)}.</span>
+                    <strong>${paymentLines.length > 1 ? "Partial debt allocation" : "Debt transaction"}</strong>
+                    <span>${formatMoney(debtAmount)} will be charged to ${escapeHtml(data.debtCustomerLabel)}. Projected remaining credit: ${formatMoney(projectedRemainingCredit)}.</span>
                 </div>
             </div>
         `
         : "";
-    const cashTenderBlock = data.paymentMethod === "cash"
+    const cashTenderBlock = cashPayment
         ? `
             <section class="confirm-section confirm-cash-tender">
                 <h4><i class="bi bi-cash-stack"></i> Cash Tender</h4>
                 <div class="confirm-cash-grid">
                     <label class="payment-wrap" for="confirm-cash-received">
                         <span>Cash Received</span>
-                        <input id="confirm-cash-received" type="number" min="${Number(data.totalAmount || 0).toFixed(2)}" step="0.01" inputmode="decimal" placeholder="0.00" autocomplete="off">
+                        <input id="confirm-cash-received" type="number" min="${Number(cashPayment.amount || 0).toFixed(2)}" step="0.01" inputmode="decimal" placeholder="0.00" autocomplete="off">
                     </label>
                     <div class="confirm-change-due" aria-live="polite">
                         <span>Change Due</span>
                         <strong id="confirm-change-due">${formatMoney(0)}</strong>
                     </div>
                 </div>
-                <small id="confirm-cash-help">Enter at least ${formatMoney(data.totalAmount)} to continue.</small>
+                <small id="confirm-cash-help">Enter at least ${formatMoney(cashPayment.amount)} for the cash portion.</small>
             </section>
         `
         : "";
     const checkoutCustomer = data.checkoutCustomer || null;
-    const customerBlock = data.paymentMethod === "debt"
+    const customerBlock = debtPayment
         ? `
             <section class="confirm-section">
                 <h4><i class="bi bi-person-vcard"></i> Debt Customer</h4>
@@ -1004,7 +1191,7 @@ function buildConfirmTransactionHtml(data) {
                     <div class="confirm-meta-item"><span>Name</span><strong>${escapeHtml(debt?.name || data.debtCustomerLabel)}</strong></div>
                     <div class="confirm-meta-item"><span>Type</span><strong>${escapeHtml(String(debt?.user_type || "N/A").replace(/\b\w/g, (letter) => letter.toUpperCase()))}</strong></div>
                     <div class="confirm-meta-item"><span>Current Debt</span><strong>${formatMoney(currentDebt)}</strong></div>
-                    <div class="confirm-meta-item"><span>Transaction Amount</span><strong>${formatMoney(data.totalAmount)}</strong></div>
+                    <div class="confirm-meta-item"><span>Debt Portion</span><strong>${formatMoney(debtAmount)}</strong></div>
                     <div class="confirm-meta-item"><span>Projected Debt</span><strong>${formatMoney(projectedDebt)}</strong></div>
                     <div class="confirm-meta-item"><span>Remaining Credit</span><strong>${formatMoney(projectedRemainingCredit)}</strong></div>
                 </div>
@@ -1047,6 +1234,7 @@ function buildConfirmTransactionHtml(data) {
                 <div class="confirm-meta-item"><span>Store</span><strong>${escapeHtml(data.storeName)}</strong></div>
                 <div class="confirm-meta-item"><span>Payment Method</span><strong>${escapeHtml(paymentLabel)}</strong></div>
             </div>
+            ${paymentBreakdownHtml}
         </section>
         ${cashTenderBlock}
         ${customerBlock}
@@ -1068,26 +1256,29 @@ function buildConfirmTransactionHtml(data) {
 }
 
 function updateConfirmCashTender() {
-    if (!pendingTransaction || pendingTransaction.paymentMethod !== "cash") return true;
+    const cashPayment = pendingTransaction?.payments?.find((line) => String(line.payment_method) === "cash");
+    if (!pendingTransaction || !cashPayment) return true;
 
     const input = document.getElementById("confirm-cash-received");
     const changeEl = document.getElementById("confirm-change-due");
     const helpEl = document.getElementById("confirm-cash-help");
     const proceedBtn = document.getElementById("confirm-proceed");
     const received = Number(input?.value || 0);
-    const total = Number(pendingTransaction.totalAmount || 0);
-    const valid = Number.isFinite(received) && received >= total;
-    const changeDue = valid ? Math.max(0, received - total) : 0;
+    const cashAmount = Number(cashPayment.amount || 0);
+    const valid = Number.isFinite(received) && received >= cashAmount;
+    const changeDue = valid ? Math.max(0, received - cashAmount) : 0;
 
     pendingTransaction.cashReceived = valid ? received : null;
     pendingTransaction.changeDue = changeDue;
     pendingTransaction.payload.cash_received = valid ? received : null;
     pendingTransaction.payload.change_due = changeDue;
+    const payloadCashLine = pendingTransaction.payload.payments?.find((line) => String(line.payment_method) === "cash");
+    if (payloadCashLine) payloadCashLine.cash_received = valid ? received : null;
     if (changeEl) changeEl.textContent = formatMoney(changeDue);
     if (helpEl) {
         helpEl.textContent = valid
             ? `${formatMoney(received)} received; return ${formatMoney(changeDue)} change.`
-            : `Enter at least ${formatMoney(total)} to continue.`;
+            : `Enter at least ${formatMoney(cashAmount)} for the cash portion.`;
         helpEl.classList.toggle("is-error", !valid && String(input?.value || "") !== "");
     }
     if (proceedBtn) proceedBtn.disabled = !valid;
@@ -1099,7 +1290,7 @@ function openConfirmTransactionModal(data) {
     const content = document.getElementById("confirm-transaction-content");
     content.innerHTML = buildConfirmTransactionHtml(data);
     document.getElementById("confirm-transaction-modal").style.display = "grid";
-    if (data.paymentMethod === "cash") {
+    if (data.payments?.some((line) => String(line.payment_method) === "cash")) {
         const input = document.getElementById("confirm-cash-received");
         input?.addEventListener("input", updateConfirmCashTender);
         input?.addEventListener("keydown", (event) => {
@@ -1133,6 +1324,50 @@ function formatCredit(customer) {
     return `Avail ${formatMoney(available)} | Debt ${formatMoney(debt)}`;
 }
 
+function getCheckoutDebtAmount() {
+    if (splitTenderEnabled) return Math.max(0, Number(splitTenderAmounts.get("debt") || 0));
+    return document.getElementById("payment-method")?.value === "debt" ? getCartTotal() : 0;
+}
+
+function updateDebtCreditMeter() {
+    const meter = document.getElementById("debt-credit-meter");
+    if (!meter) return;
+    const paymentMethod = document.getElementById("payment-method")?.value || "";
+    const usesDebt = paymentMethod === "debt" || splitIncludesDebt();
+    const customer = selectedDebtCustomer;
+    meter.classList.toggle("is-hidden", !usesDebt || !customer);
+    if (!usesDebt || !customer) return;
+
+    const creditLimit = Math.max(0, Number(customer.credit_limit || 0));
+    const currentDebt = Math.max(0, Number(customer.current_debt || 0));
+    const debtAmount = getCheckoutDebtAmount();
+    const availableCredit = Math.max(0, Number(customer.available_credit ?? (creditLimit - currentDebt)));
+    const projectedDebt = currentDebt + debtAmount;
+    const projectedAvailable = Math.max(0, creditLimit - projectedDebt);
+    const overBy = Math.max(0, debtAmount - availableCredit);
+    const usedPercent = creditLimit > 0 ? Math.min(100, (projectedDebt / creditLimit) * 100) : 100;
+    const isOver = overBy > 0.004;
+    const isMaxed = !isOver && debtAmount > 0 && projectedAvailable < 0.005;
+    const isNear = !isOver && !isMaxed && usedPercent >= 80;
+
+    meter.classList.toggle("is-over", isOver);
+    meter.classList.toggle("is-maxed", isMaxed);
+    meter.classList.toggle("is-near", isNear);
+    document.getElementById("debt-credit-status").textContent = isOver ? "Over credit limit" : isMaxed ? "Credit will be fully used" : isNear ? "Near credit limit" : "Credit available";
+    document.getElementById("debt-credit-available").textContent = `${formatMoney(projectedAvailable)} available after sale`;
+    document.getElementById("debt-credit-current").textContent = `Projected debt ${formatMoney(projectedDebt)}`;
+    document.getElementById("debt-credit-limit").textContent = `Limit ${formatMoney(creditLimit)}`;
+    document.getElementById("debt-credit-fill").style.width = `${usedPercent}%`;
+    const track = meter.querySelector(".debt-credit-track");
+    track?.setAttribute("aria-valuenow", String(Math.round(usedPercent)));
+    track?.setAttribute("aria-valuetext", `${formatMoney(projectedDebt)} projected debt of ${formatMoney(creditLimit)} limit`);
+    document.getElementById("debt-credit-message").textContent = isOver
+        ? `Debt allocation exceeds available credit by ${formatMoney(overBy)}. Reduce the Debt portion or use another payment method.`
+        : debtAmount > 0
+            ? `${formatMoney(debtAmount)} will be charged to Debt in this transaction.`
+            : `Allocate an amount to Debt to preview the employee's remaining credit.`;
+}
+
 function updateDebtPinUi() {
     const wrap = document.getElementById("debt-pin-wrap");
     const help = document.getElementById("debt-pin-help");
@@ -1141,7 +1376,7 @@ function updateDebtPinUi() {
     if (!wrap || !help || !input || !openButton) return;
 
     const paymentMethod = document.getElementById("payment-method")?.value || "";
-    const shouldShow = paymentMethod === "debt" && !!selectedDebtCustomerId;
+    const shouldShow = (paymentMethod === "debt" || splitIncludesDebt()) && !!selectedDebtCustomerId;
     wrap.style.display = shouldShow ? "flex" : "none";
 
     if (!shouldShow) {
@@ -1206,8 +1441,79 @@ function openDebtPinModal() {
     }
 
     input.value = selectedDebtPin;
+    renderDebtPinAuthorizationState();
     modal.style.display = "grid";
     setTimeout(() => input.focus(), 30);
+}
+
+function clearDebtPinLockoutTimer() {
+    if (debtPinLockoutTimer !== null) {
+        window.clearInterval(debtPinLockoutTimer);
+        debtPinLockoutTimer = null;
+    }
+}
+
+function renderDebtPinAuthorizationState(message = "") {
+    const input = document.getElementById("debt-pin-input");
+    const saveButton = document.getElementById("debt-pin-save");
+    const result = document.getElementById("debt-pin-modal-result");
+    if (!input || !saveButton || !result) return;
+
+    const lockoutKey = Number(selectedDebtCustomerId || 0);
+    const lockout = debtPinLockouts.get(lockoutKey) || null;
+    const lockedUntilMs = Number(lockout?.epoch) > 0
+        ? Number(lockout.epoch) * 1000
+        : (lockout?.until ? new Date(String(lockout.until).replace(" ", "T")).getTime() : 0);
+    const remainingSeconds = lockedUntilMs > 0 ? Math.max(0, Math.ceil((lockedUntilMs - Date.now()) / 1000)) : 0;
+    if (remainingSeconds > 0) {
+        const minutes = Math.floor(remainingSeconds / 60);
+        const seconds = remainingSeconds % 60;
+        const employeeName = selectedDebtCustomer?.name || "This employee";
+        input.disabled = true;
+        saveButton.disabled = true;
+        saveButton.innerHTML = '<i class="bi bi-lock"></i> PIN Locked';
+        result.className = "result-msg error";
+        result.textContent = `${employeeName}'s debt PIN is locked after too many incorrect attempts. Try again in ${minutes}:${String(seconds).padStart(2, "0")}. Other customers and payment methods remain available.`;
+        return;
+    }
+
+    if (lockout) {
+        debtPinLockouts.delete(lockoutKey);
+        if (debtPinLockouts.size === 0) clearDebtPinLockoutTimer();
+    }
+    input.disabled = false;
+    saveButton.disabled = false;
+    saveButton.innerHTML = '<i class="bi bi-check2-circle"></i> Use PIN';
+    if (message) {
+        result.className = "result-msg error";
+        result.textContent = message;
+    }
+}
+
+function showDebtPinAuthorizationFailure(data = {}) {
+    selectedDebtPin = "";
+    const input = document.getElementById("debt-pin-input");
+    if (input) input.value = "";
+    updateDebtPinUi();
+    closeConfirmTransactionModal(true);
+    openDebtPinModal();
+
+    if (data.locked_until) {
+        debtPinLockouts.set(Number(selectedDebtCustomerId), {
+            until: String(data.locked_until),
+            epoch: Number(data.locked_until_epoch || 0) || null,
+        });
+        clearDebtPinLockoutTimer();
+        renderDebtPinAuthorizationState();
+        debtPinLockoutTimer = window.setInterval(renderDebtPinAuthorizationState, 1000);
+        return;
+    }
+
+    const remaining = Number(data.attempts_remaining);
+    const message = Number.isFinite(remaining)
+        ? `Incorrect PIN. ${remaining} attempt${remaining === 1 ? "" : "s"} remaining before a 15-minute lockout.`
+        : (data.message || "Invalid debt PIN.");
+    renderDebtPinAuthorizationState(message);
 }
 
 function closeDebtPinModal(clearDraft = false) {
@@ -1268,6 +1574,7 @@ function updateCheckoutState() {
     const submitBtn = document.getElementById("submit-transaction");
     const debtPaymentBtn = document.getElementById("open-debt-payment-modal");
     if (!submitBtn) return;
+    updateDebtCreditMeter();
 
     if (debtPaymentBtn) {
         debtPaymentBtn.disabled = !openingBalanceReady;
@@ -1298,13 +1605,31 @@ function updateCheckoutState() {
         return;
     }
 
-    if (paymentMethod === "debt" && !selectedDebtCustomerId) {
+    if (splitTenderEnabled) {
+        const splitLines = getSplitPaymentLines();
+        const allocated = splitLines.reduce((sum, line) => sum + Number(line.amount || 0), 0);
+        const total = getCartTotal();
+        if (splitLines.length < 2 || splitLines.some((line) => line.amount <= 0) || Math.abs(allocated - total) >= 0.005) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="bi bi-calculator"></i> Balance Split Payment';
+            return;
+        }
+    }
+
+    if (((!splitTenderEnabled && requiresCheckoutCustomer(paymentMethod)) || splitIncludesDebt()) && !selectedDebtCustomerId) {
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<i class="bi bi-person-check"></i> Select Debt Customer';
+        submitBtn.innerHTML = `<i class="bi bi-person-check"></i> Select ${paymentMethod === "debt" ? "Debt" : "Employee"} Customer`;
         return;
     }
 
-    if (paymentMethod === "debt") {
+    if (paymentMethod === "debt" || splitIncludesDebt()) {
+        const availableCredit = Math.max(0, Number(selectedDebtCustomer?.available_credit || 0));
+        if (selectedDebtCustomer && getCheckoutDebtAmount() - availableCredit > 0.004) {
+            submitBtn.disabled = true;
+            submitBtn.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Debt Exceeds Credit';
+            return;
+        }
+
         if (selectedDebtCustomer && selectedDebtCustomer.has_debt_pin === false) {
             submitBtn.disabled = true;
             submitBtn.innerHTML = '<i class="bi bi-shield-exclamation"></i> Customer PIN Not Set';
@@ -1413,10 +1738,14 @@ function renderProducts() {
                 : "";
             const priceValues = variants.map((variant) => Number(variant.price || 0));
             const priceLabel = variants.length > 1 ? `From ${formatMoney(Math.min(...priceValues))}` : formatMoney(product.price);
-            const actionLabel = variants.length > 1 ? `Choose from ${variants.length} variants` : "Tap to add";
+            const isFamily = variants.length > 1;
+            const cardInteraction = `tabindex="0" role="button" aria-label="${escapeHtml(isFamily ? `Choose ${product.name} variant` : `Add ${displayName} to order`)}" aria-disabled="${canOpenOrAdd ? "false" : "true"}`;
+            const actionHtml = isFamily
+                ? `<span class="product-card-action"><i class="bi bi-hand-index-thumb"></i>Choose from ${variants.length} variants</span>`
+                : "";
 
             return `
-                <article class="product-card product-family-card stock-${stockState.key} ${canOpenOrAdd ? "" : "out-of-stock"}" data-family-card="${escapeHtml(key)}" data-direct-product="${variants.length === 1 ? Number(product.id) : ""}" tabindex="0" role="button" aria-label="${escapeHtml(variants.length > 1 ? `Choose ${product.name} variant` : `Add ${displayName} to order`)}" aria-disabled="${canOpenOrAdd ? "false" : "true"}">
+                <article class="product-card product-family-card stock-${stockState.key} ${canOpenOrAdd ? "" : "out-of-stock"}" data-family-card="${escapeHtml(key)}" data-direct-product="${isFamily ? "" : Number(product.id)}" ${cardInteraction}>
                     <div class="product-card-top">
                         ${visualHtml}
                         <span class="stock-badge stock-${stockState.key}">${escapeHtml(familyStockLabel)}</span>
@@ -1432,7 +1761,7 @@ function renderProducts() {
                         </div>
                         ${inCartHtml}
                     </div>
-                    <span class="product-card-action"><i class="bi bi-hand-index-thumb"></i>${actionLabel}</span>
+                    ${actionHtml}
                 </article>
             `;
         })
@@ -1450,6 +1779,7 @@ function renderCart() {
         subtotalEl.textContent = formatMoney(0);
         totalEl.textContent = formatMoney(0);
         itemCountEl.textContent = "0";
+        renderSplitPaymentEditor();
         updateCheckoutState();
         return;
     }
@@ -1490,6 +1820,7 @@ function renderCart() {
     subtotalEl.textContent = formatMoney(subtotal);
     totalEl.textContent = formatMoney(subtotal);
     itemCountEl.textContent = String(itemCount);
+    renderSplitPaymentEditor();
     updateCheckoutState();
 }
 
@@ -1733,18 +2064,19 @@ function updateDebtCustomerVisibility() {
     const label = document.getElementById("checkout-customer-label");
     const help = document.getElementById("checkout-customer-help");
 
+    const customerRequired = requiresCheckoutCustomer(paymentMethod) || splitIncludesDebt();
     wrap.style.display = "flex";
     if (label) {
-        label.textContent = paymentMethod === "debt"
-            ? "Debt Customer (required)"
-            : "Customer (optional)";
+        label.textContent = customerRequired ? "Employee customer (required)" : "Customer (optional)";
     }
     if (help) {
-        help.textContent = paymentMethod === "debt"
-            ? "Select the faculty or staff member who is authorizing this debt purchase."
+        help.textContent = customerRequired
+            ? (paymentMethod === "debt" || splitIncludesDebt()
+                ? "Select the faculty or staff member who is authorizing this debt purchase."
+                : "Select the employee associated with this advance payment sale.")
             : "Leave blank for a walk-in sale, or select an employee to record this transaction in their history.";
     }
-    if (paymentMethod !== "debt") {
+    if (paymentMethod !== "debt" && !splitIncludesDebt()) {
         selectedDebtPin = "";
         const debtPinInput = document.getElementById("debt-pin-input");
         if (debtPinInput) debtPinInput.value = "";
@@ -1767,14 +2099,28 @@ function renderPaymentMethods() {
         return;
     }
 
-    chipsEl.innerHTML = methods
-        .map((method, index) => {
-            const isActive = index === 0 ? " is-active" : "";
-            const iconClass = sanitizeIconClass(method.icon_class);
-            const iconHtml = iconClass ? `<i class="${escapeHtml(iconClass)}"></i>` : "";
-            return `<button type="button" class="payment-chip${isActive}" data-method="${escapeHtml(method.code)}">${iconHtml}${escapeHtml(method.label)}</button>`;
-        })
-        .join("");
+    const renderGroup = (title, description, groupMethods) => {
+        if (groupMethods.length === 0) return "";
+        const options = groupMethods.map((method) => {
+            const selectedMethod = document.getElementById("payment-method")?.value || "";
+            const active = splitTenderEnabled
+                ? splitTenderAmounts.has(String(method.code))
+                : (selectedMethod ? selectedMethod === String(method.code) : methods.indexOf(method) === 0);
+            const isActive = active ? " is-active" : "";
+            const missingAccount = method.requires_destination_account === true && (!Array.isArray(method.destination_accounts) || method.destination_accounts.length === 0);
+            const disabled = missingAccount;
+            const iconHtml = method.image_url
+                ? `<img src="${escapeHtml(method.image_url)}" alt="">`
+                : '<i class="bi bi-wallet2"></i>';
+            return `<button type="button" class="secondary-btn payment-method-option${isActive}" data-method="${escapeHtml(method.code)}" aria-pressed="${active ? "true" : "false"}" ${disabled ? "disabled" : ""} title="${missingAccount ? "Configure a receiving account in Settings first" : ""}"><span class="payment-method-option-icon">${iconHtml}</span><span>${escapeHtml(getPaymentOptionLabel(method))}${missingAccount ? '<small class="payment-method-needs-account">Setup required</small>' : ""}</span><i class="bi bi-check-circle-fill payment-method-check" aria-hidden="true"></i></button>`;
+        }).join("");
+        return `<section class="payment-method-group"><div class="payment-method-group-head"><strong>${escapeHtml(title)}</strong><small>${escapeHtml(description)}</small></div><div class="payment-method-grid">${options}</div></section>`;
+    };
+
+    const immediateMethods = methods.filter((method) => !isAccountPaymentMethod(method.code));
+    const accountMethods = methods.filter((method) => isAccountPaymentMethod(method.code));
+    chipsEl.innerHTML = renderGroup("Pay now", "Immediate sale tender", immediateMethods)
+        + renderGroup("Account transaction", "Requires an employee customer", accountMethods);
 
     selectEl.innerHTML = methods
         .map((method, index) => `<option value="${escapeHtml(method.code)}" ${index === 0 ? "selected" : ""}>${escapeHtml(method.label)}</option>`)
@@ -1809,6 +2155,9 @@ async function loadPaymentMethods() {
         }
 
         paymentMethodsCache = Array.isArray(data.methods) ? data.methods : [];
+        splitTenderSupported = data.supports_split_payment === true;
+        const splitToggle = document.getElementById("split-payment-toggle");
+        if (splitToggle) splitToggle.classList.toggle("is-hidden", !splitTenderSupported);
         if (paymentMethodsCache.length === 0) {
             renderPaymentMethods();
             setResult("No active payment methods configured for this store.", "error");
@@ -1841,9 +2190,17 @@ async function loadPaymentMethods() {
 
 function setPaymentMethod(method) {
     const paymentMethodEl = document.getElementById("payment-method");
-    const chips = document.querySelectorAll("#payment-quick .payment-chip");
+    const chips = document.querySelectorAll("#payment-quick .payment-method-option");
+    const guidance = document.getElementById("payment-method-help");
     paymentMethodEl.value = method;
-    chips.forEach((chip) => chip.classList.toggle("is-active", chip.dataset.method === method));
+    chips.forEach((chip) => {
+        const isActive = chip.dataset.method === method;
+        chip.classList.toggle("is-active", isActive);
+        chip.setAttribute("aria-pressed", isActive ? "true" : "false");
+    });
+    if (guidance) guidance.textContent = getPaymentMethodGuidance(method);
+    ensurePaymentAccountSelection(method);
+    renderPaymentAccountPicker();
 
     updateDebtCustomerVisibility();
     updateCheckoutState();
@@ -2091,19 +2448,21 @@ async function preflightCartStock() {
 }
 
 function buildPendingTransaction() {
-    const paymentMethod = document.getElementById("payment-method").value;
+    const selectedPaymentMethod = document.getElementById("payment-method").value;
+    const paymentMethod = splitTenderEnabled ? "split" : selectedPaymentMethod;
     if (!activeStoreId) return null;
 
     if (cart.length === 0) return null;
 
-    if (paymentMethod === "debt" && (!selectedDebtCustomerId || !selectedDebtPin)) return null;
+    if (((!splitTenderEnabled && requiresCheckoutCustomer(paymentMethod)) || splitIncludesDebt()) && !selectedDebtCustomerId) return null;
+    if ((paymentMethod === "debt" || splitIncludesDebt()) && !selectedDebtPin) return null;
 
     const payload = {
         customer_type: selectedDebtCustomer?.user_type || "walk_in",
         customer_user_id: selectedDebtCustomerId || null,
         store_id: activeStoreId,
         payment_method: paymentMethod,
-        debt_pin: paymentMethod === "debt" ? selectedDebtPin : "",
+        debt_pin: paymentMethod === "debt" || splitIncludesDebt() ? selectedDebtPin : "",
         items: cart.map((item) => ({
             product_id: Number(item.product_id),
             qty: Number(item.qty),
@@ -2116,7 +2475,11 @@ function buildPendingTransaction() {
         price: Number(item.price),
     }));
     const totalAmount = cartSnapshot.reduce((sum, item) => sum + item.qty * item.price, 0);
-    const debtCustomer = paymentMethod === "debt" && selectedDebtCustomerId
+    const payments = splitTenderEnabled
+        ? getSplitPaymentLines()
+        : [{payment_method: paymentMethod, amount: totalAmount, destination_account_id: selectedPaymentAccounts.get(paymentMethod) || null}];
+    payload.payments = payments.map((line) => ({...line}));
+    const debtCustomer = (paymentMethod === "debt" || splitIncludesDebt()) && selectedDebtCustomerId
         ? getDebtCustomerById(selectedDebtCustomerId)
         : null;
     const checkoutCustomer = selectedDebtCustomerId ? getDebtCustomerById(selectedDebtCustomerId) : null;
@@ -2126,9 +2489,10 @@ function buildPendingTransaction() {
         paymentMethod,
         cartSnapshot,
         totalAmount,
+        payments,
         storeName: getStoreNameById(activeStoreId),
         debtCustomerLabel:
-            paymentMethod === "debt" && selectedDebtCustomerId
+            (paymentMethod === "debt" || splitIncludesDebt()) && selectedDebtCustomerId
                 ? getDebtCustomerLabelById(selectedDebtCustomerId)
                 : "N/A",
         debtCustomer,
@@ -2139,7 +2503,7 @@ function buildPendingTransaction() {
 
 async function processConfirmedTransaction(dataToProcess) {
     if (isSubmitting || !dataToProcess) return;
-    if (dataToProcess.paymentMethod === "cash" && !updateConfirmCashTender()) {
+    if (dataToProcess.payments?.some((line) => String(line.payment_method) === "cash") && !updateConfirmCashTender()) {
         document.getElementById("confirm-cash-received")?.focus();
         return;
     }
@@ -2173,17 +2537,20 @@ async function processConfirmedTransaction(dataToProcess) {
                 createdAt: data.created_at || new Date().toISOString(),
                 storeName: dataToProcess.storeName,
                 paymentMethod: dataToProcess.paymentMethod,
+                payments: Array.isArray(data.payments) ? data.payments : dataToProcess.payload.payments,
                 customerName: dataToProcess.customerLabel || "Walk-in",
                 debtCustomerLabel: dataToProcess.debtCustomerLabel,
                 totalAmount: Number(data.total_amount ?? dataToProcess.totalAmount),
-                cashReceived: dataToProcess.paymentMethod === "cash" ? Number(data.cash_received ?? dataToProcess.cashReceived ?? 0) : null,
-                changeDue: dataToProcess.paymentMethod === "cash" ? Number(data.change_due ?? dataToProcess.changeDue ?? 0) : null,
+                cashReceived: data.cash_received !== null && data.cash_received !== undefined ? Number(data.cash_received) : null,
+                changeDue: data.change_due !== null && data.change_due !== undefined ? Number(data.change_due) : null,
                 items: dataToProcess.cartSnapshot,
                 lookupUrl: `${window.location.origin}/store/receipt/${encodeURIComponent(String(data.transaction_id))}`,
             };
 
             closeConfirmTransactionModal(true);
             cart = [];
+            splitTenderEnabled = false;
+            splitTenderAmounts.clear();
             selectedDebtPin = "";
             const debtPinInput = document.getElementById("debt-pin-input");
             if (debtPinInput) debtPinInput.value = "";
@@ -2196,7 +2563,12 @@ async function processConfirmedTransaction(dataToProcess) {
         const message = data?.message || data?.messages?.error || "Transaction failed.";
         setResult(message, "error");
     } catch (error) {
-        setResult(error.message || "Transaction failed, please try again.", "error");
+        if (error?.data && (Number.isFinite(Number(error.data.attempts_remaining)) || error.data.locked_until || error.data.locked_until_epoch)) {
+            showDebtPinAuthorizationFailure(error.data);
+            setResult(error.message || "Debt PIN authorization failed.", "error");
+        } else {
+            setResult(error.message || "Transaction failed, please try again.", "error");
+        }
     } finally {
         isSubmitting = false;
         updateCheckoutState();
@@ -2227,12 +2599,13 @@ async function submitTransaction() {
         return;
     }
 
-    if (document.getElementById("payment-method").value === "debt" && !selectedDebtCustomerId) {
+    const checkoutUsesDebt = document.getElementById("payment-method").value === "debt" || splitIncludesDebt();
+    if (checkoutUsesDebt && !selectedDebtCustomerId) {
         setResult("Select an employee (Faculty/Staff) for debt payment.", "error");
         return;
     }
 
-    if (document.getElementById("payment-method").value === "debt") {
+    if (checkoutUsesDebt) {
         if (selectedDebtCustomer && selectedDebtCustomer.has_debt_pin === false) {
             setResult("This customer must set a debt PIN in the User Portal before using debt payment.", "error");
             updateCheckoutState();
@@ -2386,9 +2759,51 @@ document.getElementById("barcode-scanner-modal").addEventListener("click", async
 });
 
 document.getElementById("payment-quick").addEventListener("click", (event) => {
-    const chip = event.target.closest(".payment-chip");
+    const chip = event.target.closest(".payment-method-option");
     if (!chip) return;
-    setPaymentMethod(chip.dataset.method || "cash");
+    const method = chip.dataset.method || "cash";
+    if (splitTenderEnabled) {
+        if (splitTenderAmounts.has(method)) {
+            splitTenderAmounts.delete(method);
+        } else {
+            splitTenderAmounts.set(method, 0);
+        }
+        renderPaymentMethods();
+        renderSplitPaymentEditor();
+        updateDebtCustomerVisibility();
+        updateCheckoutState();
+        return;
+    }
+    setPaymentMethod(method);
+});
+document.getElementById("split-payment-toggle").addEventListener("click", () => {
+    if (splitTenderSupported) setSplitTenderEnabled(!splitTenderEnabled);
+});
+document.getElementById("split-payment-editor").addEventListener("input", (event) => {
+    const input = event.target.closest("[data-split-amount]");
+    if (!input) return;
+    splitTenderAmounts.set(input.dataset.splitAmount, Number(input.value || 0));
+    refreshSplitPaymentSummary();
+    updateCheckoutState();
+});
+document.getElementById("payment-account-picker")?.addEventListener("change", (event) => {
+    const select = event.target.closest("[data-payment-account-method]"); if (!select) return;
+    selectedPaymentAccounts.set(String(select.dataset.paymentAccountMethod), Number(select.value)); renderPaymentAccountPicker(); updateCheckoutState();
+});
+document.getElementById("payment-account-picker")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-show-payment-qr]");
+    if (!button) return;
+    openCustomerQrModal(String(button.dataset.paymentMethodCode || ""), Number(button.dataset.showPaymentQr || 0), button);
+});
+document.getElementById("customer-qr-close")?.addEventListener("click", closeCustomerQrModal);
+document.getElementById("customer-qr-done")?.addEventListener("click", closeCustomerQrModal);
+document.getElementById("customer-qr-modal")?.addEventListener("click", (event) => {
+    if (event.target.id === "customer-qr-modal") closeCustomerQrModal();
+});
+document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && !document.getElementById("customer-qr-modal")?.classList.contains("is-hidden")) {
+        closeCustomerQrModal();
+    }
 });
 
 document.getElementById("debt-customer-search").addEventListener("input", async (event) => {

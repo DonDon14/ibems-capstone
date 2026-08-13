@@ -154,6 +154,8 @@
     margin: 2px 0 12px;
 }
 .inventory-summary-pill {
+    appearance: none;
+    width: 100%;
     border: 1px solid #d8e2ee;
     border-radius: 12px;
     padding: 10px 12px;
@@ -162,6 +164,24 @@
     align-items: center;
     justify-content: space-between;
     gap: 10px;
+    color: inherit;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, transform 0.15s ease;
+}
+.inventory-summary-pill:hover {
+    border-color: #8eb4df;
+    box-shadow: 0 8px 18px rgba(15, 72, 128, 0.1);
+    transform: translateY(-1px);
+}
+.inventory-summary-pill:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, 0.22);
+    outline-offset: 2px;
+}
+.inventory-summary-pill.is-active {
+    border-color: #2563eb;
+    box-shadow: inset 0 0 0 1px #2563eb, 0 8px 18px rgba(37, 99, 235, 0.12);
 }
 .inventory-summary-pill span {
     color: #64748b;
@@ -186,6 +206,18 @@
 }
 .inventory-table-wrap {
     overflow: auto;
+    max-height: min(62vh, 720px);
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+}
+.inventory-table-wrap .table {
+    margin: 0;
+}
+.inventory-table-wrap .table thead {
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    background: #f6f9fd;
 }
 .inventory-table-wrap .table td {
     vertical-align: middle;
@@ -443,12 +475,12 @@
     height: 42px;
     border-radius: 8px;
     border: 1px solid #dbe3ea;
-    background: #f8fafc;
+    background: linear-gradient(145deg, #eaf2ff, #dceafe);
     display: grid;
     place-items: center;
-    color: #64748b;
+    color: #174f86;
     font-size: 0.78rem;
-    font-weight: 600;
+    font-weight: 800;
 }
 .stock-adjust-btn {
     border: 1px solid #0b4b87;
@@ -895,6 +927,23 @@ body.ibems-modern #inventory-product-modal :is(.inv-modal-head, .inv-modal-actio
     color: #64748b;
     font-weight: 600;
 }
+.inventory-results-toolbar {
+    min-height: 38px;
+    margin: 0 0 10px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+.inventory-results-toolbar p {
+    margin: 0;
+    color: #64748b;
+    font-size: 0.82rem;
+    font-weight: 700;
+}
+.inventory-results-toolbar .is-hidden {
+    display: none;
+}
 .detail-item strong {
     color: #0f172a;
 }
@@ -967,6 +1016,13 @@ body.ibems-modern #inventory-product-modal :is(.inv-modal-head, .inv-modal-actio
     }
     .inventory-stock-summary {
         grid-template-columns: 1fr 1fr;
+    }
+    .inventory-results-toolbar {
+        align-items: stretch;
+        flex-direction: column;
+    }
+    .inventory-results-toolbar .secondary-btn {
+        width: 100%;
     }
     .inventory-movement-item {
         grid-template-columns: 1fr;

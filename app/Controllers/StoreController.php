@@ -6,6 +6,7 @@ use App\Models\ProductModel;
 use App\Models\StoreModel;
 use App\Models\StoreCategoryModel;
 use App\Models\StorePaymentMethodModel;
+use App\Models\PaymentDestinationAccountModel;
 use App\Models\StoreOpeningBalanceModel;
 use App\Models\StoreCashMovementModel;
 use App\Models\StoreDaySessionModel;
@@ -90,6 +91,9 @@ class StoreController extends BaseController
 
         if ($storeId > 0) {
             $db = Database::connect();
+            $hasPaymentLines = in_array('transaction_payments', $db->listTables(), true);
+            $paymentMethodSql = $hasPaymentLines ? 'COALESCE(tp.payment_method, t.payment_method)' : 't.payment_method';
+            $paymentAmountSql = $hasPaymentLines ? 'COALESCE(tp.amount, t.amount)' : 't.amount';
             $todayStart = date('Y-m-d 00:00:00');
             $todayEnd = date('Y-m-d 23:59:59');
             $todayDate = date('Y-m-d');
@@ -118,12 +122,16 @@ class StoreController extends BaseController
             $daySession = $sessionModel->getByStoreAndDate($storeId, $todayDate);
             $sessionStartTs = $todayDate . ' 00:00:00';
 
-            $asOfPaymentRows = $db->table('transactions')
-                ->select('payment_method, COUNT(*) AS txn_count, COALESCE(SUM(amount), 0) AS total_sales')
-                ->where('store_id', $storeId)
-                ->where('created_at >=', $sessionStartTs)
-                ->where('created_at <=', $todayEnd)
-                ->groupBy('payment_method')
+            $asOfPaymentBuilder = $db->table('transactions t')
+                ->select($paymentMethodSql . ' AS payment_method, COUNT(DISTINCT t.id) AS txn_count, COALESCE(SUM(' . $paymentAmountSql . '), 0) AS total_sales', false);
+            if ($hasPaymentLines) {
+                $asOfPaymentBuilder->join('transaction_payments tp', 'tp.transaction_id = t.id', 'left');
+            }
+            $asOfPaymentRows = $asOfPaymentBuilder
+                ->where('t.store_id', $storeId)
+                ->where('t.created_at >=', $sessionStartTs)
+                ->where('t.created_at <=', $todayEnd)
+                ->groupBy($paymentMethodSql, false)
                 ->orderBy('total_sales', 'DESC')
                 ->get()
                 ->getResultArray();
@@ -143,12 +151,16 @@ class StoreController extends BaseController
                 }
             }
 
-            $todayPaymentRows = $db->table('transactions')
-                ->select('payment_method, COUNT(*) AS txn_count, COALESCE(SUM(amount), 0) AS total_sales')
-                ->where('store_id', $storeId)
-                ->where('created_at >=', $todayStart)
-                ->where('created_at <=', $todayEnd)
-                ->groupBy('payment_method')
+            $todayPaymentBuilder = $db->table('transactions t')
+                ->select($paymentMethodSql . ' AS payment_method, COUNT(DISTINCT t.id) AS txn_count, COALESCE(SUM(' . $paymentAmountSql . '), 0) AS total_sales', false);
+            if ($hasPaymentLines) {
+                $todayPaymentBuilder->join('transaction_payments tp', 'tp.transaction_id = t.id', 'left');
+            }
+            $todayPaymentRows = $todayPaymentBuilder
+                ->where('t.store_id', $storeId)
+                ->where('t.created_at >=', $todayStart)
+                ->where('t.created_at <=', $todayEnd)
+                ->groupBy($paymentMethodSql, false)
                 ->orderBy('total_sales', 'DESC')
                 ->get()
                 ->getResultArray();
@@ -365,6 +377,9 @@ class StoreController extends BaseController
         }
 
         $db = Database::connect();
+        $hasPaymentLines = in_array('transaction_payments', $db->listTables(), true);
+        $paymentMethodSql = $hasPaymentLines ? 'COALESCE(tp.payment_method, t.payment_method)' : 't.payment_method';
+        $paymentAmountSql = $hasPaymentLines ? 'COALESCE(tp.amount, t.amount)' : 't.amount';
 
         $txnAgg = $db->table('transactions t')
             ->select('COUNT(*) AS txn_count, COALESCE(SUM(t.amount), 0) AS total_sales')
@@ -383,12 +398,16 @@ class StoreController extends BaseController
             ->get()
             ->getRowArray();
 
-        $paymentRows = $db->table('transactions t')
-            ->select('t.payment_method, COUNT(*) AS txn_count, COALESCE(SUM(t.amount), 0) AS total_sales')
+        $paymentBuilder = $db->table('transactions t')
+            ->select($paymentMethodSql . ' AS payment_method, COUNT(DISTINCT t.id) AS txn_count, COALESCE(SUM(' . $paymentAmountSql . '), 0) AS total_sales', false);
+        if ($hasPaymentLines) {
+            $paymentBuilder->join('transaction_payments tp', 'tp.transaction_id = t.id', 'left');
+        }
+        $paymentRows = $paymentBuilder
             ->where('t.store_id', $storeId)
             ->where('t.created_at >=', $fromTs)
             ->where('t.created_at <=', $toTs)
-            ->groupBy('t.payment_method')
+            ->groupBy($paymentMethodSql, false)
             ->orderBy('total_sales', 'DESC')
             ->get()
             ->getResultArray();
@@ -491,6 +510,20 @@ class StoreController extends BaseController
             ];
         }, $paymentRows);
 
+        $paymentAccountBreakdown = [];
+        if ($hasPaymentLines && $db->tableExists('payment_destination_accounts')) {
+            $accountRows = $db->table('transaction_payments tp')
+                ->select('tp.destination_account_id, tp.destination_account_name, tp.destination_account_number, tp.payment_method, COUNT(DISTINCT tp.transaction_id) AS txn_count, COALESCE(SUM(tp.amount), 0) AS total_sales', false)
+                ->join('transactions t', 't.id = tp.transaction_id')->where('t.store_id', $storeId)
+                ->where('t.created_at >=', $fromTs)->where('t.created_at <=', $toTs)->where('tp.destination_account_id IS NOT NULL', null, false)
+                ->groupBy('tp.destination_account_id, tp.destination_account_name, tp.destination_account_number, tp.payment_method')->orderBy('total_sales', 'DESC')->get()->getResultArray();
+            $paymentAccountBreakdown = array_map(static fn(array $row): array => [
+                'destination_account_id' => (int) $row['destination_account_id'], 'payment_method' => (string) $row['payment_method'],
+                'account_name' => (string) $row['destination_account_name'], 'account_number' => (string) $row['destination_account_number'],
+                'transactions' => (int) $row['txn_count'], 'sales' => (float) $row['total_sales'],
+            ], $accountRows);
+        }
+
         $cashMovementModel = new StoreCashMovementModel();
         $todayDate = $today->format('Y-m-d');
         $sessionModel = new StoreDaySessionModel();
@@ -517,12 +550,16 @@ class StoreController extends BaseController
         }
 
         $asOfToTs = $toDate . ' 23:59:59';
-        $asOfPaymentRows = $db->table('transactions t')
-            ->select('t.payment_method, COALESCE(SUM(t.amount), 0) AS total_sales')
+        $asOfPaymentBuilder = $db->table('transactions t')
+            ->select($paymentMethodSql . ' AS payment_method, COALESCE(SUM(' . $paymentAmountSql . '), 0) AS total_sales', false);
+        if ($hasPaymentLines) {
+            $asOfPaymentBuilder->join('transaction_payments tp', 'tp.transaction_id = t.id', 'left');
+        }
+        $asOfPaymentRows = $asOfPaymentBuilder
             ->where('t.store_id', $storeId)
             ->where('t.created_at >=', $openingFromTs)
             ->where('t.created_at <=', $asOfToTs)
-            ->groupBy('t.payment_method')
+            ->groupBy($paymentMethodSql, false)
             ->get()
             ->getResultArray();
 
@@ -637,6 +674,7 @@ class StoreController extends BaseController
                 'projected_profit' => (float) ($stockInAgg['projected_profit'] ?? 0),
             ],
             'payment_breakdown' => $paymentBreakdown,
+            'payment_account_breakdown' => $paymentAccountBreakdown,
             'cash_drawer' => [
                 'business_date' => $toDate,
                 'opening_business_date' => $openingBusinessDate,
@@ -736,6 +774,7 @@ class StoreController extends BaseController
         $storeId = (int) ($request['store_id'] ?? 0);
         $openingCash = (float) ($request['opening_cash'] ?? $request['opening_balance'] ?? 0);
         $openingEcash = (float) ($request['opening_ecash'] ?? 0);
+        $paymentAccountOpenings = is_array($request['payment_account_openings'] ?? null) ? $request['payment_account_openings'] : [];
         $note = trim((string) ($request['note'] ?? ''));
         $businessDate = date('Y-m-d');
 
@@ -780,6 +819,21 @@ class StoreController extends BaseController
 
         $actorId = (int) session()->get('user_id');
         $session = $model->openDay((int) $store['id'], $businessDate, $openingCash, $openingEcash, $actorId, $note);
+        $db = Database::connect();
+        if ($db->tableExists('store_day_payment_account_balances')) {
+            foreach ($paymentAccountOpenings as $opening) {
+                $accountId = (int) ($opening['destination_account_id'] ?? 0);
+                $account = $accountId > 0 ? (new PaymentDestinationAccountModel())->find($accountId) : null;
+                if (!$account || (int) $account['store_id'] !== (int) $store['id'] || !ibems_bool($account['is_active'] ?? false)) continue;
+                $amount = max(0, round((float) ($opening['opening_balance'] ?? 0), 2));
+                $payload = ['store_day_session_id' => (int) $session['id'], 'destination_account_id' => $accountId,
+                    'account_name_snapshot' => (string) $account['account_name'], 'account_number_snapshot' => (string) $account['account_number'],
+                    'opening_balance' => $amount, 'updated_at' => date('Y-m-d H:i:s')];
+                $existingBalance = $db->table('store_day_payment_account_balances')->where('store_day_session_id', (int) $session['id'])->where('destination_account_id', $accountId)->get()->getRowArray();
+                if ($existingBalance) $db->table('store_day_payment_account_balances')->where('id', (int) $existingBalance['id'])->update($payload);
+                else { $payload['created_at'] = date('Y-m-d H:i:s'); $db->table('store_day_payment_account_balances')->insert($payload); }
+            }
+        }
         $expected = $this->calculateStoreSessionExpected((int) $store['id'], $session);
 
         $auditLogModel = new AuditLogModel();
@@ -809,6 +863,7 @@ class StoreController extends BaseController
         $storeId = (int) ($request['store_id'] ?? 0);
         $countedCash = (float) ($request['counted_cash'] ?? 0);
         $countedEcash = (float) ($request['counted_ecash'] ?? 0);
+        $paymentAccountCounts = is_array($request['payment_account_counts'] ?? null) ? $request['payment_account_counts'] : [];
         $note = trim((string) ($request['note'] ?? ''));
 
         if ($countedCash < 0 || $countedEcash < 0) {
@@ -881,6 +936,26 @@ class StoreController extends BaseController
             'closed_at' => $now,
             'updated_at' => $now,
         ]);
+
+        $db = Database::connect();
+        if ($db->tableExists('store_day_payment_account_balances')) {
+            $expectedAccounts = [];
+            foreach (($expected['payment_account_balances'] ?? []) as $account) $expectedAccounts[(int) $account['id']] = $account;
+            foreach ($paymentAccountCounts as $count) {
+                $accountId = (int) ($count['destination_account_id'] ?? 0);
+                if (!isset($expectedAccounts[$accountId])) continue;
+                $account = $expectedAccounts[$accountId];
+                $counted = max(0, round((float) ($count['counted_balance'] ?? 0), 2));
+                $expectedBalance = round((float) ($account['expected_balance'] ?? 0), 2);
+                $payload = ['store_day_session_id' => (int) $session['id'], 'destination_account_id' => $accountId,
+                    'account_name_snapshot' => (string) $account['account_name'], 'account_number_snapshot' => (string) $account['account_number'],
+                    'opening_balance' => 0, 'expected_balance' => $expectedBalance, 'counted_balance' => $counted,
+                    'variance' => round($counted - $expectedBalance, 2), 'updated_at' => $now];
+                $existingAccountBalance = $db->table('store_day_payment_account_balances')->where('store_day_session_id', (int) $session['id'])->where('destination_account_id', $accountId)->get()->getRowArray();
+                if ($existingAccountBalance) $db->table('store_day_payment_account_balances')->where('id', (int) $existingAccountBalance['id'])->update($payload);
+                else { $payload['created_at'] = $now; $db->table('store_day_payment_account_balances')->insert($payload); }
+            }
+        }
 
         $closed = $model->find((int) $session['id']) ?? $session;
         if ($reviewStatus === 'pending') {
@@ -1703,18 +1778,34 @@ class StoreController extends BaseController
         $model = new StorePaymentMethodModel();
         $model->ensureDefaults((int) $store['id']);
         $methods = $model->getActiveByStore((int) $store['id']);
+        $accountsByMethod = [];
+        $db = Database::connect();
+        if ($db->tableExists('payment_destination_accounts')) {
+            foreach ($db->table('payment_destination_accounts')->where('store_id', (int) $store['id'])->where('is_active', true)
+                ->orderBy('sort_order', 'ASC')->orderBy('account_name', 'ASC')->get()->getResultArray() as $account) {
+                $accountsByMethod[(int) $account['payment_method_id']][] = [
+                    'id' => (int) $account['id'], 'account_name' => (string) $account['account_name'],
+                    'masked_number' => self::maskPaymentAccount((string) $account['account_number']),
+                    'image_url' => (string) ($account['image_url'] ?? ''),
+                ];
+            }
+        }
 
         return $this->response->setJSON([
             'status' => 'success',
             'store_id' => (int) $store['id'],
-            'methods' => array_map(static function (array $row): array {
+            'supports_split_payment' => in_array('transaction_payments', Database::connect()->listTables(), true),
+            'methods' => array_map(static function (array $row) use ($accountsByMethod): array {
                 return [
                     'id' => (int) $row['id'],
                     'code' => (string) $row['code'],
                     'label' => (string) $row['label'],
                     'icon_class' => (string) ($row['icon_class'] ?? ''),
+                    'image_url' => (string) ($row['image_url'] ?? ''),
                     'sort_order' => (int) ($row['sort_order'] ?? 0),
                     'is_system_reserved' => ibems_bool($row['is_system_reserved'] ?? false),
+                    'requires_destination_account' => !in_array((string) $row['code'], ['cash', 'debt'], true),
+                    'destination_accounts' => $accountsByMethod[(int) $row['id']] ?? [],
                 ];
             }, $methods),
         ]);
@@ -1726,6 +1817,7 @@ class StoreController extends BaseController
         $storeId = (int) ($request['store_id'] ?? 0);
         $label = trim((string) ($request['label'] ?? ''));
         $iconClass = trim((string) ($request['icon_class'] ?? ''));
+        $imageUrl = trim((string) ($request['image_url'] ?? ''));
 
         if ($label === '') {
             return $this->response->setStatusCode(400)->setJSON([
@@ -1745,7 +1837,8 @@ class StoreController extends BaseController
         $model = new StorePaymentMethodModel();
         $model->ensureDefaults((int) $store['id']);
 
-        $code = $model->normalizeCode((string) ($request['code'] ?? $label));
+        $requestedCode = trim((string) ($request['code'] ?? ''));
+        $code = $model->normalizeCode($requestedCode !== '' ? $requestedCode : $label);
         if ($code === '' || $code === 'debt') {
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
@@ -1768,6 +1861,7 @@ class StoreController extends BaseController
             $model->update((int) $existing['id'], [
                 'label' => $label,
                 'icon_class' => $iconClass !== '' ? $iconClass : null,
+                'image_url' => $imageUrl !== '' ? $imageUrl : null,
                 'is_active' => true,
                 'updated_at' => date('Y-m-d H:i:s'),
             ]);
@@ -1780,6 +1874,7 @@ class StoreController extends BaseController
                 'code' => $code,
                 'label' => $label,
                 'icon_class' => $iconClass !== '' ? $iconClass : null,
+                'image_url' => $imageUrl !== '' ? $imageUrl : null,
                 'sort_order' => $nextSort,
                 'is_active' => true,
                 'is_system_reserved' => false,
@@ -1788,8 +1883,10 @@ class StoreController extends BaseController
             ]);
         }
 
+        $saved = $model->where('store_id', (int) $store['id'])->where('code', $code)->first();
         return $this->response->setJSON([
             'status' => 'success',
+            'method' => $saved ? ['id' => (int) $saved['id'], 'code' => (string) $saved['code'], 'label' => (string) $saved['label']] : null,
         ]);
     }
 
@@ -1800,6 +1897,7 @@ class StoreController extends BaseController
         $methodId = (int) ($request['method_id'] ?? 0);
         $label = trim((string) ($request['label'] ?? ''));
         $iconClass = trim((string) ($request['icon_class'] ?? ''));
+        $imageUrl = trim((string) ($request['image_url'] ?? ''));
 
         if ($methodId <= 0 || $label === '') {
             return $this->response->setStatusCode(400)->setJSON([
@@ -1835,6 +1933,7 @@ class StoreController extends BaseController
         $model->update($methodId, [
             'label' => $label,
             'icon_class' => $iconClass !== '' ? $iconClass : null,
+            'image_url' => $imageUrl !== '' ? $imageUrl : null,
             'updated_at' => date('Y-m-d H:i:s'),
         ]);
 
@@ -1880,14 +1979,124 @@ class StoreController extends BaseController
             ]);
         }
 
+        $db = Database::connect();
+        $db->transStart();
         $model->update($methodId, [
             'is_active' => false,
             'updated_at' => date('Y-m-d H:i:s'),
         ]);
+        if ($db->tableExists('payment_destination_accounts')) {
+            $db->table('payment_destination_accounts')
+                ->where('store_id', (int) $store['id'])
+                ->where('payment_method_id', $methodId)
+                ->update(['is_active' => false, 'updated_at' => date('Y-m-d H:i:s')]);
+        }
+        $db->transComplete();
+        if ($db->transStatus() === false) {
+            return $this->response->setStatusCode(500)->setJSON([
+                'status' => 'error',
+                'message' => 'Unable to delete payment method.',
+            ]);
+        }
 
         return $this->response->setJSON([
             'status' => 'success',
+            'method_id' => $methodId,
         ]);
+    }
+
+    public function paymentAccounts()
+    {
+        $store = $this->resolveAccessibleStore((int) ($this->request->getGet('store_id') ?? 0));
+        if (!$store) return $this->response->setStatusCode(403)->setJSON(['status' => 'error', 'message' => 'You cannot access this store.']);
+        $db = Database::connect();
+        if (!$db->tableExists('payment_destination_accounts')) {
+            return $this->response->setJSON(['status' => 'success', 'accounts' => [], 'migration_required' => true]);
+        }
+        $rows = $db->table('payment_destination_accounts a')
+            ->select('a.*, m.code AS payment_method, m.label AS payment_method_label, m.icon_class')
+            ->join('store_payment_methods m', 'm.id = a.payment_method_id')
+            ->where('a.store_id', (int) $store['id'])->where('a.is_active', true)
+            ->orderBy('m.sort_order', 'ASC')->orderBy('a.sort_order', 'ASC')->orderBy('a.account_name', 'ASC')->get()->getResultArray();
+        return $this->response->setJSON(['status' => 'success', 'accounts' => array_map(static fn(array $row): array => [
+            'id' => (int) $row['id'], 'payment_method_id' => (int) $row['payment_method_id'],
+            'payment_method' => (string) $row['payment_method'], 'payment_method_label' => (string) $row['payment_method_label'],
+            'icon_class' => (string) ($row['icon_class'] ?? ''), 'account_name' => (string) $row['account_name'],
+            'account_number' => (string) $row['account_number'], 'masked_number' => self::maskPaymentAccount((string) $row['account_number']),
+            'image_url' => (string) ($row['image_url'] ?? ''),
+        ], $rows)]);
+    }
+
+    public function savePaymentAccount()
+    {
+        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $store = $this->resolveAccessibleStore((int) ($request['store_id'] ?? 0));
+        if (!$store) return $this->response->setStatusCode(403)->setJSON(['status' => 'error', 'message' => 'You cannot access this store.']);
+        $methodId = (int) ($request['payment_method_id'] ?? 0);
+        $name = trim((string) ($request['account_name'] ?? ''));
+        $number = trim((string) ($request['account_number'] ?? ''));
+        $imageUrl = trim((string) ($request['image_url'] ?? ''));
+        if ($methodId <= 0 || $name === '' || $number === '') return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => 'Payment method, account name, and account number are required.']);
+        $method = (new StorePaymentMethodModel())->find($methodId);
+        if (!$method || (int) $method['store_id'] !== (int) $store['id'] || in_array((string) $method['code'], ['cash', 'debt'], true)) {
+            return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => 'Select a non-cash receiving method.']);
+        }
+        if ($imageUrl !== '' && !filter_var($imageUrl, FILTER_VALIDATE_URL) && !str_starts_with($imageUrl, '/')) {
+            return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => 'QR image must be a valid HTTPS or application URL.']);
+        }
+        $model = new PaymentDestinationAccountModel();
+        $accountId = (int) ($request['account_id'] ?? 0);
+        $existing = $accountId > 0 ? $model->find($accountId) : null;
+        if ($existing && (int) $existing['store_id'] !== (int) $store['id']) return $this->response->setStatusCode(404)->setJSON(['status' => 'error', 'message' => 'Payment account not found.']);
+        $payload = ['store_id' => (int) $store['id'], 'payment_method_id' => $methodId, 'account_name' => $name,
+            'account_number' => $number, 'image_url' => $imageUrl !== '' ? $imageUrl : null, 'is_active' => true, 'updated_at' => date('Y-m-d H:i:s')];
+        if ($existing) $model->update($accountId, $payload); else { $payload['created_at'] = date('Y-m-d H:i:s'); $model->insert($payload); }
+        return $this->response->setJSON(['status' => 'success']);
+    }
+
+    public function deactivatePaymentAccount()
+    {
+        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $store = $this->resolveAccessibleStore((int) ($request['store_id'] ?? 0));
+        if (!$store) return $this->response->setStatusCode(403)->setJSON(['status' => 'error', 'message' => 'You cannot access this store.']);
+        $model = new PaymentDestinationAccountModel();
+        $row = $model->find((int) ($request['account_id'] ?? 0));
+        if (!$row || (int) $row['store_id'] !== (int) $store['id']) return $this->response->setStatusCode(404)->setJSON(['status' => 'error', 'message' => 'Payment account not found.']);
+        $model->update((int) $row['id'], ['is_active' => false, 'updated_at' => date('Y-m-d H:i:s')]);
+        return $this->response->setJSON(['status' => 'success']);
+    }
+
+    public function uploadPaymentAccountQr()
+    {
+        $store = $this->resolveAccessibleStore((int) ($this->request->getPost('store_id') ?? 0));
+        if (!$store) return $this->response->setStatusCode(403)->setJSON(['status' => 'error', 'message' => 'You cannot access this store.']);
+        $file = $this->request->getFile('qr_image');
+        if (!$file || $file->getError() === UPLOAD_ERR_NO_FILE) return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => 'Choose a QR image first.']);
+        try {
+            $url = (new AssetStorageService())->storeImage($file, 'payment-account-qr');
+            return $this->response->setJSON(['status' => 'success', 'image_url' => $url]);
+        } catch (\Throwable $e) {
+            return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+    }
+
+    public function uploadPaymentMethodImage()
+    {
+        $store = $this->resolveAccessibleStore((int) ($this->request->getPost('store_id') ?? 0));
+        if (!$store) return $this->response->setStatusCode(403)->setJSON(['status' => 'error', 'message' => 'You cannot access this store.']);
+        $file = $this->request->getFile('method_image');
+        if (!$file || $file->getError() === UPLOAD_ERR_NO_FILE) return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => 'Choose a payment method image first.']);
+        try {
+            return $this->response->setJSON(['status' => 'success', 'image_url' => (new AssetStorageService())->storeImage($file, 'payment-method-images')]);
+        } catch (\Throwable $e) {
+            return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+    }
+
+    private static function maskPaymentAccount(string $number): string
+    {
+        $visible = mb_substr($number, -4);
+        return mb_strlen($number) <= 4 ? $number : str_repeat('•', max(4, mb_strlen($number) - 4)) . $visible;
     }
 
     public function debtCustomers()
@@ -1918,6 +2127,7 @@ class StoreController extends BaseController
             $creditLimit = (float) $row['credit_limit'];
             $currentDebt = (float) $row['current_debt'];
             $row['available_credit'] = max(0, $creditLimit - $currentDebt);
+            $row['is_active'] = in_array($row['is_active'] ?? false, [true, 1, '1', 't', 'true'], true);
             $row['has_debt_pin'] = trim((string) ($row['debt_pin_hash'] ?? '')) !== '';
             unset($row['debt_pin_hash']);
             return $row;
@@ -1961,9 +2171,10 @@ class StoreController extends BaseController
         $dateTo = trim((string) $this->request->getGet('date_to'));
         $paymentMethod = trim((string) $this->request->getGet('payment_method'));
 
-        $allowedPaymentMethods = ['cash', 'gcash', 'card', 'bank_transfer', 'other', 'debt', 'advance_payment'];
-
         $db = Database::connect();
+        $allowedPaymentMethods = array_column($db->table('store_payment_methods')->select('code')->where('store_id', $storeId)->get()->getResultArray(), 'code');
+        $allowedPaymentMethods[] = 'split';
+        $hasPaymentLines = in_array('transaction_payments', $db->listTables(), true);
         $query = $db->table('transactions t')
             ->select('t.id, t.client_txn_id, t.created_at, t.payment_method, t.amount, t.customer_type, t.user_id, u.name AS customer_name')
             ->join('users u', 'u.id = t.user_id', 'left')
@@ -1978,7 +2189,14 @@ class StoreController extends BaseController
         }
 
         if ($paymentMethod !== '' && in_array($paymentMethod, $allowedPaymentMethods, true)) {
-            $query->where('t.payment_method', $paymentMethod);
+            if ($hasPaymentLines) {
+                $query->groupStart()
+                    ->where('t.payment_method', $paymentMethod)
+                    ->orWhere("EXISTS (SELECT 1 FROM transaction_payments tp_filter WHERE tp_filter.transaction_id = t.id AND tp_filter.payment_method = " . $db->escape($paymentMethod) . ")", null, false)
+                    ->groupEnd();
+            } else {
+                $query->where('t.payment_method', $paymentMethod);
+            }
         }
 
         $rows = $query->orderBy('t.id', 'DESC')
@@ -1986,7 +2204,32 @@ class StoreController extends BaseController
             ->get()
             ->getResultArray();
 
-        $transactions = array_map(static function (array $row): array {
+        $paymentRowsByTransaction = [];
+        $transactionIds = array_map(static fn (array $row): int => (int) $row['id'], $rows);
+        if ($hasPaymentLines && $transactionIds !== []) {
+            $paymentLineSelect = $db->fieldExists('destination_account_id', 'transaction_payments')
+                ? 'transaction_id, payment_method, destination_account_id, destination_account_name, destination_account_number, amount, cash_received, change_due'
+                : 'transaction_id, payment_method, amount, cash_received, change_due';
+            $paymentRows = $db->table('transaction_payments')
+                ->select($paymentLineSelect)
+                ->whereIn('transaction_id', $transactionIds)
+                ->orderBy('id', 'ASC')
+                ->get()
+                ->getResultArray();
+            foreach ($paymentRows as $paymentRow) {
+                $paymentRowsByTransaction[(int) $paymentRow['transaction_id']][] = [
+                    'payment_method' => (string) $paymentRow['payment_method'],
+                    'destination_account_id' => isset($paymentRow['destination_account_id']) ? (int) $paymentRow['destination_account_id'] : null,
+                    'destination_account_name' => (string) ($paymentRow['destination_account_name'] ?? ''),
+                    'destination_account_number' => (string) ($paymentRow['destination_account_number'] ?? ''),
+                    'amount' => (float) $paymentRow['amount'],
+                    'cash_received' => $paymentRow['cash_received'] !== null ? (float) $paymentRow['cash_received'] : null,
+                    'change_due' => $paymentRow['change_due'] !== null ? (float) $paymentRow['change_due'] : null,
+                ];
+            }
+        }
+
+        $transactions = array_map(static function (array $row) use ($paymentRowsByTransaction): array {
             $customerName = $row['customer_name'] ?: 'Walk-in';
             if (($row['customer_type'] ?? '') !== 'walk_in' && !$row['customer_name']) {
                 $customerName = ucfirst((string) $row['customer_type']);
@@ -2000,6 +2243,7 @@ class StoreController extends BaseController
                 'amount' => (float) $row['amount'],
                 'customer_type' => $row['customer_type'],
                 'customer_name' => $customerName,
+                'payments' => $paymentRowsByTransaction[(int) $row['id']] ?? [],
             ];
         }, $rows);
 
@@ -2058,6 +2302,35 @@ class StoreController extends BaseController
             ];
         }, $itemsRaw);
 
+        $detailPaymentSelect = $db->fieldExists('destination_account_id', 'transaction_payments')
+            ? 'payment_method, destination_account_id, destination_account_name, destination_account_number, amount, cash_received, change_due'
+            : 'payment_method, amount, cash_received, change_due';
+        $paymentRows = in_array('transaction_payments', $db->listTables(), true)
+            ? $db->table('transaction_payments')
+                ->select($detailPaymentSelect)
+                ->where('transaction_id', $transactionId)
+                ->orderBy('id', 'ASC')
+                ->get()
+                ->getResultArray()
+            : [];
+        $payments = array_map(static fn (array $row): array => [
+            'payment_method' => (string) $row['payment_method'],
+            'destination_account_id' => isset($row['destination_account_id']) ? (int) $row['destination_account_id'] : null,
+            'destination_account_name' => (string) ($row['destination_account_name'] ?? ''),
+            'destination_account_number' => (string) ($row['destination_account_number'] ?? ''),
+            'amount' => (float) $row['amount'],
+            'cash_received' => $row['cash_received'] !== null ? (float) $row['cash_received'] : null,
+            'change_due' => $row['change_due'] !== null ? (float) $row['change_due'] : null,
+        ], $paymentRows);
+        if ($payments === []) {
+            $payments[] = [
+                'payment_method' => (string) $txn['payment_method'],
+                'amount' => (float) $txn['amount'],
+                'cash_received' => null,
+                'change_due' => null,
+            ];
+        }
+
         $customerName = $txn['customer_name'] ?: 'Walk-in';
         if (($txn['customer_type'] ?? '') !== 'walk_in' && !$txn['customer_name']) {
             $customerName = ucfirst((string) $txn['customer_type']);
@@ -2074,6 +2347,7 @@ class StoreController extends BaseController
                 'customer_name' => $customerName,
                 'store_name' => $txn['store_name'],
                 'items' => $items,
+                'payments' => $payments,
             ],
         ]);
     }
@@ -2865,7 +3139,14 @@ class StoreController extends BaseController
             ->whereIn('u.user_type', ['faculty', 'staff']);
 
         if ($debtOnly) {
-            $query->where('t.payment_method', 'debt');
+            if (in_array('transaction_payments', $db->listTables(), true)) {
+                $query->groupStart()
+                    ->where('t.payment_method', 'debt')
+                    ->orWhere('EXISTS (SELECT 1 FROM transaction_payments tp_debt WHERE tp_debt.transaction_id = t.id AND tp_debt.payment_method = ' . $db->escape('debt') . ')', null, false)
+                    ->groupEnd();
+            } else {
+                $query->where('t.payment_method', 'debt');
+            }
         }
 
         if ($dateFrom !== '') {

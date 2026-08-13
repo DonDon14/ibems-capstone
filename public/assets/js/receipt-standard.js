@@ -83,7 +83,12 @@
         const items = normalizeItems(receipt);
         const total = Number(receipt.totalAmount ?? receipt.amount ?? items.reduce((sum, item) => sum + item.lineTotal, 0));
         const totalItems = items.reduce((sum, item) => sum + item.qty, 0);
-        const paymentLabel = String(receipt.paymentMethod ?? receipt.payment_method ?? "").replace(/_/g, " ").toUpperCase();
+        const payments = Array.isArray(receipt.payments) && receipt.payments.length > 0
+            ? receipt.payments
+            : [{payment_method: receipt.paymentMethod ?? receipt.payment_method ?? "", amount: total, cash_received: receipt.cashReceived, change_due: receipt.changeDue}];
+        const paymentLabel = payments.length > 1
+            ? "SPLIT PAYMENT"
+            : String(payments[0].payment_method || "").replace(/_/g, " ").toUpperCase();
         const lookupUrl = getLookupUrl(receipt);
 
         const rows = items
@@ -103,11 +108,14 @@
             ? `<div><span>Customer</span><strong>${esc(receipt.customerName)}</strong></div>`
             : "";
 
-        const cashTenderLines = String(receipt.paymentMethod ?? receipt.payment_method ?? "").toLowerCase() === "cash"
-            && Number.isFinite(Number(receipt.cashReceived))
+        const paymentLines = payments.length > 1
+            ? payments.map((payment) => `<div><span>${esc(String(payment.payment_method || "").replace(/_/g, " ").toUpperCase())}${payment.destination_account_name ? `<small style="display:block">${esc(payment.destination_account_name)}${payment.destination_account_number ? ` · ending ${esc(String(payment.destination_account_number).slice(-4))}` : ""}</small>` : ""}</span><strong>${money(payment.amount)}</strong></div>`).join("")
+            : "";
+        const cashPayment = payments.find((payment) => String(payment.payment_method || "").toLowerCase() === "cash");
+        const cashTenderLines = cashPayment && Number.isFinite(Number(cashPayment.cash_received ?? receipt.cashReceived))
             ? `
-                <div><span>Cash Received</span><strong>${money(receipt.cashReceived)}</strong></div>
-                <div><span>Change</span><strong>${money(receipt.changeDue || 0)}</strong></div>
+                <div><span>Cash Received</span><strong>${money(cashPayment.cash_received ?? receipt.cashReceived)}</strong></div>
+                <div><span>Change</span><strong>${money(cashPayment.change_due ?? receipt.changeDue ?? 0)}</strong></div>
             `
             : "";
 
@@ -123,6 +131,7 @@
                     <div><span>Date</span><strong>${esc(formatDateTime(receipt.createdAt || receipt.dateTime))}</strong></div>
                     <div><span>Store</span><strong>${esc(receipt.storeName || "Store")}</strong></div>
                     <div><span>Payment</span><strong>${esc(paymentLabel || "N/A")}</strong></div>
+                    ${paymentLines}
                     ${customerLine}
                     ${debtorLine}
                     ${cashTenderLines}

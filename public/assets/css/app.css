@@ -728,6 +728,26 @@ textarea:focus {
     padding-left: 42px;
 }
 
+.search-scan-btn {
+    position: absolute;
+    right: 9px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    border: 1px solid #3b82f6;
+    border-radius: 8px;
+    background: #fff;
+    color: #2563eb;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+.search-scan-btn:hover { background:#eff6ff; border-color:#2563eb; transform:translateY(-50%); }
+.search-scan-btn:focus-visible { outline:3px solid rgba(37,99,235,.22); outline-offset:2px; }
+.search-clear-btn{position:absolute;right:47px;top:50%;transform:translateY(-50%);width:28px;height:28px;border:0;background:transparent;color:#64748b;display:inline-flex;align-items:center;justify-content:center;cursor:pointer;border-radius:6px}.search-clear-btn:hover{background:#f1f5f9;color:#0f3f70;transform:translateY(-50%)}.search-clear-btn:focus-visible{outline:3px solid rgba(37,99,235,.22);outline-offset:1px}.search-clear-btn.is-hidden{display:none}
+
 :is(.staff-filter-panel, .acct-filters-redesign, .uv-filter-panel, .ap-filter-panel, .audit-filter-panel) {
     border: 1px solid #d8e2ee;
     border-radius: 8px;

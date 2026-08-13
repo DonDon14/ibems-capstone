@@ -36,7 +36,7 @@ final class TransactionServiceTest extends CIUnitTestCase
             ],
         ], 7, 'STORE_SYSTEM');
 
-        $this->assertSame('success', $result['status']);
+        $this->assertSame('success', $result['status'], json_encode($result));
         $this->assertArrayHasKey('transaction_id', $result);
         $this->assertSame(100.0, (float) $result['total_amount']);
         $this->assertSame(400.0, (float) $result['change_due']);
@@ -220,9 +220,42 @@ final class TransactionServiceTest extends CIUnitTestCase
         $this->assertSame('error', $result['status']);
         $this->assertSame('Insufficient credit.', $result['message']);
         $this->assertSame(0, $db->table('transactions')->countAllResults());
+        $this->assertSame(0, $db->table('transaction_items')->countAllResults());
+        $this->assertSame(0, $db->table('inventory_movements')->countAllResults());
+        $this->assertSame(0, $db->table('debt_cashbook_entries')->countAllResults());
+        $this->assertSame(0, $db->table('audit_logs')->where('action', 'CREATE_TRANSACTION')->countAllResults());
 
         $balance = $db->table('balances')->where('user_id', 501)->get()->getRowArray();
         $this->assertSame(75.0, (float) ($balance['current_debt'] ?? 0));
+        $product = $db->table('products')->where('id', 101)->get()->getRowArray();
+        $this->assertSame(3, (int) ($product['stock_qty'] ?? 0));
+    }
+
+    public function testDebtPaymentAtExactCreditLimitSucceedsWithoutGoingOver(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+
+        $this->seedStore($now);
+        $this->seedOpenStoreDay($now);
+        $this->seedPaymentMethod('debt', true, $now);
+        $this->seedProduct(101, 3, 25, $now);
+        $this->seedDebtCustomer(501, 'faculty', 100, 75, '1234', $now);
+
+        $result = (new TransactionService())->createTransaction([
+            'store_id' => 1,
+            'payment_method' => 'debt',
+            'customer_user_id' => 501,
+            'debt_pin' => '1234',
+            'items' => [['product_id' => 101, 'qty' => 1]],
+        ], 7, 'STORE_SYSTEM');
+
+        $this->assertSame('success', $result['status']);
+        $balance = $db->table('balances')->where('user_id', 501)->get()->getRowArray();
+        $this->assertSame(100.0, (float) ($balance['current_debt'] ?? 0));
+        $product = $db->table('products')->where('id', 101)->get()->getRowArray();
+        $this->assertSame(2, (int) ($product['stock_qty'] ?? 0));
+        $this->assertSame(1, $db->table('transactions')->countAllResults());
     }
 
     public function testDebtPaymentUpdatesBalanceCashbookStockAndAuditAtomically(): void
@@ -319,6 +352,7 @@ final class TransactionServiceTest extends CIUnitTestCase
         $this->assertSame('error', $result['status']);
         $this->assertSame(423, $result['code'] ?? null);
         $this->assertStringContainsString('temporarily locked', $result['message']);
+        $this->assertIsInt($result['locked_until_epoch'] ?? null);
 
         $state = $db->table('debt_pin_security')->where('user_id', 501)->get()->getRowArray();
         $this->assertSame(5, (int) ($state['failed_attempts'] ?? 0));
@@ -526,6 +560,92 @@ final class TransactionServiceTest extends CIUnitTestCase
         ], 7, 'STORE_SYSTEM');
     }
 
+    public function testSplitCashAndGcashPersistsAtomicPaymentLines(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+        $this->seedStore($now);
+        $this->seedOpenStoreDay($now);
+        $this->seedPaymentMethod('cash', true, $now);
+        $this->seedPaymentMethod('gcash', true, $now);
+        $this->seedProduct(101, 3, 100, $now);
+
+        $result = (new TransactionService())->createTransaction([
+            'store_id' => 1,
+            'payment_method' => 'split',
+            'payments' => [
+                ['payment_method' => 'cash', 'amount' => 50, 'cash_received' => 100],
+                ['payment_method' => 'gcash', 'amount' => 50],
+            ],
+            'customer_type' => 'walk_in',
+            'items' => [['product_id' => 101, 'qty' => 1]],
+        ], 7, 'STORE_SYSTEM');
+
+        $this->assertSame('success', $result['status'], json_encode($result));
+        $this->assertSame(50.0, (float) $result['change_due']);
+        $transaction = $db->table('transactions')->where('id', $result['transaction_id'])->get()->getRowArray();
+        $this->assertSame('split', $transaction['payment_method'] ?? null);
+        $payments = $db->table('transaction_payments')->where('transaction_id', $result['transaction_id'])->orderBy('id')->get()->getResultArray();
+        $this->assertCount(2, $payments);
+        $this->assertSame(['cash', 'gcash'], array_column($payments, 'payment_method'));
+        $this->assertSame([50.0, 50.0], array_map('floatval', array_column($payments, 'amount')));
+    }
+
+    public function testSplitPaymentMustEqualTransactionTotal(): void
+    {
+        $now = date('Y-m-d H:i:s');
+        $this->seedStore($now);
+        $this->seedOpenStoreDay($now);
+        $this->seedPaymentMethod('cash', true, $now);
+        $this->seedPaymentMethod('gcash', true, $now);
+        $this->seedProduct(101, 3, 100, $now);
+
+        $result = (new TransactionService())->createTransaction([
+            'store_id' => 1,
+            'payments' => [
+                ['payment_method' => 'cash', 'amount' => 40, 'cash_received' => 40],
+                ['payment_method' => 'gcash', 'amount' => 50],
+            ],
+            'items' => [['product_id' => 101, 'qty' => 1]],
+        ], 7, 'STORE_SYSTEM');
+
+        $this->assertSame('error', $result['status']);
+        $this->assertSame('Payment amounts must equal the transaction total.', $result['message']);
+        $this->assertSame(0, Database::connect()->table('transactions')->countAllResults());
+    }
+
+    public function testEmployeeCanPayPartCashAndPostOnlyRemainderToDebt(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+        $this->seedStore($now);
+        $this->seedOpenStoreDay($now);
+        $this->seedPaymentMethod('cash', true, $now);
+        $this->seedPaymentMethod('debt', true, $now);
+        $this->seedDebtCustomer(501, 'staff', 500, 25, '1234', $now);
+        $this->seedProduct(101, 3, 100, $now);
+
+        $result = (new TransactionService())->createTransaction([
+            'store_id' => 1,
+            'payments' => [
+                ['payment_method' => 'cash', 'amount' => 50, 'cash_received' => 50],
+                ['payment_method' => 'debt', 'amount' => 50],
+            ],
+            'customer_user_id' => 501,
+            'customer_type' => 'staff',
+            'debt_pin' => '1234',
+            'items' => [['product_id' => 101, 'qty' => 1]],
+        ], 7, 'STORE_SYSTEM');
+
+        $this->assertSame('success', $result['status'], json_encode($result));
+        $this->assertSame(['cash', 'debt'], array_column($result['payments'], 'payment_method'));
+        $this->assertSame(75.0, (float) $db->table('balances')->where('user_id', 501)->get()->getRowArray()['current_debt']);
+        $cashbook = $db->table('debt_cashbook_entries')->where('reference_id', $result['transaction_id'])->get()->getRowArray();
+        $this->assertSame(50.0, (float) ($cashbook['amount'] ?? 0));
+        $this->assertSame(25.0, (float) ($cashbook['debt_before'] ?? 0));
+        $this->assertSame(75.0, (float) ($cashbook['debt_after'] ?? 0));
+    }
+
     private function resetSchema(): void
     {
         $db = Database::connect();
@@ -537,6 +657,7 @@ final class TransactionServiceTest extends CIUnitTestCase
             'debt_cashbook_entries',
             'inventory_movements',
             'transaction_items',
+            'transaction_payments',
             'transactions',
             'audit_logs',
             'balances',
@@ -665,6 +786,16 @@ final class TransactionServiceTest extends CIUnitTestCase
             amount REAL NOT NULL DEFAULT 0,
             payment_method TEXT NOT NULL,
             status TEXT NOT NULL,
+            created_at TEXT
+        )');
+
+        $db->query('CREATE TABLE ' . $tn('transaction_payments') . ' (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            transaction_id INTEGER NOT NULL,
+            payment_method TEXT NOT NULL,
+            amount REAL NOT NULL,
+            cash_received REAL,
+            change_due REAL,
             created_at TEXT
         )');
 

@@ -80,6 +80,11 @@ $routes->get('store/payment-methods', 'StoreController::paymentMethods', ['filte
 $routes->post('store/payment-methods/create', 'StoreController::createPaymentMethod', ['filter' => 'access:store.operate']);
 $routes->post('store/payment-methods/update', 'StoreController::updatePaymentMethod', ['filter' => 'access:store.operate']);
 $routes->post('store/payment-methods/delete', 'StoreController::deletePaymentMethod', ['filter' => 'access:store.operate']);
+$routes->get('store/payment-accounts', 'StoreController::paymentAccounts', ['filter' => 'access:store.inspect']);
+$routes->post('store/payment-accounts/save', 'StoreController::savePaymentAccount', ['filter' => 'access:store.operate']);
+$routes->post('store/payment-accounts/upload-qr', 'StoreController::uploadPaymentAccountQr', ['filter' => 'access:store.operate']);
+$routes->post('store/payment-methods/upload-image', 'StoreController::uploadPaymentMethodImage', ['filter' => 'access:store.operate']);
+$routes->post('store/payment-accounts/deactivate', 'StoreController::deactivatePaymentAccount', ['filter' => 'access:store.operate']);
 $routes->get('store/day-session/status', 'StoreController::daySessionStatus', ['filter' => 'access:store.inspect']);
 $routes->post('store/day-session/open', 'StoreController::openDaySession', ['filter' => 'access:store.operate']);
 $routes->post('store/day-session/close', 'StoreController::closeDaySession', ['filter' => 'access:store.operate']);

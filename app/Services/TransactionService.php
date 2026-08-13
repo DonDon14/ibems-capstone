@@ -7,11 +7,13 @@ use App\Models\BalanceModel;
 use App\Models\DebtCashbookEntryModel;
 use App\Models\InventoryMovementModel;
 use App\Models\ProductModel;
+use App\Models\PaymentDestinationAccountModel;
 use App\Models\StoreDaySessionModel;
 use App\Models\StoreModel;
 use App\Models\StorePaymentMethodModel;
 use App\Models\TransactionItemModel;
 use App\Models\TransactionModel;
+use App\Models\TransactionPaymentModel;
 use App\Models\UserModel;
 use Config\Database;
 use Config\Services;
@@ -23,7 +25,8 @@ class TransactionService
         $validation = Services::validation();
         $validation->setRules([
             'store_id' => 'required|is_natural_no_zero',
-            'payment_method' => 'required|max_length[50]',
+            'payment_method' => 'permit_empty|max_length[50]',
+            'payments' => 'permit_empty',
             'customer_user_id' => 'permit_empty|is_natural_no_zero',
             'customer_type' => 'permit_empty|in_list[walk_in,faculty,staff,student]',
             'debt_pin' => 'permit_empty|regex_match[/^[0-9]{4,6}$/]',
@@ -40,6 +43,7 @@ class TransactionService
         $customerType = (string) ($request['customer_type'] ?? 'walk_in');
         $debtPin = trim((string) ($request['debt_pin'] ?? ''));
         $cashReceived = isset($request['cash_received']) ? (float) $request['cash_received'] : null;
+        $requestedPayments = $request['payments'] ?? [];
         $items = $request['items'] ?? [];
 
         if (!is_array($items) || $items === []) {
@@ -76,7 +80,7 @@ class TransactionService
 
         $paymentMethodModel = new StorePaymentMethodModel();
         $paymentMethodModel->ensureDefaults($storeId);
-        if ($paymentMethod === '' || !$paymentMethodModel->isAllowedForStore($storeId, $paymentMethod)) {
+        if ($paymentMethod === '' && (!is_array($requestedPayments) || $requestedPayments === [])) {
             return $this->error('Invalid or disabled payment method.');
         }
 
@@ -117,18 +121,33 @@ class TransactionService
             ];
         }
 
-        $changeDue = null;
-        if ($paymentMethod === 'cash') {
-            if ($cashReceived === null || !is_finite($cashReceived) || $cashReceived < $totalAmount) {
-                return $this->error('Cash received must cover the transaction total.');
-            }
-            $changeDue = round($cashReceived - $totalAmount, 2);
+        try {
+            $paymentLines = $this->normalizePaymentLines(
+                is_array($requestedPayments) ? $requestedPayments : [],
+                $paymentMethod,
+                $totalAmount,
+                $cashReceived,
+                $paymentMethodModel,
+                $storeId
+            );
+        } catch (\InvalidArgumentException $e) {
+            return $this->error($e->getMessage());
         }
+        $paymentMethod = count($paymentLines) > 1 ? 'split' : (string) $paymentLines[0]['payment_method'];
+        $supportsPaymentLines = $this->transactionPaymentsTableExists(Database::connect());
+        if (count($paymentLines) > 1 && !$supportsPaymentLines) {
+            return $this->error('Split payment is not available until the transaction payments migration is applied.');
+        }
+        $cashLine = array_values(array_filter($paymentLines, static fn (array $line): bool => $line['payment_method'] === 'cash'))[0] ?? null;
+        $debtLine = array_values(array_filter($paymentLines, static fn (array $line): bool => $line['payment_method'] === 'debt'))[0] ?? null;
+        $debtAmount = (float) ($debtLine['amount'] ?? 0);
+        $cashReceived = $cashLine['cash_received'] ?? null;
+        $changeDue = $cashLine['change_due'] ?? null;
 
         $balanceModel = new BalanceModel();
         $debtCashbookModel = new DebtCashbookEntryModel();
         $debtBalanceBefore = null;
-        if ($paymentMethod === 'debt') {
+        if ($debtLine !== null) {
             if (!$customerUserId) {
                 return $this->error('Please select a faculty/staff customer for debt transactions.');
             }
@@ -147,7 +166,7 @@ class TransactionService
                 $debtPin,
                 $actorId,
                 $storeId,
-                $totalAmount
+                $debtAmount
             );
             if (($pinAuthorization['status'] ?? 'error') !== 'success') {
                 return $pinAuthorization;
@@ -156,6 +175,7 @@ class TransactionService
 
         $transactionModel = new TransactionModel();
         $transactionItemModel = new TransactionItemModel();
+        $transactionPaymentModel = new TransactionPaymentModel();
         $movementModel = new InventoryMovementModel();
         $auditLogModel = new AuditLogModel();
 
@@ -166,7 +186,7 @@ class TransactionService
         $createdAt = date('Y-m-d H:i:s');
 
         try {
-            if ($paymentMethod === 'debt') {
+            if ($debtLine !== null) {
                 $debtBalanceBefore = $balanceModel->getBalanceForUpdate((int) $customerUserId);
                 if (!$debtBalanceBefore) {
                     throw new \RuntimeException('Balance record not found.');
@@ -174,7 +194,7 @@ class TransactionService
 
                 $availableCredit = (float) $debtBalanceBefore['credit_limit']
                     - (float) $debtBalanceBefore['current_debt'];
-                if ($availableCredit < $totalAmount) {
+                if ($availableCredit < $debtAmount) {
                     throw new \RuntimeException('Insufficient credit.');
                 }
             }
@@ -192,6 +212,25 @@ class TransactionService
 
             if (!$txnId) {
                 throw new \RuntimeException('Failed to create transaction.');
+            }
+
+            foreach ($supportsPaymentLines ? $paymentLines : [] as $paymentLine) {
+                $paymentPayload = [
+                    'transaction_id' => $txnId,
+                    'payment_method' => $paymentLine['payment_method'],
+                    'amount' => $paymentLine['amount'],
+                    'cash_received' => $paymentLine['cash_received'],
+                    'change_due' => $paymentLine['change_due'],
+                    'created_at' => $createdAt,
+                ];
+                if (array_key_exists('destination_account_id', $paymentLine)) {
+                    $paymentPayload['destination_account_id'] = $paymentLine['destination_account_id'];
+                    $paymentPayload['destination_account_name'] = $paymentLine['destination_account_name'];
+                    $paymentPayload['destination_account_number'] = $paymentLine['destination_account_number'];
+                }
+                if (!$transactionPaymentModel->insert($paymentPayload)) {
+                    throw new \RuntimeException('Failed to create transaction payment line.');
+                }
             }
 
             foreach ($productSnapshot as $row) {
@@ -240,6 +279,7 @@ class TransactionService
                     'amount' => $totalAmount,
                     'cash_received' => $cashReceived,
                     'change_due' => $changeDue,
+                    'payments' => $paymentLines,
                     'items' => array_values(array_map(static function (int $productId, int $qty): array {
                         return ['product_id' => $productId, 'qty' => $qty];
                     }, array_keys($aggregatedItems), $aggregatedItems)),
@@ -249,22 +289,22 @@ class TransactionService
                 throw new \RuntimeException('Failed to write audit log.');
             }
 
-            if ($paymentMethod === 'debt') {
-                if (!$balanceModel->addDebt((int) $customerUserId, $totalAmount)) {
+            if ($debtLine !== null) {
+                if (!$balanceModel->addDebt((int) $customerUserId, $debtAmount)) {
                     throw new \RuntimeException('Failed to update debt balance.');
                 }
 
                 $debtBalanceAfter = $balanceModel->getBalanceByUserId((int) $customerUserId);
                 $creditLimit = (float) ($debtBalanceAfter['credit_limit'] ?? $debtBalanceBefore['credit_limit'] ?? 0);
                 $debtBefore = (float) ($debtBalanceBefore['current_debt'] ?? 0);
-                $debtAfter = (float) ($debtBalanceAfter['current_debt'] ?? ($debtBefore + $totalAmount));
+                $debtAfter = (float) ($debtBalanceAfter['current_debt'] ?? ($debtBefore + $debtAmount));
                 $availableAfter = max(0, $creditLimit - $debtAfter);
 
                 $debtCashbookModel->insert([
                     'user_id' => $customerUserId,
                     'entry_type' => 'debt_purchase',
                     'direction' => 'debit',
-                    'amount' => $totalAmount,
+                    'amount' => $debtAmount,
                     'debt_before' => $debtBefore,
                     'debt_after' => $debtAfter,
                     'credit_limit_snapshot' => $creditLimit,
@@ -276,6 +316,7 @@ class TransactionService
                     'meta_json' => json_encode([
                         'store_id' => $storeId,
                         'payment_method' => 'debt',
+                        'transaction_payment_amount' => $debtAmount,
                         'transaction_id' => (int) $txnId,
                     ]),
                     'created_at' => $createdAt,
@@ -301,8 +342,114 @@ class TransactionService
             'total_amount' => $totalAmount,
             'cash_received' => $cashReceived,
             'change_due' => $changeDue,
+            'payments' => $paymentLines,
             'code' => 200,
         ];
+    }
+
+    private function normalizePaymentLines(
+        array $requestedPayments,
+        string $legacyMethod,
+        float $totalAmount,
+        ?float $legacyCashReceived,
+        StorePaymentMethodModel $paymentMethodModel,
+        int $storeId
+    ): array {
+        $rawLines = $requestedPayments;
+        if ($rawLines === []) {
+            $rawLines = [[
+                'payment_method' => $legacyMethod,
+                'amount' => $totalAmount,
+                'cash_received' => $legacyCashReceived,
+            ]];
+        }
+
+        $lines = [];
+        $seen = [];
+        foreach ($rawLines as $rawLine) {
+            if (!is_array($rawLine)) {
+                throw new \InvalidArgumentException('Invalid payment line.');
+            }
+            $method = strtolower(trim((string) ($rawLine['payment_method'] ?? '')));
+            $amount = round((float) ($rawLine['amount'] ?? 0), 2);
+            if ($method === '' || !$paymentMethodModel->isAllowedForStore($storeId, $method)) {
+                throw new \InvalidArgumentException('Invalid or disabled payment method.');
+            }
+            if (isset($seen[$method])) {
+                throw new \InvalidArgumentException('Duplicate payment method.');
+            }
+            if (!is_finite($amount) || $amount <= 0) {
+                throw new \InvalidArgumentException('Each payment amount must be greater than zero.');
+            }
+            $seen[$method] = true;
+            $lines[] = [
+                'payment_method' => $method,
+                'amount' => $amount,
+                'cash_received' => isset($rawLine['cash_received']) ? (float) $rawLine['cash_received'] : null,
+                'change_due' => null,
+            ];
+            $lineIndex = array_key_last($lines);
+            if (!in_array($method, ['cash', 'debt'], true)) {
+                $db = Database::connect();
+                if ($db->tableExists('payment_destination_accounts')) {
+                    $accountId = (int) ($rawLine['destination_account_id'] ?? 0);
+                    $account = $accountId > 0 ? (new PaymentDestinationAccountModel())->find($accountId) : null;
+                    if (!$account || (int) $account['store_id'] !== $storeId || !ibems_bool($account['is_active'] ?? false)) {
+                        throw new \InvalidArgumentException('Select an active receiving account for ' . $method . '.');
+                    }
+                    $methodRow = $paymentMethodModel->find((int) $account['payment_method_id']);
+                    if (!$methodRow || (string) $methodRow['code'] !== $method) {
+                        throw new \InvalidArgumentException('The selected receiving account does not match the payment method.');
+                    }
+                    $lines[$lineIndex]['destination_account_id'] = $accountId;
+                    $lines[$lineIndex]['destination_account_name'] = (string) $account['account_name'];
+                    $lines[$lineIndex]['destination_account_number'] = (string) $account['account_number'];
+                }
+            }
+        }
+
+        $allocatedCents = array_sum(array_map(static fn (array $line): int => (int) round($line['amount'] * 100), $lines));
+        if ($allocatedCents !== (int) round($totalAmount * 100)) {
+            throw new \InvalidArgumentException('Payment amounts must equal the transaction total.');
+        }
+
+        foreach ($lines as &$line) {
+            if ($line['payment_method'] !== 'cash') {
+                $line['cash_received'] = null;
+                continue;
+            }
+            $received = $line['cash_received'];
+            if ($received === null && count($lines) === 1) {
+                $received = $legacyCashReceived;
+            }
+            if ($received === null || !is_finite($received) || $received < $line['amount']) {
+                throw new \InvalidArgumentException('Cash received must cover the cash payment amount.');
+            }
+            $line['cash_received'] = round($received, 2);
+            $line['change_due'] = round($received - $line['amount'], 2);
+        }
+        unset($line);
+
+        return $lines;
+    }
+
+    private function transactionPaymentsTableExists($db): bool
+    {
+        $tableName = $db->getPrefix() . 'transaction_payments';
+        try {
+            if (stripos((string) ($db->DBDriver ?? ''), 'SQLite') !== false) {
+                return $db->query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?", [$tableName])
+                    ->getRowArray() !== null;
+            }
+            if (stripos((string) ($db->DBDriver ?? ''), 'Postgre') !== false) {
+                return $db->query("SELECT 1 FROM information_schema.tables WHERE table_schema = current_schema() AND table_name = ?", [$tableName])
+                    ->getRowArray() !== null;
+            }
+            return $db->query("SELECT 1 FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = ?", [$tableName])
+                ->getRowArray() !== null;
+        } catch (\Throwable) {
+            return false;
+        }
     }
 
     private function error(string $message, int $code = 400): array

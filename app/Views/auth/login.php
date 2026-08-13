@@ -11,6 +11,8 @@
     <link rel="icon" type="image/jpeg" href="<?= base_url('assets/images/ustp_claveria_logo.jpg') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.css') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/auth-login.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/password-visibility.css') ?>?v=20260813a">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 </head>
 <body class="auth-modern">
 <?php $ustpLogoUrl = base_url('assets/images/ustp_claveria_logo.jpg'); ?>
@@ -56,5 +58,6 @@
 
     <script src="<?= base_url('assets/js/csrf.js') ?>"></script>
     <script src="<?= base_url('assets/js/auth-login.js') ?>"></script>
+    <script src="<?= base_url('assets/js/password-visibility.js') ?>?v=20260813a"></script>
 </body>
 </html>
