@@ -1,9 +1,14 @@
-# Render Free Development Deployment
+# Render Free Production Deployment
 
-IBEMS runs on Render as a Docker web service and continues to use the existing
+IBEMS runs on Render as a Docker web service in Singapore and continues to use the existing
 Supabase PostgreSQL database and Supabase Storage bucket. Render receives only
 environment-variable names from `render.yaml`; secret values are entered in the
 Render dashboard and are never committed.
+
+The service follows the `production` branch. Automatic deployments are disabled,
+so local development and pushes to other branches cannot change the live system.
+Releases require an intentional merge or cherry-pick into `production`, followed
+by a manual deployment in Render.
 
 ## Required secret values
 
@@ -32,8 +37,8 @@ login loss when Render replaces its temporary filesystem.
 - The web service sleeps after inactivity and may take about one minute to wake.
 - Open the site several minutes before a demonstration.
 - Uploaded images are stored in Supabase Storage, not the Render filesystem.
-- This configuration is for development and capstone demonstrations, not a
-  production payroll deployment.
+- This free configuration is the capstone production/demo service. It is not a
+  paid high-availability payroll deployment.
 
 ## Verification after deployment
 

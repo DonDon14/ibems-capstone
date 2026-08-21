@@ -1,11 +1,13 @@
 services:
   - type: web
-    name: ibems-development
+    name: ibems-production
     runtime: docker
     plan: free
+    region: singapore
+    branch: production
     dockerfilePath: ./Dockerfile
     healthCheckPath: /healthz
-    autoDeployTrigger: commit
+    autoDeployTrigger: off
     envVars:
       - key: CI_ENVIRONMENT
         value: production

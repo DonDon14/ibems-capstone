@@ -12,6 +12,10 @@ final class RenderDeploymentConventionTest extends CIUnitTestCase
 
         $this->assertStringContainsString('runtime: docker', $blueprint);
         $this->assertStringContainsString('plan: free', $blueprint);
+        $this->assertStringContainsString('name: ibems-production', $blueprint);
+        $this->assertStringContainsString('region: singapore', $blueprint);
+        $this->assertStringContainsString('branch: production', $blueprint);
+        $this->assertStringContainsString('autoDeployTrigger: off', $blueprint);
         $this->assertStringContainsString('healthCheckPath: /healthz', $blueprint);
         $this->assertStringContainsString('IBEMS_DATABASE_PASSWORD', $blueprint);
         $this->assertStringContainsString('IBEMS_SUPABASE_SECRET_KEY', $blueprint);
