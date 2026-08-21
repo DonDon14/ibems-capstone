@@ -46,6 +46,10 @@ final class AdminStoreFormConventionTest extends CIUnitTestCase
         foreach (['sortedStoreRows', 'assignmentWarningMarkup', 'storeNeedsAssignment', 'storePaginationMarkup', 'data-store-page', 'store-cards-grid'] as $function) {
             $this->assertStringContainsString($function, $script);
         }
+        $this->assertStringContainsString('store-pagination--single', $script);
+        $this->assertStringContainsString('Needs assignment', $script);
+        $this->assertStringContainsString('class="store-card-action"', $script);
+        $this->assertStringNotContainsString('store-edit-icon', $script);
         $this->assertStringNotContainsString('<table class="stores-table">', $script);
         $this->assertStringContainsString('NOT EXISTS (SELECT 1 FROM store_supervisors', $service);
     }

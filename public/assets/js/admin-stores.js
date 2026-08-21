@@ -341,13 +341,16 @@ function storeLogoMarkup(row, sizeClass = "") {
 
 function assignmentWarningMarkup(row) {
     if (!storeNeedsAssignment(row)) return "";
-    const missing = [];
-    if (Number(row.officer_id || 0) <= 0) missing.push("officer");
-    if (!Array.isArray(row.supervisors) || row.supervisors.length === 0) missing.push("supervisor");
-    return `<span class="assignment-warning"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> Missing ${sEscape(missing.join(" and "))}</span>`;
+    return `<span class="assignment-warning"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> Needs assignment</span>`;
 }
 
 function storePaginationMarkup(totalRows) {
+    if (totalRows <= storePageSize) {
+        return `<div class="store-pagination store-pagination--single" aria-live="polite">
+            <span>Showing all ${totalRows} ${totalRows === 1 ? "store" : "stores"}</span>
+        </div>`;
+    }
+
     const totalPages = Math.max(1, Math.ceil(totalRows / storePageSize));
     const start = totalRows === 0 ? 0 : (storePage - 1) * storePageSize + 1;
     const end = Math.min(storePage * storePageSize, totalRows);
@@ -392,8 +395,8 @@ function renderStores(rows) {
                     <div class="store-card-footer">
                         <small>Created ${row.created_at ? sEscape(sDateOnly(row.created_at)) : "—"}</small>
                         <div class="store-card-actions">
-                            <a href="${sEscape(storeDetailPrefix)}/${row.id}" class="store-view-link">View details <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
-                            ${canManageStores ? `<button class="store-edit-icon" type="button" data-edit-store="${row.id}" aria-label="Edit ${sEscape(row.store_name)}" title="Edit store"><i class="bi bi-pencil" aria-hidden="true"></i></button>` : ""}
+                            <a href="${sEscape(storeDetailPrefix)}/${row.id}" class="store-card-action"><i class="bi bi-eye" aria-hidden="true"></i> View</a>
+                            ${canManageStores ? `<button class="store-card-action" type="button" data-edit-store="${row.id}" aria-label="Edit ${sEscape(row.store_name)}"><i class="bi bi-pencil" aria-hidden="true"></i> Edit</button>` : ""}
                         </div>
                     </div>
                 </div>

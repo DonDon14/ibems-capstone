@@ -168,28 +168,9 @@ body.ibems-modern .admin-stores-modal .people-picker input[type="search"]:focus 
     display: inline-flex;
     align-items: center;
     gap: 5px;
-    color: #9a4d08;
+    color: #8a4a0f;
     font-size: 0.72rem;
     font-weight: 700;
-}
-
-.store-edit-icon {
-    display: inline-grid;
-    width: 36px;
-    height: 36px;
-    place-items: center;
-    border: 1px solid #c7d5e4;
-    border-radius: 9px;
-    background: #fff;
-    color: #0b4b87;
-    cursor: pointer;
-}
-
-.store-edit-icon:hover,
-.store-edit-icon:focus-visible {
-    border-color: #93b7dc;
-    background: #eef6ff;
-    outline: 0;
 }
 
 .store-pagination {
@@ -197,13 +178,18 @@ body.ibems-modern .admin-stores-modal .people-picker input[type="search"]:focus 
     align-items: center;
     justify-content: space-between;
     gap: 14px;
-    padding: 12px 14px;
+    padding: 9px 12px;
     border: 1px solid #d8e2ee;
     border-top: 0;
     border-radius: 0 0 14px 14px;
     background: #f8fbff;
     color: #64748b;
     font-size: 0.75rem;
+}
+
+.store-pagination--single {
+    justify-content: flex-start;
+    min-height: 40px;
 }
 
 .store-page-size,
@@ -253,12 +239,12 @@ body.ibems-modern .store-page-size select {
     background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
     border: 1px solid #d8e2ee;
     border-radius: 14px;
-    min-height: 218px;
-    padding: 16px;
+    min-height: 0;
+    padding: 14px;
     display: grid;
     grid-template-columns: auto 1fr;
-    align-items: start;
-    gap: 14px;
+    align-items: stretch;
+    gap: 12px;
     position: relative;
 }
 
@@ -269,14 +255,15 @@ body.ibems-modern .store-page-size select {
 }
 
 .store-card-logo {
-    width: 64px;
-    height: 64px;
-    border-radius: 14px;
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
     overflow: hidden;
     border: 1px solid #dbe3ea;
     display: grid;
     place-items: center;
     background: #fff7d1;
+    align-self: start;
 }
 
 .store-logo-img {
@@ -297,6 +284,7 @@ body.ibems-modern .store-page-size select {
 .store-card-meta {
     display: flex;
     min-width: 0;
+    height: 100%;
     flex-direction: column;
 }
 
@@ -321,7 +309,11 @@ body.ibems-modern .store-page-size select {
 }
 
 .store-card-meta > .assignment-warning {
-    margin-top: 7px;
+    align-self: flex-start;
+    margin-top: 6px;
+    border-radius: 999px;
+    background: #fff7e6;
+    padding: 3px 7px;
 }
 
 .store-card-title:hover {
@@ -335,13 +327,13 @@ body.ibems-modern .store-page-size select {
 
 .store-mobile-details {
     display: grid;
-    gap: 7px;
-    margin: 12px 0 0;
+    gap: 6px;
+    margin: 10px 0 0;
 }
 
 .store-mobile-details div {
     display: grid;
-    grid-template-columns: 84px minmax(0, 1fr);
+    grid-template-columns: 76px minmax(0, 1fr);
     gap: 8px;
 }
 
@@ -381,7 +373,7 @@ body.ibems-modern .store-page-size select {
     justify-content: space-between;
     gap: 10px;
     margin-top: auto;
-    padding-top: 12px;
+    padding-top: 10px;
     border-top: 1px solid #e5edf5;
 }
 
@@ -393,15 +385,32 @@ body.ibems-modern .store-page-size select {
 .store-card-actions {
     display: flex;
     align-items: center;
-    gap: 7px;
+    gap: 6px;
 }
 
-.store-view-link {
+.store-card-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 30px;
+    border: 1px solid #c7d5e4;
+    border-radius: 8px;
+    background: #fff;
     color: #0b4b87;
-    font-size: 0.73rem;
-    font-weight: 800;
+    padding: 5px 8px;
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 700;
     text-decoration: none;
     white-space: nowrap;
+    cursor: pointer;
+}
+
+.store-card-action:hover,
+.store-card-action:focus-visible {
+    border-color: #93b7dc;
+    background: #eef6ff;
+    outline: 0;
 }
 
 .store-cards-grid + .store-pagination {
@@ -814,6 +823,10 @@ body.admin-stores-modal-open {
 @media (max-width: 760px) {
     .store-card {
         padding: 14px;
+    }
+
+    .store-card-footer {
+        align-items: flex-end;
     }
 
     .store-pagination {
