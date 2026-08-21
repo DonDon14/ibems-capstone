@@ -29,6 +29,7 @@ $roleLabels = [
 ];
 $readableRole = $roleLabels[strtoupper($role)] ?? ucwords(strtolower(str_replace('_', ' ', $role)));
 $profileDetail = trim((string) ($profileDetail ?? $readableRole));
+$portalContext = is_array($portalContext ?? null) ? $portalContext : [];
 if ($role !== '' && str_starts_with($profileDetail, $role)) {
     $profileDetail = $readableRole . substr($profileDetail, strlen($role));
 }
@@ -156,6 +157,9 @@ $ustpLogoUrl = base_url('assets/images/ustp_claveria_logo.jpg');
 <script src="<?= base_url('assets/js/modern-controls.js') ?>"></script>
 <script src="<?= base_url('assets/js/app-dialog.js') ?>"></script>
 <script src="<?= base_url('assets/js/password-visibility.js') ?>?v=20260813a"></script>
+<script>
+window.IBEMS_PORTAL_CONTEXT = <?= json_encode($portalContext, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+</script>
 <?= $this->renderSection('scripts') ?>
 </body>
 </html>

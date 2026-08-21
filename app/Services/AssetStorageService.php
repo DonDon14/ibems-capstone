@@ -9,13 +9,17 @@ class AssetStorageService
 {
     private const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
     private const MAX_FILE_SIZE = 2 * 1024 * 1024;
+    private const EVIDENCE_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
+    private const MAX_EVIDENCE_FILE_SIZE = 5 * 1024 * 1024;
 
     private string $driver;
     private string $supabaseUrl;
     private string $secretKey;
     private string $bucket;
+    private string $privateBucket;
     private $transport;
-    private bool $bucketReady = false;
+    /** @var array<string, bool> */
+    private array $readyBuckets = [];
 
     public function __construct(?array $config = null, ?callable $transport = null)
     {
@@ -24,12 +28,14 @@ class AssetStorageService
             'supabase_url' => getenv('IBEMS_SUPABASE_URL') ?: '',
             'secret_key' => getenv('IBEMS_SUPABASE_SECRET_KEY') ?: '',
             'bucket' => getenv('IBEMS_SUPABASE_STORAGE_BUCKET') ?: 'ibems-assets',
+            'private_bucket' => getenv('IBEMS_SUPABASE_PRIVATE_STORAGE_BUCKET') ?: 'ibems-private',
         ];
 
         $this->driver = strtolower(trim((string) ($config['driver'] ?? 'local')));
         $this->supabaseUrl = rtrim(trim((string) ($config['supabase_url'] ?? '')), '/');
         $this->secretKey = trim((string) ($config['secret_key'] ?? ''));
         $this->bucket = trim((string) ($config['bucket'] ?? 'ibems-assets'));
+        $this->privateBucket = trim((string) ($config['private_bucket'] ?? 'ibems-private'));
         $this->transport = $transport;
     }
 
@@ -56,37 +62,89 @@ class AssetStorageService
 
     public function ensureBucket(): void
     {
-        $this->assertSupabaseConfigured();
-        if ($this->bucketReady) {
+        $this->ensureSupabaseBucket($this->bucket, true, self::MAX_FILE_SIZE, self::ALLOWED_MIME_TYPES);
+    }
+
+    public function ensurePrivateBucket(): void
+    {
+        $this->ensureSupabaseBucket($this->privateBucket, false, self::MAX_EVIDENCE_FILE_SIZE, self::EVIDENCE_MIME_TYPES);
+    }
+
+    /**
+     * @return array{stored_name: string, file_size: int, sha256: string}
+     */
+    public function storeEvidence(UploadedFile $file, string $folder): array
+    {
+        $this->validateEvidence($file);
+        $folder = $this->normalizeFolder($folder);
+        $fileName = $file->getRandomName();
+        $contents = file_get_contents($file->getTempName());
+        if ($contents === false) {
+            throw new \RuntimeException('Unable to read the uploaded evidence file.');
+        }
+
+        if ($this->driver === 'supabase') {
+            $this->ensurePrivateBucket();
+            $this->uploadObject($this->privateBucket, $folder . '/' . $fileName, $contents, (string) $file->getMimeType());
+            $storedName = 'supabase:' . $fileName;
+        } elseif ($this->driver === 'local') {
+            $directory = WRITEPATH . 'private/' . str_replace('/', DIRECTORY_SEPARATOR, $folder);
+            if (!is_dir($directory) && !mkdir($directory, 0700, true) && !is_dir($directory)) {
+                throw new \RuntimeException('Evidence storage is unavailable.');
+            }
+            $file->move($directory, $fileName);
+            $storedName = $fileName;
+        } else {
+            throw new \RuntimeException("Unsupported asset storage driver '{$this->driver}'.");
+        }
+
+        return [
+            'stored_name' => $storedName,
+            'file_size' => strlen($contents),
+            'sha256' => hash('sha256', $contents),
+        ];
+    }
+
+    public function readEvidence(string $storedName, string $folder): string
+    {
+        $folder = $this->normalizeFolder($folder);
+        if (str_starts_with($storedName, 'supabase:')) {
+            $this->assertSupabaseConfigured($this->privateBucket);
+            $fileName = basename(substr($storedName, strlen('supabase:')));
+            $response = $this->request('GET', $this->storageEndpoint(
+                '/object/' . rawurlencode($this->privateBucket) . '/' . $this->encodeObjectPath($folder . '/' . $fileName)
+            ));
+            if ($response['status'] !== 200) {
+                throw new \RuntimeException('Evidence file is unavailable in Supabase Storage (HTTP ' . $response['status'] . ').');
+            }
+
+            return (string) $response['body'];
+        }
+
+        $path = WRITEPATH . 'private/' . str_replace('/', DIRECTORY_SEPARATOR, $folder)
+            . DIRECTORY_SEPARATOR . basename($storedName);
+        $contents = is_file($path) ? file_get_contents($path) : false;
+        if ($contents === false) {
+            throw new \RuntimeException('Evidence file is missing.');
+        }
+
+        return $contents;
+    }
+
+    public function deleteEvidence(string $storedName, string $folder): void
+    {
+        $folder = $this->normalizeFolder($folder);
+        if (str_starts_with($storedName, 'supabase:')) {
+            $fileName = basename(substr($storedName, strlen('supabase:')));
+            $this->deleteSupabaseObject($this->privateBucket, $folder . '/' . $fileName);
             return;
         }
 
-        $bucketUrl = $this->storageEndpoint('/bucket/' . rawurlencode($this->bucket));
-        $response = $this->request('GET', $bucketUrl);
-        if ($response['status'] === 200) {
-            $this->bucketReady = true;
-            return;
+        $path = WRITEPATH . 'private/' . str_replace('/', DIRECTORY_SEPARATOR, $folder)
+            . DIRECTORY_SEPARATOR . basename($storedName);
+        if (is_file($path)) {
+            @unlink($path);
         }
-
-        if (!$this->isMissingResourceResponse($response)) {
-            throw new \RuntimeException(
-                'Unable to verify the Supabase Storage bucket (HTTP ' . $response['status'] . $this->responseDetail($response) . ').'
-            );
-        }
-
-        $response = $this->request('POST', $this->storageEndpoint('/bucket'), json_encode([
-            'id' => $this->bucket,
-            'name' => $this->bucket,
-            'public' => true,
-            'file_size_limit' => self::MAX_FILE_SIZE,
-            'allowed_mime_types' => self::ALLOWED_MIME_TYPES,
-        ], JSON_THROW_ON_ERROR), ['Content-Type: application/json']);
-
-        if (!in_array($response['status'], [200, 201], true)) {
-            throw new \RuntimeException('Unable to create the Supabase Storage bucket (HTTP ' . $response['status'] . ').');
-        }
-
-        $this->bucketReady = true;
     }
 
     /**
@@ -143,6 +201,19 @@ class AssetStorageService
         }
     }
 
+    private function validateEvidence(UploadedFile $file): void
+    {
+        if (!$file->isValid() || $file->hasMoved()) {
+            throw new \RuntimeException('A valid evidence file is required.');
+        }
+
+        if (!in_array((string) $file->getMimeType(), self::EVIDENCE_MIME_TYPES, true)
+            || (int) $file->getSize() <= 0
+            || (int) $file->getSize() > self::MAX_EVIDENCE_FILE_SIZE) {
+            throw new \RuntimeException('Evidence must be a PDF, JPG, or PNG file up to 5 MB.');
+        }
+    }
+
     private function uploadToSupabase(UploadedFile $file, string $objectPath): string
     {
         $this->ensureBucket();
@@ -151,15 +222,7 @@ class AssetStorageService
             throw new \RuntimeException('Unable to read the uploaded image.');
         }
 
-        $url = $this->storageEndpoint('/object/' . rawurlencode($this->bucket) . '/' . $this->encodeObjectPath($objectPath));
-        $response = $this->request('POST', $url, $contents, [
-            'Content-Type: ' . $file->getMimeType(),
-            'x-upsert: false',
-        ]);
-
-        if (!in_array($response['status'], [200, 201], true)) {
-            throw new \RuntimeException('Unable to upload the image to Supabase Storage (HTTP ' . $response['status'] . ').');
-        }
+        $this->uploadObject($this->bucket, $objectPath, $contents, (string) $file->getMimeType());
 
         return $this->storageEndpoint('/object/public/' . rawurlencode($this->bucket) . '/' . $this->encodeObjectPath($objectPath));
     }
@@ -191,29 +254,75 @@ class AssetStorageService
             return;
         }
 
-        $objectPath = rawurldecode(substr($url, strlen($prefix)));
-        $response = $this->request(
-            'DELETE',
-            $this->storageEndpoint('/object/' . rawurlencode($this->bucket)),
-            json_encode(['prefixes' => [$objectPath]], JSON_THROW_ON_ERROR),
-            ['Content-Type: application/json']
-        );
-
-        if (!in_array($response['status'], [200, 204], true)) {
-            log_message('warning', 'Supabase Storage cleanup failed for a replaced asset with HTTP {status}.', [
-                'status' => $response['status'],
-            ]);
-        }
+        $this->deleteSupabaseObject($this->bucket, rawurldecode(substr($url, strlen($prefix))));
     }
 
-    private function assertSupabaseConfigured(): void
+    private function assertSupabaseConfigured(?string $bucket = null): void
     {
-        if ($this->supabaseUrl === '' || $this->secretKey === '' || $this->bucket === '') {
+        if ($this->supabaseUrl === '' || $this->secretKey === '' || trim((string) ($bucket ?? $this->bucket)) === '') {
             throw new \RuntimeException('Supabase Storage is not configured. Set the server-side storage environment variables.');
         }
 
         if (!str_starts_with($this->supabaseUrl, 'https://')) {
             throw new \RuntimeException('Supabase Storage URL must use HTTPS.');
+        }
+    }
+
+    /** @param list<string> $allowedMimeTypes */
+    private function ensureSupabaseBucket(string $bucket, bool $public, int $fileSizeLimit, array $allowedMimeTypes): void
+    {
+        $this->assertSupabaseConfigured($bucket);
+        if (isset($this->readyBuckets[$bucket])) {
+            return;
+        }
+
+        $response = $this->request('GET', $this->storageEndpoint('/bucket/' . rawurlencode($bucket)));
+        if ($response['status'] === 200) {
+            $this->readyBuckets[$bucket] = true;
+            return;
+        }
+        if (!$this->isMissingResourceResponse($response)) {
+            throw new \RuntimeException(
+                'Unable to verify the Supabase Storage bucket (HTTP ' . $response['status'] . $this->responseDetail($response) . ').'
+            );
+        }
+
+        $response = $this->request('POST', $this->storageEndpoint('/bucket'), json_encode([
+            'id' => $bucket,
+            'name' => $bucket,
+            'public' => $public,
+            'file_size_limit' => $fileSizeLimit,
+            'allowed_mime_types' => $allowedMimeTypes,
+        ], JSON_THROW_ON_ERROR), ['Content-Type: application/json']);
+        if (!in_array($response['status'], [200, 201], true)) {
+            throw new \RuntimeException('Unable to create the Supabase Storage bucket (HTTP ' . $response['status'] . ').');
+        }
+        $this->readyBuckets[$bucket] = true;
+    }
+
+    private function uploadObject(string $bucket, string $objectPath, string $contents, string $mimeType): void
+    {
+        $response = $this->request(
+            'POST',
+            $this->storageEndpoint('/object/' . rawurlencode($bucket) . '/' . $this->encodeObjectPath($objectPath)),
+            $contents,
+            ['Content-Type: ' . $mimeType, 'x-upsert: false']
+        );
+        if (!in_array($response['status'], [200, 201], true)) {
+            throw new \RuntimeException('Unable to upload the file to Supabase Storage (HTTP ' . $response['status'] . ').');
+        }
+    }
+
+    private function deleteSupabaseObject(string $bucket, string $objectPath): void
+    {
+        $response = $this->request(
+            'DELETE',
+            $this->storageEndpoint('/object/' . rawurlencode($bucket)),
+            json_encode(['prefixes' => [$objectPath]], JSON_THROW_ON_ERROR),
+            ['Content-Type: application/json']
+        );
+        if (!in_array($response['status'], [200, 204], true)) {
+            log_message('warning', 'Supabase Storage cleanup failed with HTTP {status}.', ['status' => $response['status']]);
         }
     }
 

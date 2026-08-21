@@ -26,7 +26,7 @@ class AuthController extends Controller
 
         $userModel = new UserModel();
 
-        $user = $userModel->getActiveUserByEmail($email);
+        $user = $userModel->getActiveUserWithRolesByEmail($email);
 
         if (!$user) {
             return $this->response->setStatusCode(401)->setJSON([
@@ -54,6 +54,7 @@ class AuthController extends Controller
             'email'     => $user['email'],
             'role'      => $activeRole,
             'available_roles' => $roles,
+            'roles_refreshed_at' => time(),
             'profile_image_url' => $user['profile_image_url'] ?? null,
             'logged_in' => true
         ]);

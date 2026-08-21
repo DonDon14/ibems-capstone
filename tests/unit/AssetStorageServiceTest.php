@@ -101,6 +101,34 @@ final class AssetStorageServiceTest extends CIUnitTestCase
         $this->assertSame(['prefixes' => ['store-logos/old.png']], json_decode((string) $delete['body'], true));
     }
 
+    public function testEvidenceUsesPrivateSupabaseBucketAndAuthenticatedDownload(): void
+    {
+        $requests = [];
+        $transport = static function (string $method, string $url, array $headers, ?string $body) use (&$requests): array {
+            $requests[] = compact('method', 'url', 'headers', 'body');
+            if ($method === 'GET' && str_contains($url, '/storage/v1/bucket/')) {
+                return ['status' => 404, 'body' => '{}'];
+            }
+            if ($method === 'GET' && str_contains($url, '/storage/v1/object/ibems-private/')) {
+                return ['status' => 200, 'body' => 'private-evidence'];
+            }
+
+            return ['status' => 200, 'body' => '{}'];
+        };
+        $service = new AssetStorageService($this->supabaseConfig(), $transport);
+
+        $stored = $service->storeEvidence($this->uploadedPng(), 'variance-evidence/12');
+        $contents = $service->readEvidence($stored['stored_name'], 'variance-evidence/12');
+
+        $this->assertStringStartsWith('supabase:', $stored['stored_name']);
+        $this->assertSame('private-evidence', $contents);
+        $this->assertCount(4, $requests);
+        $this->assertStringContainsString('"public":false', (string) $requests[1]['body']);
+        $this->assertStringContainsString('/storage/v1/object/ibems-private/variance-evidence/12/', $requests[2]['url']);
+        $this->assertStringNotContainsString('/object/public/', $requests[2]['url']);
+        $this->assertContains('Authorization: Bearer test-secret', $requests[3]['headers']);
+    }
+
     public function testSupabaseDriverRejectsMissingSecretBeforeNetworkRequest(): void
     {
         $service = new AssetStorageService([
@@ -127,6 +155,7 @@ final class AssetStorageServiceTest extends CIUnitTestCase
             'supabase_url' => 'https://project.supabase.co',
             'secret_key' => 'test-secret',
             'bucket' => 'ibems-assets',
+            'private_bucket' => 'ibems-private',
         ];
     }
 

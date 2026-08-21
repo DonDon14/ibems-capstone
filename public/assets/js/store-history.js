@@ -93,6 +93,13 @@ function renderTransactions(transactions, summary = null) {
 }
 
 async function loadStores() {
+    const context = window.IBEMS_PORTAL_CONTEXT || {};
+    if (Array.isArray(context.stores) && context.stores.length > 0) {
+        historyStores = context.stores;
+        historyActiveStoreId = Number(context.default_store_id || historyStores[0].id);
+        return;
+    }
+
     const response = await fetch("/store/my-stores");
     const data = await response.json();
 

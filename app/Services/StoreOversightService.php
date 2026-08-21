@@ -632,25 +632,33 @@ public function reviewStoreDayVariance(RequestInterface $request, ResponseInterf
         }
 
         $actorId = (int) session()->get('user_id');
-        $storedName = bin2hex(random_bytes(24)) . '.' . $allowed[$mime];
-        $directory = WRITEPATH . 'private/variance-evidence/' . $caseId;
-        if (!is_dir($directory) && !mkdir($directory, 0700, true) && !is_dir($directory)) {
+        $folder = 'variance-evidence/' . $caseId;
+        $storage = new AssetStorageService();
+        try {
+            $stored = $storage->storeEvidence($file, $folder);
+        } catch (\RuntimeException $exception) {
+            log_message('error', 'Variance evidence upload failed: {message}', ['message' => $exception->getMessage()]);
             return $response->setStatusCode(500)->setJSON(['status' => 'error', 'message' => 'Evidence storage is unavailable.']);
         }
-        $file->move($directory, $storedName);
-        $path = $directory . DIRECTORY_SEPARATOR . $storedName;
+
+        $storedName = $stored['stored_name'];
+        $fileSize = $stored['file_size'];
+        $sha256 = $stored['sha256'];
         $now = date('Y-m-d H:i:s');
         $description = mb_substr(trim((string) $request->getPost('description')), 0, 255);
         $db->transStart();
         $db->table('store_day_variance_case_attachments')->insert([
             'case_id' => $caseId, 'uploaded_by' => $actorId, 'original_name' => basename((string) $file->getClientName()),
-            'stored_name' => $storedName, 'mime_type' => $mime, 'file_size' => filesize($path), 'sha256' => hash_file('sha256', $path),
+            'stored_name' => $storedName, 'mime_type' => $mime, 'file_size' => $fileSize, 'sha256' => $sha256,
             'description' => $description !== '' ? $description : null, 'retention_until' => date('Y-m-d', strtotime($now . ' +7 years')), 'created_at' => $now,
         ]);
         $attachmentId = (int) $db->insertID();
-        $this->appendVarianceEvent($db, $caseId, $actorId, 'evidence_attached', $description ?: 'Evidence file attached.', ['attachment_id' => $attachmentId, 'mime_type' => $mime, 'file_size' => filesize($path)], $now);
+        $this->appendVarianceEvent($db, $caseId, $actorId, 'evidence_attached', $description ?: 'Evidence file attached.', ['attachment_id' => $attachmentId, 'mime_type' => $mime, 'file_size' => $fileSize], $now);
         $db->transComplete();
-        if (!$db->transStatus()) { @unlink($path); return $response->setStatusCode(500)->setJSON(['status' => 'error', 'message' => 'Failed to record evidence.']); }
+        if (!$db->transStatus()) {
+            $storage->deleteEvidence($storedName, $folder);
+            return $response->setStatusCode(500)->setJSON(['status' => 'error', 'message' => 'Failed to record evidence.']);
+        }
         return $response->setJSON(['status' => 'success', 'attachment_id' => $attachmentId]);
     }
 
@@ -659,9 +667,25 @@ public function reviewStoreDayVariance(RequestInterface $request, ResponseInterf
         $db = Database::connect();
         $attachment = $db->table('store_day_variance_case_attachments a')->select('a.*, c.store_id')->join('store_day_variance_cases c', 'c.id = a.case_id')->where('a.id', $attachmentId)->get()->getRowArray();
         if (!$attachment || !$this->canAccessStoreForAdminArea((int) $attachment['store_id'])) return $response->setStatusCode(404)->setBody('Evidence not found.');
-        $path = WRITEPATH . 'private/variance-evidence/' . (int) $attachment['case_id'] . DIRECTORY_SEPARATOR . basename((string) $attachment['stored_name']);
-        if (!is_file($path) || !hash_equals((string) $attachment['sha256'], hash_file('sha256', $path))) return $response->setStatusCode(410)->setBody('Evidence file is missing or failed integrity verification.');
-        return $response->download($path, null)->setFileName((string) $attachment['original_name']);
+        try {
+            $contents = (new AssetStorageService())->readEvidence(
+                (string) $attachment['stored_name'],
+                'variance-evidence/' . (int) $attachment['case_id']
+            );
+        } catch (\RuntimeException $exception) {
+            log_message('warning', 'Variance evidence download failed: {message}', ['message' => $exception->getMessage()]);
+            return $response->setStatusCode(410)->setBody('Evidence file is missing or failed integrity verification.');
+        }
+        if (!hash_equals((string) $attachment['sha256'], hash('sha256', $contents))) {
+            return $response->setStatusCode(410)->setBody('Evidence file is missing or failed integrity verification.');
+        }
+
+        $originalName = str_replace(["\r", "\n"], '', basename((string) $attachment['original_name']));
+        return $response
+            ->setHeader('Content-Type', (string) $attachment['mime_type'])
+            ->setHeader('Content-Length', (string) strlen($contents))
+            ->setHeader('Content-Disposition', "attachment; filename*=UTF-8''" . rawurlencode($originalName))
+            ->setBody($contents);
     }
 
     public function handoffVarianceCase(RequestInterface $request, ResponseInterface $response, int $caseId): ResponseInterface

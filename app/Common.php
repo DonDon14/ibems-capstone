@@ -46,7 +46,7 @@ if (! function_exists('ibems_available_roles')) {
 }
 
 if (! function_exists('ibems_refresh_session_roles')) {
-    function ibems_refresh_session_roles(): array
+    function ibems_refresh_session_roles(bool $force = false): array
     {
         if (! session()->get('logged_in')) {
             return [];
@@ -57,9 +57,18 @@ if (! function_exists('ibems_refresh_session_roles')) {
             return ibems_available_roles();
         }
 
+        $configuredInterval = getenv('IBEMS_ROLE_REFRESH_INTERVAL');
+        $refreshInterval = is_numeric($configuredInterval)
+            ? max(0, min(300, (int) $configuredInterval))
+            : (ENVIRONMENT === 'testing' ? 0 : 30);
+        $lastRefresh = (int) (session()->get('roles_refreshed_at') ?? 0);
+        if (! $force && $refreshInterval > 0 && $lastRefresh > 0 && (time() - $lastRefresh) < $refreshInterval) {
+            return ibems_available_roles();
+        }
+
         try {
             $userModel = new \App\Models\UserModel();
-            $user = $userModel->getActiveUserById($userId);
+            $user = $userModel->getActiveUserWithRolesById($userId);
             if (! $user) {
                 session()->destroy();
                 return [];
@@ -80,6 +89,7 @@ if (! function_exists('ibems_refresh_session_roles')) {
             session()->set([
                 'available_roles' => $roles,
                 'role' => $currentRole,
+                'roles_refreshed_at' => time(),
             ]);
 
             return $roles;
