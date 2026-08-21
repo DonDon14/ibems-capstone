@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/admin') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/admin-stores.css') ?>?v=20260821a">
+<link rel="stylesheet" href="<?= base_url('assets/css/admin-stores.css') ?>?v=20260821b">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -105,7 +105,7 @@
                 </select>
                 <small class="field-help">New stores default to inactive so they can be configured safely before opening.</small>
             </div>
-            <div class="field is-hidden" id="store-deactivation-reason-field">
+            <div class="field is-hidden" id="store-deactivation-reason-field" hidden>
                 <label for="store-deactivation-reason">Deactivation Reason</label>
                 <textarea id="store-deactivation-reason" rows="3" placeholder="Required when deactivating a store"></textarea>
                 <small class="field-help">Open store days and unresolved variance cases must be completed first. History will remain available.</small>
@@ -121,5 +121,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/admin-stores.js') ?>?v=20260821a"></script>
+<script src="<?= base_url('assets/js/admin-stores.js') ?>?v=20260821b"></script>
 <?= $this->endSection() ?>

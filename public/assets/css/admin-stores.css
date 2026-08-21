@@ -256,7 +256,7 @@
     z-index: 1300;
 }
 
-.admin-stores-modal .admin-modal-card {
+body.ibems-modern .admin-stores-modal .admin-modal-card {
     display: grid;
     grid-template-rows: auto minmax(0, 1fr) auto;
     width: min(920px, 100%);
@@ -307,9 +307,33 @@
     overscroll-behavior: contain;
     scrollbar-gutter: stable;
     padding: 16px 20px 20px;
+    scrollbar-color: #94a3b8 transparent;
+    scrollbar-width: thin;
 }
 
-.admin-stores-modal .field.is-hidden {
+.admin-stores-modal-body::-webkit-scrollbar {
+    width: 9px;
+}
+
+.admin-stores-modal-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.admin-stores-modal-body::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: #94a3b8;
+    background-clip: padding-box;
+}
+
+.admin-stores-modal-body::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+}
+
+body.ibems-modern .admin-stores-modal .field.is-hidden,
+body.ibems-modern .admin-stores-modal .field[hidden] {
     display: none;
 }
 
@@ -493,7 +517,7 @@ body.admin-stores-modal-open {
         padding: 10px;
     }
 
-    .admin-stores-modal .admin-modal-card {
+    body.ibems-modern .admin-stores-modal .admin-modal-card {
         max-height: calc(100dvh - 20px);
     }
 

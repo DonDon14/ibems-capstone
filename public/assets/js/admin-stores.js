@@ -415,7 +415,11 @@ function updateDeactivationReasonVisibility() {
     const isDeactivating = Boolean(editingStoreId)
         && editingInitialIsActive
         && document.getElementById("store-active").value === "0";
-    document.getElementById("store-deactivation-reason-field")?.classList.toggle("is-hidden", !isDeactivating);
+    const reasonField = document.getElementById("store-deactivation-reason-field");
+    if (!reasonField) return;
+    reasonField.hidden = !isDeactivating;
+    reasonField.classList.toggle("is-hidden", !isDeactivating);
+    if (!isDeactivating) document.getElementById("store-deactivation-reason").value = "";
 }
 document.getElementById("store-active")?.addEventListener("change", updateDeactivationReasonVisibility);
 document.getElementById("store-logo-source")?.addEventListener("change", (event) => {
