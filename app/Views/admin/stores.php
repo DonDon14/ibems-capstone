@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/admin') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/admin-stores.css') ?>?v=20260821b">
+<link rel="stylesheet" href="<?= base_url('assets/css/admin-stores.css') ?>?v=20260821c">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -62,20 +62,25 @@
             </div>
             <div class="field">
                 <label for="store-officer-search">Store Officer</label>
-                <div class="officer-picker-row">
-                    <input id="store-officer-search" type="search" placeholder="Optional: type name, email, or employee ID">
+                <div id="store-officer-picker" class="people-picker" data-selection-mode="single">
+                    <div id="store-officer-selected" class="people-picker-values"></div>
+                    <input id="store-officer-search" type="search" role="combobox" autocomplete="off"
+                        aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false" aria-controls="store-officer-suggestions"
+                        placeholder="Optional: type name, email, or employee ID">
                 </div>
                 <input id="store-officer-id" type="hidden">
-                <div id="store-officer-suggestions" class="officer-suggestions is-hidden"></div>
+                <div id="store-officer-suggestions" class="officer-suggestions is-hidden" role="listbox" aria-label="Store officer suggestions"></div>
                 <small id="store-officer-help" class="field-help">Optional while inactive. An active store requires a primary officer.</small>
             </div>
             <div class="field store-supervisors-field">
                 <label for="store-supervisor-search">Store Supervisors</label>
-                <div class="officer-picker-row">
-                    <input id="store-supervisor-search" type="search" placeholder="Optional: type name, email, or employee ID">
+                <div id="store-supervisor-picker" class="people-picker" data-selection-mode="multiple">
+                    <div id="store-supervisor-selected" class="people-picker-values"></div>
+                    <input id="store-supervisor-search" type="search" role="combobox" autocomplete="off"
+                        aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false" aria-controls="store-supervisor-suggestions"
+                        placeholder="Optional: type name, email, or employee ID">
                 </div>
-                <div id="store-supervisor-selected" class="supervisor-selected-list"></div>
-                <div id="store-supervisor-suggestions" class="officer-suggestions is-hidden"></div>
+                <div id="store-supervisor-suggestions" class="officer-suggestions is-hidden" role="listbox" aria-multiselectable="true" aria-label="Store supervisor suggestions"></div>
                 <small class="field-help">Optional while inactive. An active store requires at least one supervisor.</small>
             </div>
             <div class="field store-logo-field">
@@ -121,5 +126,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/admin-stores.js') ?>?v=20260821b"></script>
+<script src="<?= base_url('assets/js/admin-stores.js') ?>?v=20260821c"></script>
 <?= $this->endSection() ?>

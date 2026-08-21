@@ -14,6 +14,20 @@ final class AdminStoreFormConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('data-remove-supervisor', (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js'));
     }
 
+    public function testOfficerAndSupervisorUseTheSameAccessiblePeoplePickerPattern(): void
+    {
+        $view = (string) file_get_contents(APPPATH . 'Views/admin/stores.php');
+        $styles = (string) file_get_contents(FCPATH . 'assets/css/admin-stores.css');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js');
+
+        $this->assertSame(2, substr_count($view, 'class="people-picker"'));
+        $this->assertSame(2, substr_count($view, 'role="combobox"'));
+        $this->assertStringContainsString('aria-multiselectable="true"', $view);
+        $this->assertStringContainsString('.people-picker:focus-within', $styles);
+        $this->assertStringContainsString('renderSelectedOfficer', $script);
+        $this->assertStringContainsString('handlePeoplePickerKeydown', $script);
+    }
+
     public function testStoreModalKeepsChromeFixedAndHidesConditionalTextarea(): void
     {
         $view = (string) file_get_contents(APPPATH . 'Views/admin/stores.php');

@@ -7,6 +7,8 @@ let logoInputMode = "upload";
 let storeLogoPreviewObjectUrl = null;
 let selectedSupervisorIds = [];
 let editingInitialIsActive = true;
+let activeOfficerSuggestionIndex = -1;
+let activeSupervisorSuggestionIndex = -1;
 const storeShell = document.querySelector(".admin-stores-shell");
 const canManageStores = storeShell?.getAttribute("data-can-manage-stores") === "1";
 const storesDataUrl = storeShell?.getAttribute("data-stores-data-url") || "/admin/stores/data";
@@ -71,16 +73,52 @@ function getSupervisorMatches(query) {
     });
 }
 
-function renderOfficerSuggestions(query) {
-    const box = document.getElementById("store-officer-suggestions");
-    const matches = getOfficerMatches(query);
-    if (matches.length === 0) {
-        box.style.display = "none";
-        box.innerHTML = "";
+function setSuggestionBoxOpen(inputId, boxId, isOpen) {
+    const input = document.getElementById(inputId);
+    const box = document.getElementById(boxId);
+    if (input) input.setAttribute("aria-expanded", isOpen ? "true" : "false");
+    if (!isOpen && input) {
+        input.removeAttribute("aria-activedescendant");
+        if (inputId === "store-officer-search") activeOfficerSuggestionIndex = -1;
+        if (inputId === "store-supervisor-search") activeSupervisorSuggestionIndex = -1;
+    }
+    if (box) box.style.display = isOpen ? "grid" : "none";
+}
+
+function renderSelectedOfficer() {
+    const wrap = document.getElementById("store-officer-selected");
+    const input = document.getElementById("store-officer-search");
+    const officerId = Number(document.getElementById("store-officer-id")?.value || 0);
+    if (!wrap || !input) return;
+
+    if (officerId <= 0) {
+        wrap.innerHTML = "";
+        input.placeholder = "Optional: type name, email, or employee ID";
         return;
     }
 
-    box.innerHTML = matches.map((officer) => {
+    const officer = findOfficerById(officerId);
+    const label = officer ? `${officer.name} (${officer.email})` : `User #${officerId}`;
+    wrap.innerHTML = `
+        <span class="supervisor-chip">
+            <span>${sEscape(label)}</span>
+            <button type="button" data-remove-officer="${officerId}" title="Remove store officer" aria-label="Remove ${sEscape(label)} as store officer"><i class="bi bi-x" aria-hidden="true"></i></button>
+        </span>
+    `;
+    input.placeholder = "Search to replace officer";
+}
+
+function renderOfficerSuggestions(query) {
+    const box = document.getElementById("store-officer-suggestions");
+    const matches = getOfficerMatches(query);
+    activeOfficerSuggestionIndex = -1;
+    if (matches.length === 0) {
+        box.innerHTML = "";
+        setSuggestionBoxOpen("store-officer-search", "store-officer-suggestions", false);
+        return;
+    }
+
+    box.innerHTML = matches.map((officer, index) => {
         const role = formatRoleLabel(officer.role);
         const type = formatTypeLabel(officer.user_type);
         const employee = officer.employee_id ? `${sEscape(officer.employee_id)} - ` : "";
@@ -90,20 +128,20 @@ function renderOfficerSuggestions(query) {
             ? `Assigned to ${officer.assigned_store_name || "another store"}`
             : "Available";
         return `
-            <button class="officer-suggestion-item ${isAssignedElsewhere ? "is-disabled" : ""}" type="button" data-officer-pick="${officer.id}" ${isAssignedElsewhere ? "disabled" : ""}>
+            <button id="store-officer-option-${index}" class="officer-suggestion-item ${isAssignedElsewhere ? "is-disabled" : ""}" type="button" role="option" aria-selected="false" data-officer-pick="${officer.id}" ${isAssignedElsewhere ? "disabled" : ""}>
                 <span>${employee}${sEscape(officer.name)} (${sEscape(officer.email)})</span>
                 <small>${sEscape(role)} / ${sEscape(type)} - ${sEscape(assignmentText)}</small>
             </button>
         `;
     }).join("");
-    box.style.display = "grid";
+    setSuggestionBoxOpen("store-officer-search", "store-officer-suggestions", true);
 }
 
 function renderSelectedSupervisors() {
     const wrap = document.getElementById("store-supervisor-selected");
     if (!wrap) return;
     if (selectedSupervisorIds.length === 0) {
-        wrap.innerHTML = '<span class="supervisor-empty">No supervisors assigned.</span>';
+        wrap.innerHTML = "";
         return;
     }
 
@@ -112,8 +150,8 @@ function renderSelectedSupervisors() {
         const label = supervisor ? `${supervisor.name} (${supervisor.email})` : `User #${supervisorId}`;
         return `
             <span class="supervisor-chip">
-                ${sEscape(label)}
-                <button type="button" data-remove-supervisor="${supervisorId}" title="Remove supervisor"><i class="bi bi-x"></i></button>
+                <span>${sEscape(label)}</span>
+                <button type="button" data-remove-supervisor="${supervisorId}" title="Remove supervisor" aria-label="Remove ${sEscape(label)} as store supervisor"><i class="bi bi-x" aria-hidden="true"></i></button>
             </span>
         `;
     }).join("");
@@ -123,22 +161,78 @@ function renderSupervisorSuggestions(query) {
     const box = document.getElementById("store-supervisor-suggestions");
     if (!box) return;
     const matches = getSupervisorMatches(query);
+    activeSupervisorSuggestionIndex = -1;
     if (matches.length === 0) {
-        box.style.display = "none";
         box.innerHTML = "";
+        setSuggestionBoxOpen("store-supervisor-search", "store-supervisor-suggestions", false);
         return;
     }
 
-    box.innerHTML = matches.map((officer) => {
+    box.innerHTML = matches.map((officer, index) => {
         const roles = Array.isArray(officer.roles) && officer.roles.length ? officer.roles : [officer.role];
         return `
-            <button class="officer-suggestion-item" type="button" data-supervisor-pick="${officer.id}">
+            <button id="store-supervisor-option-${index}" class="officer-suggestion-item" type="button" role="option" aria-selected="false" data-supervisor-pick="${officer.id}">
                 <span>${sEscape(officer.employee_id ? `${officer.employee_id} - ` : "")}${sEscape(officer.name)} (${sEscape(officer.email)})</span>
                 <small>${sEscape(roles.map(formatRoleLabel).join(", "))} / ${sEscape(formatTypeLabel(officer.user_type))}</small>
             </button>
         `;
     }).join("");
-    box.style.display = "grid";
+    setSuggestionBoxOpen("store-supervisor-search", "store-supervisor-suggestions", true);
+}
+
+function setActiveSuggestion(kind, nextIndex) {
+    const isOfficer = kind === "officer";
+    const box = document.getElementById(isOfficer ? "store-officer-suggestions" : "store-supervisor-suggestions");
+    const input = document.getElementById(isOfficer ? "store-officer-search" : "store-supervisor-search");
+    const items = Array.from(box?.querySelectorAll(".officer-suggestion-item:not(:disabled)") || []);
+    if (!input || items.length === 0) return;
+
+    const normalizedIndex = (nextIndex + items.length) % items.length;
+    items.forEach((item, index) => item.classList.toggle("is-active", index === normalizedIndex));
+    const activeItem = items[normalizedIndex];
+    input.setAttribute("aria-activedescendant", activeItem.id);
+    activeItem.scrollIntoView({ block: "nearest" });
+    if (isOfficer) activeOfficerSuggestionIndex = normalizedIndex;
+    else activeSupervisorSuggestionIndex = normalizedIndex;
+}
+
+function handlePeoplePickerKeydown(kind, event) {
+    const isOfficer = kind === "officer";
+    const input = event.currentTarget;
+    const box = document.getElementById(isOfficer ? "store-officer-suggestions" : "store-supervisor-suggestions");
+    const render = isOfficer ? renderOfficerSuggestions : renderSupervisorSuggestions;
+    const items = () => Array.from(box?.querySelectorAll(".officer-suggestion-item:not(:disabled)") || []);
+    const activeIndex = () => isOfficer ? activeOfficerSuggestionIndex : activeSupervisorSuggestionIndex;
+
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        if (items().length === 0) render(input.value || "");
+        if (items().length > 0) {
+            const nextIndex = activeIndex() < 0
+                ? (event.key === "ArrowDown" ? 0 : items().length - 1)
+                : activeIndex() + (event.key === "ArrowDown" ? 1 : -1);
+            setActiveSuggestion(kind, nextIndex);
+        }
+        return;
+    }
+    if (event.key === "Enter" && activeIndex() >= 0) {
+        event.preventDefault();
+        items()[activeIndex()]?.click();
+        return;
+    }
+    if (event.key === "Escape") {
+        setSuggestionBoxOpen(input.id, box.id, false);
+        return;
+    }
+    if (event.key === "Backspace" && input.value === "") {
+        if (isOfficer && Number(document.getElementById("store-officer-id").value || 0) > 0) {
+            document.getElementById("store-officer-id").value = "";
+            renderSelectedOfficer();
+        } else if (!isOfficer && selectedSupervisorIds.length > 0) {
+            selectedSupervisorIds.pop();
+            renderSelectedSupervisors();
+        }
+    }
 }
 
 function findOfficerById(officerId) {
@@ -275,21 +369,15 @@ function openStoreModal(mode, store) {
     updateDeactivationReasonVisibility();
     const selectedOfficerId = mode === "edit" ? Number(store.officer_id || 0) : 0;
     document.getElementById("store-officer-id").value = selectedOfficerId > 0 ? String(selectedOfficerId) : "";
-    if (selectedOfficerId > 0) {
-        const officer = findOfficerById(selectedOfficerId);
-        document.getElementById("store-officer-search").value = officer
-            ? `${officer.name} (${officer.email})`
-            : `${store.officer_name || ""} (${store.officer_email || ""})`;
-    } else {
-        document.getElementById("store-officer-search").value = "";
-    }
-    document.getElementById("store-officer-suggestions").style.display = "none";
+    document.getElementById("store-officer-search").value = "";
+    renderSelectedOfficer();
+    setSuggestionBoxOpen("store-officer-search", "store-officer-suggestions", false);
     document.getElementById("store-officer-suggestions").innerHTML = "";
     selectedSupervisorIds = mode === "edit" && Array.isArray(store.supervisor_ids)
         ? store.supervisor_ids.map(Number).filter(Boolean)
         : [];
     document.getElementById("store-supervisor-search").value = "";
-    document.getElementById("store-supervisor-suggestions").style.display = "none";
+    setSuggestionBoxOpen("store-supervisor-search", "store-supervisor-suggestions", false);
     document.getElementById("store-supervisor-suggestions").innerHTML = "";
     renderSelectedSupervisors();
     lastOfficerSearchQuery = "";
@@ -315,8 +403,8 @@ function closeStoreModal() {
         URL.revokeObjectURL(storeLogoPreviewObjectUrl);
         storeLogoPreviewObjectUrl = null;
     }
-    document.getElementById("store-officer-suggestions").style.display = "none";
-    document.getElementById("store-supervisor-suggestions").style.display = "none";
+    setSuggestionBoxOpen("store-officer-search", "store-officer-suggestions", false);
+    setSuggestionBoxOpen("store-supervisor-search", "store-supervisor-suggestions", false);
     document.getElementById("store-modal").style.display = "none";
     document.body.classList.remove("admin-stores-modal-open");
 }
@@ -431,12 +519,12 @@ document.getElementById("store-logo-url")?.addEventListener("input", updateStore
 document.getElementById("store-officer-search")?.addEventListener("input", (event) => {
     const query = event.target.value || "";
     lastOfficerSearchQuery = query;
-    document.getElementById("store-officer-id").value = "";
     renderOfficerSuggestions(query);
 });
 document.getElementById("store-officer-search")?.addEventListener("focus", (event) => {
     renderOfficerSuggestions(event.target.value || "");
 });
+document.getElementById("store-officer-search")?.addEventListener("keydown", (event) => handlePeoplePickerKeydown("officer", event));
 document.getElementById("store-officer-suggestions")?.addEventListener("click", (event) => {
     const item = event.target.closest("[data-officer-pick]");
     if (!item || item.disabled) return;
@@ -446,9 +534,17 @@ document.getElementById("store-officer-suggestions")?.addEventListener("click", 
     const picked = officersData.find((officer) => Number(officer.id) === officerId);
     if (!picked) return;
 
-    document.getElementById("store-officer-search").value = `${picked.name} (${picked.email})`;
+    document.getElementById("store-officer-search").value = "";
     document.getElementById("store-officer-id").value = String(officerId);
-    document.getElementById("store-officer-suggestions").style.display = "none";
+    renderSelectedOfficer();
+    setSuggestionBoxOpen("store-officer-search", "store-officer-suggestions", false);
+});
+document.getElementById("store-officer-selected")?.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-remove-officer]");
+    if (!button) return;
+    document.getElementById("store-officer-id").value = "";
+    renderSelectedOfficer();
+    document.getElementById("store-officer-search").focus();
 });
 document.getElementById("store-supervisor-search")?.addEventListener("input", (event) => {
     renderSupervisorSuggestions(event.target.value || "");
@@ -456,6 +552,7 @@ document.getElementById("store-supervisor-search")?.addEventListener("input", (e
 document.getElementById("store-supervisor-search")?.addEventListener("focus", (event) => {
     renderSupervisorSuggestions(event.target.value || "");
 });
+document.getElementById("store-supervisor-search")?.addEventListener("keydown", (event) => handlePeoplePickerKeydown("supervisor", event));
 document.getElementById("store-supervisor-suggestions")?.addEventListener("click", (event) => {
     const item = event.target.closest("[data-supervisor-pick]");
     if (!item) return;
@@ -464,7 +561,7 @@ document.getElementById("store-supervisor-suggestions")?.addEventListener("click
 
     selectedSupervisorIds.push(supervisorId);
     document.getElementById("store-supervisor-search").value = "";
-    document.getElementById("store-supervisor-suggestions").style.display = "none";
+    setSuggestionBoxOpen("store-supervisor-search", "store-supervisor-suggestions", false);
     renderSelectedSupervisors();
 });
 document.getElementById("store-supervisor-selected")?.addEventListener("click", (event) => {
@@ -473,6 +570,14 @@ document.getElementById("store-supervisor-selected")?.addEventListener("click", 
     const supervisorId = Number(button.getAttribute("data-remove-supervisor") || 0);
     selectedSupervisorIds = selectedSupervisorIds.filter((id) => id !== supervisorId);
     renderSelectedSupervisors();
+    document.getElementById("store-supervisor-search").focus();
+});
+
+document.querySelectorAll(".people-picker").forEach((picker) => {
+    picker.addEventListener("click", (event) => {
+        if (event.target.closest("button")) return;
+        picker.querySelector("input")?.focus();
+    });
 });
 
 document.getElementById("stores-gallery").addEventListener("click", async (event) => {
@@ -489,11 +594,11 @@ document.getElementById("stores-gallery").addEventListener("click", async (event
 document.addEventListener("click", (event) => {
     if (!event.target.closest("#store-officer-search") && !event.target.closest("#store-officer-suggestions")) {
         const suggestionBox = document.getElementById("store-officer-suggestions");
-        if (suggestionBox) suggestionBox.style.display = "none";
+        if (suggestionBox) setSuggestionBoxOpen("store-officer-search", suggestionBox.id, false);
     }
     if (!event.target.closest("#store-supervisor-search") && !event.target.closest("#store-supervisor-suggestions")) {
         const suggestionBox = document.getElementById("store-supervisor-suggestions");
-        if (suggestionBox) suggestionBox.style.display = "none";
+        if (suggestionBox) setSuggestionBoxOpen("store-supervisor-search", suggestionBox.id, false);
     }
 });
 
