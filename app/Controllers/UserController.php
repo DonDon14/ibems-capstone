@@ -275,6 +275,7 @@ class UserController extends Controller
         $sortDir = strtolower(trim((string) ($this->request->getGet('sort_dir') ?? 'asc'))) === 'desc' ? 'DESC' : 'ASC';
         $page = max(1, (int) ($this->request->getGet('page') ?? 1));
         $pageSize = max(12, min(60, (int) ($this->request->getGet('page_size') ?? 24)));
+        $includeOptions = filter_var($this->request->getGet('include_options') ?? true, FILTER_VALIDATE_BOOL);
         $offset = ($page - 1) * $pageSize;
 
         $sortColumns = [
@@ -302,11 +303,11 @@ class UserController extends Controller
             }
             if ($q !== '') {
                 $query->groupStart()
-                    ->like('p.name', $q)
-                    ->orLike('p.variant_label', $q)
-                    ->orLike('p.category', $q)
-                    ->orLike('p.sku', $q)
-                    ->orLike('s.store_name', $q)
+                    ->like('p.name', $q, 'both', null, true)
+                    ->orLike('p.variant_label', $q, 'both', null, true)
+                    ->orLike('p.category', $q, 'both', null, true)
+                    ->orLike('p.sku', $q, 'both', null, true)
+                    ->orLike('s.store_name', $q, 'both', null, true)
                     ->groupEnd();
             }
             return $query;
@@ -331,25 +332,29 @@ class UserController extends Controller
             ->get()
             ->getResultArray();
 
-        $stores = $db->table('stores s')
-            ->select('s.id, s.store_name, s.logo_url, COUNT(p.id) AS product_count')
-            ->join('products p', 'p.store_id = s.id AND p.is_active = TRUE', 'left', false)
-            ->where('s.is_active', true)
-            ->groupBy('s.id, s.store_name, s.logo_url')
-            ->orderBy('s.store_name', 'ASC')
-            ->get()
-            ->getResultArray();
-        $categories = $db->table('products p')
-            ->select('p.category')
-            ->join('stores s', 's.id = p.store_id', 'inner')
-            ->where('p.is_active', true)
-            ->where('s.is_active', true)
-            ->where('p.category IS NOT NULL', null, false)
-            ->where('p.category !=', '')
-            ->groupBy('p.category')
-            ->orderBy('p.category', 'ASC')
-            ->get()
-            ->getResultArray();
+        $stores = [];
+        $categories = [];
+        if ($includeOptions) {
+            $stores = $db->table('stores s')
+                ->select('s.id, s.store_name, s.logo_url, COUNT(p.id) AS product_count')
+                ->join('products p', 'p.store_id = s.id AND p.is_active = TRUE', 'left', false)
+                ->where('s.is_active', true)
+                ->groupBy('s.id, s.store_name, s.logo_url')
+                ->orderBy('s.store_name', 'ASC')
+                ->get()
+                ->getResultArray();
+            $categories = $db->table('products p')
+                ->select('p.category')
+                ->join('stores s', 's.id = p.store_id', 'inner')
+                ->where('p.is_active', true)
+                ->where('s.is_active', true)
+                ->where('p.category IS NOT NULL', null, false)
+                ->where('p.category !=', '')
+                ->groupBy('p.category')
+                ->orderBy('p.category', 'ASC')
+                ->get()
+                ->getResultArray();
+        }
 
         return $this->response->setJSON([
             'status' => 'success',
@@ -375,6 +380,7 @@ class UserController extends Controller
                 'product_count' => (int) ($row['product_count'] ?? 0),
             ], $stores),
             'categories' => array_values(array_map(static fn(array $row): string => (string) ($row['category'] ?? ''), $categories)),
+            'options_included' => $includeOptions,
             'pagination' => [
                 'page' => $page,
                 'page_size' => $pageSize,

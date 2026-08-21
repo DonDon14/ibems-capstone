@@ -14,7 +14,7 @@ final class PosCashTenderTest extends TestCase
         $this->assertStringContainsString('received >= cashAmount', $js);
         $this->assertStringContainsString('received - cashAmount', $js);
         $this->assertStringContainsString('payload.cash_received', $js);
-        $this->assertStringContainsString('Cash Received', $receipt);
+        $this->assertStringContainsString('Cash received', $receipt);
         $this->assertStringContainsString('Change', $receipt);
 
         $css = file_get_contents(ROOTPATH . 'public/assets/css/store-pos.css');

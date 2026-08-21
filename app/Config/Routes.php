@@ -28,6 +28,7 @@ $routes->get('admin/accounting-debts/data', 'AdminController::accountingDebtsDat
 $routes->get('admin/user-view', 'AdminController::userView', ['filter' => 'access:system.manage']);
 $routes->get('admin/user-view/data', 'AdminController::userViewData', ['filter' => 'access:system.manage']);
 $routes->get('admin/user-view/(:num)', 'AdminController::userViewDetail/$1', ['filter' => 'access:system.manage']);
+$routes->get('admin/salary-schedules', 'AdminController::salarySchedules', ['filter' => 'access:system.manage']);
 $routes->post('admin/user-view/create', 'AdminController::createUser', ['filter' => 'access:system.manage']);
 $routes->post('admin/user-view/update', 'AdminController::updateUser', ['filter' => 'access:system.manage']);
 $routes->post('admin/user-view/import-csv', 'AdminController::importUsersCsv', ['filter' => 'access:system.manage']);
@@ -129,6 +130,7 @@ $routes->get('accounting/debts', 'AccountingController::debts', ['filter' => 'ac
 $routes->get('accounting/deductions', 'AccountingController::deductions', ['filter' => 'access:accounting.inspect']);
 $routes->get('accounting/debts/data', 'AccountingController::debtsData', ['filter' => 'access:accounting.inspect']);
 $routes->get('accounting/debts/profile', 'AccountingController::debtProfile', ['filter' => 'access:accounting.inspect']);
+$routes->get('accounting/salary-schedules', 'AccountingController::salarySchedules', ['filter' => 'access:accounting.inspect']);
 $routes->get('accounting/debts/history', 'AccountingController::debtHistory', ['filter' => 'access:accounting.inspect']);
 $routes->get('accounting/debts/daily-summary', 'AccountingController::dailySummary', ['filter' => 'access:accounting.inspect']);
 $routes->get('accounting/deduction-workflow', 'AccountingController::deductionWorkflowData', ['filter' => 'access:accounting.inspect']);

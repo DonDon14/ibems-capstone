@@ -107,10 +107,35 @@ final class StoreAdminDayStatusTest extends CIUnitTestCase
         $this->assertStringContainsString('StoreDayVarianceCaseService', $oversight);
         $this->assertStringContainsString("admin/store-day-sessions/(:num)/resolve-stale", $routes);
         $this->assertStringContainsString("store-admin/store-day-sessions/(:num)/resolve-stale", $routes);
-        $this->assertStringContainsString('stale-day-resolution-form', $script);
-        $this->assertStringContainsString('stale-day-expected', $script);
-        $this->assertStringContainsString('System expected cash', $script);
+        $storeDetailsView = (string) file_get_contents(APPPATH . 'Views/store-admin/store-details.php');
+        $this->assertStringContainsString('stale-day-resolution-form', $storeDetailsView);
+        $this->assertStringContainsString('stale-day-expected', $storeDetailsView);
+        $this->assertStringContainsString('System expected cash', $storeDetailsView);
         $this->assertStringContainsString("\$expectedService->calculate", $oversight);
+    }
+
+    public function testStoreDetailsUseProgressiveStoreDayResolutionAndPaginateRepeatedSections(): void
+    {
+        $adminView = (string) file_get_contents(APPPATH . 'Views/admin/store-details.php');
+        $supervisorView = (string) file_get_contents(APPPATH . 'Views/store-admin/store-details.php');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-store-details.js');
+
+        foreach ([$adminView, $supervisorView] as $view) {
+            $this->assertStringContainsString('id="sd-stale-day-modal"', $view);
+            $this->assertStringContainsString('class="admin-modal admin-overview-modal sd-stale-day-modal is-hidden"', $view);
+            $this->assertStringContainsString('class="admin-modal-actions"', $view);
+            $this->assertStringContainsString('id="sd-session-pager"', $view);
+            $this->assertStringContainsString('id="sd-inventory-pager"', $view);
+            $this->assertStringContainsString('id="sd-transactions-pager"', $view);
+        }
+
+        $this->assertStringContainsString('data-open-stale-day', $script);
+        $this->assertStringContainsString('function sdOpenStaleDayModal(', $script);
+        $this->assertStringContainsString('function sdRefreshAndOpenStaleDay(', $script);
+        $this->assertStringContainsString('function sdExpectedBreakdown(', $script);
+        $this->assertStringContainsString('function sdRenderPager(', $script);
+        $this->assertStringContainsString('function sdRenderInventory()', $script);
+        $this->assertStringContainsString('function sdRenderTransactions()', $script);
     }
 
     public function testVarianceDispositionRequiresAVisiblePreviewAndEvidenceAwareCorrectionCopy(): void

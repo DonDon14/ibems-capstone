@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/store') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/store-settings.css') ?>?v=20260813e">
+<link rel="stylesheet" href="<?= base_url('assets/css/store-settings.css') ?>?v=20260821c">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -13,36 +13,88 @@
         'icon' => 'bi bi-gear',
     ]) ?>
 
-    <article class="settings-card">
-        <h4>Category Management</h4>
-        <div class="category-add-row">
-            <label class="settings-input-field" for="new-category-name"><span>Category name</span><input id="new-category-name" type="text" placeholder="e.g. Drinks"></label>
-            <button id="add-category-btn" class="primary-btn" type="button">Add Category</button>
+    <article id="category-settings-card" class="settings-card category-settings-card">
+        <div class="settings-card-head category-card-head">
+            <div>
+                <h4>Category management</h4>
+                <p class="settings-note">Organize products for Inventory and POS. Product counts update automatically.</p>
+            </div>
+            <div class="category-head-actions">
+                <span id="category-count" class="settings-section-count" aria-live="polite">Loading categories</span>
+                <button id="add-category-btn" class="primary-btn" type="button"><i class="bi bi-plus-circle" aria-hidden="true"></i> Add category</button>
+            </div>
+        </div>
+        <div id="category-tools" class="category-tools is-hidden">
+            <label class="settings-input-field" for="category-search"><span>Search categories</span><input id="category-search" type="search" placeholder="Category name"></label>
+            <label class="settings-input-field" for="category-sort"><span>Sort by</span><select id="category-sort"><option value="name-asc">Name (A–Z)</option><option value="name-desc">Name (Z–A)</option><option value="products-desc">Most products</option></select></label>
         </div>
         <div class="settings-table-wrap">
             <table class="table">
                 <thead>
                     <tr>
                         <th>Category</th>
+                        <th class="w-products">Products</th>
                         <th class="w-actions-220">Actions</th>
                     </tr>
                 </thead>
                 <tbody id="category-body">
-                    <?= view('components/data_state', ['tag' => 'tr', 'colspan' => 2, 'type' => 'loading', 'message' => 'Loading categories...']) ?>
+                    <?= view('components/data_state', ['tag' => 'tr', 'colspan' => 3, 'type' => 'loading', 'message' => 'Loading categories...']) ?>
                 </tbody>
             </table>
         </div>
-        <p id="settings-result" class="settings-result"></p>
+        <div id="category-pagination" class="category-pagination is-hidden" aria-label="Category pagination">
+            <span id="category-page-summary">Page 1 of 1</span>
+            <div>
+                <button id="category-prev" class="secondary-btn btn-sm" type="button"><i class="bi bi-chevron-left" aria-hidden="true"></i> Previous</button>
+                <button id="category-next" class="secondary-btn btn-sm" type="button">Next <i class="bi bi-chevron-right" aria-hidden="true"></i></button>
+            </div>
+        </div>
+        <p id="settings-result" class="settings-result" role="status" aria-live="polite"></p>
     </article>
 
     <article class="settings-card payment-settings-card">
-        <div class="settings-card-head"><div><h4>Payment Methods</h4><p class="settings-note">Cash is built in. Add the wallets, banks, terminals, or other payment destinations accepted by this store.</p></div><button id="add-payment-method-btn" class="primary-btn" type="button"><i class="bi bi-plus-circle"></i> Add payment method</button></div>
+        <div class="settings-card-head"><div><h4>Payment methods</h4><p class="settings-note">Cash is built in. Add the wallets, banks, terminals, or other payment destinations accepted by this store.</p></div><button id="add-payment-method-btn" class="primary-btn" type="button"><i class="bi bi-plus-circle"></i> Add payment method</button></div>
         <div id="payment-method-list" class="payment-method-list" aria-live="polite">
             <?= view('components/data_state', ['type' => 'loading', 'message' => 'Loading payment methods...']) ?>
         </div>
-        <p id="settings-method-result" class="settings-result"></p>
+        <p id="settings-method-result" class="settings-result" role="status" aria-live="polite"></p>
     </article>
 </section>
+
+<div id="category-edit-modal" class="settings-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="category-edit-title" aria-describedby="category-edit-subtitle">
+    <div class="settings-modal-card category-edit-card">
+        <header class="settings-modal-head category-edit-head">
+            <div class="category-modal-heading">
+                <span class="category-modal-icon" aria-hidden="true"><i class="bi bi-tags"></i></span>
+                <div>
+                    <span class="settings-modal-eyebrow">Category settings</span>
+                    <h3 id="category-edit-title">Edit category</h3>
+                    <p id="category-edit-subtitle">Rename this category across Inventory and POS.</p>
+                </div>
+            </div>
+            <button id="category-edit-close" class="icon-btn" type="button" aria-label="Close category editor"><i class="bi bi-x-lg"></i></button>
+        </header>
+        <div class="settings-modal-body category-edit-body">
+            <div class="category-edit-summary">
+                <i class="bi bi-box-seam" aria-hidden="true"></i>
+                <div>
+                    <strong id="category-edit-current">Selected category</strong>
+                    <span id="category-edit-usage">Checking assigned products...</span>
+                </div>
+            </div>
+            <label class="settings-input-field category-edit-field" for="category-edit-name">
+                <span>Category name</span>
+                <input id="category-edit-name" type="text" maxlength="100" autocomplete="off" placeholder="e.g. Beverages" aria-describedby="category-edit-guidance category-edit-result">
+            </label>
+            <p id="category-edit-guidance" class="category-edit-guidance"><i class="bi bi-info-circle" aria-hidden="true"></i><span id="category-edit-guidance-text">Products are not deleted. Their category label updates automatically.</span></p>
+            <p id="category-edit-result" class="settings-result category-edit-result" role="alert" aria-live="assertive"></p>
+        </div>
+        <footer class="settings-modal-actions">
+            <button id="category-edit-cancel" class="secondary-btn" type="button">Cancel</button>
+            <button id="category-edit-save" class="primary-btn" type="button"><i class="bi bi-check2-circle" aria-hidden="true"></i> Save changes</button>
+        </footer>
+    </div>
+</div>
 
 <div id="payment-method-modal" class="settings-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="payment-method-modal-title">
     <div class="settings-modal-card">
@@ -76,5 +128,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/store-settings.js') ?>?v=20260813f"></script>
+<script src="<?= base_url('assets/js/store-settings.js') ?>?v=20260821c"></script>
 <?= $this->endSection() ?>

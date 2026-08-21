@@ -33,6 +33,33 @@
     align-items: start;
 }
 
+.store-detail-section-head,
+.store-detail-table-tools {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.store-detail-section-head p {
+    margin: 4px 0 0;
+    color: #64748b;
+    font-size: 0.82rem;
+}
+
+.store-detail-table-tools {
+    justify-content: flex-end;
+}
+
+.store-detail-rows-filter {
+    min-width: 5.5rem;
+}
+
+.store-detail-money {
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
 .status-warning {
     margin-left: 6px;
     border-color: #fde68a;
@@ -1062,6 +1089,37 @@
     background: linear-gradient(180deg, #fffdf7 0%, #fffaf0 100%);
 }
 
+.stale-day-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin-top: 14px;
+    padding: 13px 14px;
+    border: 1px solid #fed7aa;
+    border-radius: 11px;
+    background: #fffaf0;
+}
+
+.stale-day-summary .danger-btn {
+    flex: 0 0 auto;
+}
+
+.sd-stale-day-modal .stale-day-resolution-form {
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+    background: transparent;
+    padding: 0;
+    gap: 18px;
+}
+
+.store-detail-pager-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .stale-day-intro {
     display: flex;
     align-items: flex-start;
@@ -1085,8 +1143,7 @@
     font-size: 0.9rem;
 }
 
-.stale-day-intro p,
-.stale-day-footer p {
+.stale-day-intro p {
     margin: 3px 0 0;
     color: #64748b;
     font-size: 0.8rem;
@@ -1098,6 +1155,7 @@
     grid-template-columns: minmax(130px, 0.8fr) minmax(130px, 0.8fr) minmax(260px, 1.6fr);
     gap: 12px;
     align-items: start;
+    padding-bottom: 4px;
 }
 
 .stale-day-expected {
@@ -1157,27 +1215,87 @@
     resize: vertical;
 }
 
-.stale-day-footer {
+.stale-day-fields textarea {
+    min-height: 96px;
+}
+
+.stale-day-payment-breakdown {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.stale-day-breakdown-column,
+.stale-day-account-breakdown {
+    padding: 12px 14px;
+    border: 1px solid #d8e2ee;
+    border-radius: 10px;
+    background: #f8fbff;
+}
+
+.stale-day-breakdown-column h5 {
+    margin: 0 0 8px;
+    color: #0b3f73;
+    font-size: 0.78rem;
+}
+
+.stale-day-breakdown-column h5 i {
+    margin-right: 5px;
+    color: #2563eb;
+}
+
+.stale-day-breakdown-column > div,
+.stale-day-account-breakdown > div {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    gap: 14px;
-    padding-top: 12px;
-    border-top: 1px solid #fed7aa;
+    gap: 12px;
+    padding: 4px 0;
+    color: #64748b;
+    font-size: 0.75rem;
 }
 
-.stale-day-footer p {
+.stale-day-breakdown-column strong,
+.stale-day-account-breakdown strong {
+    color: #0f172a;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+}
+
+.stale-day-account-breakdown {
+    grid-column: 1 / -1;
+    padding-top: 10px;
+    padding-bottom: 10px;
+}
+
+.stale-day-account-breakdown summary {
+    cursor: pointer;
+    color: #0b3f73;
+    font-size: 0.76rem;
+    font-weight: 800;
+}
+
+.stale-day-account-breakdown[open] summary {
+    margin-bottom: 6px;
+}
+
+.stale-day-guidance {
     margin: 0;
-    max-width: 520px;
+    padding: 12px 14px;
+    border-radius: 9px;
+    background: #f0f9ff;
+    color: #52677f;
+    font-size: 0.8rem;
+    line-height: 1.45;
 }
 
-.stale-day-footer p i {
+.stale-day-guidance i {
     margin-right: 5px;
     color: #0369a1;
 }
 
-.stale-day-footer button {
-    flex: 0 0 auto;
+body.ibems-modern .sd-stale-day-modal .admin-modal-card {
+    width: min(760px, 100%);
 }
 
 @media (max-width: 760px) {
@@ -1185,10 +1303,15 @@
     .variance-handoff-form { grid-template-columns: 1fr; }
 
     .stale-day-fields,
-    .stale-day-expected { grid-template-columns: 1fr; }
+    .stale-day-expected,
+    .stale-day-payment-breakdown { grid-template-columns: 1fr; }
     .stale-day-expected p { grid-column: auto; }
-    .stale-day-footer { align-items: stretch; flex-direction: column; }
-    .stale-day-footer button { width: 100%; }
+    .stale-day-summary,
+    .store-detail-section-head,
+    .store-detail-table-tools,
+    .store-detail-pager { align-items: stretch; flex-direction: column; }
+    .stale-day-summary .danger-btn,
+    .store-detail-rows-filter { width: 100%; }
 }
 
 .store-day-history-head {
@@ -1529,4 +1652,10 @@
 .overview-pager button:disabled {
     cursor: not-allowed;
     opacity: 0.5;
+}
+
+.store-detail-pager {
+    justify-content: space-between;
+    padding: 10px 16px;
+    border-top: 1px solid #e2e8f0;
 }

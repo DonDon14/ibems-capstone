@@ -94,70 +94,72 @@
         const rows = items
             .map((item) => `
                 <tr>
-                    <td>${esc(`${item.qty}x ${item.name}`)}</td>
-                    <td>${money(item.lineTotal)}</td>
+                    <td><strong>${esc(item.name)}</strong><small>${money(item.unitPrice)} each</small></td>
+                    <td class="ibems-receipt-qty">${item.qty}</td>
+                    <td class="ibems-receipt-amount">${money(item.lineTotal)}</td>
                 </tr>
             `)
             .join("");
 
         const debtorLine = receipt.debtCustomerLabel
-            ? `<div><span>Debtor</span><strong>${esc(receipt.debtCustomerLabel)}</strong></div>`
+            ? `<div class="ibems-receipt-detail"><span>Debtor</span><strong>${esc(receipt.debtCustomerLabel)}</strong></div>`
             : "";
 
         const customerLine = receipt.customerName
-            ? `<div><span>Customer</span><strong>${esc(receipt.customerName)}</strong></div>`
+            ? `<div class="ibems-receipt-detail"><span>Customer</span><strong>${esc(receipt.customerName)}</strong></div>`
             : "";
 
         const showPaymentLines = payments.length > 1 || payments.some((payment) => String(payment.destination_account_name || "").trim() !== "");
         const paymentLines = showPaymentLines
-            ? payments.map((payment) => `<div><span>${esc(String(payment.payment_method || "").replace(/_/g, " ").toUpperCase())}${payment.destination_account_name ? `<small style="display:block">${esc(payment.destination_account_name)}${payment.destination_account_number ? ` · ending ${esc(String(payment.destination_account_number).slice(-4))}` : ""}</small>` : ""}</span><strong>${money(payment.amount)}</strong></div>`).join("")
+            ? payments.map((payment) => `<div class="ibems-receipt-payment-row"><span><strong>${esc(String(payment.payment_method || "").replace(/_/g, " ").toUpperCase())}</strong>${payment.destination_account_name ? `<small>${esc(payment.destination_account_name)}${payment.destination_account_number ? ` · ending ${esc(String(payment.destination_account_number).slice(-4))}` : ""}</small>` : ""}</span><b>${money(payment.amount)}</b></div>`).join("")
             : "";
         const cashPayment = payments.find((payment) => String(payment.payment_method || "").toLowerCase() === "cash");
         const cashTenderLines = cashPayment && Number.isFinite(Number(cashPayment.cash_received ?? receipt.cashReceived))
             ? `
-                <div><span>Cash Received</span><strong>${money(cashPayment.cash_received ?? receipt.cashReceived)}</strong></div>
-                <div><span>Change</span><strong>${money(cashPayment.change_due ?? receipt.changeDue ?? 0)}</strong></div>
+                <div class="ibems-receipt-payment-row"><span><strong>Cash received</strong></span><b>${money(cashPayment.cash_received ?? receipt.cashReceived)}</b></div>
+                <div class="ibems-receipt-payment-row"><span><strong>Change</strong></span><b>${money(cashPayment.change_due ?? receipt.changeDue ?? 0)}</b></div>
             `
             : "";
 
         return `
             <div class="ibems-receipt">
-                <div class="ibems-receipt-center">
-                    <p class="ibems-receipt-sub">USTP IBEMS</p>
-                    <h4 class="ibems-receipt-title">RECEIPT</h4>
-                </div>
-                <div class="ibems-receipt-divider"></div>
-                <div class="ibems-receipt-meta">
-                    <div><span>Transaction #</span><strong>${esc(receipt.clientTxnId || receipt.transactionId || "-")}</strong></div>
-                    <div><span>Date</span><strong>${esc(formatDateTime(receipt.createdAt || receipt.dateTime))}</strong></div>
-                    <div><span>Store</span><strong>${esc(receipt.storeName || "Store")}</strong></div>
-                    <div><span>Payment</span><strong>${esc(paymentLabel || "N/A")}</strong></div>
-                    ${paymentLines}
+                <header class="ibems-receipt-brand">
+                    <span class="ibems-receipt-mark" aria-hidden="true">IB</span>
+                    <div>
+                        <p class="ibems-receipt-sub">USTP IBEMS</p>
+                        <h4 class="ibems-receipt-title">Transaction receipt</h4>
+                    </div>
+                    <span class="ibems-receipt-status">Completed</span>
+                </header>
+
+                <section class="ibems-receipt-details" aria-label="Transaction details">
+                    <div class="ibems-receipt-detail is-wide"><span>Transaction number</span><strong>${esc(receipt.clientTxnId || receipt.transactionId || "-")}</strong></div>
+                    <div class="ibems-receipt-detail"><span>Date</span><strong>${esc(formatDateTime(receipt.createdAt || receipt.dateTime))}</strong></div>
+                    <div class="ibems-receipt-detail"><span>Store</span><strong>${esc(receipt.storeName || "Store")}</strong></div>
                     ${customerLine}
                     ${debtorLine}
-                    ${cashTenderLines}
-                </div>
-                <div class="ibems-receipt-divider"></div>
+                </section>
+
+                <div class="ibems-receipt-section-head"><span>Order details</span><strong>${totalItems} item${totalItems === 1 ? "" : "s"}</strong></div>
                 <table class="ibems-receipt-lines">
                     <thead>
-                        <tr><th>Item</th><th>Amount</th></tr>
+                        <tr><th>Item</th><th>Qty</th><th>Amount</th></tr>
                     </thead>
                     <tbody>${rows}</tbody>
                 </table>
-                <div class="ibems-receipt-divider"></div>
-                <div class="ibems-receipt-total">
-                    <span>TOTAL</span>
-                    <span>${money(total)}</span>
-                </div>
-                <div class="ibems-receipt-meta" style="margin-top:8px;">
-                    <div><span>Items</span><strong>${totalItems}</strong></div>
-                </div>
-                <div class="ibems-receipt-divider"></div>
-                <div class="ibems-receipt-thankyou">THANK YOU</div>
-                <div class="ibems-receipt-divider"></div>
+
+                <section class="ibems-receipt-payment" aria-label="Payment details">
+                    <div class="ibems-receipt-section-head"><span>Payment</span><strong class="ibems-receipt-payment-pill">${esc(paymentLabel || "N/A")}</strong></div>
+                    ${paymentLines}
+                    ${cashTenderLines}
+                </section>
+
+                <div class="ibems-receipt-total"><span>Total paid</span><strong>${money(total)}</strong></div>
+
+                <div class="ibems-receipt-thankyou"><strong>Thank you for your purchase</strong><span>Keep this receipt for your records.</span></div>
                 <div class="ibems-receipt-qr-wrap">
                     <img class="ibems-receipt-qr" data-qr-text="${esc(lookupUrl)}" alt="Receipt QR">
-                    <a class="ibems-receipt-qr-link" href="${esc(lookupUrl)}" target="_blank" rel="noopener">Open transaction details</a>
+                    <div><strong>Verify this receipt</strong><span>Scan the QR code or open the transaction record.</span><a class="ibems-receipt-qr-link" href="${esc(lookupUrl)}" target="_blank" rel="noopener">Open transaction details</a></div>
                 </div>
             </div>
         `;
@@ -183,22 +185,19 @@
                     body { font-family: Arial, sans-serif; padding: 14px; color: #111; }
                     .receipt-card { max-width: 440px; margin: 0 auto; }
                     ${document.querySelector("link[href*='receipt-standard.css']") ? "" : ""}
-                    .ibems-receipt{border:1px dashed #94a3b8;border-radius:10px;padding:12px;background:#fff}
-                    .ibems-receipt-center{text-align:center}
-                    .ibems-receipt-title{margin:8px 0;font-size:1.7rem;letter-spacing:1px;color:#0f172a}
-                    .ibems-receipt-sub{margin:0;color:#475569;font-size:.84rem}
-                    .ibems-receipt-divider{border-top:2px dashed #475569;margin:10px 0}
-                    .ibems-receipt-meta{display:grid;gap:4px;font-size:.9rem;color:#0f172a}
-                    .ibems-receipt-meta>div{display:flex;justify-content:space-between;gap:10px}
-                    .ibems-receipt-lines{width:100%;border-collapse:collapse;margin:8px 0}
-                    .ibems-receipt-lines th,.ibems-receipt-lines td{font-size:.9rem;padding:5px 2px;border:0}
-                    .ibems-receipt-lines th{color:#334155;text-transform:uppercase;font-size:.76rem;letter-spacing:.3px;border-bottom:1px dashed #94a3b8}
-                    .ibems-receipt-lines td:last-child,.ibems-receipt-lines th:last-child{text-align:right}
-                    .ibems-receipt-total{display:flex;justify-content:space-between;font-weight:700;color:#0f172a;font-size:1rem}
-                    .ibems-receipt-thankyou{text-align:center;margin:8px 0;font-size:1.5rem;font-weight:800;letter-spacing:.4px;color:#0f172a}
-                    .ibems-receipt-qr-wrap{display:grid;place-items:center;gap:6px;margin-top:8px}
-                    .ibems-receipt-qr{width:124px;height:124px;border:1px solid #dbe3ea;border-radius:6px;object-fit:cover;background:#fff}
-                    .ibems-receipt-qr-link{font-size:.74rem;color:#1d4ed8;text-decoration:none}
+                    *{box-sizing:border-box}
+                    .ibems-receipt{overflow:hidden;border:1px solid #cbd5e1;border-radius:12px;background:#fff;color:#172033}
+                    .ibems-receipt-brand{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;padding:14px;border-bottom:1px solid #dbe3ea;background:#f8fafc}
+                    .ibems-receipt-mark{width:38px;height:38px;display:grid;place-items:center;border:1px solid #cbd5e1;border-radius:9px;color:#0b4a83;font-size:.72rem;font-weight:900}
+                    .ibems-receipt-title{margin:2px 0 0;color:#0b3f73;font-size:1rem}.ibems-receipt-sub{margin:0;color:#64748b;font-size:.62rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase}
+                    .ibems-receipt-status,.ibems-receipt-payment-pill{display:inline-flex;border:1px solid #a7d8be;border-radius:999px;padding:4px 8px;color:#087443;font-size:.64rem;font-weight:800}
+                    .ibems-receipt-details{display:grid;grid-template-columns:1fr 1fr;gap:8px 14px;padding:14px;border-bottom:1px solid #e2e8f0}.ibems-receipt-detail{display:grid;gap:2px;min-width:0}.ibems-receipt-detail.is-wide{grid-column:1/-1}.ibems-receipt-detail span{color:#64748b;font-size:.68rem}.ibems-receipt-detail strong{overflow-wrap:anywhere;font-size:.8rem}
+                    .ibems-receipt-section-head{display:flex;justify-content:space-between;align-items:center;padding:9px 14px;color:#40546b;font-size:.7rem;font-weight:800;text-transform:uppercase}
+                    .ibems-receipt-lines{width:100%;border-collapse:collapse}.ibems-receipt-lines th,.ibems-receipt-lines td{padding:8px 14px;border-bottom:1px solid #e5e7eb;font-size:.8rem}.ibems-receipt-lines th{background:#f8fafc;color:#64748b;font-size:.62rem;text-transform:uppercase}.ibems-receipt-lines td strong,.ibems-receipt-lines td small{display:block}.ibems-receipt-lines td small{color:#64748b;font-size:.66rem}.ibems-receipt-qty,.ibems-receipt-lines th:nth-child(2){text-align:center}.ibems-receipt-amount,.ibems-receipt-lines th:last-child{text-align:right;white-space:nowrap}
+                    .ibems-receipt-payment{border-block:1px solid #e2e8f0;background:#fbfcfe}.ibems-receipt-payment-row{display:flex;justify-content:space-between;gap:10px;padding:6px 14px;font-size:.76rem}.ibems-receipt-payment-row span,.ibems-receipt-payment-row span>*{display:block}.ibems-receipt-payment-row small{color:#64748b}
+                    .ibems-receipt-total{display:flex;justify-content:space-between;margin:12px 14px;border-radius:9px;background:#0b477d;padding:11px 12px;color:#fff;font-weight:800}.ibems-receipt-thankyou{display:grid;gap:2px;padding:4px 14px 12px;text-align:center}.ibems-receipt-thankyou span{color:#64748b;font-size:.68rem}
+                    .ibems-receipt-qr-wrap{display:flex;align-items:center;gap:10px;padding:12px 14px;border-top:1px solid #e2e8f0;background:#f8fafc}.ibems-receipt-qr{width:76px;height:76px;border:1px solid #dbe3ea;border-radius:8px;padding:3px;object-fit:cover}.ibems-receipt-qr-wrap>div{display:grid;gap:3px}.ibems-receipt-qr-wrap span,.ibems-receipt-qr-link{font-size:.66rem}.ibems-receipt-qr-link{color:#1d4ed8;text-decoration:none}
+                    @media print{body{padding:0}.receipt-card{max-width:none}.ibems-receipt{box-shadow:none}}
                 </style>
             </head>
             <body>

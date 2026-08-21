@@ -50,13 +50,24 @@
 }
 
 .field input,
-.field select {
+.field select,
+.field textarea {
     border: 1px solid #c7d5e4;
     border-radius: 10px;
     padding: 9px 12px;
     width: 100%;
     min-width: 0;
     max-width: 100%;
+    box-sizing: border-box;
+    color: #0f172a;
+    background: #fff;
+    font: inherit;
+}
+
+.field textarea {
+    min-height: 92px;
+    line-height: 1.45;
+    resize: vertical;
 }
 
 .field-help {
@@ -65,10 +76,42 @@
     line-height: 1.3;
 }
 
-.officer-picker-row {
-    display: grid;
-    grid-template-columns: 1fr auto;
-    gap: 8px;
+.people-picker {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-height: 44px;
+    padding: 5px 8px;
+    border: 1px solid #c7d5e4;
+    border-radius: 10px;
+    background: #fff;
+    cursor: text;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.people-picker:focus-within {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.14);
+}
+
+body.ibems-modern .admin-stores-modal .people-picker input[type="search"],
+body.ibems-modern .admin-stores-modal .people-picker input[type="search"]:hover,
+body.ibems-modern .admin-stores-modal .people-picker input[type="search"]:focus {
+    flex: 1 1 230px;
+    width: auto;
+    min-width: 180px;
+    min-height: 32px;
+    border: 0;
+    border-radius: 0;
+    padding: 5px 4px 5px 38px;
+    outline: 0;
+    box-shadow: none;
+    background-color: transparent;
+}
+
+.people-picker-values {
+    display: contents;
 }
 
 .field-icon-btn {
@@ -111,9 +154,83 @@
 }
 
 .stores-gallery {
+    min-width: 0;
+}
+
+.store-cards-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-    gap: 16px;
+    gap: 14px;
+}
+
+.assignment-warning,
+.not-assigned {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    color: #8a4a0f;
+    font-size: 0.72rem;
+    font-weight: 700;
+}
+
+.store-pagination {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 9px 12px;
+    border: 1px solid #d8e2ee;
+    border-top: 0;
+    border-radius: 0 0 14px 14px;
+    background: #f8fbff;
+    color: #64748b;
+    font-size: 0.75rem;
+}
+
+.store-pagination--single {
+    justify-content: flex-start;
+    min-height: 40px;
+}
+
+.store-page-size,
+.store-page-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.store-page-size label {
+    font-weight: 700;
+}
+
+body.ibems-modern .store-page-size select {
+    width: 72px;
+    min-height: 34px;
+    padding-top: 5px;
+    padding-bottom: 5px;
+}
+
+.store-page-actions strong {
+    min-width: 88px;
+    color: #334155;
+    text-align: center;
+}
+
+.store-page-actions button {
+    display: inline-grid;
+    width: 34px;
+    height: 34px;
+    place-items: center;
+    border: 1px solid #c7d5e4;
+    border-radius: 8px;
+    background: #fff;
+    color: #0b4b87;
+    cursor: pointer;
+}
+
+.store-page-actions button:disabled {
+    cursor: not-allowed;
+    opacity: 0.45;
 }
 
 .store-card {
@@ -122,11 +239,12 @@
     background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
     border: 1px solid #d8e2ee;
     border-radius: 14px;
-    padding: 18px;
+    min-height: 0;
+    padding: 14px;
     display: grid;
     grid-template-columns: auto 1fr;
-    align-items: start;
-    gap: 14px;
+    align-items: stretch;
+    gap: 12px;
     position: relative;
 }
 
@@ -137,14 +255,15 @@
 }
 
 .store-card-logo {
-    width: 64px;
-    height: 64px;
-    border-radius: 14px;
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
     overflow: hidden;
     border: 1px solid #dbe3ea;
     display: grid;
     place-items: center;
     background: #fff7d1;
+    align-self: start;
 }
 
 .store-logo-img {
@@ -162,11 +281,43 @@
     font-weight: 800;
 }
 
-.store-card-meta strong {
-    display: block;
+.store-card-meta {
+    display: flex;
+    min-width: 0;
+    height: 100%;
+    flex-direction: column;
+}
+
+.store-card-heading {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 10px;
+}
+
+.store-card-title {
+    min-width: 0;
     color: #003366;
-    font-size: 1.08rem;
-    padding-right: 92px;
+    font-size: 1rem;
+    font-weight: 800;
+    line-height: 1.3;
+    text-decoration: none;
+}
+
+.store-card-heading .status-badge {
+    flex: 0 0 auto;
+}
+
+.store-card-meta > .assignment-warning {
+    align-self: flex-start;
+    margin-top: 6px;
+    border-radius: 999px;
+    background: #fff7e6;
+    padding: 3px 7px;
+}
+
+.store-card-title:hover {
+    text-decoration: underline;
 }
 
 .store-card-meta small {
@@ -174,14 +325,98 @@
     font-size: 0.9rem;
 }
 
-.store-card-right {
-    position: absolute;
-    top: 10px;
-    right: 10px;
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
+.store-mobile-details {
+    display: grid;
+    gap: 6px;
+    margin: 10px 0 0;
+}
+
+.store-mobile-details div {
+    display: grid;
+    grid-template-columns: 76px minmax(0, 1fr);
     gap: 8px;
+}
+
+.store-mobile-details dt {
+    color: #64748b;
+    font-size: 0.73rem;
+    font-weight: 700;
+}
+
+.store-mobile-details dd {
+    margin: 0;
+    color: #334155;
+    font-size: 0.78rem;
+}
+
+.store-mobile-details dd {
+    display: grid;
+    gap: 2px;
+}
+
+.store-mobile-details dd strong {
+    color: #334155;
+    font-size: 0.78rem;
+}
+
+.store-mobile-details dd small {
+    overflow: hidden;
+    color: #64748b;
+    font-size: 0.72rem;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.store-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: auto;
+    padding-top: 10px;
+    border-top: 1px solid #e5edf5;
+}
+
+.store-card-footer > small {
+    color: #7b8da2;
+    font-size: 0.68rem;
+}
+
+.store-card-actions {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.store-card-action {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 30px;
+    border: 1px solid #c7d5e4;
+    border-radius: 8px;
+    background: #fff;
+    color: #0b4b87;
+    padding: 5px 8px;
+    font: inherit;
+    font-size: 0.72rem;
+    font-weight: 700;
+    text-decoration: none;
+    white-space: nowrap;
+    cursor: pointer;
+}
+
+.store-card-action:hover,
+.store-card-action:focus-visible {
+    border-color: #93b7dc;
+    background: #eef6ff;
+    outline: 0;
+}
+
+.store-cards-grid + .store-pagination {
+    margin-top: 12px;
+    border-top: 1px solid #d8e2ee;
+    border-radius: 12px;
 }
 
 .card-action-btn {
@@ -245,12 +480,16 @@
     z-index: 1300;
 }
 
-.admin-stores-modal .admin-modal-card {
-    width: min(860px, 100%);
+body.ibems-modern .admin-stores-modal .admin-modal-card {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    width: min(920px, 100%);
+    max-height: min(820px, calc(100dvh - 36px));
+    overflow: hidden;
     background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);
     border: 1px solid #d6e2ef;
     border-radius: 14px;
-    padding: 16px;
+    padding: 0;
     box-shadow: 0 24px 48px rgba(15, 23, 42, 0.3);
 }
 
@@ -258,12 +497,19 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 10px;
+    margin: 0;
+    padding: 16px 20px;
 }
 
 .admin-stores-modal .admin-modal-head h4 {
     margin: 0;
     color: #003366;
+}
+
+.admin-stores-modal .admin-modal-head p {
+    margin: 4px 0 0;
+    color: #64748b;
+    font-size: 0.76rem;
 }
 
 .admin-stores-modal .admin-modal-close {
@@ -282,6 +528,111 @@
     grid-template-columns: 1fr 1fr;
     gap: 16px 10px;
     align-items: start;
+}
+
+.admin-stores-modal-body {
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-gutter: stable;
+    padding: 16px 20px 20px;
+    scrollbar-color: #94a3b8 transparent;
+    scrollbar-width: thin;
+}
+
+.store-form-section {
+    display: grid;
+    gap: 14px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.store-form-section + .store-form-section {
+    margin-top: 20px;
+}
+
+.store-form-section:last-child {
+    padding-bottom: 0;
+    border-bottom: 0;
+}
+
+.store-form-section-head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.store-form-section-head > span {
+    display: inline-grid;
+    width: 34px;
+    height: 34px;
+    flex: 0 0 auto;
+    place-items: center;
+    border: 1px solid #cfe0f1;
+    border-radius: 9px;
+    background: #eef6ff;
+    color: #0b4b87;
+}
+
+.store-form-section-head h5,
+.store-form-section-head p {
+    margin: 0;
+}
+
+.store-form-section-head h5 {
+    color: #123b67;
+    font-size: 0.86rem;
+}
+
+.store-form-section-head p {
+    margin-top: 2px;
+    color: #64748b;
+    font-size: 0.72rem;
+}
+
+.optional-label {
+    margin-left: 5px;
+    color: #94a3b8;
+    font-size: 0.68rem;
+    font-weight: 600;
+}
+
+.store-name-field,
+.store-officer-field,
+.store-form-section .store-supervisors-field,
+.store-status-field {
+    grid-column: 1 / -1;
+}
+
+.admin-stores-modal-body::-webkit-scrollbar {
+    width: 9px;
+}
+
+.admin-stores-modal-body::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.admin-stores-modal-body::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: #94a3b8;
+    background-clip: padding-box;
+}
+
+.admin-stores-modal-body::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+}
+
+body.ibems-modern .admin-stores-modal .field.is-hidden,
+body.ibems-modern .admin-stores-modal .field[hidden] {
+    display: none;
+}
+
+body.admin-stores-modal-open {
+    overflow: hidden;
 }
 
 .store-supervisors-field {
@@ -308,7 +659,7 @@
 
 .store-logo-preview-box {
     display: grid;
-    min-height: 112px;
+    min-height: 82px;
     place-items: center;
     overflow: hidden;
     border: 1px dashed #cbd5e1;
@@ -316,6 +667,12 @@
     background: #f8fafc;
     color: #64748b;
     font-size: 0.82rem;
+}
+
+.store-logo-preview-box span {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
 }
 
 .store-logo-preview-box img {
@@ -358,6 +715,13 @@
     background: #f1f5f9;
 }
 
+.officer-suggestion-item.is-active {
+    background: #e8f1ff;
+    color: #003366;
+    outline: 2px solid #93c5fd;
+    outline-offset: -2px;
+}
+
 .officer-suggestion-item small {
     color: #64748b;
     font-size: 0.74rem;
@@ -370,23 +734,12 @@
     background: #f8fafc;
 }
 
-.supervisor-selected-list {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
-    gap: 6px;
-    min-height: 32px;
-}
-
-.supervisor-empty {
-    color: #64748b;
-    font-size: 0.8rem;
-}
-
 .supervisor-chip {
     display: inline-flex;
     align-items: center;
     gap: 6px;
+    min-width: 0;
+    max-width: min(100%, 390px);
     border: 1px solid #c7d5e4;
     border-radius: 999px;
     background: #f8fbff;
@@ -394,6 +747,12 @@
     padding: 5px 8px 5px 10px;
     font-size: 0.78rem;
     font-weight: 700;
+}
+
+.supervisor-chip > span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 
 .supervisor-chip button {
@@ -414,6 +773,11 @@
     color: #0f172a;
 }
 
+.supervisor-chip button:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 1px;
+}
+
 .field-toggle-link {
     align-self: flex-start;
     border: 0;
@@ -426,9 +790,11 @@
 }
 
 .admin-stores-modal .admin-modal-actions {
-    margin-top: 12px;
+    margin: 0;
     display: flex;
     justify-content: flex-end;
+    gap: 9px;
+    padding: 14px 20px;
 }
 
 @media (max-width: 900px) {
@@ -452,4 +818,53 @@
 
     .store-logo-field { grid-column: auto; }
     .store-logo-input-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 760px) {
+    .store-card {
+        padding: 14px;
+    }
+
+    .store-card-footer {
+        align-items: flex-end;
+    }
+
+    .store-pagination {
+        margin-top: 12px;
+        border-top: 1px solid #d8e2ee;
+        border-radius: 12px;
+    }
+}
+
+@media (max-width: 620px) {
+    .admin-stores-filters > .field {
+        flex: 1 1 100%;
+    }
+
+    .admin-stores-filters > button {
+        flex: 1 1 calc(50% - 5px);
+    }
+
+    .store-pagination {
+        flex-wrap: wrap;
+    }
+
+    .store-pagination > span {
+        flex: 1 1 100%;
+    }
+
+    .admin-stores-modal {
+        padding: 10px;
+    }
+
+    body.ibems-modern .admin-stores-modal .admin-modal-card {
+        max-height: calc(100dvh - 20px);
+    }
+
+    .admin-stores-modal .admin-modal-head,
+    .admin-stores-modal-body,
+    .admin-stores-modal .admin-modal-actions {
+        padding-left: 14px;
+        padding-right: 14px;
+    }
 }

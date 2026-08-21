@@ -17,6 +17,9 @@ let deductionWorkflowPeriods = [];
 let deductionWorkflowRegister = [];
 let deductionWorkflowItems = [];
 let acctPage = 1;
+let acctSalarySchedules = [];
+let acctDefaultCreditPercentage = 25;
+let acctSalarySchedulesPromise = null;
 
 function aEscape(value) {
     return String(value ?? "")
@@ -29,6 +32,59 @@ function aEscape(value) {
 
 function aMoney(value) {
     return window.IbemsFormat?.money(value) || `PHP ${Number(value || 0).toFixed(2)}`;
+}
+
+async function loadAcctSalarySchedules() {
+    if (acctSalarySchedulesPromise) return acctSalarySchedulesPromise;
+    acctSalarySchedulesPromise = fetch("/accounting/salary-schedules")
+        .then((response) => response.json())
+        .then((data) => {
+            if (!data || data.status !== "success" || !Array.isArray(data.data) || !data.data.length) {
+                throw new Error(data?.message || "Salary schedules are unavailable. Apply the latest development database migration, then refresh this page.");
+            }
+            acctSalarySchedules = data.data;
+            acctDefaultCreditPercentage = Number(data.default_credit_percentage ?? 25);
+            return acctSalarySchedules;
+        });
+    return acctSalarySchedulesPromise;
+}
+
+function selectedAcctSalarySchedule() {
+    const id = Number(document.getElementById("employee-salary-schedule").value || 0);
+    return acctSalarySchedules.find((schedule) => Number(schedule.id) === id) || null;
+}
+
+function populateAcctSalaryProfile(profile = {}) {
+    const scheduleEl = document.getElementById("employee-salary-schedule");
+    const requestedScheduleId = Number(profile.salary_schedule_id || scheduleEl.value || acctSalarySchedules[0]?.id || 0);
+    scheduleEl.innerHTML = acctSalarySchedules.map((schedule) =>
+        `<option value="${Number(schedule.id)}">${aEscape(schedule.name)} (${aEscape(schedule.code)})</option>`
+    ).join("");
+    scheduleEl.value = String(requestedScheduleId || acctSalarySchedules[0]?.id || "");
+
+    const schedule = selectedAcctSalarySchedule();
+    const rates = Array.isArray(schedule?.rates) ? schedule.rates : [];
+    const grades = [...new Set(rates.map((rate) => Number(rate.salary_grade)))];
+    const gradeEl = document.getElementById("employee-salary-grade");
+    const requestedGrade = Number(String(profile.salary_grade || gradeEl.value || 11).replace(/\D/g, "")) || 11;
+    gradeEl.innerHTML = grades.map((grade) => `<option value="${grade}">SG ${grade}</option>`).join("");
+    gradeEl.value = String(grades.includes(requestedGrade) ? requestedGrade : (grades.includes(11) ? 11 : grades[0] || ""));
+
+    const grade = Number(gradeEl.value || 0);
+    const steps = rates.filter((rate) => Number(rate.salary_grade) === grade).map((rate) => Number(rate.salary_step));
+    const stepEl = document.getElementById("employee-salary-step");
+    const requestedStep = Number(profile.salary_step || stepEl.value || 1);
+    stepEl.innerHTML = steps.map((step) => `<option value="${step}">Step ${step}</option>`).join("");
+    stepEl.value = String(steps.includes(requestedStep) ? requestedStep : steps[0] || "");
+
+    document.getElementById("employee-employment-type").value = profile.employment_type || "plantilla";
+    const today = new Date().toISOString().slice(0, 10);
+    const defaultEffectiveDate = today < (schedule?.effective_from || today)
+        ? schedule.effective_from
+        : (schedule?.effective_to && today > schedule.effective_to ? schedule.effective_to : today);
+    document.getElementById("employee-salary-effective-date").value = profile.salary_effective_date || defaultEffectiveDate;
+    document.getElementById("employee-credit-percentage").value = Number(profile.credit_percentage ?? acctDefaultCreditPercentage);
+    refreshDynamicCreditPreview();
 }
 
 function aDateTime(value) {
@@ -449,7 +505,7 @@ function renderRows(rows) {
                     <div class="table-debt-bar acct-debt-bar"><i style="width:${Math.min(100, (Number(row.current_debt || 0) / Math.max(1, Number(row.credit_limit || 0))) * 100)}%"></i></div>
                 </div>
                 <div class="acct-fin-kv grid gap-0.5">
-                    <span class="text-xs text-slate-500">Credit Limit</span>
+                    <span class="text-xs text-slate-500">Credit Limit (${aEscape(Number(row.credit_percentage ?? acctDefaultCreditPercentage))}%)</span>
                     <strong class="text-sm font-semibold text-slate-900">${aEscape(aMoney(row.credit_limit))}</strong>
                 </div>
                 <div class="acct-fin-kv grid gap-0.5">
@@ -767,7 +823,7 @@ function buildProfileHtml(p) {
                 <div class="kv rounded-lg border border-slate-200 bg-white p-2.5"><span class="block text-xs text-slate-500">Category</span><strong class="text-sm text-slate-900">${aEscape(aCategory(p.user_type))}</strong></div>
                 <div class="kv rounded-lg border border-slate-200 bg-white p-2.5"><span class="block text-xs text-slate-500">Base Salary</span><strong class="text-sm text-slate-900">${aEscape(aMoney(p.base_salary))}</strong></div>
                 <div class="kv rounded-lg border border-slate-200 bg-white p-2.5"><span class="block text-xs text-slate-500">Current Debt</span><strong class="text-sm text-slate-900">${aEscape(aMoney(p.current_debt))}</strong></div>
-                <div class="kv rounded-lg border border-slate-200 bg-white p-2.5"><span class="block text-xs text-slate-500">Credit Limit</span><strong class="text-sm text-slate-900">${aEscape(aMoney(p.credit_limit))}</strong></div>
+                <div class="kv rounded-lg border border-slate-200 bg-white p-2.5"><span class="block text-xs text-slate-500">Credit Limit (${aEscape(Number(p.credit_percentage ?? acctDefaultCreditPercentage))}%)</span><strong class="text-sm text-slate-900">${aEscape(aMoney(p.credit_limit))}</strong></div>
                 <div class="kv rounded-lg border border-slate-200 bg-white p-2.5"><span class="block text-xs text-slate-500">Available Credit</span><strong class="text-sm text-slate-900">${aEscape(aMoney(p.available_credit))}</strong></div>
                 <div class="kv rounded-lg border border-slate-200 bg-white p-2.5"><span class="block text-xs text-slate-500">Updated At</span><strong class="text-sm text-slate-900">${aEscape(aDateTime(p.updated_at))}</strong></div>
             </div>
@@ -905,6 +961,13 @@ async function openEmployeeModal(userId) {
     document.getElementById("employee-modal-actions").classList.add("hidden");
     document.getElementById("employee-limit-box").classList.add("hidden");
 
+    try {
+        await loadAcctSalarySchedules();
+    } catch (error) {
+        profileEl.innerHTML = `<div class="mode-profile-empty">${aEscape(error.message || "Salary schedules are unavailable.")}</div>`;
+        historyEl.innerHTML = "No history available.";
+        return;
+    }
     employeeModalProfile = await loadProfile(employeeModalUserId);
     if (!employeeModalProfile) {
         profileEl.innerHTML = '<div class="mode-profile-empty">Unable to load profile.</div>';
@@ -914,14 +977,9 @@ async function openEmployeeModal(userId) {
 
     profileEl.innerHTML = buildProfileHtml(employeeModalProfile);
     document.getElementById("employee-limit-current").textContent = aBool(employeeModalProfile.financial_profile_configured)
-        ? `${aCategory(employeeModalProfile.employment_type)} | ${employeeModalProfile.salary_grade || "-"}${employeeModalProfile.salary_step ? ` Step ${employeeModalProfile.salary_step}` : ""} | Salary ${aMoney(employeeModalProfile.base_salary || 0)} | Credit ${aMoney(employeeModalProfile.credit_limit || 0)}`
+        ? `${aCategory(employeeModalProfile.employment_type)} | ${employeeModalProfile.salary_grade || "-"}${employeeModalProfile.salary_step ? ` Step ${employeeModalProfile.salary_step}` : ""} | Salary ${aMoney(employeeModalProfile.base_salary || 0)} | ${Number(employeeModalProfile.credit_percentage ?? acctDefaultCreditPercentage)}% Credit ${aMoney(employeeModalProfile.credit_limit || 0)}`
         : "Salary-grade profile not configured";
-    document.getElementById("employee-employment-type").value = employeeModalProfile.employment_type || "plantilla";
-    document.getElementById("employee-salary-grade").value = employeeModalProfile.salary_grade || "";
-    document.getElementById("employee-salary-step").value = employeeModalProfile.salary_step || "";
-    document.getElementById("employee-salary-effective-date").value = employeeModalProfile.salary_effective_date || new Date().toISOString().slice(0, 10);
-    document.getElementById("employee-salary-value").value = Number(employeeModalProfile.base_salary || 0).toFixed(2);
-    document.getElementById("employee-limit-value").value = aMoney(Number(employeeModalProfile.base_salary || 0) * 0.25);
+    populateAcctSalaryProfile(employeeModalProfile);
     document.getElementById("employee-modal-actions").classList.remove("hidden");
 
     const history = await loadHistory(employeeModalUserId);
@@ -962,7 +1020,7 @@ function renderCsvPreview(data) {
         <div class="import-preview-item is-valid rounded-xl border border-emerald-200 bg-emerald-50 p-3">
             <strong>Line ${row.line}: ${aEscape(row.action === "create" ? "Create" : "Update")}</strong><br>
             ${aEscape(row.name || "-")} (${aEscape(row.email || "-")})<br>
-            <span>${aEscape(aCategory(row.user_type))} | ${aEscape(aCategory(row.employment_type))} | ${aEscape(row.salary_grade || "-")}${row.salary_step ? ` Step ${aEscape(row.salary_step)}` : ""} | Salary ${aEscape(aMoney(row.monthly_salary || 0))} | Credit ${aEscape(aMoney(row.credit_limit || 0))}</span>
+            <span>${aEscape(aCategory(row.user_type))} | ${aEscape(aCategory(row.employment_type))} | ${aEscape(row.salary_schedule_code || "-")} · ${aEscape(row.salary_grade || "-")}${row.salary_step ? ` Step ${aEscape(row.salary_step)}` : ""} | Salary ${aEscape(aMoney(row.monthly_salary || 0))} | ${aEscape(Number(row.credit_percentage ?? acctDefaultCreditPercentage))}% Credit ${aEscape(aMoney(row.credit_limit || 0))}</span>
         </div>
     `).join("") : "";
 
@@ -1878,33 +1936,47 @@ document.getElementById("employee-limit-cancel").addEventListener("click", () =>
 });
 
 function refreshDynamicCreditPreview() {
-    const salary = Math.max(0, Number(document.getElementById("employee-salary-value").value || 0));
-    document.getElementById("employee-limit-value").value = aMoney(salary * 0.25);
+    const schedule = selectedAcctSalarySchedule();
+    const grade = Number(document.getElementById("employee-salary-grade").value || 0);
+    const step = Number(document.getElementById("employee-salary-step").value || 0);
+    const rate = (schedule?.rates || []).find((item) => Number(item.salary_grade) === grade && Number(item.salary_step) === step);
+    const salary = Number(rate?.monthly_salary || 0);
+    const percentage = Math.min(100, Math.max(0, Number(document.getElementById("employee-credit-percentage").value || 0)));
+    document.getElementById("employee-salary-value").value = aMoney(salary);
+    document.getElementById("employee-limit-value").value = aMoney(salary * percentage / 100);
 }
 
-document.getElementById("employee-salary-value").addEventListener("input", refreshDynamicCreditPreview);
-document.getElementById("employee-employment-type").addEventListener("change", (event) => {
-    const step = document.getElementById("employee-salary-step");
-    step.required = event.target.value === "plantilla";
-    if (event.target.value !== "plantilla") step.value = "";
-});
+document.getElementById("employee-salary-schedule").addEventListener("change", () => populateAcctSalaryProfile({
+    salary_schedule_id: document.getElementById("employee-salary-schedule").value,
+    employment_type: document.getElementById("employee-employment-type").value,
+    credit_percentage: document.getElementById("employee-credit-percentage").value,
+}));
+document.getElementById("employee-salary-grade").addEventListener("change", () => populateAcctSalaryProfile({
+    salary_schedule_id: document.getElementById("employee-salary-schedule").value,
+    salary_grade: document.getElementById("employee-salary-grade").value,
+    employment_type: document.getElementById("employee-employment-type").value,
+    credit_percentage: document.getElementById("employee-credit-percentage").value,
+}));
+document.getElementById("employee-salary-step").addEventListener("change", refreshDynamicCreditPreview);
+document.getElementById("employee-credit-percentage").addEventListener("input", refreshDynamicCreditPreview);
 
 document.getElementById("employee-limit-save").addEventListener("click", async () => {
     if (!employeeModalUserId) return;
-    const salary = Number(document.getElementById("employee-salary-value").value || -1);
     const employmentType = document.getElementById("employee-employment-type").value;
     const salaryGrade = (document.getElementById("employee-salary-grade").value || "").trim();
     const salaryStep = (document.getElementById("employee-salary-step").value || "").trim();
+    const salaryScheduleId = Number(document.getElementById("employee-salary-schedule").value || 0);
     const effectiveDate = document.getElementById("employee-salary-effective-date").value;
-    const value = salary * 0.25;
+    const creditPercentage = Number(document.getElementById("employee-credit-percentage").value || -1);
+    const value = document.getElementById("employee-limit-value").value;
     const reason = (document.getElementById("employee-limit-reason").value || "").trim();
 
-    if (salary <= 0 || !salaryGrade || !effectiveDate || !reason || (employmentType === "plantilla" && !salaryStep)) {
-        setAcctResult("Employment type, salary grade, valid salary, effective date, and reason are required. Plantilla also requires a step.", "error");
+    if (!salaryScheduleId || !salaryGrade || !salaryStep || !effectiveDate || !reason || creditPercentage < 0 || creditPercentage > 100) {
+        setAcctResult("Schedule, grade, step, employment type, effective date, credit percentage, and reason are required.", "error");
         return;
     }
 
-    if (!await window.IbemsDialog.confirm(`Save this salary profile? The credit limit will be ${aMoney(value)} (25%).`, {
+    if (!await window.IbemsDialog.confirm(`Save this salary profile? The credit limit will be ${value} (${creditPercentage}%).`, {
         title: "Update salary-grade profile?",
         confirmLabel: "Save profile",
     })) return;
@@ -1914,11 +1986,12 @@ document.getElementById("employee-limit-save").addEventListener("click", async (
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
             user_id: employeeModalUserId,
-            base_salary: salary,
             employment_type: employmentType,
+            salary_schedule_id: salaryScheduleId,
             salary_grade: salaryGrade,
             salary_step: salaryStep,
             salary_effective_date: effectiveDate,
+            credit_percentage: creditPercentage,
             reason,
         }),
     });

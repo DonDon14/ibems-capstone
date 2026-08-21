@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/user') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/user-portal.css') ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/user-portal.css') ?>?v=20260821b">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>

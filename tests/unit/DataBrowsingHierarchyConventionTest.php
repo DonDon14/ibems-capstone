@@ -40,6 +40,10 @@ final class DataBrowsingHierarchyConventionTest extends CIUnitTestCase
         }
         $this->assertStringContainsString('historical credit usage', $view);
         $this->assertStringContainsString('current outstanding debt', $view);
+        $this->assertStringContainsString('id="uh-reset-filters"', $view);
+        $this->assertStringNotContainsString('id="uh-apply"', $view);
+        $this->assertStringNotContainsString('id="uh-clear"', $view);
+        $this->assertStringContainsString('["uh-date-from", "uh-date-to"]', $script);
     }
 
     public function testEmployeeCatalogShowsOnlyActiveStoreProductsWithControls(): void
@@ -58,6 +62,14 @@ final class DataBrowsingHierarchyConventionTest extends CIUnitTestCase
             $this->assertStringContainsString('"' . $id . '"', $script);
         }
         $this->assertStringContainsString('user-product-image-fallback', $script);
+        $this->assertStringContainsString('id="us-reset-filters"', $view);
+        $this->assertStringNotContainsString('id="us-clear"', $view);
+        $this->assertStringContainsString('let usRequestSequence = 0;', $script);
+        $this->assertStringContainsString('requestId !== usRequestSequence', $script);
+        $this->assertStringContainsString('let usOptionsLoaded = false;', $script);
+        $this->assertStringContainsString('"include_options"', $script);
+        $this->assertStringContainsString("'options_included' => \$includeOptions", $controller);
+        $this->assertStringContainsString("->orLike('p.sku', \$q, 'both', null, true)", $controller);
     }
 
     public function testLargeDataScreensExposeSortAndPaginationControls(): void

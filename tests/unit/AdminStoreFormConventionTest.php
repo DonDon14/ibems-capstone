@@ -14,6 +14,86 @@ final class AdminStoreFormConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('data-remove-supervisor', (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js'));
     }
 
+    public function testOfficerAndSupervisorUseTheSameAccessiblePeoplePickerPattern(): void
+    {
+        $view = (string) file_get_contents(APPPATH . 'Views/admin/stores.php');
+        $styles = (string) file_get_contents(FCPATH . 'assets/css/admin-stores.css');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js');
+
+        $this->assertSame(2, substr_count($view, 'class="people-picker"'));
+        $this->assertSame(2, substr_count($view, 'role="combobox"'));
+        $this->assertStringContainsString('aria-multiselectable="true"', $view);
+        $this->assertStringContainsString('.people-picker:focus-within', $styles);
+        $this->assertStringContainsString('.people-picker input[type="search"]:focus', $styles);
+        $this->assertStringContainsString('padding: 5px 4px 5px 38px', $styles);
+        $this->assertStringContainsString('renderSelectedOfficer', $script);
+        $this->assertStringContainsString('handlePeoplePickerKeydown', $script);
+    }
+
+    public function testStoreManagementKeepsResponsiveCardsWithSortingPaginationAndWarnings(): void
+    {
+        $view = (string) file_get_contents(APPPATH . 'Views/admin/stores.php');
+        $styles = (string) file_get_contents(FCPATH . 'assets/css/admin-stores.css');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js');
+        $service = (string) file_get_contents(APPPATH . 'Services/StoreOversightService.php');
+
+        foreach (['store-sort', 'stores-gallery'] as $id) {
+            $this->assertStringContainsString($id, $view);
+        }
+        foreach (['store-cards-grid', 'store-card-heading', 'store-pagination'] as $selector) {
+            $this->assertStringContainsString($selector, $styles);
+        }
+        foreach (['sortedStoreRows', 'assignmentWarningMarkup', 'storeNeedsAssignment', 'storePaginationMarkup', 'data-store-page', 'store-cards-grid'] as $function) {
+            $this->assertStringContainsString($function, $script);
+        }
+        $this->assertStringContainsString('store-pagination--single', $script);
+        $this->assertStringContainsString('Needs assignment', $script);
+        $this->assertStringContainsString('class="store-card-action"', $script);
+        $this->assertStringNotContainsString('store-edit-icon', $script);
+        $this->assertStringNotContainsString('<table class="stores-table">', $script);
+        $this->assertStringContainsString('NOT EXISTS (SELECT 1 FROM store_supervisors', $service);
+    }
+
+    public function testStoreModalUsesSectionedFormAndSynchronizedActions(): void
+    {
+        $view = (string) file_get_contents(APPPATH . 'Views/admin/stores.php');
+        $styles = (string) file_get_contents(FCPATH . 'assets/css/admin-stores.css');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js');
+
+        foreach (['Store information', 'Staff assignments', 'Availability', 'cancel-store-modal', 'store-modal-description'] as $content) {
+            $this->assertStringContainsString($content, $view);
+        }
+        $this->assertStringContainsString('.store-form-section-head', $styles);
+        $this->assertStringContainsString('setSelectValue("store-active"', $script);
+        $this->assertStringContainsString('dataset.idleLabel', $script);
+    }
+
+    public function testSharedStoreScriptTreatsAdminOnlyControlsAsOptional(): void
+    {
+        $storeAdminView = (string) file_get_contents(APPPATH . 'Views/store-admin/stores.php');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js');
+
+        $this->assertStringNotContainsString('id="store-sort"', $storeAdminView);
+        $this->assertStringContainsString('document.getElementById("store-sort")?.addEventListener', $script);
+        $this->assertStringContainsString('admin-stores.js\') ?>?v=20260821g', $storeAdminView);
+    }
+
+    public function testStoreModalKeepsChromeFixedAndHidesConditionalTextarea(): void
+    {
+        $view = (string) file_get_contents(APPPATH . 'Views/admin/stores.php');
+        $styles = (string) file_get_contents(FCPATH . 'assets/css/admin-stores.css');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js');
+
+        $this->assertStringContainsString('admin-stores-modal-body', $view);
+        $this->assertStringContainsString('store-deactivation-reason-field" hidden', $view);
+        $this->assertStringContainsString('grid-template-rows: auto minmax(0, 1fr) auto', $styles);
+        $this->assertStringContainsString('body.ibems-modern .admin-stores-modal .admin-modal-card', $styles);
+        $this->assertStringContainsString('.admin-stores-modal .field[hidden]', $styles);
+        $this->assertStringContainsString('.field textarea', $styles);
+        $this->assertStringContainsString('admin-stores-modal-open', $script);
+        $this->assertStringContainsString('reasonField.hidden = !isDeactivating', $script);
+    }
+
     public function testStoreLogoMatchesTheProductMediaInputPattern(): void
     {
         $view = (string) file_get_contents(APPPATH . 'Views/admin/stores.php');

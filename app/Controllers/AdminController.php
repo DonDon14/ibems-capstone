@@ -14,6 +14,8 @@ use App\Models\UserRoleModel;
 use App\Models\DebtCashbookEntryModel;
 use App\Services\StoreOversightService;
 use App\Services\AssetStorageService;
+use App\Services\SalaryCreditPolicy;
+use App\Services\SalaryScheduleService;
 use CodeIgniter\Controller;
 use Config\Database;
 
@@ -393,6 +395,22 @@ class AdminController extends Controller
     public function products()
     {
         return view('admin/products');
+    }
+
+    public function salarySchedules()
+    {
+        $catalog = (new SalaryScheduleService())->catalog(Database::connect());
+        if ($catalog === []) {
+            return $this->response->setStatusCode(503)->setJSON([
+                'status' => 'error',
+                'message' => 'Salary schedules are unavailable. Apply the latest development database migration, then refresh this page.',
+            ]);
+        }
+        return $this->response->setJSON([
+            'status' => 'success',
+            'data' => $catalog,
+            'default_credit_percentage' => SalaryCreditPolicy::percentageFromRate(SalaryCreditPolicy::DEFAULT_CREDIT_RATE),
+        ]);
     }
 
     public function audit()
@@ -1063,8 +1081,13 @@ class AdminController extends Controller
     {
         $q = trim((string) $this->request->getGet('q'));
         $db = Database::connect();
+        $salaryProfileSelect = [];
+        foreach (['employment_type', 'salary_grade', 'salary_effective_date', 'salary_schedule_id'] as $field) {
+            $salaryProfileSelect[] = $db->fieldExists($field, 'users') ? 'u.' . $field : 'NULL AS ' . $field;
+        }
+        $creditRateSelect = $db->fieldExists('credit_rate', 'balances') ? 'b.credit_rate' : (string) SalaryCreditPolicy::DEFAULT_CREDIT_RATE . ' AS credit_rate';
         $query = $db->table('users u')
-            ->select('u.id, u.employee_id, u.name, u.email, u.role, u.user_type, u.is_active, b.user_id AS balance_user_id, b.current_debt, b.credit_limit')
+            ->select('u.id, u.employee_id, u.name, u.email, u.role, u.user_type, u.is_active, ' . implode(', ', $salaryProfileSelect) . ', b.user_id AS balance_user_id, b.current_debt, b.credit_limit, ' . $creditRateSelect, false)
             ->join('balances b', 'b.user_id = u.id', 'left');
 
         if ($q !== '') {
@@ -1090,9 +1113,15 @@ class AdminController extends Controller
                     'roles' => $rolesMap[$userId] ?? [strtoupper((string) ($row['role'] ?? 'USER'))],
                     'user_type' => $row['user_type'],
                     'is_active' => ibems_bool($row['is_active']),
-                    'financial_profile_configured' => $row['balance_user_id'] !== null,
+                    'financial_profile_configured' => in_array(strtolower((string) ($row['user_type'] ?? '')), ['faculty', 'staff'], true)
+                        && $row['balance_user_id'] !== null
+                        && trim((string) ($row['employment_type'] ?? '')) !== ''
+                        && trim((string) ($row['salary_grade'] ?? '')) !== ''
+                        && trim((string) ($row['salary_effective_date'] ?? '')) !== ''
+                        && (int) ($row['salary_schedule_id'] ?? 0) > 0,
                     'current_debt' => (float) ($row['current_debt'] ?? 0),
                     'credit_limit' => (float) ($row['credit_limit'] ?? 0),
+                    'credit_percentage' => SalaryCreditPolicy::percentageFromRate((float) ($row['credit_rate'] ?? SalaryCreditPolicy::DEFAULT_CREDIT_RATE)),
                 ];
             }, $rows),
         ]);
@@ -1109,11 +1138,12 @@ class AdminController extends Controller
 
         $db = Database::connect();
         $salaryProfileSelect = [];
-        foreach (['employment_type', 'salary_grade', 'salary_step', 'salary_effective_date'] as $field) {
+        foreach (['employment_type', 'salary_grade', 'salary_step', 'salary_effective_date', 'salary_schedule_id'] as $field) {
             $salaryProfileSelect[] = $db->fieldExists($field, 'users') ? 'u.' . $field : 'NULL AS ' . $field;
         }
+        $creditRateSelect = $db->fieldExists('credit_rate', 'balances') ? 'b.credit_rate' : (string) SalaryCreditPolicy::DEFAULT_CREDIT_RATE . ' AS credit_rate';
         $row = $db->table('users u')
-            ->select('u.id, u.employee_id, u.name, u.email, u.role, u.user_type, u.base_salary, ' . implode(', ', $salaryProfileSelect) . ', u.is_active, u.created_at, b.user_id AS balance_user_id, b.current_debt, b.credit_limit', false)
+            ->select('u.id, u.employee_id, u.name, u.email, u.role, u.user_type, u.base_salary, ' . implode(', ', $salaryProfileSelect) . ', u.is_active, u.created_at, b.user_id AS balance_user_id, b.current_debt, b.credit_limit, ' . $creditRateSelect, false)
             ->join('balances b', 'b.user_id = u.id', 'left')
             ->where('u.id', $userId)
             ->get()
@@ -1141,14 +1171,17 @@ class AdminController extends Controller
                 'salary_grade' => $row['salary_grade'] ?? null,
                 'salary_step' => isset($row['salary_step']) ? (int) $row['salary_step'] : null,
                 'salary_effective_date' => $row['salary_effective_date'] ?? null,
+                'salary_schedule_id' => isset($row['salary_schedule_id']) ? (int) $row['salary_schedule_id'] : null,
                 'is_active' => ibems_bool($row['is_active']),
                 'created_at' => $row['created_at'],
                 'financial_profile_configured' => $row['balance_user_id'] !== null
                     && trim((string) ($row['employment_type'] ?? '')) !== ''
                     && trim((string) ($row['salary_grade'] ?? '')) !== ''
-                    && trim((string) ($row['salary_effective_date'] ?? '')) !== '',
+                    && trim((string) ($row['salary_effective_date'] ?? '')) !== ''
+                    && (int) ($row['salary_schedule_id'] ?? 0) > 0,
                 'current_debt' => (float) ($row['current_debt'] ?? 0),
                 'credit_limit' => (float) ($row['credit_limit'] ?? 0),
+                'credit_percentage' => SalaryCreditPolicy::percentageFromRate((float) ($row['credit_rate'] ?? SalaryCreditPolicy::DEFAULT_CREDIT_RATE)),
             ],
         ]);
     }
@@ -1203,6 +1236,18 @@ class AdminController extends Controller
         $balanceModel = new BalanceModel();
         $auditLogModel = new AuditLogModel();
 
+        $financialProfile = null;
+        if (in_array($userType, ['faculty', 'staff'], true)) {
+            try {
+                $financialProfile = $this->resolveEmployeeFinancialProfile($db, $request);
+            } catch (\InvalidArgumentException $exception) {
+                return $this->response->setStatusCode(400)->setJSON([
+                    'status' => 'error',
+                    'message' => $exception->getMessage(),
+                ]);
+            }
+        }
+
         if ($userModel->where('email', $email)->first()) {
             return $this->response->setStatusCode(409)->setJSON([
                 'status' => 'error',
@@ -1218,11 +1263,11 @@ class AdminController extends Controller
 
         $primaryRole = $this->pickPrimaryRole($roles);
         $passwordHash = $password !== '' ? password_hash($password, PASSWORD_BCRYPT) : password_hash('123456', PASSWORD_BCRYPT);
-        $initialCreditLimit = $this->initialCreditLimitForUserType($userType);
+        $initialCreditLimit = (float) ($financialProfile['credit_limit'] ?? 0);
 
         $db->transStart();
 
-        $db->table('users')->insert([
+        $userPayload = [
             'employee_id' => $employeeId !== '' ? $employeeId : null,
             'name' => $name,
             'email' => $email,
@@ -1230,22 +1275,36 @@ class AdminController extends Controller
             'role' => $primaryRole,
             'user_type' => $userType,
             'qr_token' => bin2hex(random_bytes(16)),
-            'base_salary' => 0,
+            'base_salary' => (float) ($financialProfile['monthly_salary'] ?? 0),
             'is_active' => $isActive,
             'created_at' => date('Y-m-d H:i:s'),
-        ]);
+        ];
+        if ($financialProfile !== null) {
+            $userPayload += [
+                'employment_type' => $financialProfile['employment_type'],
+                'salary_grade' => $financialProfile['salary_grade_label'],
+                'salary_step' => $financialProfile['salary_step'],
+                'salary_effective_date' => $financialProfile['effective_date'],
+                'salary_schedule_id' => $financialProfile['schedule_id'],
+            ];
+        }
+        $db->table('users')->insert($userPayload);
         $createdUser = $db->table('users')->select('id')->where('email', $email)->get()->getRowArray();
         $userId = (int) ($createdUser['id'] ?? 0);
 
         if ($userId) {
             $this->syncUserRoles((int) $userId, $roles);
 
-            $balanceModel->insert([
+            $balancePayload = [
                 'user_id' => (int) $userId,
                 'credit_limit' => $initialCreditLimit,
                 'current_debt' => 0,
                 'updated_at' => date('Y-m-d H:i:s'),
-            ]);
+            ];
+            if ($db->fieldExists('credit_rate', 'balances')) {
+                $balancePayload['credit_rate'] = (float) ($financialProfile['credit_rate'] ?? 0);
+            }
+            $balanceModel->insert($balancePayload);
         }
 
         $auditLogModel->insert([
@@ -1259,6 +1318,7 @@ class AdminController extends Controller
                 'roles' => $roles,
                 'user_type' => $userType,
                 'initial_credit_limit' => $initialCreditLimit,
+                'salary_profile' => $financialProfile,
             ]),
             'created_at' => date('Y-m-d H:i:s'),
         ]);
@@ -1275,6 +1335,7 @@ class AdminController extends Controller
             'status' => 'success',
             'user_id' => (int) $userId,
             'initial_credit_limit' => $initialCreditLimit,
+            'credit_percentage' => (float) ($financialProfile['credit_percentage'] ?? 0),
         ]);
     }
 
@@ -1334,6 +1395,18 @@ class AdminController extends Controller
                 'message' => 'User not found.',
             ]);
         }
+        $existingBalance = $balanceModel->find($userId);
+        $financialProfile = null;
+        if (in_array($userType, ['faculty', 'staff'], true)) {
+            try {
+                $financialProfile = $this->resolveEmployeeFinancialProfile($db, $request, array_merge($user, $existingBalance ?? []));
+            } catch (\InvalidArgumentException $exception) {
+                return $this->response->setStatusCode(400)->setJSON([
+                    'status' => 'error',
+                    'message' => $exception->getMessage(),
+                ]);
+            }
+        }
 
         $sameEmail = $db->table('users')->where('email', $email)->where('id !=', $userId)->get()->getRowArray();
         if ($sameEmail) {
@@ -1355,28 +1428,48 @@ class AdminController extends Controller
         $primaryRole = $this->pickPrimaryRole($roles);
         $db->transStart();
 
-        $db->table('users')->where('id', $userId)->update([
+        $userPayload = [
             'employee_id' => $employeeId !== '' ? $employeeId : null,
             'name' => $name,
             'email' => $email,
             'role' => $primaryRole,
             'user_type' => $userType,
             'is_active' => $isActive,
-        ]);
+        ];
+        if ($financialProfile !== null) {
+            $userPayload += [
+                'base_salary' => $financialProfile['monthly_salary'],
+                'employment_type' => $financialProfile['employment_type'],
+                'salary_grade' => $financialProfile['salary_grade_label'],
+                'salary_step' => $financialProfile['salary_step'],
+                'salary_effective_date' => $financialProfile['effective_date'],
+                'salary_schedule_id' => $financialProfile['schedule_id'],
+            ];
+        }
+        $db->table('users')->where('id', $userId)->update($userPayload);
         $this->syncUserRoles($userId, $roles);
 
-        $balance = $balanceModel->find($userId);
+        $balance = $existingBalance;
         if ($balance) {
-            $balanceModel->update($userId, [
+            $balancePayload = [
+                'credit_limit' => (float) ($financialProfile['credit_limit'] ?? 0),
                 'updated_at' => date('Y-m-d H:i:s'),
-            ]);
+            ];
+            if ($db->fieldExists('credit_rate', 'balances')) {
+                $balancePayload['credit_rate'] = (float) ($financialProfile['credit_rate'] ?? 0);
+            }
+            $balanceModel->update($userId, $balancePayload);
         } else {
-            $balanceModel->insert([
+            $balancePayload = [
                 'user_id' => $userId,
-                'credit_limit' => $this->initialCreditLimitForUserType($userType),
+                'credit_limit' => (float) ($financialProfile['credit_limit'] ?? 0),
                 'current_debt' => 0,
                 'updated_at' => date('Y-m-d H:i:s'),
-            ]);
+            ];
+            if ($db->fieldExists('credit_rate', 'balances')) {
+                $balancePayload['credit_rate'] = (float) ($financialProfile['credit_rate'] ?? 0);
+            }
+            $balanceModel->insert($balancePayload);
         }
 
         $auditLogModel->insert([
@@ -1443,6 +1536,7 @@ class AdminController extends Controller
         $userModel = new UserModel();
         $balanceModel = new BalanceModel();
         $auditLogModel = new AuditLogModel();
+        $standardProfile = (new SalaryScheduleService())->standardProfile($db);
 
         $allowedRoles = ['USER', 'STORE_SYSTEM', 'STORE_SUPERVISOR', 'ACCOUNTING_OFFICE', 'ADMIN'];
         $allowedTypes = ['faculty', 'staff', 'student'];
@@ -1488,19 +1582,40 @@ class AdminController extends Controller
                 $existing = $db->table('users')->where('employee_id', $employeeId)->get()->getRowArray();
             }
 
+            $needsStandardProfile = in_array($userType, ['faculty', 'staff'], true)
+                && (!$existing || empty($existing['salary_schedule_id']));
+            if ($needsStandardProfile && $standardProfile === null) {
+                throw new \RuntimeException('The standard salary schedule is unavailable. Apply the latest database migration before importing employees.');
+            }
+            $standardCreditRate = SalaryCreditPolicy::DEFAULT_CREDIT_RATE;
+            $standardCreditLimit = $needsStandardProfile
+                ? SalaryCreditPolicy::creditLimit((float) $standardProfile['monthly_salary'], $standardCreditRate)
+                : 0.0;
+
             if ($existing) {
-                $db->table('users')->where('id', (int) $existing['id'])->update([
+                $updatePayload = [
                     'employee_id' => $employeeId !== '' ? $employeeId : $existing['employee_id'],
                     'name' => $name,
                     'email' => $email,
                     'role' => $primaryRole,
                     'user_type' => $userType,
                     'is_active' => $isActive,
-                ]);
+                ];
+                if ($needsStandardProfile) {
+                    $updatePayload += [
+                        'base_salary' => $standardProfile['monthly_salary'],
+                        'employment_type' => 'plantilla',
+                        'salary_grade' => $standardProfile['salary_grade_label'],
+                        'salary_step' => $standardProfile['salary_step'],
+                        'salary_effective_date' => $standardProfile['effective_from'],
+                        'salary_schedule_id' => $standardProfile['schedule_id'],
+                    ];
+                }
+                $db->table('users')->where('id', (int) $existing['id'])->update($updatePayload);
                 $userId = (int) $existing['id'];
                 $updated++;
             } else {
-                $db->table('users')->insert([
+                $newUserPayload = [
                     'employee_id' => $employeeId !== '' ? $employeeId : null,
                     'name' => $name,
                     'email' => $email,
@@ -1508,10 +1623,20 @@ class AdminController extends Controller
                     'role' => $primaryRole,
                     'user_type' => $userType,
                     'qr_token' => bin2hex(random_bytes(16)),
-                    'base_salary' => 0,
+                    'base_salary' => $needsStandardProfile ? $standardProfile['monthly_salary'] : 0,
                     'is_active' => $isActive,
                     'created_at' => date('Y-m-d H:i:s'),
-                ]);
+                ];
+                if ($needsStandardProfile) {
+                    $newUserPayload += [
+                        'employment_type' => 'plantilla',
+                        'salary_grade' => $standardProfile['salary_grade_label'],
+                        'salary_step' => $standardProfile['salary_step'],
+                        'salary_effective_date' => $standardProfile['effective_from'],
+                        'salary_schedule_id' => $standardProfile['schedule_id'],
+                    ];
+                }
+                $db->table('users')->insert($newUserPayload);
                 $createdUser = $db->table('users')->select('id')->where('email', $email)->get()->getRowArray();
                 $userId = (int) ($createdUser['id'] ?? 0);
                 if ($userId <= 0) {
@@ -1524,13 +1649,19 @@ class AdminController extends Controller
 
             $balance = $balanceModel->find($userId);
             if ($balance) {
-                $balanceModel->update($userId, [
+                $balanceUpdate = [
                     'updated_at' => date('Y-m-d H:i:s'),
-                ]);
+                ];
+                if ($needsStandardProfile) {
+                    $balanceUpdate['credit_limit'] = $standardCreditLimit;
+                    $balanceUpdate['credit_rate'] = $standardCreditRate;
+                }
+                $balanceModel->update($userId, $balanceUpdate);
             } else {
                 $balanceModel->insert([
                     'user_id' => $userId,
-                    'credit_limit' => $this->initialCreditLimitForUserType($userType),
+                    'credit_limit' => $standardCreditLimit,
+                    'credit_rate' => $needsStandardProfile ? $standardCreditRate : 0,
                     'current_debt' => 0,
                     'updated_at' => date('Y-m-d H:i:s'),
                 ]);
@@ -1581,9 +1712,50 @@ class AdminController extends Controller
         ]);
     }
 
-    private function initialCreditLimitForUserType(string $userType): float
+    private function resolveEmployeeFinancialProfile($db, array $request, ?array $current = null): array
     {
-        return 0.00;
+        foreach (['employment_type', 'salary_grade', 'salary_step', 'salary_effective_date', 'salary_schedule_id'] as $field) {
+            if (!$db->fieldExists($field, 'users')) {
+                throw new \InvalidArgumentException('Salary schedule setup is unavailable until the latest database migration is applied.');
+            }
+        }
+        if (!$db->fieldExists('credit_rate', 'balances')) {
+            throw new \InvalidArgumentException('Dynamic credit percentage is unavailable until the latest database migration is applied.');
+        }
+
+        $scheduleId = (int) ($request['salary_schedule_id'] ?? $current['salary_schedule_id'] ?? 0);
+        $grade = (string) ($request['salary_grade'] ?? $current['salary_grade'] ?? '');
+        $step = (int) ($request['salary_step'] ?? $current['salary_step'] ?? 0);
+        $employmentType = SalaryCreditPolicy::normalizeEmploymentType((string) ($request['employment_type'] ?? $current['employment_type'] ?? 'plantilla'));
+        $effectiveDate = trim((string) ($request['salary_effective_date'] ?? $current['salary_effective_date'] ?? ''));
+        $creditPercentage = (float) ($request['credit_percentage'] ?? SalaryCreditPolicy::percentageFromRate((float) ($current['credit_rate'] ?? SalaryCreditPolicy::DEFAULT_CREDIT_RATE)));
+
+        if (!in_array($employmentType, SalaryCreditPolicy::EMPLOYMENT_TYPES, true)) {
+            throw new \InvalidArgumentException('Select a valid employment type.');
+        }
+        if (!SalaryCreditPolicy::isValidEffectiveDate($effectiveDate)) {
+            throw new \InvalidArgumentException('Select a valid salary effective date.');
+        }
+        if (!SalaryCreditPolicy::isValidCreditPercentage($creditPercentage)) {
+            throw new \InvalidArgumentException('Credit percentage must be from 0% to 100%.');
+        }
+
+        $rate = (new SalaryScheduleService())->resolveRate($db, $scheduleId, $grade, $step);
+        if ($rate === null) {
+            throw new \InvalidArgumentException('Select a valid salary schedule, grade, and step.');
+        }
+        if ($effectiveDate < $rate['effective_from'] || ($rate['effective_to'] !== null && $effectiveDate > $rate['effective_to'])) {
+            throw new \InvalidArgumentException('The salary effective date must fall within the selected schedule.');
+        }
+
+        $creditRate = SalaryCreditPolicy::rateFromPercentage($creditPercentage);
+        return $rate + [
+            'employment_type' => $employmentType,
+            'effective_date' => $effectiveDate,
+            'credit_percentage' => $creditPercentage,
+            'credit_rate' => $creditRate,
+            'credit_limit' => SalaryCreditPolicy::creditLimit((float) $rate['monthly_salary'], $creditRate),
+        ];
     }
 
     public function storesData()
@@ -1754,6 +1926,7 @@ class AdminController extends Controller
                 'supervisor_ids' => $supervisorIds,
                 'logo_url' => $logoUrl,
                 'is_active' => $isActive,
+                'salary_profile' => $financialProfile,
             ]),
             'created_at' => date('Y-m-d H:i:s'),
         ]);

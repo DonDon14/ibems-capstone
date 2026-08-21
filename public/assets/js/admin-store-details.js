@@ -3,6 +3,10 @@ function sdMoney(value) {
 }
 
 let sdDaySessions = [];
+let sdInventoryRows = [];
+let sdTransactionRows = [];
+const sdPages = { sessions: 1, inventory: 1, transactions: 1 };
+let sdStaleDayTrigger = null;
 
 function sdDateTime(value) {
     return window.IbemsFormat?.dateTime(value) || new Date(value).toLocaleString();
@@ -41,6 +45,37 @@ function sdDataState(type, message, colspan = 0) {
     const role = safeType === "error" ? "alert" : "status";
     const content = `<div class="data-state data-state--${safeType}" role="${role}" aria-live="polite"><i class="${icons[safeType]}" aria-hidden="true"></i><div><strong>${sdEscape(message)}</strong></div></div>`;
     return colspan > 0 ? `<tr class="data-state-row"><td colspan="${Number(colspan)}">${content}</td></tr>` : content;
+}
+
+function sdPageSize(section) {
+    const controlName = section === "sessions" ? "session" : section;
+    return Math.max(1, Number(document.getElementById(`sd-${controlName}-page-size`)?.value || 10));
+}
+
+function sdPageSlice(section, rows) {
+    const pageSize = sdPageSize(section);
+    const totalPages = Math.max(1, Math.ceil(rows.length / pageSize));
+    sdPages[section] = Math.min(Math.max(1, sdPages[section] || 1), totalPages);
+    const start = (sdPages[section] - 1) * pageSize;
+    return { rows: rows.slice(start, start + pageSize), start, totalPages };
+}
+
+function sdRenderPager(section, totalRows) {
+    const controlName = section === "sessions" ? "session" : section;
+    const pager = document.getElementById(`sd-${controlName}-pager`);
+    if (!pager) return;
+    const pageSize = sdPageSize(section);
+    const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
+    const page = Math.min(Math.max(1, sdPages[section] || 1), totalPages);
+    const start = totalRows === 0 ? 0 : (page - 1) * pageSize + 1;
+    const end = Math.min(page * pageSize, totalRows);
+    pager.innerHTML = `
+        <span>${start}–${end} of ${totalRows}</span>
+        <div class="store-detail-pager-actions">
+            <button class="secondary-btn btn-sm" type="button" data-sd-page-section="${section}" data-sd-page="${page - 1}" ${page <= 1 ? "disabled" : ""} aria-label="Previous ${section} page"><i class="bi bi-chevron-left"></i> Previous</button>
+            <strong>Page ${page} of ${totalPages}</strong>
+            <button class="secondary-btn btn-sm" type="button" data-sd-page-section="${section}" data-sd-page="${page + 1}" ${page >= totalPages ? "disabled" : ""}>Next <i class="bi bi-chevron-right"></i></button>
+        </div>`;
 }
 
 function sdReviewLabel(value) {
@@ -202,29 +237,16 @@ function sdRenderDaySession(session) {
     const canReview = isClosed && reviewStatus !== "not_required" && !["approved", "waived", "corrected"].includes(reviewStatus);
     const isStaleOpen = !isClosed && String(session.business_date || "") < new Date().toLocaleDateString("en-CA");
     const staleResolution = isStaleOpen ? `
-        <form class="variance-evidence-form stale-day-resolution-form" data-stale-session-id="${Number(session.id || 0)}">
+        <div class="stale-day-summary" role="alert">
             <div class="stale-day-intro">
                 <span class="stale-day-icon" aria-hidden="true"><i class="bi bi-calendar-x"></i></span>
                 <div>
                     <strong>Previous day still open</strong>
-                    <p>Enter independently counted balances. The original business date and opener will be preserved.</p>
+                    <p>Reconcile the original business date before this store begins a new day.</p>
                 </div>
             </div>
-            <div class="stale-day-expected" role="status">
-                <div><span>System expected cash</span><strong>${sdEscape(sdMoney(session.expected_cash || 0))}</strong></div>
-                <div><span>System expected e-cash</span><strong>${sdEscape(sdMoney(session.expected_ecash || 0))}</strong></div>
-                <p>Count independently before entering values. These expectations are shown for reconciliation and must not replace a physical count.</p>
-            </div>
-            <div class="stale-day-fields">
-                <label><span>Counted Cash</span><input type="number" name="counted_cash" min="0" step="0.01" placeholder="PHP 0.00" required></label>
-                <label><span>Counted E-Cash</span><input type="number" name="counted_ecash" min="0" step="0.01" placeholder="PHP 0.00" required></label>
-                <label class="stale-day-reason"><span>Resolution Reason</span><textarea name="reason" rows="3" required placeholder="Explain why the day remained open and how the balances were independently counted"></textarea></label>
-            </div>
-            <div class="stale-day-footer">
-                <p><i class="bi bi-shield-check" aria-hidden="true"></i> A difference from the system expectation opens a variance case for another reviewer.</p>
-                <button type="submit" class="danger-btn">Resolve Previous Day</button>
-            </div>
-        </form>
+            <button type="button" class="danger-btn" data-open-stale-day="${Number(session.id || 0)}">Review and resolve</button>
+        </div>
     ` : "";
     const reviewActions = canReview ? `
         <div class="variance-actions">
@@ -296,6 +318,73 @@ function sdRenderDaySession(session) {
     `;
 }
 
+function sdOpenStaleDayModal(sessionId, trigger) {
+    const session = sdDaySessions.find((row) => Number(row.id || 0) === Number(sessionId));
+    const modal = document.getElementById("sd-stale-day-modal");
+    const form = document.getElementById("sd-stale-day-form");
+    if (!session || !modal || !form) return;
+    sdStaleDayTrigger = trigger || null;
+    form.reset();
+    form.setAttribute("data-stale-session-id", String(sessionId));
+    document.getElementById("sd-stale-day-description").textContent = `Business date ${session.business_date || "-"} · opened by ${session.opened_by_name || "Unknown"}. The original session identity will be preserved.`;
+    document.getElementById("sd-stale-expected-cash").textContent = sdMoney(session.expected_cash || 0);
+    document.getElementById("sd-stale-expected-ecash").textContent = sdMoney(session.expected_ecash || 0);
+    const breakdown = document.getElementById("sd-stale-payment-breakdown");
+    if (breakdown) breakdown.innerHTML = sdExpectedBreakdown(session);
+    modal.classList.remove("is-hidden");
+    document.body.classList.add("modal-open");
+    modal.querySelector(".admin-modal-card")?.focus();
+}
+
+function sdExpectedBreakdown(session) {
+    const paymentSales = Array.isArray(session.payment_method_sales) ? session.payment_method_sales : [];
+    const electronicSales = paymentSales.filter((row) => !["cash", "debt"].includes(String(row.payment_method || "").toLowerCase()));
+    const accounts = Array.isArray(session.payment_account_balances) ? session.payment_account_balances : [];
+    const cashMovementNet = Number(session.cash_in || 0) - Number(session.cash_out || 0);
+    const ecashMovementNet = Number(session.ecash_in || 0) - Number(session.ecash_out || 0);
+    const detailRow = (label, value) => `<div><span>${sdEscape(label)}</span><strong>${sdEscape(sdMoney(value))}</strong></div>`;
+    return `
+        <div class="stale-day-breakdown-column">
+            <h5><i class="bi bi-cash-stack" aria-hidden="true"></i> Cash calculation</h5>
+            ${detailRow("Opening cash", session.opening_cash || 0)}
+            ${detailRow("Cash payments received", session.cash_sales || 0)}
+            ${detailRow("Cash movements (net)", cashMovementNet)}
+        </div>
+        <div class="stale-day-breakdown-column">
+            <h5><i class="bi bi-phone" aria-hidden="true"></i> E-cash calculation</h5>
+            ${detailRow("Opening e-cash", session.opening_ecash || 0)}
+            ${electronicSales.length ? electronicSales.map((row) => detailRow(`${row.payment_method_label || sdIdentifierLabel(row.payment_method)} received`, row.amount || 0)).join("") : detailRow("Electronic payments received", session.ecash_sales || 0)}
+            ${detailRow("E-cash movements (net)", ecashMovementNet)}
+        </div>
+        ${accounts.length ? `<details class="stale-day-account-breakdown"><summary>Receiving-account balances (${accounts.length})</summary>${accounts.map((account) => detailRow(`${account.payment_method_label || sdIdentifierLabel(account.payment_method)} · ${account.account_name || "Receiving account"}`, account.expected_balance || 0)).join("")}</details>` : ""}`;
+}
+
+async function sdRefreshAndOpenStaleDay(sessionId, trigger) {
+    if (trigger) {
+        trigger.disabled = true;
+        trigger.innerHTML = '<i class="bi bi-arrow-repeat" aria-hidden="true"></i> Refreshing totals...';
+    }
+    const loaded = await loadStoreDetails();
+    if (!loaded) {
+        if (trigger?.isConnected) {
+            trigger.disabled = false;
+            trigger.textContent = "Review and resolve";
+        }
+        return;
+    }
+    const freshTrigger = document.querySelector(`[data-open-stale-day="${Number(sessionId)}"]`);
+    sdOpenStaleDayModal(sessionId, freshTrigger || trigger);
+}
+
+function sdCloseStaleDayModal() {
+    const modal = document.getElementById("sd-stale-day-modal");
+    if (!modal || modal.classList.contains("is-hidden")) return;
+    modal.classList.add("is-hidden");
+    document.body.classList.remove("modal-open");
+    sdStaleDayTrigger?.focus();
+    sdStaleDayTrigger = null;
+}
+
 async function sdResolveStaleDay(form) {
     const sessionId = Number(form.getAttribute("data-stale-session-id") || 0);
     if (!sessionId) return;
@@ -329,6 +418,7 @@ async function sdResolveStaleDay(form) {
         await window.IbemsDialog.alert(data.message || "Failed to resolve the previous store day.", { title: "Store day not resolved", tone: "danger" });
         return;
     }
+    sdCloseStaleDayModal();
     await window.IbemsDialog.alert(data.message || "Previous store day resolved.", { title: "Store day resolved", tone: "success" });
     await loadStoreDetails();
 }
@@ -428,10 +518,12 @@ function sdRenderSessionHistory() {
 
     if (rows.length === 0) {
         body.innerHTML = sdDataState("empty", "No store day sessions match this filter.", 6);
+        sdRenderPager("sessions", 0);
         return;
     }
 
-    body.innerHTML = rows.map((session) => {
+    const page = sdPageSlice("sessions", rows);
+    body.innerHTML = page.rows.map((session) => {
         const varianceStatus = String(session.variance_status || "balanced");
         const reviewStatus = String(session.review_status || "not_required");
         const canReview = String(session.status || "") === "closed" && unresolved.includes(reviewStatus);
@@ -455,6 +547,43 @@ function sdRenderSessionHistory() {
             </tr>
         `;
     }).join("");
+    sdRenderPager("sessions", rows.length);
+}
+
+function sdRenderInventory() {
+    const body = document.getElementById("sd-inventory-body");
+    const count = document.getElementById("sd-inventory-count");
+    if (!body) return;
+    if (count) count.textContent = `${sdInventoryRows.length} ${sdInventoryRows.length === 1 ? "product" : "products"} in this store`;
+    if (sdInventoryRows.length === 0) {
+        body.innerHTML = sdDataState("empty", "No products in this store.", 3);
+        sdRenderPager("inventory", 0);
+        return;
+    }
+    const page = sdPageSlice("inventory", sdInventoryRows);
+    body.innerHTML = page.rows.map((row) => `
+        <tr>
+            <td><div class="inv-product">${row.image_url ? `<img src="${sdEscape(row.image_url)}" alt="${sdEscape(row.name)}" class="inv-product-img">` : `<div class="inv-product-fallback">${sdEscape(sdInitials(row.name))}</div>`}<span>${sdEscape(row.name)}</span></div></td>
+            <td>${Number(row.stock_qty || 0)} ${Number(row.stock_qty || 0) <= Number(row.low_stock_threshold ?? 10) && row.is_active ? '<span class="table-chip status-warning">Low</span>' : ""}</td>
+            <td class="store-detail-money">${sdEscape(sdMoney(row.price || 0))}</td>
+        </tr>`).join("");
+    sdRenderPager("inventory", sdInventoryRows.length);
+}
+
+function sdRenderTransactions() {
+    const body = document.getElementById("sd-transactions-body");
+    const count = document.getElementById("sd-transactions-count");
+    if (!body) return;
+    if (count) count.textContent = `Latest ${sdTransactionRows.length} ${sdTransactionRows.length === 1 ? "transaction" : "transactions"}`;
+    if (sdTransactionRows.length === 0) {
+        body.innerHTML = sdDataState("empty", "No transactions yet.", 4);
+        sdRenderPager("transactions", 0);
+        return;
+    }
+    const page = sdPageSlice("transactions", sdTransactionRows);
+    body.innerHTML = page.rows.map((row) => `
+        <tr><td>${sdEscape(sdDateTime(row.created_at))}</td><td>${sdEscape(row.customer_name || "Walk-in")}</td><td>${sdEscape(String(row.payment_method || "").toUpperCase())}</td><td class="store-detail-money">${sdEscape(sdMoney(row.amount || 0))}</td></tr>`).join("");
+    sdRenderPager("transactions", sdTransactionRows.length);
 }
 
 async function loadStoreDetails() {
@@ -473,7 +602,7 @@ async function loadStoreDetails() {
         document.getElementById("sd-officers").innerHTML = sdDataState("error", message);
         document.getElementById("sd-inventory-body").innerHTML = sdDataState("error", message, 3);
         document.getElementById("sd-transactions-body").innerHTML = sdDataState("error", message, 4);
-        return;
+        return false;
     }
 
     const store = data.store || {};
@@ -496,48 +625,29 @@ async function loadStoreDetails() {
     sdRenderSessionHistory();
     sdRenderOfficers(data.officers || []);
 
-    const inventory = Array.isArray(data.inventory) ? data.inventory : [];
-    const inventoryBody = document.getElementById("sd-inventory-body");
-    if (inventory.length === 0) {
-        inventoryBody.innerHTML = sdDataState("empty", "No products in this store.", 3);
-    } else {
-        inventoryBody.innerHTML = inventory.map((row) => `
-            <tr>
-                <td>
-                    <div class="inv-product">
-                        ${row.image_url
-                            ? `<img src="${sdEscape(row.image_url)}" alt="${sdEscape(row.name)}" class="inv-product-img">`
-                            : `<div class="inv-product-fallback">${sdEscape(sdInitials(row.name))}</div>`
-                        }
-                        <span>${sdEscape(row.name)}</span>
-                    </div>
-                </td>
-                <td>
-                    ${Number(row.stock_qty || 0)}
-                    ${Number(row.stock_qty || 0) <= Number(row.low_stock_threshold ?? 10) && row.is_active ? '<span class="table-chip status-warning">Low</span>' : ""}
-                </td>
-                <td>${sdEscape(sdMoney(row.price || 0))}</td>
-            </tr>
-        `).join("");
-    }
-
-    const txns = Array.isArray(data.recent_transactions) ? data.recent_transactions : [];
-    const txnBody = document.getElementById("sd-transactions-body");
-    if (txns.length === 0) {
-        txnBody.innerHTML = sdDataState("empty", "No transactions yet.", 4);
-    } else {
-        txnBody.innerHTML = txns.map((row) => `
-            <tr>
-                <td>${sdEscape(sdDateTime(row.created_at))}</td>
-                <td>${sdEscape(row.customer_name || "Walk-in")}</td>
-                <td>${sdEscape(String(row.payment_method || "").toUpperCase())}</td>
-                <td>${sdEscape(sdMoney(row.amount || 0))}</td>
-            </tr>
-        `).join("");
-    }
+    sdInventoryRows = Array.isArray(data.inventory) ? data.inventory : [];
+    sdTransactionRows = Array.isArray(data.recent_transactions) ? data.recent_transactions : [];
+    sdRenderInventory();
+    sdRenderTransactions();
+    return true;
 }
 
 document.addEventListener("click", (event) => {
+    const staleDayButton = event.target.closest("[data-open-stale-day]");
+    if (staleDayButton) {
+        event.preventDefault();
+        sdRefreshAndOpenStaleDay(staleDayButton.getAttribute("data-open-stale-day"), staleDayButton);
+        return;
+    }
+    const pagerButton = event.target.closest("[data-sd-page-section]");
+    if (pagerButton) {
+        const section = pagerButton.getAttribute("data-sd-page-section");
+        sdPages[section] = Math.max(1, Number(pagerButton.getAttribute("data-sd-page") || 1));
+        if (section === "sessions") sdRenderSessionHistory();
+        if (section === "inventory") sdRenderInventory();
+        if (section === "transactions") sdRenderTransactions();
+        return;
+    }
     const acknowledge = event.target.closest("[data-case-acknowledge]");
     if (acknowledge) {
         event.preventDefault();
@@ -564,6 +674,13 @@ document.addEventListener("submit", (event) => {
     sdSubmitCaseForm(evidenceForm || handoffForm, evidenceForm ? "attachments" : "handoff");
 });
 
-document.getElementById("sd-session-filter")?.addEventListener("change", sdRenderSessionHistory);
+document.getElementById("sd-session-filter")?.addEventListener("change", () => { sdPages.sessions = 1; sdRenderSessionHistory(); });
+document.getElementById("sd-session-page-size")?.addEventListener("change", () => { sdPages.sessions = 1; sdRenderSessionHistory(); });
+document.getElementById("sd-inventory-page-size")?.addEventListener("change", () => { sdPages.inventory = 1; sdRenderInventory(); });
+document.getElementById("sd-transactions-page-size")?.addEventListener("change", () => { sdPages.transactions = 1; sdRenderTransactions(); });
+document.getElementById("sd-stale-day-close")?.addEventListener("click", sdCloseStaleDayModal);
+document.getElementById("sd-stale-day-cancel")?.addEventListener("click", sdCloseStaleDayModal);
+document.getElementById("sd-stale-day-modal")?.addEventListener("click", (event) => { if (event.target.id === "sd-stale-day-modal") sdCloseStaleDayModal(); });
+document.addEventListener("keydown", (event) => { if (event.key === "Escape") sdCloseStaleDayModal(); });
 
 loadStoreDetails();

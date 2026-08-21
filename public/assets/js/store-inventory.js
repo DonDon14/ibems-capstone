@@ -296,8 +296,8 @@ function invRenderProductTable() {
         const stock = invStockState(product);
         const variant = product.variant_label ? `<span>${invEscape(product.variant_label)}</span>` : "";
         const sku = product.sku ? `<span>SKU ${invEscape(product.sku)}</span>` : "";
-        const supplier = product.supplier ? `<span>Supplier ${invEscape(product.supplier)}</span>` : "";
-        const location = product.location_bin ? `<span>Bin ${invEscape(product.location_bin)}</span>` : "";
+        const supplier = product.supplier ? `<span><i class="bi bi-truck"></i>${invEscape(product.supplier)}</span>` : "";
+        const location = product.location_bin ? `<span><i class="bi bi-geo-alt"></i>${invEscape(product.location_bin)}</span>` : "";
         const operationalMeta = supplier || location
             ? `<div class="inventory-product-meta inventory-product-meta-secondary">${supplier}${location}</div>`
             : "";
@@ -311,6 +311,9 @@ function invRenderProductTable() {
         const familyStockStates = variants.map((item) => invStockState(item));
         const familyState = familyStockStates.some((item) => item.key === "out") ? "out" : familyStockStates.some((item) => item.key === "low") ? "low" : "in";
         const familyStatus = familyState === "out" ? "Needs attention" : familyState === "low" ? "Some low stock" : "All in stock";
+        const familyTitle = isFamily
+            ? `<button class="inventory-family-name-toggle" type="button" data-family-toggle="${invEscape(key)}" aria-expanded="${expanded}" aria-label="${expanded ? "Hide" : "View"} ${invEscape(product.name || "product")} variants"><strong>${invEscape(product.name || "Unnamed product")}</strong><span class="inventory-family-count">${variants.length} variants</span><i class="bi bi-chevron-${expanded ? "up" : "down"}" aria-hidden="true"></i></button>`
+            : `<strong>${invEscape(product.name || "Unnamed product")}</strong>`;
         const childRows = expanded ? variants.map((item) => {
             const itemStock = invStockState(item);
             return `<tr class="inventory-variant-row inventory-row-${itemStock.key}">
@@ -327,8 +330,7 @@ function invRenderProductTable() {
                     <div class="inventory-product-cell">
                         ${thumb}
                         <div class="inventory-product-copy">
-                            <strong>${invEscape(product.name || "Unnamed product")}</strong>
-                            ${variants.length > 1 ? `<span class="inventory-family-count">${variants.length} variants</span>` : ""}
+                            ${familyTitle}
                             <div class="inventory-product-meta">${isFamily ? `<span>${totalStock} total units</span><span>${invMoney(Math.min(...prices))} - ${invMoney(Math.max(...prices))}</span>` : `${sku}${variant}`}</div>
                             ${operationalMeta}
                         </div>
@@ -362,24 +364,28 @@ function invRenderStockSummary(groups, selectedStock = "") {
         else acc.in += 1;
         return acc;
     }, { total: 0, variants: 0, in: 0, low: 0, out: 0 });
+    const plural = (count, singular, pluralWord = `${singular}s`) => count === 1 ? singular : pluralWord;
 
     summary.innerHTML = `
         <button class="inventory-summary-pill ${selectedStock === "" ? "is-active" : ""}" type="button" data-stock-summary="" aria-pressed="${selectedStock === ""}">
             <span>All Families</span>
             <strong>${counts.total}</strong>
-            <small>${counts.variants} variants</small>
+            <small>${counts.variants} ${plural(counts.variants, "variant")}</small>
         </button>
         <button class="inventory-summary-pill inventory-summary-in ${selectedStock === "in" ? "is-active" : ""}" type="button" data-stock-summary="in" aria-pressed="${selectedStock === "in"}">
             <span>In Stock</span>
             <strong>${counts.in}</strong>
+            <small>${plural(counts.in, "family", "families")}</small>
         </button>
         <button class="inventory-summary-pill inventory-summary-low ${selectedStock === "low" ? "is-active" : ""}" type="button" data-stock-summary="low" aria-pressed="${selectedStock === "low"}">
             <span>Low Stock</span>
             <strong>${counts.low}</strong>
+            <small>${plural(counts.low, "family", "families")}</small>
         </button>
         <button class="inventory-summary-pill inventory-summary-out ${selectedStock === "out" ? "is-active" : ""}" type="button" data-stock-summary="out" aria-pressed="${selectedStock === "out"}">
-            <span>Out</span>
+            <span>Out of Stock</span>
             <strong>${counts.out}</strong>
+            <small>${plural(counts.out, "family", "families")}</small>
         </button>
     `;
 }
@@ -396,7 +402,10 @@ function invRenderResultsContext(groups, contextualGroups, search, categoryFilte
     const totalFamilies = invGroupProducts(invProducts).length;
     const familyWord = totalFamilies === 1 ? "family" : "families";
     count.textContent = `Showing ${groups.length} of ${totalFamilies} ${familyWord}${activeFilters.length ? ` · ${activeFilters.join(" · ")}` : ""}`;
-    clear.disabled = activeFilters.length === 0;
+    const hasNonDefaultControls = activeFilters.length > 0
+        || document.getElementById("inventory-sort").value !== "name:asc"
+        || document.getElementById("inventory-page-size").value !== "25";
+    clear.classList.toggle("is-hidden", !hasNonDefaultControls);
 
     const multiVariantKeys = groups.filter((group) => group.variants.length > 1).map((group) => group.key);
     const allExpanded = multiVariantKeys.length > 0 && multiVariantKeys.every((key) => invExpandedFamilies.has(key));
@@ -468,14 +477,20 @@ function invOpenProductActionModal(productId) {
     invModalProductId = Number(product.id);
     const displayName = product.variant_label ? `${product.name} (${product.variant_label})` : product.name;
     const stock = invStockState(product);
+    const productThumb = product.image_url
+        ? `<img src="${invEscape(product.image_url)}" alt="${invEscape(displayName)}" class="product-action-thumb">`
+        : `<div class="product-action-thumb product-action-thumb-fallback" role="img" aria-label="No product image">${invEscape(invInitials(product.name))}</div>`;
     document.getElementById("product-action-info").innerHTML = `
         <div class="product-action-main">
-            <div>
-                <span class="product-action-label">Selected Product</span>
-                <strong>${invEscape(displayName)}</strong>
-                <div class="product-action-meta">
-                    <span>SKU ${invEscape(product.sku || "-")}</span>
-                    <span>${invEscape(product.category || "Uncategorized")}</span>
+            <div class="product-action-identity">
+                ${productThumb}
+                <div>
+                    <span class="product-action-label">Selected Product</span>
+                    <strong>${invEscape(displayName)}</strong>
+                    <div class="product-action-meta">
+                        <span>SKU ${invEscape(product.sku || "-")}</span>
+                        <span>${invEscape(product.category || "Uncategorized")}</span>
+                    </div>
                 </div>
             </div>
             <span class="inv-stock-badge inv-stock-${stock.key}">${stock.label}</span>
@@ -490,7 +505,7 @@ function invOpenProductActionModal(productId) {
                 <strong>${invEscape(invMoney(product.price))}</strong>
             </div>
             <div>
-                <span>Status Note</span>
+                <span>POS Availability</span>
                 <strong>${invEscape(stock.detail)}</strong>
             </div>
         </div>
@@ -511,16 +526,11 @@ function invOpenProductActionModal(productId) {
     invToggleModalProductImageInput();
     invRenderModalProductCurrentImage(product.image_url || "");
     invUpdateModalProductImagePreview();
-    document.getElementById("product-view-sku").textContent = product.sku || "-";
-    document.getElementById("product-view-name").textContent = product.name || "-";
     document.getElementById("product-view-variant").textContent = product.variant_label || "-";
-    document.getElementById("product-view-category").textContent = product.category || "-";
     document.getElementById("product-view-supplier").textContent = product.supplier || "-";
     document.getElementById("product-view-location").textContent = product.location_bin || "-";
     document.getElementById("product-view-barcode").textContent = product.barcode || "-";
-    document.getElementById("product-view-price").textContent = invMoney(product.price);
     document.getElementById("product-view-low-stock").textContent = String(Number(product.low_stock_threshold ?? product.reorder_level ?? 10));
-    document.getElementById("product-view-image").textContent = product.image_url || "Not set";
     document.getElementById("modal-actual-stock").value = Number(product.stock_qty || 0);
     document.getElementById("modal-stock-reason").value = "Physical count adjustment";
     document.getElementById("modal-restock-qty").value = "1";
@@ -559,6 +569,10 @@ function invSetModalPanel(panel) {
     document.getElementById("modal-restock-panel").style.display = isAdjust ? "none" : "block";
     document.getElementById("modal-panel-adjust-btn").classList.toggle("is-active", isAdjust);
     document.getElementById("modal-panel-restock-btn").classList.toggle("is-active", !isAdjust);
+    document.getElementById("modal-panel-adjust-btn").setAttribute("aria-selected", isAdjust ? "true" : "false");
+    document.getElementById("modal-panel-restock-btn").setAttribute("aria-selected", isAdjust ? "false" : "true");
+    document.getElementById("modal-adjust-panel").setAttribute("aria-hidden", isAdjust ? "false" : "true");
+    document.getElementById("modal-restock-panel").setAttribute("aria-hidden", isAdjust ? "true" : "false");
     document.getElementById("modal-save-adjustment").style.display = isAdjust ? "inline-flex" : "none";
     document.getElementById("modal-restock-submit").style.display = isAdjust ? "none" : "inline-flex";
 }
@@ -587,6 +601,7 @@ function invUpdateAdjustmentPreview() {
     const diff = targetQty - currentQty;
     const saveButton = document.getElementById("modal-save-adjustment");
     const diffEl = document.getElementById("modal-adjust-diff");
+    const hintEl = document.getElementById("modal-adjust-hint");
 
     document.getElementById("modal-adjust-current").textContent = String(currentQty);
     document.getElementById("modal-adjust-target").textContent = Number.isFinite(targetQty) ? String(targetQty) : "Invalid";
@@ -596,6 +611,8 @@ function invUpdateAdjustmentPreview() {
         diffEl.textContent = "Invalid";
         diffEl.classList.add("is-negative");
         saveButton.disabled = true;
+        saveButton.title = "Enter a valid whole-number stock count.";
+        if (hintEl) hintEl.textContent = "Enter a valid whole-number stock count to continue.";
         return;
     }
 
@@ -603,12 +620,16 @@ function invUpdateAdjustmentPreview() {
         diffEl.textContent = "No change";
         diffEl.classList.add("is-neutral");
         saveButton.disabled = true;
+        saveButton.title = "No stock change to save.";
+        if (hintEl) hintEl.textContent = "No change detected. Enter a different stock count to enable saving.";
         return;
     }
 
     diffEl.textContent = `${diff > 0 ? "+" : ""}${diff}`;
     diffEl.classList.add(diff > 0 ? "is-positive" : "is-negative");
     saveButton.disabled = false;
+    saveButton.removeAttribute("title");
+    if (hintEl) hintEl.textContent = `This will record a ${diff > 0 ? "+" : ""}${diff} stock adjustment.`;
 }
 
 async function invLoadStores() {

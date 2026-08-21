@@ -27,6 +27,7 @@ class UserModel extends Model
         'salary_grade',
         'salary_step',
         'salary_effective_date',
+        'salary_schedule_id',
         'is_active',
         'created_at',
     ];
@@ -38,6 +39,7 @@ class UserModel extends Model
         'id'          => 'integer',
         'base_salary' => 'float',
         'salary_step' => '?integer',
+        'salary_schedule_id' => '?integer',
         'is_active'   => 'boolean',
     ];
 

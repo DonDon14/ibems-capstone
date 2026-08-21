@@ -276,29 +276,39 @@ function srRenderTransactionStores() {
 
 function srUpdateTransactionScope() {
     const storeName = srActiveStoreName();
-    document.getElementById("staff-employee-title").textContent = `Transactions at ${storeName}`;
+    document.getElementById("staff-employee-title").textContent = "Transaction history";
     const scope = document.querySelector("[data-staff-transaction-scope]");
-    if (scope) scope.innerHTML = `<strong>Scope:</strong> Purchases and receipts recorded at ${srEscape(storeName)}. Credit and debt above remain totals across all stores.`;
+    if (scope) scope.innerHTML = `<i class="bi bi-shop" aria-hidden="true"></i><span>Showing purchases and receipts from <strong>${srEscape(storeName)}</strong>. Account balances remain totals across all stores.</span>`;
 }
 
 function srRenderDebts(rows) {
     const body = document.getElementById("debt-body");
     const countText = document.getElementById("staff-count-text");
+    const countBadge = document.getElementById("staff-count-badge");
     if (!Array.isArray(rows) || rows.length === 0) {
         body.innerHTML = srDebtDataState("empty", "No debt records found.");
         if (countText) countText.textContent = "Showing 0 records";
+        if (countBadge) countBadge.textContent = "0 employees";
         return;
     }
 
     if (countText) countText.textContent = `Showing ${rows.length} ${rows.length === 1 ? "record" : "records"}`;
+    if (countBadge) countBadge.textContent = `${rows.length} employee${rows.length === 1 ? "" : "s"}`;
 
-    body.innerHTML = rows.map((row) => `
+    body.innerHTML = rows.map((row) => {
+        const currentDebt = Math.max(0, Number(row.current_debt || 0));
+        const creditLimit = Math.max(0, Number(row.credit_limit || 0));
+        const debtUsage = creditLimit > 0 ? Math.min(100, (currentDebt / creditLimit) * 100) : 0;
+        return `
         <article class="staff-record-row sr-row-clickable flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:shadow-sm"
             data-debt-user-id="${Number(row.id || 0)}"
             data-debt-name="${srEscape(row.name)}"
             data-debt-employee="${srEscape(row.employee_id || "")}"
             data-debt-email="${srEscape(row.email || "")}"
-            data-debt-category="${srEscape(row.user_type || "")}">
+            data-debt-category="${srEscape(row.user_type || "")}"
+            data-current-debt="${currentDebt}"
+            data-credit-limit="${creditLimit}"
+            data-available-credit="${Math.max(0, Number(row.available_credit || 0))}">
             <div class="staff-person flex min-w-0 items-center gap-3">
                 <div class="staff-avatar inline-flex h-11 w-11 flex-none items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-sm font-bold text-blue-700">${srEscape(String(row.name || "U").split(" ").filter(Boolean).slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join("") || "U")}</div>
                 <div class="staff-person-meta min-w-0">
@@ -311,23 +321,25 @@ function srRenderDebts(rows) {
                 </div>
             </div>
             <div class="staff-finance flex flex-wrap items-center justify-end gap-4">
-                <div class="staff-fin-kv grid gap-0.5">
-                    <span class="text-xs text-slate-500">Overall Debt</span>
-                    <strong class="text-sm font-semibold ${Number(row.current_debt || 0) > 0 ? "staff-money-debt text-rose-600" : "text-slate-900"}">${srEscape(srMoney(row.current_debt))}</strong>
-                    <div class="table-debt-bar"><i style="width:${Math.min(100, (Number(row.current_debt || 0) / Math.max(1, Number(row.credit_limit || 0))) * 100)}%"></i></div>
+                <div class="staff-fin-kv staff-fin-debt grid gap-0.5">
+                    <span class="text-xs text-slate-500">Debt used</span>
+                    <strong class="text-sm font-semibold ${currentDebt > 0 ? "staff-money-debt text-rose-600" : "text-slate-900"}">${srEscape(srMoney(currentDebt))}</strong>
+                    <div class="staff-debt-meter"><i style="width:${debtUsage}%"></i></div>
+                    <small>${debtUsage.toFixed(0)}% of limit</small>
                 </div>
                 <div class="staff-fin-kv grid gap-0.5">
-                    <span class="text-xs text-slate-500">Credit Limit</span>
-                    <strong class="text-sm font-semibold text-slate-900">${srEscape(srMoney(row.credit_limit))}</strong>
+                    <span class="text-xs text-slate-500">Credit limit</span>
+                    <strong class="text-sm font-semibold text-slate-900">${srEscape(srMoney(creditLimit))}</strong>
                 </div>
                 <div class="staff-fin-kv grid gap-0.5">
-                    <span class="text-xs text-slate-500">Overall Available Credit</span>
+                    <span class="text-xs text-slate-500">Available credit</span>
                     <strong class="text-sm font-semibold text-slate-900">${srEscape(srMoney(row.available_credit))}</strong>
                 </div>
-                <button class="secondary-btn btn-sm staff-view-transactions" type="button"><i class="bi bi-receipt"></i> View transactions</button>
+                <button class="secondary-btn btn-sm staff-view-transactions" type="button"><i class="bi bi-clock-history"></i> Transaction history</button>
             </div>
         </article>
-    `).join("");
+    `;
+    }).join("");
 }
 
 function srRenderTransactions(rows) {
@@ -393,11 +405,15 @@ async function srLoadDebtRecords() {
     srRenderDebts(data.customers);
     srDebtPage = Number(data.pagination?.page || 1);
     srRenderPager("debt-pager", data.pagination, "debt-page");
-    if (countText) countText.textContent = `${Number(data.pagination?.total || 0)} matching ${Number(data.pagination?.total || 0) === 1 ? "record" : "records"}`;
+    const total = Number(data.pagination?.total || 0);
+    if (countText) countText.textContent = `${total} matching ${total === 1 ? "record" : "records"}`;
+    const countBadge = document.getElementById("staff-count-badge");
+    if (countBadge) countBadge.textContent = `${total} employee${total === 1 ? "" : "s"}`;
     searchButton.disabled = false;
 }
 
 async function srLoadStaffTransactions() {
+    srUpdateTransactionResetVisibility();
     if (!srSelectedEmployee || !srSelectedEmployee.userId) {
         srRenderTransactions([]);
         return;
@@ -435,9 +451,7 @@ async function srLoadStaffTransactions() {
     if (debtOnly) params.set("debt_only", "1");
 
     const body = document.getElementById("txn-body");
-    const applyButton = document.getElementById("txn-search-btn");
     body.innerHTML = srTransactionDataState("loading", "Loading employee transactions...");
-    applyButton.disabled = true;
     srSetTransactionResult("");
 
     let data;
@@ -450,7 +464,6 @@ async function srLoadStaffTransactions() {
         body.innerHTML = srTransactionDataState("error", message);
         document.getElementById("txn-pager").innerHTML = "";
         srSetTransactionResult(message, "error");
-        applyButton.disabled = false;
         return;
     }
     if (requestId !== srTransactionRequestSequence) return;
@@ -459,7 +472,6 @@ async function srLoadStaffTransactions() {
         body.innerHTML = srTransactionDataState("error", message);
         document.getElementById("txn-pager").innerHTML = "";
         srSetTransactionResult(message, "error");
-        applyButton.disabled = false;
         return;
     }
     srRenderTransactions(data.transactions);
@@ -467,7 +479,15 @@ async function srLoadStaffTransactions() {
     srRenderPager("txn-pager", data.pagination, "txn-page");
     const total = Number(data.pagination?.total || 0);
     srSetTransactionResult(`${total} matching transaction${total === 1 ? "" : "s"} for ${srActiveStoreName()}.`);
-    applyButton.disabled = false;
+}
+
+function srUpdateTransactionResetVisibility() {
+    const hasActiveFilters = document.getElementById("txn-date-from").value !== ""
+        || document.getElementById("txn-date-to").value !== ""
+        || document.getElementById("txn-debt-only").checked
+        || document.getElementById("txn-sort").value !== "date:desc"
+        || document.getElementById("txn-page-size").value !== "25";
+    document.getElementById("txn-clear-btn").classList.toggle("is-hidden", !hasActiveFilters);
 }
 
 function srOpenEmployeeModal(employee) {
@@ -475,12 +495,22 @@ function srOpenEmployeeModal(employee) {
     srSelectedEmployee = employee;
     srTransactionPage = 1;
     srRenderTransactionStores();
+    const initials = String(employee.name || "U").split(" ").filter(Boolean).slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join("") || "U";
     document.getElementById("staff-employee-summary").innerHTML = `
-        <div><strong>Employee:</strong> ${srEscape(employee.name)}</div>
-        <div><strong>Employee ID:</strong> ${srEscape(employee.employeeId || "-")} | <strong>Email:</strong> ${srEscape(employee.email || "-")} | <strong>Category:</strong> ${srEscape(srCategory(employee.userType))}</div>
-        <div data-staff-transaction-scope></div>
+        <div class="staff-summary-person">
+            <span class="staff-avatar">${srEscape(initials)}</span>
+            <div><strong>${srEscape(employee.name)}</strong><span>${srEscape(employee.employeeId || "-")} &middot; ${srEscape(employee.email || "-")}</span></div>
+            <span class="table-chip">${srEscape(srCategory(employee.userType))}</span>
+        </div>
+        <div class="staff-summary-finance">
+            <div><span>Overall debt</span><strong class="${Number(employee.currentDebt || 0) > 0 ? "staff-money-debt" : ""}">${srEscape(srMoney(employee.currentDebt))}</strong></div>
+            <div><span>Credit limit</span><strong>${srEscape(srMoney(employee.creditLimit))}</strong></div>
+            <div><span>Available credit</span><strong>${srEscape(srMoney(employee.availableCredit))}</strong></div>
+        </div>
+        <div class="staff-transaction-scope" data-staff-transaction-scope></div>
     `;
     srUpdateTransactionScope();
+    srUpdateTransactionResetVisibility();
     document.getElementById("staff-employee-modal").style.display = "grid";
     window.requestAnimationFrame(() => document.getElementById("staff-employee-close").focus());
 }
@@ -491,6 +521,7 @@ function srCloseEmployeeModal() {
     document.getElementById("txn-date-from").value = "";
     document.getElementById("txn-date-to").value = "";
     document.getElementById("txn-debt-only").checked = false;
+    srUpdateTransactionResetVisibility();
     srSetTransactionResult("");
     document.getElementById("txn-body").innerHTML = '<tr><td class="px-3 py-4 text-sm text-slate-500" colspan="5">Select an employee to load transactions.</td></tr>';
     document.getElementById("txn-pager").innerHTML = "";
@@ -603,12 +634,6 @@ document.getElementById("staff-scanner-modal").addEventListener("click", async (
     }
 });
 
-document.getElementById("txn-search-btn").addEventListener("click", async () => {
-    srSetResult("", "ok");
-    srTransactionPage = 1;
-    await srLoadStaffTransactions();
-});
-
 document.getElementById("txn-store-select").addEventListener("change", async (event) => {
     const requestedStoreId = Number(event.target.value || 0);
     if (!srStores.some((store) => Number(store.id) === requestedStoreId)) {
@@ -647,9 +672,12 @@ document.getElementById("txn-clear-btn").addEventListener("click", async () => {
     document.getElementById("txn-date-from").value = "";
     document.getElementById("txn-date-to").value = "";
     document.getElementById("txn-debt-only").checked = false;
+    document.getElementById("txn-sort").value = "date:desc";
+    document.getElementById("txn-page-size").value = "25";
     document.getElementById("txn-date-from").removeAttribute("aria-invalid");
     document.getElementById("txn-date-to").removeAttribute("aria-invalid");
     srTransactionPage = 1;
+    srUpdateTransactionResetVisibility();
     await srLoadStaffTransactions();
 });
 
@@ -666,6 +694,13 @@ document.getElementById("debt-page-size").addEventListener("change", async () =>
 document.getElementById("txn-sort").addEventListener("change", async () => {
     srTransactionPage = 1;
     await srLoadStaffTransactions();
+});
+
+["txn-date-from", "txn-date-to", "txn-debt-only"].forEach((controlId) => {
+    document.getElementById(controlId).addEventListener("change", async () => {
+        srTransactionPage = 1;
+        await srLoadStaffTransactions();
+    });
 });
 
 document.getElementById("txn-page-size").addEventListener("change", async () => {
@@ -700,6 +735,9 @@ document.getElementById("debt-body").addEventListener("click", async (event) => 
         employeeId: row.getAttribute("data-debt-employee") || "",
         email: row.getAttribute("data-debt-email") || "",
         userType: row.getAttribute("data-debt-category") || "",
+        currentDebt: Number(row.getAttribute("data-current-debt") || 0),
+        creditLimit: Number(row.getAttribute("data-credit-limit") || 0),
+        availableCredit: Number(row.getAttribute("data-available-credit") || 0),
     });
     await srLoadStaffTransactions();
 });

@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/store') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/store-inventory.css') ?>?v=20260813a">
+<link rel="stylesheet" href="<?= base_url('assets/css/store-inventory.css') ?>?v=20260821b">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -65,7 +65,7 @@
                         <option value="50">50</option>
                     </select>
                 </label>
-                <button id="inventory-clear-filters" class="secondary-btn" type="button"><i class="bi bi-x-circle"></i> Clear</button>
+                <button id="inventory-clear-filters" class="secondary-btn is-hidden" type="button"><i class="bi bi-arrow-counterclockwise"></i> Reset filters</button>
             </div>
         </div>
         <div id="inventory-stock-summary" class="inventory-stock-summary" aria-live="polite">
@@ -270,20 +270,8 @@
 
             <div class="product-detail-view">
                 <div class="detail-item">
-                    <span>SKU</span>
-                    <strong id="product-view-sku">-</strong>
-                </div>
-                <div class="detail-item">
-                    <span>Name</span>
-                    <strong id="product-view-name">-</strong>
-                </div>
-                <div class="detail-item">
                     <span>Variant</span>
                     <strong id="product-view-variant">-</strong>
-                </div>
-                <div class="detail-item">
-                    <span>Category</span>
-                    <strong id="product-view-category">-</strong>
                 </div>
                 <div class="detail-item">
                     <span>Supplier</span>
@@ -298,16 +286,8 @@
                     <strong id="product-view-barcode">-</strong>
                 </div>
                 <div class="detail-item">
-                    <span>Price</span>
-                    <strong id="product-view-price">PHP 0.00</strong>
-                </div>
-                <div class="detail-item">
                     <span>Low Stock Threshold</span>
                     <strong id="product-view-low-stock">10</strong>
-                </div>
-                <div class="detail-item detail-item-wide">
-                    <span>Image</span>
-                    <strong id="product-view-image">Not set</strong>
                 </div>
             </div>
 
@@ -382,12 +362,12 @@
                 </div>
             </div>
 
-            <div class="modal-action-tabs">
-                <button id="modal-panel-adjust-btn" class="panel-tab is-active" type="button">Adjust Stock</button>
-                <button id="modal-panel-restock-btn" class="panel-tab" type="button">Stock In</button>
+            <div class="modal-action-tabs" role="tablist" aria-label="Stock action">
+                <button id="modal-panel-adjust-btn" class="panel-tab is-active" role="tab" aria-selected="true" aria-controls="modal-adjust-panel" type="button">Adjust Stock</button>
+                <button id="modal-panel-restock-btn" class="panel-tab" role="tab" aria-selected="false" aria-controls="modal-restock-panel" type="button">Stock In</button>
             </div>
 
-            <div id="modal-adjust-panel" class="action-panel">
+            <div id="modal-adjust-panel" class="action-panel" role="tabpanel" aria-labelledby="modal-panel-adjust-btn" aria-hidden="false">
                 <div class="form-grid">
                     <div class="field">
                         <label for="modal-actual-stock">Actual Stock</label>
@@ -412,9 +392,10 @@
                         <strong id="modal-adjust-diff">No change</strong>
                     </div>
                 </div>
+                <p id="modal-adjust-hint" class="adjust-save-hint" role="status" aria-live="polite">Enter a different stock count to enable saving.</p>
             </div>
 
-            <div id="modal-restock-panel" class="action-panel is-hidden">
+            <div id="modal-restock-panel" class="action-panel is-hidden" role="tabpanel" aria-labelledby="modal-panel-restock-btn" aria-hidden="true">
                 <div class="form-grid">
                     <div class="field">
                         <label for="modal-restock-qty">Quantity</label>
@@ -465,5 +446,5 @@
 
 <?= $this->section('scripts') ?>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script src="<?= base_url('assets/js/store-inventory.js') ?>?v=20260813a"></script>
+<script src="<?= base_url('assets/js/store-inventory.js') ?>?v=20260821f"></script>
 <?= $this->endSection() ?>

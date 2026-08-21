@@ -1,5 +1,19 @@
 let usPage = 1;
 let usSearchTimer = null;
+let usRequestSequence = 0;
+let usOptionsLoaded = false;
+
+function usHasActiveFilters() {
+    return document.getElementById("us-search").value.trim() !== ""
+        || document.getElementById("us-store").value !== ""
+        || document.getElementById("us-category").value !== ""
+        || document.getElementById("us-availability").value !== ""
+        || document.getElementById("us-sort").value !== "store:asc";
+}
+
+function usUpdateResetFilters() {
+    document.getElementById("us-reset-filters").classList.toggle("is-hidden", !usHasActiveFilters());
+}
 
 function usEscape(value) {
     return String(value ?? "")
@@ -72,7 +86,10 @@ function usRenderPager(meta) {
 }
 
 async function usLoad() {
+    const requestId = ++usRequestSequence;
+    usUpdateResetFilters();
     const params = new URLSearchParams({ page: String(usPage), page_size: "24" });
+    params.set("include_options", usOptionsLoaded ? "0" : "1");
     const values = {
         q: document.getElementById("us-search").value.trim(),
         store_id: document.getElementById("us-store").value,
@@ -89,19 +106,24 @@ async function usLoad() {
     try {
         const response = await fetch(`/user/stores/data?${params.toString()}`);
         const data = await response.json();
+        if (requestId !== usRequestSequence) return;
         if (!response.ok || data?.status !== "success") throw new Error(data?.message || "Unable to load store products.");
 
-        usSetOptions("us-store", "All stores", data.stores || [], "id", "store_name");
-        usSetOptions("us-category", "All categories", data.categories || [], "", "");
+        if (data.options_included) {
+            usSetOptions("us-store", "All stores", data.stores || [], "id", "store_name");
+            usSetOptions("us-category", "All categories", data.categories || [], "", "");
+            usOptionsLoaded = true;
+        }
         const rows = Array.isArray(data.data) ? data.data : [];
         const meta = data.pagination || {};
-        document.getElementById("us-store-count").textContent = String((data.stores || []).length);
+        if (data.options_included) document.getElementById("us-store-count").textContent = String((data.stores || []).length);
         document.getElementById("us-product-count").textContent = String(Number(meta.total || 0));
         document.getElementById("us-available-count").textContent = String(rows.filter((row) => row.availability === "available").length);
         document.getElementById("us-context").textContent = `Showing ${rows.length} of ${Number(meta.total || 0)} matching products`;
         usRenderProducts(rows);
         usRenderPager(meta);
     } catch (error) {
+        if (requestId !== usRequestSequence) return;
         grid.innerHTML = usState("error", error.message || "Unable to load store products.");
         document.getElementById("us-context").textContent = "Products unavailable";
         document.getElementById("us-pager").innerHTML = "";
@@ -113,13 +135,21 @@ document.querySelectorAll("#us-store, #us-category, #us-availability, #us-sort")
 });
 document.getElementById("us-search").addEventListener("input", () => {
     clearTimeout(usSearchTimer);
+    usUpdateResetFilters();
     usSearchTimer = setTimeout(() => { usPage = 1; usLoad(); }, 250);
 });
-document.getElementById("us-clear").addEventListener("click", () => {
+document.getElementById("us-search").addEventListener("search", () => {
+    clearTimeout(usSearchTimer);
+    usPage = 1;
+    usLoad();
+});
+document.getElementById("us-reset-filters").addEventListener("click", () => {
     ["us-search", "us-store", "us-category", "us-availability"].forEach((id) => { document.getElementById(id).value = ""; });
     document.getElementById("us-sort").value = "store:asc";
     usPage = 1;
+    usUpdateResetFilters();
     usLoad();
+    document.getElementById("us-search").focus();
 });
 document.getElementById("us-pager").addEventListener("click", (event) => {
     const button = event.target.closest("[data-page]");

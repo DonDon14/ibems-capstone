@@ -20,4 +20,58 @@ final class StoreSettingsUiTest extends CIUnitTestCase
         $this->assertStringContainsString('.settings-submit-spinner', $styles);
         $this->assertStringContainsString('@keyframes settings-submit-spin', $styles);
     }
+
+    public function testCategoryManagementShowsUsageAndProtectedDefaultActions(): void
+    {
+        $view = (string) file_get_contents(APPPATH . 'Views/store/settings.php');
+        $controller = (string) file_get_contents(APPPATH . 'Controllers/StoreController.php');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/store-settings.js');
+        $styles = (string) file_get_contents(FCPATH . 'assets/css/store-settings.css');
+
+        $this->assertStringContainsString('id="category-count"', $view);
+        $this->assertStringContainsString('id="category-search"', $view);
+        $this->assertStringContainsString("'colspan' => 3", $view);
+        $this->assertStringContainsString("'product_count' =>", $controller);
+        $this->assertStringContainsString('const categoryPageSize = 10;', $script);
+        $this->assertStringContainsString('category-default-badge', $script);
+        $this->assertStringContainsString('setCategoryMutationPending(true', $script);
+        $this->assertStringContainsString('payment-status-badge', $script);
+        $this->assertStringContainsString('payment-method-destination', $script);
+        $this->assertStringContainsString('.category-delete-btn', $styles);
+        $this->assertStringContainsString('.payment-status-badge.is-ready', $styles);
+    }
+
+    public function testCategoryUpdateUsesTheDedicatedAccessibleEditor(): void
+    {
+        $view = (string) file_get_contents(APPPATH . 'Views/store/settings.php');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/store-settings.js');
+        $styles = (string) file_get_contents(FCPATH . 'assets/css/store-settings.css');
+
+        $this->assertStringContainsString('id="category-edit-modal"', $view);
+        $this->assertStringContainsString('aria-labelledby="category-edit-title"', $view);
+        $this->assertStringContainsString('Products are not deleted.', $view);
+        $this->assertStringContainsString('function openCategoryEditModal(categoryId, trigger = null)', $script);
+        $this->assertStringContainsString('syncCategoryEditSaveState()', $script);
+        $this->assertStringContainsString('event.key === "Enter"', $script);
+        $this->assertStringContainsString('event.key !== "Escape"', $script);
+        $this->assertStringNotContainsString('IbemsDialog.prompt("Change the category name used by products in this store."', $script);
+        $this->assertStringContainsString('.category-edit-card', $styles);
+        $this->assertStringContainsString('.category-edit-result.is-error', $styles);
+    }
+
+    public function testCategoryCreationUsesTheSameModalPatternAsPaymentMethods(): void
+    {
+        $view = (string) file_get_contents(APPPATH . 'Views/store/settings.php');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/store-settings.js');
+        $styles = (string) file_get_contents(FCPATH . 'assets/css/store-settings.css');
+
+        $this->assertStringNotContainsString('id="new-category-name"', $view);
+        $this->assertStringContainsString('class="category-head-actions"', $view);
+        $this->assertStringContainsString('function openCategoryCreateModal(trigger = null)', $script);
+        $this->assertStringContainsString('async function createCategory(nextName)', $script);
+        $this->assertStringContainsString('Creating category...', $script);
+        $this->assertStringContainsString('openCategoryCreateModal(event.currentTarget)', $script);
+        $this->assertStringContainsString('await createCategory(nextName);', $script);
+        $this->assertStringContainsString('.category-head-actions', $styles);
+    }
 }
