@@ -399,9 +399,16 @@ class AdminController extends Controller
 
     public function salarySchedules()
     {
+        $catalog = (new SalaryScheduleService())->catalog(Database::connect());
+        if ($catalog === []) {
+            return $this->response->setStatusCode(503)->setJSON([
+                'status' => 'error',
+                'message' => 'Salary schedules are unavailable. Apply the latest development database migration, then refresh this page.',
+            ]);
+        }
         return $this->response->setJSON([
             'status' => 'success',
-            'data' => (new SalaryScheduleService())->catalog(Database::connect()),
+            'data' => $catalog,
             'default_credit_percentage' => SalaryCreditPolicy::percentageFromRate(SalaryCreditPolicy::DEFAULT_CREDIT_RATE),
         ]);
     }

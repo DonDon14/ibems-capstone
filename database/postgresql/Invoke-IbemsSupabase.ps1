@@ -1,5 +1,5 @@
 param(
-    [ValidateSet('validate', 'reconcile', 'migrate', 'repair-product-families', 'repair-variance-cases', 'payment-accounts', 'credit-boundary-test', 'one-day-operations', 'cleanup-test-data', 'cleanup-demo-employees', 'cleanup-live-credit-test', 'preflight', 'smoke', 'seed', 'snapshot', 'serve', 'serve-background')]
+    [ValidateSet('validate', 'reconcile', 'migrate', 'hosted-bootstrap', 'repair-product-families', 'repair-variance-cases', 'payment-accounts', 'credit-boundary-test', 'one-day-operations', 'cleanup-test-data', 'cleanup-demo-employees', 'cleanup-live-credit-test', 'preflight', 'smoke', 'seed', 'snapshot', 'serve', 'serve-background')]
     [string] $Action = 'preflight',
 
     [ValidateRange(1024, 65535)]
@@ -44,7 +44,7 @@ if ($CredentialDialog) {
 $passwordPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($securePassword)
 $storageKeyPointer = [IntPtr]::Zero
 $plainStorageKey = $null
-if ($Action -notin @('migrate', 'repair-product-families', 'repair-variance-cases', 'payment-accounts', 'credit-boundary-test', 'one-day-operations', 'cleanup-test-data', 'cleanup-demo-employees', 'cleanup-live-credit-test')) {
+if ($Action -notin @('migrate', 'hosted-bootstrap', 'repair-product-families', 'repair-variance-cases', 'payment-accounts', 'credit-boundary-test', 'one-day-operations', 'cleanup-test-data', 'cleanup-demo-employees', 'cleanup-live-credit-test')) {
     $secureStorageKey = Read-Host 'Supabase server secret key for Storage' -AsSecureString
     $storageKeyPointer = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($secureStorageKey)
 }
@@ -171,6 +171,7 @@ try {
         }
         'preflight' { $actionOutput = & php spark ibems:preflight 2>&1; $actionExitCode = $LASTEXITCODE; $actionOutput | Tee-Object -FilePath $logPath }
         'migrate' { $actionOutput = & php spark migrate --all 2>&1; $actionExitCode = $LASTEXITCODE; $actionOutput | Tee-Object -FilePath $validationLogPath }
+        'hosted-bootstrap' { $actionOutput = & php spark ibems:hosted-bootstrap 2>&1; $actionExitCode = $LASTEXITCODE; $actionOutput | Tee-Object -FilePath $validationLogPath }
         'repair-product-families' { $actionOutput = & php spark ibems:repair-product-families 2>&1; $actionExitCode = $LASTEXITCODE; $actionOutput | Tee-Object -FilePath $validationLogPath }
         'repair-variance-cases' { $actionOutput = & php spark ibems:repair-variance-cases 2>&1; $actionExitCode = $LASTEXITCODE; $actionOutput | Tee-Object -FilePath $validationLogPath }
         'payment-accounts' { $actionOutput = & php spark ibems:payment-accounts-migrate 2>&1; $actionExitCode = $LASTEXITCODE; $actionOutput | Tee-Object -FilePath $validationLogPath }

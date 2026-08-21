@@ -40,7 +40,7 @@ async function loadUvSalarySchedules() {
         .then((response) => response.json())
         .then((data) => {
             if (!data || data.status !== "success" || !Array.isArray(data.data) || !data.data.length) {
-                throw new Error(data?.message || "Salary schedules are unavailable.");
+                throw new Error(data?.message || "Salary schedules are unavailable. Apply the latest development database migration, then refresh this page.");
             }
             uvSalarySchedules = data.data;
             uvDefaultCreditPercentage = Number(data.default_credit_percentage ?? 25);
@@ -329,11 +329,18 @@ async function loadUserView() {
 }
 
 async function openEditUser(userId) {
-    await loadUvSalarySchedules();
-    const response = await fetch(`/admin/user-view/${userId}`);
-    const data = await response.json();
-    if (!data || data.status !== "success") {
-        setUvResult(data?.message || "Unable to load user detail.", "error");
+    let data;
+    try {
+        const response = await fetch(`/admin/user-view/${userId}`);
+        data = await response.json();
+        if (!data || data.status !== "success") {
+            throw new Error(data?.message || "Unable to load user detail.");
+        }
+        if (["faculty", "staff"].includes(String(data.data?.user_type || "").toLowerCase())) {
+            await loadUvSalarySchedules();
+        }
+    } catch (error) {
+        setUvResult(error.message || "Unable to load employee salary schedules. Apply the latest development database migration and try again.", "error");
         return;
     }
 
@@ -345,7 +352,9 @@ async function openEditUser(userId) {
     setRoleChecks("uv-e", row.roles, row.role);
     document.getElementById("uv-e-type").value = row.user_type || "staff";
     document.getElementById("uv-e-active").value = row.is_active ? "1" : "0";
-    populateUvSalaryProfile("uv-e", row);
+    if (["faculty", "staff"].includes(String(row.user_type || "").toLowerCase())) {
+        populateUvSalaryProfile("uv-e", row);
+    }
     toggleUvFinancialFields("uv-e");
     openModal("uv-edit-modal");
 }

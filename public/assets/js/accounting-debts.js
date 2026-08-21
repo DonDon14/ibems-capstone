@@ -40,7 +40,7 @@ async function loadAcctSalarySchedules() {
         .then((response) => response.json())
         .then((data) => {
             if (!data || data.status !== "success" || !Array.isArray(data.data) || !data.data.length) {
-                throw new Error(data?.message || "Salary schedules are unavailable.");
+                throw new Error(data?.message || "Salary schedules are unavailable. Apply the latest development database migration, then refresh this page.");
             }
             acctSalarySchedules = data.data;
             acctDefaultCreditPercentage = Number(data.default_credit_percentage ?? 25);
