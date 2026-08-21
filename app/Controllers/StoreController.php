@@ -1689,15 +1689,27 @@ class StoreController extends BaseController
 
         $categoryModel = new StoreCategoryModel();
         $categories = $categoryModel->getActiveByStore((int) $store['id']);
+        $productCounts = [];
+        $productRows = Database::connect()->table('products')
+            ->select('category, COUNT(id) AS product_count')
+            ->where('store_id', (int) $store['id'])
+            ->groupBy('category')
+            ->get()
+            ->getResultArray();
+        foreach ($productRows as $productRow) {
+            $productCounts[strtolower(trim((string) ($productRow['category'] ?? '')))] = (int) ($productRow['product_count'] ?? 0);
+        }
 
         return $this->response->setJSON([
             'status' => 'success',
             'store_id' => (int) $store['id'],
-            'categories' => array_map(static function (array $row): array {
+            'categories' => array_map(static function (array $row) use ($productCounts): array {
+                $categoryKey = strtolower(trim((string) ($row['name'] ?? '')));
                 return [
                     'id' => (int) $row['id'],
                     'name' => (string) $row['name'],
                     'sort_order' => (int) ($row['sort_order'] ?? 0),
+                    'product_count' => (int) ($productCounts[$categoryKey] ?? 0),
                 ];
             }, $categories),
         ]);
@@ -3303,14 +3315,21 @@ class StoreController extends BaseController
             ]);
         }
 
+        $page = max(1, (int) ($this->request->getGet('page') ?? 1));
+        $pageSize = max(10, min(100, (int) ($this->request->getGet('page_size') ?? $this->request->getGet('limit') ?? 25)));
+        $sortBy = strtolower(trim((string) ($this->request->getGet('sort_by') ?? 'date')));
+        $sortDir = strtolower(trim((string) ($this->request->getGet('sort_dir') ?? 'desc'))) === 'asc' ? 'ASC' : 'DESC';
+        $sortColumns = [
+            'date' => 't.created_at',
+            'payment' => 't.payment_method',
+            'amount' => 't.amount',
+        ];
+        $sortColumn = $sortColumns[$sortBy] ?? $sortColumns['date'];
         $q = trim((string) $this->request->getGet('q'));
         $employeeUserId = (int) ($this->request->getGet('user_id') ?? 0);
         $debtOnly = (int) ($this->request->getGet('debt_only') ?? 0) === 1;
         $dateFrom = trim((string) $this->request->getGet('date_from'));
         $dateTo = trim((string) $this->request->getGet('date_to'));
-        $limit = (int) ($this->request->getGet('limit') ?? 100);
-        $limit = max(1, min(200, $limit));
-
         $db = Database::connect();
         $query = $db->table('transactions t')
             ->select('t.id, t.client_txn_id, t.created_at, t.payment_method, t.amount, u.id AS user_id, u.employee_id, u.name, u.email, u.user_type, b.current_debt')

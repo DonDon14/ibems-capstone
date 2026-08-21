@@ -595,7 +595,7 @@ document.getElementById("store-refresh-btn").addEventListener("click", async () 
 document.getElementById("store-status-filter").addEventListener("change", () => {
     if (!suppressStoreFilterEvents) loadStores();
 });
-document.getElementById("store-sort").addEventListener("change", () => {
+document.getElementById("store-sort")?.addEventListener("change", () => {
     if (suppressStoreFilterEvents) return;
     storePage = 1;
     renderStores(storesData);

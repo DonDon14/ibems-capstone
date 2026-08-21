@@ -526,7 +526,12 @@ document.getElementById("reports-refresh-btn").addEventListener("click", async (
     await rLoadSummary();
 });
 
-document.getElementById("reports-custom-clear").addEventListener("click",()=>{document.getElementById("reports-date-from").value="";document.getElementById("reports-date-to").value="";rSetResult("Custom dates cleared.","ok");});
+function rUpdateCustomResetVisibility(){
+    const hasDates=document.getElementById("reports-date-from").value!==""||document.getElementById("reports-date-to").value!=="";
+    document.getElementById("reports-custom-clear").classList.toggle("is-hidden",!hasDates);
+}
+["reports-date-from","reports-date-to"].forEach((id)=>document.getElementById(id).addEventListener("change",rUpdateCustomResetVisibility));
+document.getElementById("reports-custom-clear").addEventListener("click",()=>{document.getElementById("reports-date-from").value="";document.getElementById("reports-date-to").value="";rUpdateCustomResetVisibility();rSetResult("Custom dates reset.","ok");});
 document.getElementById("reports-transactions-body").addEventListener("click",async(event)=>{const button=event.target.closest("[data-report-receipt]");if(!button)return;try{await rOpenReceipt(button.dataset.reportReceipt,button);}catch(error){rSetResult(error.message,"error");}});
 document.getElementById("reports-receipt-close").addEventListener("click",rCloseReceipt);
 document.getElementById("reports-receipt-modal").addEventListener("click",event=>{if(event.target.id==="reports-receipt-modal")rCloseReceipt();});

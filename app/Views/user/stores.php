@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/user') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/user-portal.css') ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/user-portal.css') ?>?v=20260821b">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -51,7 +51,7 @@
                 <option value="category:asc">Category A-Z</option>
             </select>
         </div>
-        <button id="us-clear" class="secondary-btn" type="button"><i class="bi bi-x-circle"></i> Clear</button>
+        <button id="us-reset-filters" class="secondary-btn is-hidden" type="button"><i class="bi bi-arrow-counterclockwise"></i> Reset filters</button>
     </div>
 
     <p id="us-context" class="user-results-context" aria-live="polite">Loading products...</p>
@@ -63,5 +63,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/user-stores.js') ?>"></script>
+<script src="<?= base_url('assets/js/user-stores.js') ?>?v=20260821b"></script>
 <?= $this->endSection() ?>

@@ -15,7 +15,15 @@ final class InventoryUiTest extends CIUnitTestCase
         }
 
         $this->assertStringContainsString('data-stock-summary', $script);
+        $this->assertStringContainsString('inventory-family-name-toggle', $script);
+        $this->assertStringContainsString('product-action-thumb', $script);
+        $this->assertStringContainsString('POS Availability', $script);
+        $this->assertStringContainsString('aria-selected', $script);
+        $this->assertStringContainsString('Out of Stock', $script);
         $this->assertStringContainsString('invRenderResultsContext', $script);
+        $this->assertStringContainsString('id="inventory-clear-filters" class="secondary-btn is-hidden"', $view);
+        $this->assertStringContainsString('Reset filters', $view);
+        $this->assertStringContainsString('clear.classList.toggle("is-hidden", !hasNonDefaultControls)', $script);
         $this->assertStringContainsString('groups.flatMap', $script);
         $this->assertStringContainsString('bi bi-sliders', $script);
         $this->assertStringContainsString('aria-label="No product image"', $script);
@@ -29,6 +37,12 @@ final class InventoryUiTest extends CIUnitTestCase
         $this->assertStringContainsString('.inventory-summary-pill:focus-visible', $styles);
         $this->assertStringContainsString('.inventory-summary-pill.is-active', $styles);
         $this->assertStringContainsString('.inventory-results-toolbar', $styles);
+        $this->assertStringContainsString('overflow-x: auto;', $styles);
+        $this->assertStringNotContainsString('max-height: min(62vh, 720px);', $styles);
+        $this->assertStringContainsString('table-layout: fixed;', $styles);
+        $this->assertStringContainsString('.product-action-thumb', $styles);
+        $this->assertStringContainsString('.adjust-save-hint', $styles);
+        $this->assertStringContainsString('background: #0f3f72;', $styles);
         $this->assertStringContainsString('position: sticky;', $styles);
     }
 

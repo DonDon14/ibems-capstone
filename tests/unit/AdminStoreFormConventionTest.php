@@ -68,6 +68,16 @@ final class AdminStoreFormConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('dataset.idleLabel', $script);
     }
 
+    public function testSharedStoreScriptTreatsAdminOnlyControlsAsOptional(): void
+    {
+        $storeAdminView = (string) file_get_contents(APPPATH . 'Views/store-admin/stores.php');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js');
+
+        $this->assertStringNotContainsString('id="store-sort"', $storeAdminView);
+        $this->assertStringContainsString('document.getElementById("store-sort")?.addEventListener', $script);
+        $this->assertStringContainsString('admin-stores.js\') ?>?v=20260821g', $storeAdminView);
+    }
+
     public function testStoreModalKeepsChromeFixedAndHidesConditionalTextarea(): void
     {
         $view = (string) file_get_contents(APPPATH . 'Views/admin/stores.php');

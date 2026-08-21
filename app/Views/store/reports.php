@@ -2,7 +2,7 @@
 
 <?= $this->section('styles') ?>
 <link rel="stylesheet" href="<?= base_url('assets/css/store-reports.css') ?>?v=20260813g">
-<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20260821b">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -18,7 +18,7 @@
             <div id="reports-custom-range" class="reports-custom-range hidden">
                 <label class="reports-date-field" for="reports-date-from"><span>From</span><input id="reports-date-from" type="date"></label>
                 <label class="reports-date-field" for="reports-date-to"><span>To</span><input id="reports-date-to" type="date"></label>
-                <button id="reports-custom-clear" class="secondary-btn btn-sm" type="button"><i class="bi bi-x-circle"></i> Clear dates</button>
+                <button id="reports-custom-clear" class="secondary-btn btn-sm is-hidden" type="button"><i class="bi bi-arrow-counterclockwise"></i> Reset dates</button>
             </div>
             <button id="reports-refresh-btn" class="primary-btn" type="button"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
         </div>
@@ -228,6 +228,6 @@
 
 <?= $this->section('scripts') ?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260813j"></script>
-<script src="<?= base_url('assets/js/store-reports.js') ?>?v=20260821a"></script>
+<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260821a"></script>
+<script src="<?= base_url('assets/js/store-reports.js') ?>?v=20260821b"></script>
 <?= $this->endSection() ?>

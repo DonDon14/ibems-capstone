@@ -7,10 +7,13 @@ final class OperationalFormLayoutConventionTest extends CIUnitTestCase
 {
     public function testPreviousDayResolutionUsesStructuredReviewLayout(): void
     {
-        $source = (string) file_get_contents(FCPATH . 'assets/js/admin-store-details.js');
+        $adminView = (string) file_get_contents(APPPATH . 'Views/admin/store-details.php');
+        $storeAdminView = (string) file_get_contents(APPPATH . 'Views/store-admin/store-details.php');
 
-        foreach (['stale-day-intro', 'stale-day-fields', 'stale-day-reason', 'stale-day-footer'] as $class) {
-            $this->assertStringContainsString($class, $source);
+        foreach ([$adminView, $storeAdminView] as $view) {
+            foreach (['admin-modal-card', 'stale-day-resolution-form', 'stale-day-expected', 'stale-day-payment-breakdown', 'stale-day-fields', 'stale-day-reason', 'admin-modal-actions'] as $class) {
+                $this->assertStringContainsString($class, $view);
+            }
         }
     }
 

@@ -1,8 +1,8 @@
 <?= $this->extend('layouts/store') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/store-history.css') ?>">
-<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/store-history.css') ?>?v=20260821c">
+<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20260821b">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -14,7 +14,12 @@
         'icon' => 'bi bi-receipt-cutoff',
     ]) ?>
 
-    <div class="history-filters">
+    <div class="history-summary">
+        <?= view('components/stat_card', ['title' => 'Transactions', 'value' => '0', 'valueId' => 'history-summary-count', 'icon' => 'bi bi-receipt', 'tone' => 'users', 'class' => 'history-summary-card']) ?>
+        <?= view('components/stat_card', ['title' => 'Total Sales', 'value' => 'PHP 0.00', 'valueId' => 'history-summary-total', 'icon' => 'bi bi-graph-up-arrow', 'tone' => 'sales', 'class' => 'history-summary-card']) ?>
+    </div>
+
+    <div class="history-filters" aria-label="Transaction filters">
         <div class="history-filter-field">
             <label for="history-date-from">From</label>
             <input id="history-date-from" type="date">
@@ -57,14 +62,8 @@
             </select>
         </div>
         <div class="history-filter-actions">
-            <button id="history-apply-filters" class="primary-btn" type="button">Apply Filters</button>
-            <button id="history-clear-filters" class="secondary-btn" type="button">Clear</button>
+            <button id="history-clear-filters" class="secondary-btn is-hidden" type="button"><i class="bi bi-arrow-counterclockwise"></i> Reset filters</button>
         </div>
-    </div>
-
-    <div class="history-summary">
-        <?= view('components/stat_card', ['title' => 'Transactions', 'value' => '0', 'valueId' => 'history-summary-count', 'icon' => 'bi bi-receipt', 'tone' => 'users', 'class' => 'history-summary-card']) ?>
-        <?= view('components/stat_card', ['title' => 'Total Sales', 'value' => 'PHP 0.00', 'valueId' => 'history-summary-total', 'icon' => 'bi bi-graph-up-arrow', 'tone' => 'sales', 'class' => 'history-summary-card']) ?>
     </div>
 
     <div class="history-table-wrap table-standard-wrap">
@@ -112,7 +111,7 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260813j"></script>
-<script src="<?= base_url('assets/js/store-history.js') ?>?v=20260821a"></script>
+<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260821a"></script>
+<script src="<?= base_url('assets/js/store-history.js') ?>?v=20260821b"></script>
 <?= $this->endSection() ?>
 

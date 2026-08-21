@@ -6,6 +6,15 @@ let editingPaymentMethodId = null;
 let editingPaymentAccountId = null;
 let editingPaymentMethodImageUrl = "";
 let paymentMethodSavePending = false;
+let categoryMutationPending = false;
+let categoryQuery = "";
+let categorySort = "name-asc";
+let categoryPage = 1;
+const categoryPageSize = 10;
+let categoryPendingButton = null;
+let categoryPendingButtonHtml = "";
+let editingCategoryId = null;
+let categoryEditTrigger = null;
 
 function settingsEscape(value) {
     return String(value ?? "")
@@ -40,28 +49,181 @@ function settingsSetMethodResult(message, isError = false) {
     el.style.color = isError ? "#b91c1c" : "#166534";
 }
 
+function setCategoryEditResult(message, isError = false) {
+    const result = document.getElementById("category-edit-result");
+    if (!result) return;
+    result.textContent = message || "";
+    result.classList.toggle("is-error", Boolean(message) && isError);
+}
+
+function syncCategoryEditSaveState() {
+    const current = settingsCategories.find((row) => Number(row.id) === Number(editingCategoryId));
+    const input = document.getElementById("category-edit-name");
+    const save = document.getElementById("category-edit-save");
+    if (!input || !save) return;
+    const nextName = String(input.value || "").trim();
+    const unchanged = nextName === String(current?.name || "").trim();
+    save.disabled = categoryMutationPending || nextName === "" || unchanged;
+}
+
+function openCategoryCreateModal(trigger = null) {
+    const modal = document.getElementById("category-edit-modal");
+    const input = document.getElementById("category-edit-name");
+    if (!modal || !input) return;
+
+    editingCategoryId = null;
+    categoryEditTrigger = trigger;
+    document.getElementById("category-edit-title").textContent = "Add category";
+    document.getElementById("category-edit-subtitle").textContent = "Create a category for products shown in Inventory and POS.";
+    document.getElementById("category-edit-current").textContent = "New category";
+    document.getElementById("category-edit-usage").textContent = "Products can be assigned after the category is created.";
+    document.getElementById("category-edit-guidance-text").textContent = "Use a short, specific name that store officers can recognize quickly.";
+    document.getElementById("category-edit-save").innerHTML = '<i class="bi bi-plus-circle" aria-hidden="true"></i> Create category';
+    input.value = "";
+    setCategoryEditResult("");
+    modal.classList.remove("is-hidden");
+    document.body.classList.add("settings-modal-open");
+    syncCategoryEditSaveState();
+    window.requestAnimationFrame(() => input.focus());
+}
+
+function openCategoryEditModal(categoryId, trigger = null) {
+    const current = settingsCategories.find((row) => Number(row.id) === Number(categoryId));
+    const modal = document.getElementById("category-edit-modal");
+    const input = document.getElementById("category-edit-name");
+    if (!current || !modal || !input) return;
+
+    editingCategoryId = Number(current.id);
+    categoryEditTrigger = trigger;
+    document.getElementById("category-edit-title").textContent = "Edit category";
+    document.getElementById("category-edit-subtitle").textContent = "Rename this category across Inventory and POS.";
+    document.getElementById("category-edit-guidance-text").textContent = "Products are not deleted. Their category label updates automatically.";
+    document.getElementById("category-edit-save").innerHTML = '<i class="bi bi-check2-circle" aria-hidden="true"></i> Save changes';
+    input.value = String(current.name || "");
+    document.getElementById("category-edit-current").textContent = String(current.name || "Selected category");
+    const productCount = Number(current.product_count || 0);
+    document.getElementById("category-edit-usage").textContent = productCount === 0
+        ? "No products currently use this category."
+        : `${productCount} ${productCount === 1 ? "product uses" : "products use"} this category.`;
+    setCategoryEditResult("");
+    modal.classList.remove("is-hidden");
+    document.body.classList.add("settings-modal-open");
+    syncCategoryEditSaveState();
+    window.requestAnimationFrame(() => {
+        input.focus();
+        input.select();
+    });
+}
+
+function closeCategoryEditModal(restoreFocus = true) {
+    if (categoryMutationPending) return;
+    const modal = document.getElementById("category-edit-modal");
+    modal?.classList.add("is-hidden");
+    editingCategoryId = null;
+    setCategoryEditResult("");
+    if (!document.querySelector(".settings-modal:not(.is-hidden)")) document.body.classList.remove("settings-modal-open");
+    if (restoreFocus && categoryEditTrigger?.isConnected) categoryEditTrigger.focus();
+    categoryEditTrigger = null;
+}
+
 function renderCategories() {
     const body = document.getElementById("category-body");
+    const count = document.getElementById("category-count");
+    const tools = document.getElementById("category-tools");
+    const pagination = document.getElementById("category-pagination");
 
     if (!Array.isArray(settingsCategories) || settingsCategories.length === 0) {
-        body.innerHTML = settingsDataState("empty", "No categories found.", 2);
+        body.innerHTML = settingsDataState("empty", "No categories found.", 3);
+        if (count) count.textContent = "0 categories";
+        tools?.classList.add("is-hidden");
+        pagination?.classList.add("is-hidden");
         return;
     }
 
-    body.innerHTML = settingsCategories.map((category) => {
+    const normalizedQuery = categoryQuery.trim().toLowerCase();
+    const filtered = settingsCategories.filter((category) => !normalizedQuery || String(category.name || "").toLowerCase().includes(normalizedQuery));
+    filtered.sort((left, right) => {
+        if (categorySort === "name-desc") return String(right.name || "").localeCompare(String(left.name || ""));
+        if (categorySort === "products-desc") return Number(right.product_count || 0) - Number(left.product_count || 0) || String(left.name || "").localeCompare(String(right.name || ""));
+        return String(left.name || "").localeCompare(String(right.name || ""));
+    });
+
+    const pageCount = Math.max(1, Math.ceil(filtered.length / categoryPageSize));
+    categoryPage = Math.min(categoryPage, pageCount);
+    const start = (categoryPage - 1) * categoryPageSize;
+    const visible = filtered.slice(start, start + categoryPageSize);
+    const hasLargeList = settingsCategories.length > categoryPageSize;
+    tools?.classList.toggle("is-hidden", !hasLargeList);
+    pagination?.classList.toggle("is-hidden", !hasLargeList || filtered.length <= categoryPageSize);
+    if (count) count.textContent = `${filtered.length}${normalizedQuery ? ` of ${settingsCategories.length}` : ""} ${filtered.length === 1 ? "category" : "categories"}`;
+
+    if (!visible.length) {
+        body.innerHTML = settingsDataState("empty", "No categories match your search.", 3);
+    } else {
+        body.innerHTML = visible.map((category) => {
         const isGeneral = String(category.name || "").toLowerCase() === "general";
+        const productCount = Number(category.product_count || 0);
         return `
             <tr>
-                <td>${settingsEscape(category.name)}</td>
+                <td><div class="category-name-cell"><strong>${settingsEscape(category.name)}</strong>${isGeneral ? '<span class="category-default-badge"><i class="bi bi-lock-fill" aria-hidden="true"></i> Default</span>' : ""}</div></td>
+                <td><span class="category-product-count" aria-label="${productCount} ${productCount === 1 ? "product" : "products"}">${productCount}</span></td>
                 <td>
                     <div class="category-action-cell">
-                        <button type="button" class="secondary-btn btn-sm" data-action="edit" data-id="${category.id}">Edit</button>
-                        <button type="button" class="danger-btn btn-sm" data-action="delete" data-id="${category.id}" ${isGeneral ? "disabled" : ""}>Delete</button>
+                        <button type="button" class="secondary-btn btn-sm" data-action="edit" data-id="${category.id}" aria-label="Edit ${settingsEscape(category.name)}"><i class="bi bi-pencil-square" aria-hidden="true"></i> Edit</button>
+                        ${isGeneral ? "" : `<button type="button" class="category-delete-btn btn-sm" data-action="delete" data-id="${category.id}" aria-label="Delete ${settingsEscape(category.name)}"><i class="bi bi-trash3" aria-hidden="true"></i> Delete</button>`}
                     </div>
                 </td>
             </tr>
         `;
-    }).join("");
+        }).join("");
+    }
+
+    const summary = document.getElementById("category-page-summary");
+    if (summary) summary.textContent = `Page ${categoryPage} of ${pageCount}`;
+    const previous = document.getElementById("category-prev");
+    const next = document.getElementById("category-next");
+    if (previous) previous.disabled = categoryPage <= 1;
+    if (next) next.disabled = categoryPage >= pageCount;
+}
+
+function setCategoryMutationPending(isPending, action = "create", activeButton = null) {
+    categoryMutationPending = Boolean(isPending);
+    const card = document.getElementById("category-settings-card");
+    const editModal = document.getElementById("category-edit-modal");
+    const addButton = document.getElementById("add-category-btn");
+    card?.setAttribute("aria-busy", categoryMutationPending ? "true" : "false");
+    editModal?.querySelector(".category-edit-card")?.setAttribute("aria-busy", categoryMutationPending ? "true" : "false");
+    document.querySelectorAll("#category-settings-card button, #category-settings-card select, #category-settings-card input, #category-edit-modal button, #category-edit-modal input").forEach((control) => {
+        control.disabled = categoryMutationPending;
+    });
+
+    if (categoryMutationPending) {
+        categoryPendingButton = activeButton || addButton;
+        categoryPendingButtonHtml = categoryPendingButton?.innerHTML || "";
+        const labels = {create: "Creating category...", update: "Saving...", delete: "Deleting..."};
+        if (categoryPendingButton) categoryPendingButton.innerHTML = `<i class="bi bi-arrow-repeat settings-submit-spinner" aria-hidden="true"></i> ${labels[action] || "Working..."}`;
+        return;
+    }
+
+    if (categoryPendingButton?.isConnected && categoryPendingButtonHtml) categoryPendingButton.innerHTML = categoryPendingButtonHtml;
+    if (addButton) addButton.innerHTML = '<i class="bi bi-plus-circle" aria-hidden="true"></i> Add category';
+    categoryPendingButton = null;
+    categoryPendingButtonHtml = "";
+    renderCategories();
+    syncCategoryEditSaveState();
+}
+
+async function runCategoryMutation(action, activeButton, task) {
+    if (categoryMutationPending) return;
+    settingsSetResult("");
+    setCategoryMutationPending(true, action, activeButton);
+    try {
+        await task();
+    } catch (error) {
+        settingsSetResult(error.message || "Category action failed.", true);
+    } finally {
+        setCategoryMutationPending(false);
+    }
 }
 
 function renderPaymentMethods() {
@@ -79,9 +241,17 @@ function renderPaymentMethods() {
         const accountSummary = requiresAccount
             ? (accounts.length ? `${accounts.length} receiving account${accounts.length === 1 ? "" : "s"}` : "Setup required")
             : (String(method.code) === "cash" ? "Cash drawer" : String(method.code) === "debt" ? "Employee account" : "No receiving account required");
-        const action = String(method.code) === "cash" ? '<span class="payment-built-in">Built in</span>' : `<button type="button" class="secondary-btn btn-sm" data-method-edit="${Number(method.id)}"><i class="bi bi-pencil-square"></i> Edit</button>`;
+        const isBuiltIn = String(method.code) === "cash";
+        const needsSetup = requiresAccount && !accounts.length;
+        const statusLabel = isBuiltIn ? "Built in" : needsSetup ? "Setup required" : "Ready";
+        const statusClass = isBuiltIn ? "is-built-in" : needsSetup ? "is-setup" : "is-ready";
+        const primaryAccount = accounts[0] || null;
+        const destination = primaryAccount
+            ? `<small class="payment-method-destination"><i class="bi bi-send" aria-hidden="true"></i> ${settingsEscape(primaryAccount.account_name)}${primaryAccount.masked_number ? ` · ${settingsEscape(primaryAccount.masked_number)}` : ""}${accounts.length > 1 ? ` · +${accounts.length - 1} more` : ""}</small>`
+            : "";
+        const action = isBuiltIn ? "" : `<button type="button" class="secondary-btn btn-sm" data-method-edit="${Number(method.id)}"><i class="bi bi-pencil-square"></i> Edit</button>`;
         const visual = method.image_url ? `<img src="${settingsEscape(method.image_url)}" alt="${settingsEscape(method.label)}">` : `<i class="${settingsEscape(icon)}"></i>`;
-        return `<article class="payment-method-card${requiresAccount && !accounts.length ? " needs-setup" : ""}"><span class="payment-method-icon">${visual}</span><div class="payment-method-copy"><strong>${settingsEscape(method.label)}</strong><span>${settingsEscape(accountSummary)}</span><code>${settingsEscape(method.code)}</code></div>${action}</article>`;
+        return `<article class="payment-method-card${needsSetup ? " needs-setup" : ""}"><span class="payment-method-icon">${visual}</span><div class="payment-method-copy"><div class="payment-method-title-row"><strong>${settingsEscape(method.label)}</strong><span class="payment-status-badge ${statusClass}">${statusLabel}</span></div><span class="payment-method-summary">${settingsEscape(accountSummary)}</span>${destination}<code>${settingsEscape(method.code)}</code></div>${action}</article>`;
     }).join("");
 }
 
@@ -99,7 +269,8 @@ async function loadCategories() {
     const data = await response.json();
     if (!data || data.status !== "success") {
         const message = data?.message || "Unable to load categories.";
-        document.getElementById("category-body").innerHTML = settingsDataState("error", message, 2);
+        document.getElementById("category-body").innerHTML = settingsDataState("error", message, 3);
+        document.getElementById("category-count").textContent = "Unavailable";
         throw new Error(message);
     }
     settingsCategories = Array.isArray(data.categories) ? data.categories : [];
@@ -323,12 +494,10 @@ async function createPaymentAccount() {
     renderPaymentAccounts();
 }
 
-async function createCategory() {
-    const input = document.getElementById("new-category-name");
-    const name = String(input.value || "").trim();
+async function createCategory(nextName) {
+    const name = String(nextName || "").trim();
     if (!name) {
-        settingsSetResult("Category name is required.", true);
-        return;
+        throw new Error("Category name is required.");
     }
 
     const response = await fetch("/store/categories/create", {
@@ -344,27 +513,20 @@ async function createCategory() {
         throw new Error(data?.message || "Failed to create category.");
     }
 
-    input.value = "";
-    settingsSetResult(`Category saved: ${name}`);
     await loadCategories();
+    settingsSetResult(`Category created: ${name}.`);
 }
 
-async function updateCategory(categoryId) {
+async function updateCategory(categoryId, nextName) {
     const current = settingsCategories.find((row) => Number(row.id) === Number(categoryId));
     if (!current) return;
 
-    const next = await window.IbemsDialog.prompt("Change the category name used by products in this store.", {
-        title: "Update category",
-        inputLabel: "Category name",
-        defaultValue: current.name || "",
-        required: true,
-        confirmLabel: "Update category",
-    });
-    if (next === null) return;
-    const name = String(next || "").trim();
+    const name = String(nextName || "").trim();
     if (!name) {
-        settingsSetResult("Category name is required.", true);
-        return;
+        throw new Error("Category name is required.");
+    }
+    if (name === String(current.name || "").trim()) {
+        throw new Error("Enter a different category name before saving.");
     }
 
     const response = await fetch("/store/categories/update", {
@@ -381,8 +543,8 @@ async function updateCategory(categoryId) {
         throw new Error(data?.message || "Failed to update category.");
     }
 
-    settingsSetResult("Category updated.");
     await loadCategories();
+    settingsSetResult(`Category updated to ${name}.`);
 }
 
 async function deleteCategory(categoryId) {
@@ -524,14 +686,8 @@ async function deletePaymentMethod(methodId) {
     await loadPaymentMethods();
 }
 
-document.getElementById("add-category-btn").addEventListener("click", () => {
-    createCategory().catch((error) => settingsSetResult(error.message || "Create failed.", true));
-});
-
-document.getElementById("new-category-name").addEventListener("keydown", (event) => {
-    if (event.key !== "Enter") return;
-    event.preventDefault();
-    createCategory().catch((error) => settingsSetResult(error.message || "Create failed.", true));
+document.getElementById("add-category-btn").addEventListener("click", (event) => {
+    openCategoryCreateModal(event.currentTarget);
 });
 
 document.getElementById("category-body").addEventListener("click", (event) => {
@@ -543,17 +699,92 @@ document.getElementById("category-body").addEventListener("click", (event) => {
     if (categoryId <= 0) return;
 
     if (action === "edit") {
-        updateCategory(categoryId).catch((error) => settingsSetResult(error.message || "Update failed.", true));
+        openCategoryEditModal(categoryId, button);
         return;
     }
 
     if (action === "delete") {
-        deleteCategory(categoryId).catch((error) => settingsSetResult(error.message || "Delete failed.", true));
+        runCategoryMutation("delete", button, () => deleteCategory(categoryId));
     }
+});
+
+document.getElementById("category-search")?.addEventListener("input", (event) => {
+    categoryQuery = String(event.target.value || "");
+    categoryPage = 1;
+    renderCategories();
+});
+document.getElementById("category-sort")?.addEventListener("change", (event) => {
+    categorySort = String(event.target.value || "name-asc");
+    categoryPage = 1;
+    renderCategories();
+});
+document.getElementById("category-prev")?.addEventListener("click", () => {
+    if (categoryPage <= 1) return;
+    categoryPage -= 1;
+    renderCategories();
+});
+document.getElementById("category-next")?.addEventListener("click", () => {
+    categoryPage += 1;
+    renderCategories();
+});
+
+document.getElementById("category-edit-name")?.addEventListener("input", () => {
+    setCategoryEditResult("");
+    syncCategoryEditSaveState();
+});
+document.getElementById("category-edit-name")?.addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !document.getElementById("category-edit-save")?.disabled) {
+        event.preventDefault();
+        document.getElementById("category-edit-save")?.click();
+    }
+});
+document.getElementById("category-edit-save")?.addEventListener("click", async (event) => {
+    if (categoryMutationPending) return;
+    const current = settingsCategories.find((row) => Number(row.id) === Number(editingCategoryId));
+    const isCreating = !editingCategoryId;
+    const nextName = String(document.getElementById("category-edit-name")?.value || "").trim();
+    if (!nextName) {
+        setCategoryEditResult("Enter a category name.", true);
+        syncCategoryEditSaveState();
+        return;
+    }
+    if (!isCreating && !current) {
+        setCategoryEditResult("This category is no longer available. Refresh and try again.", true);
+        return;
+    }
+
+    let saved = false;
+    setCategoryEditResult("");
+    setCategoryMutationPending(true, isCreating ? "create" : "update", event.currentTarget);
+    try {
+        if (isCreating) {
+            await createCategory(nextName);
+        } else {
+            await updateCategory(Number(current.id), nextName);
+        }
+        saved = true;
+    } catch (error) {
+        setCategoryEditResult(error.message || `Unable to ${isCreating ? "create" : "update"} this category.`, true);
+    } finally {
+        setCategoryMutationPending(false);
+    }
+    if (saved) closeCategoryEditModal(false);
+});
+document.getElementById("category-edit-cancel")?.addEventListener("click", () => closeCategoryEditModal());
+document.getElementById("category-edit-close")?.addEventListener("click", () => closeCategoryEditModal());
+document.getElementById("category-edit-modal")?.addEventListener("click", (event) => {
+    if (event.target.id === "category-edit-modal") closeCategoryEditModal();
+});
+document.getElementById("category-edit-modal")?.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    event.preventDefault();
+    closeCategoryEditModal();
 });
 
 const settingsModalRoot = document.getElementById("payment-method-modal");
 if (settingsModalRoot && settingsModalRoot.parentElement !== document.body) document.body.appendChild(settingsModalRoot);
+const categoryEditModalRoot = document.getElementById("category-edit-modal");
+if (categoryEditModalRoot && categoryEditModalRoot.parentElement !== document.body) document.body.appendChild(categoryEditModalRoot);
 
 document.getElementById("payment-method-list").addEventListener("click", (event) => {
     const button = event.target.closest("button[data-method-edit]");
@@ -629,7 +860,7 @@ document.getElementById("payment-account-list")?.addEventListener("click", async
     } catch (error) {
         const message = error.message || "Unable to initialize store settings.";
         if (document.querySelector("#category-body .data-state--loading")) {
-            document.getElementById("category-body").innerHTML = settingsDataState("error", message, 2);
+            document.getElementById("category-body").innerHTML = settingsDataState("error", message, 3);
         }
         const methodList = document.getElementById("payment-method-list");
         if (methodList) methodList.innerHTML = `<div class="payment-method-empty is-error"><strong>${settingsEscape(message)}</strong></div>`;

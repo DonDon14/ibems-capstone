@@ -1,8 +1,8 @@
 <?= $this->extend('layouts/store') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/store-pos.css') ?>?v=20260813l">
-<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/store-pos.css') ?>?v=20260821e">
+<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20260821b">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <?= $this->endSection() ?>
 
@@ -16,6 +16,12 @@
             'icon' => 'bi bi-cart-check',
             'actions' => '<a class="secondary-btn pos-back-btn" href="' . site_url('store/dashboard') . '"><i class="bi bi-arrow-left" aria-hidden="true"></i> Back to dashboard</a>',
         ]) ?>
+        <div class="pos-context-bar" role="status" aria-live="polite">
+            <span class="pos-context-label"><i class="bi bi-shop-window" aria-hidden="true"></i> Active store</span>
+            <strong id="pos-store-name">Loading store...</strong>
+            <span class="pos-context-separator" aria-hidden="true"></span>
+            <span id="pos-store-role">Store operations</span>
+        </div>
     </div>
 
     <div class="pos-left panel">
@@ -26,8 +32,13 @@
             </div>
         </header>
 
-        <div id="category-tabs" class="category-tabs">
-            <button class="category-tab active" data-category="All" type="button">All</button>
+        <p id="pos-transaction-note" class="pos-transaction-note" role="status" aria-live="polite">
+            <i class="bi bi-lock" aria-hidden="true"></i>
+            <span>Open today&apos;s store day before adding items.</span>
+        </p>
+
+        <div id="category-tabs" class="category-tabs" role="tablist" aria-label="Product categories">
+            <button class="category-tab active" data-category="All" type="button" role="tab" aria-selected="true" aria-controls="product-grid">All</button>
         </div>
 
         <div id="product-grid" class="product-grid">
@@ -91,21 +102,6 @@
 
         <div id="cart-body" class="cart-list"></div>
 
-        <div class="order-summary">
-            <div class="summary-row">
-                <span><i class="bi bi-receipt"></i> Subtotal</span>
-                <strong id="subtotal-amount">PHP 0.00</strong>
-            </div>
-            <div class="summary-row">
-                <span><i class="bi bi-basket"></i> Items</span>
-                <strong id="item-count">0</strong>
-            </div>
-            <div class="summary-row total-row">
-                <span><i class="bi bi-cash-stack"></i> Total</span>
-                <strong id="grand-total">PHP 0.00</strong>
-            </div>
-        </div>
-
         <div class="payment-wrap">
             <label id="payment-method-label" for="payment-method"><i class="bi bi-credit-card-2-front"></i> Payment Method</label>
             <div class="payment-selector" id="payment-quick" role="group" aria-labelledby="payment-method-label"></div>
@@ -143,9 +139,25 @@
             </div>
         </div>
 
-        <button id="submit-transaction" class="primary-btn" type="button"><i class="bi bi-check2-circle"></i> Complete Transaction</button>
-        <p id="result" class="result-msg"></p>
-        <div id="pos-success-strip" class="pos-success-strip is-hidden"></div>
+        <div class="pos-checkout-footer">
+            <div class="order-summary">
+                <div class="summary-row">
+                    <span><i class="bi bi-receipt"></i> Subtotal</span>
+                    <strong id="subtotal-amount">PHP 0.00</strong>
+                </div>
+                <div class="summary-row">
+                    <span><i class="bi bi-basket"></i> Items</span>
+                    <strong id="item-count">0</strong>
+                </div>
+                <div class="summary-row total-row">
+                    <span><i class="bi bi-cash-stack"></i> Total</span>
+                    <strong id="grand-total">PHP 0.00</strong>
+                </div>
+            </div>
+            <button id="submit-transaction" class="primary-btn" type="button"><i class="bi bi-check2-circle"></i> Complete Transaction</button>
+            <p id="result" class="result-msg"></p>
+            <div id="pos-success-strip" class="pos-success-strip is-hidden"></div>
+        </div>
     </aside>
 </section>
 
@@ -378,7 +390,7 @@
 
 <?= $this->section('scripts') ?>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260813j"></script>
-<script src="<?= base_url('assets/js/store-pos.js') ?>?v=20260813w"></script>
+<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260821a"></script>
+<script src="<?= base_url('assets/js/store-pos.js') ?>?v=20260821b"></script>
 <?= $this->endSection() ?>
 

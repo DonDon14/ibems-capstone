@@ -1,8 +1,8 @@
 <?= $this->extend('layouts/user') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/user-portal.css') ?>">
-<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/user-portal.css') ?>?v=20260821b">
+<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20260821b">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -63,8 +63,7 @@
                 <option value="50">50</option>
             </select>
         </div>
-        <button id="uh-apply" class="primary-btn" type="button">Apply</button>
-        <button id="uh-clear" class="secondary-btn" type="button">Clear</button>
+        <button id="uh-reset-filters" class="secondary-btn is-hidden" type="button"><i class="bi bi-arrow-counterclockwise"></i> Reset filters</button>
     </div>
 
     <article class="dash-panel user-store-spending-panel">
@@ -155,6 +154,6 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/receipt-standard.js') ?>"></script>
-<script src="<?= base_url('assets/js/user-history.js') ?>"></script>
+<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260821a"></script>
+<script src="<?= base_url('assets/js/user-history.js') ?>?v=20260821b"></script>
 <?= $this->endSection() ?>

@@ -43,5 +43,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/admin-stores.js') ?>"></script>
+<script src="<?= base_url('assets/js/admin-stores.js') ?>?v=20260821g"></script>
 <?= $this->endSection() ?>

@@ -315,6 +315,7 @@ function printReceipt() {
 }
 
 async function loadUserHistoryAll() {
+    uhUpdateResetFilters();
     await Promise.allSettled([
         loadUserSummaryCards(),
         loadUserTransactions(),
@@ -322,12 +323,20 @@ async function loadUserHistoryAll() {
     ]);
 }
 
-document.getElementById("uh-apply").addEventListener("click", () => {
-    uhTransactionPage = 1;
-    uhCashbookPage = 1;
-    loadUserHistoryAll();
-});
-document.getElementById("uh-clear").addEventListener("click", () => {
+function uhHasActiveFilters() {
+    return document.getElementById("uh-store").value !== ""
+        || document.getElementById("uh-date-from").value !== ""
+        || document.getElementById("uh-date-to").value !== ""
+        || document.getElementById("uh-sort").value !== "date:desc"
+        || document.getElementById("uh-cashbook-sort").value !== "date:desc"
+        || document.getElementById("uh-page-size").value !== "25";
+}
+
+function uhUpdateResetFilters() {
+    document.getElementById("uh-reset-filters").classList.toggle("is-hidden", !uhHasActiveFilters());
+}
+
+document.getElementById("uh-reset-filters").addEventListener("click", () => {
     document.getElementById("uh-store").value = "";
     document.getElementById("uh-date-from").value = "";
     document.getElementById("uh-date-to").value = "";
@@ -336,21 +345,33 @@ document.getElementById("uh-clear").addEventListener("click", () => {
     document.getElementById("uh-page-size").value = "25";
     uhTransactionPage = 1;
     uhCashbookPage = 1;
+    uhUpdateResetFilters();
     loadUserHistoryAll();
 });
 
-["uh-store", "uh-sort", "uh-page-size"].forEach((id) => {
+["uh-store", "uh-sort"].forEach((id) => {
     document.getElementById(id).addEventListener("change", () => {
         uhTransactionPage = 1;
+        uhUpdateResetFilters();
         loadUserTransactions();
     });
 });
 document.getElementById("uh-page-size").addEventListener("change", () => {
+    uhTransactionPage = 1;
     uhCashbookPage = 1;
-    loadUserCashbook();
+    uhUpdateResetFilters();
+    Promise.allSettled([loadUserTransactions(), loadUserCashbook()]);
+});
+["uh-date-from", "uh-date-to"].forEach((id) => {
+    document.getElementById(id).addEventListener("change", () => {
+        uhTransactionPage = 1;
+        uhCashbookPage = 1;
+        loadUserHistoryAll();
+    });
 });
 document.getElementById("uh-cashbook-sort").addEventListener("change", () => {
     uhCashbookPage = 1;
+    uhUpdateResetFilters();
     loadUserCashbook();
 });
 document.getElementById("uh-transactions-pager").addEventListener("click", (event) => {

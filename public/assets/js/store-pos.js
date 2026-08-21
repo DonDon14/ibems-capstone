@@ -61,6 +61,11 @@ function closeProductVariantPicker() {
 }
 
 function openProductVariantPicker(familyKey) {
+    if (!openingBalanceReady) {
+        setResult("Open today's store day before adding items.", "error");
+        return;
+    }
+
     const group = groupCatalogProducts(productsCache).find((item) => item.key === familyKey);
     if (!group || group.variants.length < 2) return;
     activeVariantFamilyKey = familyKey;
@@ -387,6 +392,32 @@ function setOpeningBalanceResult(message, type) {
 
 function setPosTransactionEnabled(enabled) {
     openingBalanceReady = !!enabled;
+
+    const shell = document.querySelector(".pos-shell");
+    const note = document.getElementById("pos-transaction-note");
+    const noteText = note?.querySelector("span");
+    const guardedControls = [
+        "scan-code-input",
+        "scan-qty-input",
+        "scan-add-btn",
+        "open-scanner-btn",
+        "open-debt-payment-modal",
+    ];
+
+    shell?.classList.toggle("is-pos-locked", !openingBalanceReady);
+    guardedControls.forEach((id) => {
+        const control = document.getElementById(id);
+        if (control) control.disabled = !openingBalanceReady;
+    });
+
+    if (note) note.classList.toggle("is-locked", !openingBalanceReady);
+    if (noteText) {
+        noteText.textContent = openingBalanceReady
+            ? "Tap a product card or scan a code to add items to the order."
+            : (document.getElementById("opening-balance-guidance")?.textContent || "Open today's store day before adding items.");
+    }
+
+    if (productsLoadCompleted) renderProducts();
     updateCheckoutState();
 }
 
@@ -996,6 +1027,19 @@ async function handleDetectedScannerCode(rawValue) {
 function getStoreNameById(storeId) {
     const store = myStores.find((s) => Number(s.id) === Number(storeId));
     return store ? store.store_name : `Store #${storeId}`;
+}
+
+function getCurrentUserRoleLabel() {
+    const normalized = currentUserRole.replace(/[_-]+/g, " ").trim().toLowerCase();
+    if (!normalized) return "Store operations";
+    return normalized.replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function updatePosStoreContext() {
+    const nameEl = document.getElementById("pos-store-name");
+    const roleEl = document.getElementById("pos-store-role");
+    if (nameEl) nameEl.textContent = getStoreNameById(activeStoreId);
+    if (roleEl) roleEl.textContent = getCurrentUserRoleLabel();
 }
 
 function getDebtCustomerLabelById(customerId) {
@@ -1790,7 +1834,7 @@ function renderCategoryTabs() {
     tabsEl.innerHTML = categories
         .map(
             (category) =>
-                `<button class="category-tab ${category === activeCategory ? "active" : ""}" data-category="${escapeHtml(category)}" type="button">${escapeHtml(category)}</button>`
+                `<button class="category-tab ${category === activeCategory ? "active" : ""}" data-category="${escapeHtml(category)}" type="button" role="tab" aria-selected="${category === activeCategory ? "true" : "false"}" aria-controls="product-grid">${escapeHtml(category)}</button>`
         )
         .join("");
 }
@@ -1839,29 +1883,33 @@ function renderProducts() {
             const priceValues = variants.map((variant) => Number(variant.price || 0));
             const priceLabel = variants.length > 1 ? `From ${formatMoney(Math.min(...priceValues))}` : formatMoney(product.price);
             const isFamily = variants.length > 1;
-            const cardInteraction = `tabindex="0" role="button" aria-label="${escapeHtml(isFamily ? `Choose ${product.name} variant` : `Add ${displayName} to order`)}" aria-disabled="${canOpenOrAdd ? "false" : "true"}`;
+            const canInteract = openingBalanceReady && canOpenOrAdd;
+            const cardInteraction = `tabindex="0" role="button" aria-label="${escapeHtml(!openingBalanceReady ? "Open store day before adding items" : (isFamily ? `Choose ${product.name} variant` : `Add ${displayName} to order`))}" aria-disabled="${canInteract ? "false" : "true"}"`;
             const actionHtml = isFamily
-                ? `<span class="product-card-action"><i class="bi bi-hand-index-thumb"></i>Choose from ${variants.length} variants</span>`
-                : "";
+                ? `<span class="product-card-action"><i class="bi bi-hand-index-thumb"></i>Choose a variant</span>`
+                : `<span class="product-card-action"><i class="bi bi-cart-plus"></i>Tap to add</span>`;
+            const lockedActionHtml = `<span class="product-card-action is-locked"><i class="bi bi-lock"></i>POS locked</span>`;
 
             return `
-                <article class="product-card product-family-card stock-${stockState.key} ${canOpenOrAdd ? "" : "out-of-stock"}" data-family-card="${escapeHtml(key)}" data-direct-product="${isFamily ? "" : Number(product.id)}" ${cardInteraction}>
+                <article class="product-card product-family-card stock-${stockState.key} ${canOpenOrAdd ? "" : "out-of-stock"} ${openingBalanceReady ? "" : "is-pos-locked"}" data-family-card="${escapeHtml(key)}" data-direct-product="${isFamily ? "" : Number(product.id)}" ${cardInteraction}>
                     <div class="product-card-top">
                         ${visualHtml}
+                        <div class="product-card-heading">
+                            <h5 class="product-name">${escapeHtml(displayName)}</h5>
+                            <p class="product-meta product-card-category">${escapeHtml(category)} · ${variants.length} ${variants.length === 1 ? "variant" : "variants"}</p>
+                        </div>
                         <span class="stock-badge stock-${stockState.key}">${escapeHtml(familyStockLabel)}</span>
                     </div>
-                    <h5 class="product-name">${escapeHtml(displayName)}</h5>
-                    <p class="product-meta">${escapeHtml(category)} | ${variants.length} ${variants.length === 1 ? "variant" : "variants"}</p>
                     <p class="product-meta product-selected-sku">${variants.length > 1 ? "Tap to view sizes" : `SKU: ${escapeHtml(product.sku)}`}</p>
                     ${operationsMeta}
                     <div class="product-bottom">
                         <div>
                             <div class="product-price">${priceLabel}</div>
-                            <div class="product-stock">${variants.length > 1 ? `${variants.length} choices available` : `${escapeHtml(stockState.detail)} | Stock: ${stock}`}</div>
+                            <div class="product-stock">${variants.length > 1 ? `${variants.length} choices available` : escapeHtml(stockState.detail)}</div>
                         </div>
                         ${inCartHtml}
                     </div>
-                    ${actionHtml}
+                    ${openingBalanceReady ? actionHtml : lockedActionHtml}
                 </article>
             `;
         })
@@ -2333,6 +2381,11 @@ function refreshUi() {
 }
 
 function addToCart(productId, name, price, qtyRequested = 1) {
+    if (!openingBalanceReady) {
+        setResult("Open today's store day before adding items.", "error");
+        return false;
+    }
+
     const product = getProductById(productId);
     if (!product) return;
 
@@ -2446,6 +2499,7 @@ async function loadMyStores() {
 
     myStores = data.stores;
     activeStoreId = Number(data.default_store_id || myStores[0].id);
+    updatePosStoreContext();
 }
 
 async function loadProducts() {
@@ -2947,6 +3001,10 @@ document.getElementById("product-grid").addEventListener("keydown", (event) => {
 document.getElementById("product-variant-options").addEventListener("click", (event) => {
     const option = event.target.closest("[data-pick-variant]");
     if (!option) return;
+    if (!openingBalanceReady) {
+        setResult("Open today's store day before adding items.", "error");
+        return;
+    }
     const product = getProductById(Number(option.dataset.pickVariant || 0));
     if (!product) return;
     addToCart(product.id, getProductDisplayName(product), Number(product.price || 0));
@@ -3177,6 +3235,7 @@ document.getElementById("store-day-unassigned-counts").addEventListener("input",
     try {
         renderCategoryTabs();
         setScannerUiState(false);
+        setPosTransactionEnabled(false);
         await loadMyStores();
         await loadProducts();
         await loadPaymentMethods();

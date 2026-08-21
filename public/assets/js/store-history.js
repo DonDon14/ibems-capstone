@@ -49,6 +49,31 @@ function setHistoryResult(message, type) {
     el.style.color = type === "error" ? "#b91c1c" : "#166534";
 }
 
+function syncHistoryFilters() {
+    historyFilters.dateFrom = document.getElementById("history-date-from").value || "";
+    historyFilters.dateTo = document.getElementById("history-date-to").value || "";
+    historyFilters.paymentMethod = document.getElementById("history-payment-filter").value || "";
+
+    const hasActiveFilters = Boolean(
+        historyFilters.dateFrom ||
+        historyFilters.dateTo ||
+        historyFilters.paymentMethod ||
+        document.getElementById("history-sort").value !== "date:desc" ||
+        document.getElementById("history-page-size").value !== "25"
+    );
+    document.getElementById("history-clear-filters").classList.toggle("is-hidden", !hasActiveFilters);
+}
+
+async function applyHistoryFiltersAutomatically() {
+    syncHistoryFilters();
+    if (historyFilters.dateFrom && historyFilters.dateTo && historyFilters.dateFrom > historyFilters.dateTo) {
+        setHistoryResult("From date cannot be later than To date.", "error");
+        return;
+    }
+    historyPage = 1;
+    await loadTransactions();
+}
+
 function renderSummary(transactions, summary = null) {
     const countEl = document.getElementById("history-summary-count");
     const totalEl = document.getElementById("history-summary-total");
@@ -201,14 +226,6 @@ async function printReceiptById(transactionId) {
     printReceipt();
 }
 
-document.getElementById("history-apply-filters").addEventListener("click", async () => {
-    historyFilters.dateFrom = document.getElementById("history-date-from").value || "";
-    historyFilters.dateTo = document.getElementById("history-date-to").value || "";
-    historyFilters.paymentMethod = document.getElementById("history-payment-filter").value || "";
-    historyPage = 1;
-    await loadTransactions();
-});
-
 document.getElementById("history-clear-filters").addEventListener("click", async () => {
     historyFilters = {
         dateFrom: "",
@@ -221,16 +238,19 @@ document.getElementById("history-clear-filters").addEventListener("click", async
     document.getElementById("history-payment-filter").value = "";
     document.getElementById("history-sort").value = "date:desc";
     document.getElementById("history-page-size").value = "25";
+    syncHistoryFilters();
     historyPage = 1;
     await loadTransactions();
 });
 
-["history-payment-filter", "history-sort", "history-page-size"].forEach((id) => {
-    document.getElementById(id).addEventListener("change", async () => {
-        historyFilters.paymentMethod = document.getElementById("history-payment-filter").value || "";
-        historyPage = 1;
-        await loadTransactions();
-    });
+[
+    "history-date-from",
+    "history-date-to",
+    "history-payment-filter",
+    "history-sort",
+    "history-page-size",
+].forEach((id) => {
+    document.getElementById(id).addEventListener("change", applyHistoryFiltersAutomatically);
 });
 document.getElementById("history-pager").addEventListener("click", async (event) => {
     const button = event.target.closest("[data-page]");
