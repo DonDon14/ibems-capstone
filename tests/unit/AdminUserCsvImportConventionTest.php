@@ -28,14 +28,14 @@ final class AdminUserCsvImportConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('button.disabled = false', $script);
     }
 
-    public function testNewEmployeesStartWithoutCreditUntilAccountingSetup(): void
+    public function testNewEmployeesUseTheCurrentStandardSalaryProfile(): void
     {
         $source = file_get_contents(ROOTPATH . 'app/Controllers/AdminController.php');
         $view = file_get_contents(ROOTPATH . 'app/Views/admin/user-view.php');
 
         $this->assertStringNotContainsString('DEFAULT_EMPLOYEE_CREDIT_LIMIT', $source);
-        $this->assertGreaterThanOrEqual(3, substr_count($source, 'initialCreditLimitForUserType('));
-        $this->assertStringContainsString('return 0.00;', $source);
-        $this->assertStringContainsString('start with no credit', $view);
+        $this->assertStringContainsString('standardProfile($db)', $source);
+        $this->assertStringContainsString("'salary_schedule_id' => $" . "standardProfile['schedule_id']", $source);
+        $this->assertStringContainsString('current standard SG 11, Step 1 profile', $view);
     }
 }

@@ -15,6 +15,7 @@ class BalanceModel extends Model
     protected $allowedFields = [
         'user_id',
         'credit_limit',
+        'credit_rate',
         'current_debt',
         'updated_at',
     ];
@@ -25,6 +26,7 @@ class BalanceModel extends Model
     protected array $casts = [
         'user_id'       => 'integer',
         'credit_limit'  => 'float',
+        'credit_rate'   => 'float',
         'current_debt'  => 'float',
     ];
 

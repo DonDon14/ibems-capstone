@@ -3,6 +3,9 @@ let uvEditingUserId = null;
 let uvViewingUserId = null;
 let uvQuickFilter = "all";
 let uvPage = 1;
+let uvSalarySchedules = [];
+let uvDefaultCreditPercentage = 25;
+let uvSalarySchedulesPromise = null;
 
 function aMoney(value) {
     return window.IbemsFormat?.money(value) || `PHP ${Number(value || 0).toFixed(2)}`;
@@ -29,6 +32,86 @@ function formatTypeLabel(type) {
     const value = String(type || "");
     if (!value) return "-";
     return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
+}
+
+async function loadUvSalarySchedules() {
+    if (uvSalarySchedulesPromise) return uvSalarySchedulesPromise;
+    uvSalarySchedulesPromise = fetch("/admin/salary-schedules")
+        .then((response) => response.json())
+        .then((data) => {
+            if (!data || data.status !== "success" || !Array.isArray(data.data) || !data.data.length) {
+                throw new Error(data?.message || "Salary schedules are unavailable.");
+            }
+            uvSalarySchedules = data.data;
+            uvDefaultCreditPercentage = Number(data.default_credit_percentage ?? 25);
+            return uvSalarySchedules;
+        });
+    return uvSalarySchedulesPromise;
+}
+
+function uvSelectedSchedule(prefix) {
+    const id = Number(document.getElementById(`${prefix}-schedule`).value || 0);
+    return uvSalarySchedules.find((schedule) => Number(schedule.id) === id) || null;
+}
+
+function populateUvSalaryProfile(prefix, profile = {}) {
+    const scheduleEl = document.getElementById(`${prefix}-schedule`);
+    const requestedScheduleId = Number(profile.salary_schedule_id || scheduleEl.value || uvSalarySchedules[0]?.id || 0);
+    scheduleEl.innerHTML = uvSalarySchedules.map((schedule) =>
+        `<option value="${Number(schedule.id)}">${aEscape(schedule.name)} (${aEscape(schedule.code)})</option>`
+    ).join("");
+    scheduleEl.value = String(requestedScheduleId || uvSalarySchedules[0]?.id || "");
+
+    const schedule = uvSelectedSchedule(prefix);
+    const rates = Array.isArray(schedule?.rates) ? schedule.rates : [];
+    const grades = [...new Set(rates.map((rate) => Number(rate.salary_grade)))];
+    const gradeEl = document.getElementById(`${prefix}-grade`);
+    const requestedGrade = Number(String(profile.salary_grade || gradeEl.value || 11).replace(/\D/g, "")) || 11;
+    gradeEl.innerHTML = grades.map((grade) => `<option value="${grade}">SG ${grade}</option>`).join("");
+    gradeEl.value = String(grades.includes(requestedGrade) ? requestedGrade : (grades.includes(11) ? 11 : grades[0] || ""));
+
+    const grade = Number(gradeEl.value || 0);
+    const steps = rates.filter((rate) => Number(rate.salary_grade) === grade).map((rate) => Number(rate.salary_step));
+    const stepEl = document.getElementById(`${prefix}-step`);
+    const requestedStep = Number(profile.salary_step || stepEl.value || 1);
+    stepEl.innerHTML = steps.map((step) => `<option value="${step}">Step ${step}</option>`).join("");
+    stepEl.value = String(steps.includes(requestedStep) ? requestedStep : steps[0] || "");
+
+    document.getElementById(`${prefix}-employment-type`).value = profile.employment_type || "plantilla";
+    const today = new Date().toISOString().slice(0, 10);
+    const defaultEffectiveDate = today < (schedule?.effective_from || today)
+        ? schedule.effective_from
+        : (schedule?.effective_to && today > schedule.effective_to ? schedule.effective_to : today);
+    document.getElementById(`${prefix}-effective`).value = profile.salary_effective_date || defaultEffectiveDate;
+    document.getElementById(`${prefix}-credit-percent`).value = Number(profile.credit_percentage ?? uvDefaultCreditPercentage);
+    refreshUvSalaryPreview(prefix);
+}
+
+function refreshUvSalaryPreview(prefix) {
+    const schedule = uvSelectedSchedule(prefix);
+    const grade = Number(document.getElementById(`${prefix}-grade`).value || 0);
+    const step = Number(document.getElementById(`${prefix}-step`).value || 0);
+    const rate = (schedule?.rates || []).find((item) => Number(item.salary_grade) === grade && Number(item.salary_step) === step);
+    const salary = Number(rate?.monthly_salary || 0);
+    const percentage = Math.min(100, Math.max(0, Number(document.getElementById(`${prefix}-credit-percent`).value || 0)));
+    document.getElementById(`${prefix}-salary-preview`).value = aMoney(salary);
+    document.getElementById(`${prefix}-limit-preview`).value = aMoney(salary * percentage / 100);
+}
+
+function uvFinancialPayload(prefix) {
+    return {
+        employment_type: document.getElementById(`${prefix}-employment-type`).value,
+        salary_schedule_id: Number(document.getElementById(`${prefix}-schedule`).value || 0),
+        salary_grade: document.getElementById(`${prefix}-grade`).value,
+        salary_step: Number(document.getElementById(`${prefix}-step`).value || 0),
+        salary_effective_date: document.getElementById(`${prefix}-effective`).value,
+        credit_percentage: Number(document.getElementById(`${prefix}-credit-percent`).value || 0),
+    };
+}
+
+function toggleUvFinancialFields(prefix) {
+    const isEmployee = ["faculty", "staff"].includes(document.getElementById(`${prefix}-type`).value);
+    document.getElementById(`${prefix}-financial-fields`).classList.toggle("hidden", !isEmployee);
 }
 
 function renderRoleChips(roles) {
@@ -176,7 +259,7 @@ function renderUserTable(rows) {
                     <strong class="text-sm font-semibold ${debt > 0 ? "uv-money-debt text-rose-600" : "text-slate-900"}">${aEscape(aMoney(debt))}</strong>
                 </div>
                 <div class="uv-fin-kv grid gap-0.5">
-                    <span class="text-xs text-slate-500">Credit Limit</span>
+                    <span class="text-xs text-slate-500">Credit Limit (${aEscape(Number(row.credit_percentage ?? uvDefaultCreditPercentage))}%)</span>
                     <strong class="text-sm font-semibold text-slate-900">${aEscape(aMoney(creditLimit))}</strong>
                 </div>
                 ` : '<div class="uv-fin-kv grid gap-0.5"><span class="text-xs text-slate-500">Financial Profile</span><strong class="text-sm font-semibold text-amber-700">Not configured</strong></div>'}
@@ -246,6 +329,7 @@ async function loadUserView() {
 }
 
 async function openEditUser(userId) {
+    await loadUvSalarySchedules();
     const response = await fetch(`/admin/user-view/${userId}`);
     const data = await response.json();
     if (!data || data.status !== "success") {
@@ -261,6 +345,8 @@ async function openEditUser(userId) {
     setRoleChecks("uv-e", row.roles, row.role);
     document.getElementById("uv-e-type").value = row.user_type || "staff";
     document.getElementById("uv-e-active").value = row.is_active ? "1" : "0";
+    populateUvSalaryProfile("uv-e", row);
+    toggleUvFinancialFields("uv-e");
     openModal("uv-edit-modal");
 }
 
@@ -286,6 +372,7 @@ async function openViewUser(userId) {
     document.getElementById("uv-v-grade").value = profileConfigured ? `${row.salary_grade || "-"}${row.salary_step ? ` Step ${row.salary_step}` : ""}` : "Not configured by Accounting";
     document.getElementById("uv-v-effective").value = profileConfigured ? (row.salary_effective_date || "-") : "Not configured by Accounting";
     document.getElementById("uv-v-credit-limit").value = profileConfigured ? aMoney(row.credit_limit || 0) : "Not configured by Accounting";
+    document.getElementById("uv-v-credit-limit-label").textContent = `Credit Limit (${Number(row.credit_percentage ?? uvDefaultCreditPercentage).toFixed(2).replace(/\.00$/, "")}%)`;
     document.getElementById("uv-v-current-debt").value = profileConfigured ? aMoney(row.current_debt || 0) : "Not configured by Accounting";
     document.getElementById("uv-v-created-at").value = row.created_at || "-";
     openModal("uv-view-modal");
@@ -309,6 +396,7 @@ async function saveEditedUser() {
         user_type: document.getElementById("uv-e-type").value,
         is_active: Number(document.getElementById("uv-e-active").value || 1),
     };
+    if (["faculty", "staff"].includes(payload.user_type)) Object.assign(payload, uvFinancialPayload("uv-e"));
 
     const response = await fetch("/admin/user-view/update", {
         method: "POST",
@@ -342,6 +430,7 @@ async function createUser() {
         user_type: document.getElementById("uv-a-type").value,
         is_active: 1,
     };
+    if (["faculty", "staff"].includes(payload.user_type)) Object.assign(payload, uvFinancialPayload("uv-a"));
 
     const response = await fetch("/admin/user-view/create", {
         method: "POST",
@@ -476,8 +565,17 @@ document.querySelectorAll("[data-uv-quick]").forEach((chip) => {
     setQuickChipState(chip, chip.classList.contains("is-active"));
 });
 
-document.getElementById("uv-add-btn").addEventListener("click", () => {
+document.getElementById("uv-add-btn").addEventListener("click", async () => {
+    try {
+        await loadUvSalarySchedules();
+    } catch (error) {
+        setUvResult(error.message || "Salary schedules are unavailable.", "error");
+        return;
+    }
     setRoleChecks("uv-a", ["USER"]);
+    document.getElementById("uv-a-type").value = "faculty";
+    populateUvSalaryProfile("uv-a", {});
+    toggleUvFinancialFields("uv-a");
     openModal("uv-add-modal");
 });
 document.getElementById("uv-import-btn").addEventListener("click", () => openModal("uv-import-modal"));
@@ -520,6 +618,23 @@ document.getElementById("uv-pager").addEventListener("click", (event) => {
     document.getElementById(id).addEventListener("click", (event) => {
         if (event.target.id === id) closeModal(id);
     });
+});
+
+["uv-a", "uv-e"].forEach((prefix) => {
+    document.getElementById(`${prefix}-type`).addEventListener("change", () => toggleUvFinancialFields(prefix));
+    document.getElementById(`${prefix}-schedule`).addEventListener("change", () => populateUvSalaryProfile(prefix, {
+        salary_schedule_id: document.getElementById(`${prefix}-schedule`).value,
+        employment_type: document.getElementById(`${prefix}-employment-type`).value,
+        credit_percentage: document.getElementById(`${prefix}-credit-percent`).value,
+    }));
+    document.getElementById(`${prefix}-grade`).addEventListener("change", () => populateUvSalaryProfile(prefix, {
+        salary_schedule_id: document.getElementById(`${prefix}-schedule`).value,
+        salary_grade: document.getElementById(`${prefix}-grade`).value,
+        employment_type: document.getElementById(`${prefix}-employment-type`).value,
+        credit_percentage: document.getElementById(`${prefix}-credit-percent`).value,
+    }));
+    document.getElementById(`${prefix}-step`).addEventListener("change", () => refreshUvSalaryPreview(prefix));
+    document.getElementById(`${prefix}-credit-percent`).addEventListener("input", () => refreshUvSalaryPreview(prefix));
 });
 
 loadUserView();

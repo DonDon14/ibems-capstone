@@ -5,7 +5,7 @@
     <?= view('components/page_header', [
         'eyebrow' => 'Identity administration',
         'title' => 'Employee records',
-        'description' => 'Manage employee and student identity, roles, and account status. Accounting assigns salary-grade profiles and IBEMS derives employee credit at 25%.',
+        'description' => 'Manage identities, roles, salary-grade profiles, and each employee\'s adjustable credit percentage.',
         'icon' => 'bi bi-people',
     ]) ?>
 
@@ -127,6 +127,17 @@
                     <option value="0">Inactive</option>
                 </select>
             </div>
+            <div id="uv-e-financial-fields" class="grid gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 md:col-span-2 md:grid-cols-3">
+                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-e-employment-type">Employment Type</label><select id="uv-e-employment-type" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"><option value="plantilla">Plantilla</option><option value="cos">COS</option><option value="part_time">Part-time</option></select></div>
+                <div class="field space-y-1 md:col-span-2"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-e-schedule">Salary Schedule</label><select id="uv-e-schedule" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"></select></div>
+                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-e-grade">Salary Grade</label><select id="uv-e-grade" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"></select></div>
+                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-e-step">Step</label><select id="uv-e-step" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"></select></div>
+                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-e-effective">Effective Date</label><input id="uv-e-effective" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="date"></div>
+                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-e-credit-percent">Credit Percentage</label><div class="relative"><input id="uv-e-credit-percent" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 pr-9 text-sm" type="number" min="0" max="100" step="0.01"><span class="pointer-events-none absolute right-3 top-3 text-sm text-slate-500">%</span></div></div>
+                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-e-salary-preview">Monthly Salary</label><input id="uv-e-salary-preview" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="text" readonly></div>
+                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-e-limit-preview">Credit Limit</label><input id="uv-e-limit-preview" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="text" readonly></div>
+                <p class="text-xs text-slate-600 md:col-span-3">Salary comes from the selected schedule. Changing the percentage recalculates future available credit without changing existing debt.</p>
+            </div>
         </div>
         <div class="admin-modal-actions">
             <button id="uv-edit-save" class="primary-btn" type="button">Save Changes</button>
@@ -151,7 +162,7 @@
             <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-v-employment">Employment Type</label><input id="uv-v-employment" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
             <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-v-grade">Salary Grade</label><input id="uv-v-grade" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
             <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-v-effective">Salary Effective Date</label><input id="uv-v-effective" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
-            <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-v-credit-limit">Credit Limit (25%)</label><input id="uv-v-credit-limit" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
+            <div class="field space-y-1"><label id="uv-v-credit-limit-label" class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-v-credit-limit">Credit Limit</label><input id="uv-v-credit-limit" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
             <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-v-current-debt">Current Debt</label><input id="uv-v-current-debt" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
             <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-v-created-at">Created At</label><input id="uv-v-created-at" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
         </div>
@@ -189,7 +200,17 @@
                     <option value="student">Student</option>
                 </select>
             </div>
-            <div class="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 md:col-span-2">Salary and credit limit are managed by Accounting after the employee account is created.</div>
+            <div id="uv-a-financial-fields" class="grid gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 md:col-span-2 md:grid-cols-3">
+                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-a-employment-type">Employment Type</label><select id="uv-a-employment-type" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"><option value="plantilla">Plantilla</option><option value="cos">COS</option><option value="part_time">Part-time</option></select></div>
+                <div class="field space-y-1 md:col-span-2"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-a-schedule">Salary Schedule</label><select id="uv-a-schedule" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"></select></div>
+                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-a-grade">Salary Grade</label><select id="uv-a-grade" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"></select></div>
+                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-a-step">Step</label><select id="uv-a-step" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"></select></div>
+                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-a-effective">Effective Date</label><input id="uv-a-effective" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="date"></div>
+                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-a-credit-percent">Credit Percentage</label><div class="relative"><input id="uv-a-credit-percent" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 pr-9 text-sm" type="number" min="0" max="100" step="0.01" value="25"><span class="pointer-events-none absolute right-3 top-3 text-sm text-slate-500">%</span></div></div>
+                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-a-salary-preview">Monthly Salary</label><input id="uv-a-salary-preview" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="text" readonly></div>
+                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-a-limit-preview">Credit Limit</label><input id="uv-a-limit-preview" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="text" readonly></div>
+                <p class="text-xs text-slate-600 md:col-span-3">New employees default to the standard SG 11, Step 1 profile and 25% credit. Both remain editable by Admin or Accounting.</p>
+            </div>
         </div>
         <div class="admin-modal-actions">
             <button id="uv-add-save" class="primary-btn" type="button">Create User</button>
@@ -206,7 +227,7 @@
         <div class="field space-y-1">
             <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-import-file">CSV File</label>
             <input id="uv-import-file" class="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-blue-700" type="file" accept=".csv,text/csv">
-            <small class="text-sm text-slate-500">Required columns: name, email, user_type. Role is optional and defaults to USER. Optional: employee_id, role, is_active. New employees start with no credit until Accounting assigns their salary-grade profile; the limit is then calculated automatically at 25%.</small>
+            <small class="text-sm text-slate-500">Required columns: name, email, user_type. Role is optional and defaults to USER. Optional: employee_id, role, is_active. New Faculty and Staff use the current standard SG 11, Step 1 profile and the default credit percentage.</small>
             <p id="uv-import-result" class="min-h-5 text-sm font-semibold" role="status" aria-live="polite"></p>
         </div>
         <div class="admin-modal-actions">

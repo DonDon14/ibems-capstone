@@ -38,7 +38,7 @@ final class RenderDeploymentConventionTest extends CIUnitTestCase
         $routes = (string) file_get_contents(APPPATH . 'Config/Routes.php');
         $sessions = (string) file_get_contents(ROOTPATH . 'database/postgresql/011_render_hosted_sessions.sql');
 
-        $this->assertStringContainsString("['010_salary_grade_profiles.sql', '011_render_hosted_sessions.sql']", $command);
+        $this->assertStringContainsString("['010_salary_grade_profiles.sql', '011_render_hosted_sessions.sql', '012_dynamic_salary_schedules.sql']", $command);
         $this->assertStringContainsString("\$routes->get('healthz', 'PageController::health')", $routes);
         $this->assertStringContainsString('create table if not exists public.ci_sessions', strtolower($sessions));
         $this->assertStringNotContainsString('truncate', strtolower($sessions));

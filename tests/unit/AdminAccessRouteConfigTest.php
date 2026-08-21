@@ -16,6 +16,7 @@ final class AdminAccessRouteConfigTest extends CIUnitTestCase
             "store/transactions', 'StoreController::transactions', ['filter' => 'access:store.inspect']",
             "store/reports/summary', 'StoreController::reportSummary', ['filter' => 'access:store.inspect']",
             "accounting/debts/data', 'AccountingController::debtsData', ['filter' => 'access:accounting.inspect']",
+            "accounting/salary-schedules', 'AccountingController::salarySchedules', ['filter' => 'access:accounting.inspect']",
             "accounting/settlement/preview', 'AccountingController::settlementPreview', ['filter' => 'access:accounting.inspect']",
         ] as $expectedRoute) {
             $this->assertStringContainsString($expectedRoute, $routes);
