@@ -30,6 +30,40 @@ final class AdminStoreFormConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('handlePeoplePickerKeydown', $script);
     }
 
+    public function testStoreManagementKeepsResponsiveCardsWithSortingPaginationAndWarnings(): void
+    {
+        $view = (string) file_get_contents(APPPATH . 'Views/admin/stores.php');
+        $styles = (string) file_get_contents(FCPATH . 'assets/css/admin-stores.css');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js');
+        $service = (string) file_get_contents(APPPATH . 'Services/StoreOversightService.php');
+
+        foreach (['store-sort', 'stores-gallery'] as $id) {
+            $this->assertStringContainsString($id, $view);
+        }
+        foreach (['store-cards-grid', 'store-card-heading', 'store-pagination'] as $selector) {
+            $this->assertStringContainsString($selector, $styles);
+        }
+        foreach (['sortedStoreRows', 'assignmentWarningMarkup', 'storeNeedsAssignment', 'storePaginationMarkup', 'data-store-page', 'store-cards-grid'] as $function) {
+            $this->assertStringContainsString($function, $script);
+        }
+        $this->assertStringNotContainsString('<table class="stores-table">', $script);
+        $this->assertStringContainsString('NOT EXISTS (SELECT 1 FROM store_supervisors', $service);
+    }
+
+    public function testStoreModalUsesSectionedFormAndSynchronizedActions(): void
+    {
+        $view = (string) file_get_contents(APPPATH . 'Views/admin/stores.php');
+        $styles = (string) file_get_contents(FCPATH . 'assets/css/admin-stores.css');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js');
+
+        foreach (['Store information', 'Staff assignments', 'Availability', 'cancel-store-modal', 'store-modal-description'] as $content) {
+            $this->assertStringContainsString($content, $view);
+        }
+        $this->assertStringContainsString('.store-form-section-head', $styles);
+        $this->assertStringContainsString('setSelectValue("store-active"', $script);
+        $this->assertStringContainsString('dataset.idleLabel', $script);
+    }
+
     public function testStoreModalKeepsChromeFixedAndHidesConditionalTextarea(): void
     {
         $view = (string) file_get_contents(APPPATH . 'Views/admin/stores.php');

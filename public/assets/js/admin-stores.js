@@ -9,6 +9,9 @@ let selectedSupervisorIds = [];
 let editingInitialIsActive = true;
 let activeOfficerSuggestionIndex = -1;
 let activeSupervisorSuggestionIndex = -1;
+let storePage = 1;
+let storePageSize = 10;
+let suppressStoreFilterEvents = false;
 const storeShell = document.querySelector(".admin-stores-shell");
 const canManageStores = storeShell?.getAttribute("data-can-manage-stores") === "1";
 const storesDataUrl = storeShell?.getAttribute("data-stores-data-url") || "/admin/stores/data";
@@ -25,6 +28,10 @@ function sEscape(value) {
 
 function sDateTime(value) {
     return window.IbemsFormat?.dateTime(value) || new Date(value).toLocaleString();
+}
+
+function sDateOnly(value) {
+    return window.IbemsFormat?.date?.(value) || new Date(value).toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
 function sBool(value) {
@@ -62,6 +69,13 @@ function getOfficerMatches(query) {
     );
 }
 
+function setSelectValue(selectId, value) {
+    const select = document.getElementById(selectId);
+    if (!select) return;
+    select.value = String(value);
+    select.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
 function getSupervisorMatches(query) {
     const q = String(query || "").trim().toLowerCase();
     if (q === "") return [];
@@ -93,7 +107,7 @@ function renderSelectedOfficer() {
 
     if (officerId <= 0) {
         wrap.innerHTML = "";
-        input.placeholder = "Optional: type name, email, or employee ID";
+        input.placeholder = "Search name, email, or employee ID";
         return;
     }
 
@@ -288,6 +302,66 @@ function renderStoresDataState(type, message) {
     return `<div class="data-state data-state--${safeType}" role="${role}" aria-live="polite"><i class="${icons[safeType]}" aria-hidden="true"></i><div><strong>${sEscape(message)}</strong></div></div>`;
 }
 
+function storeNeedsAssignment(row) {
+    return Number(row.officer_id || 0) <= 0 || !Array.isArray(row.supervisors) || row.supervisors.length === 0;
+}
+
+function sortedStoreRows(rows) {
+    const sort = document.getElementById("store-sort")?.value || "name_asc";
+    return [...rows].sort((left, right) => {
+        const leftName = String(left.store_name || "");
+        const rightName = String(right.store_name || "");
+        if (sort === "name_desc") return rightName.localeCompare(leftName);
+        if (sort === "newest" || sort === "oldest") {
+            const leftTime = Date.parse(left.created_at || "") || 0;
+            const rightTime = Date.parse(right.created_at || "") || 0;
+            return sort === "newest" ? rightTime - leftTime : leftTime - rightTime;
+        }
+        if (sort === "status") {
+            const assignmentOrder = Number(storeNeedsAssignment(right)) - Number(storeNeedsAssignment(left));
+            if (assignmentOrder !== 0) return assignmentOrder;
+            const activeOrder = Number(sBool(right.is_active)) - Number(sBool(left.is_active));
+            return activeOrder !== 0 ? activeOrder : leftName.localeCompare(rightName);
+        }
+        return leftName.localeCompare(rightName);
+    });
+}
+
+function storeLogoMarkup(row, sizeClass = "") {
+    const initials = String(row.store_name || "S")
+        .split(/\s+/)
+        .slice(0, 2)
+        .map((part) => part.charAt(0).toUpperCase())
+        .join("");
+    const logo = row.logo_url
+        ? `<img src="${sEscape(row.logo_url)}" alt="${sEscape(row.store_name)} logo" class="store-logo-img">`
+        : `<div class="store-logo-fallback">${sEscape(initials || "S")}</div>`;
+    return `<div class="store-card-logo ${sizeClass}">${logo}</div>`;
+}
+
+function assignmentWarningMarkup(row) {
+    if (!storeNeedsAssignment(row)) return "";
+    const missing = [];
+    if (Number(row.officer_id || 0) <= 0) missing.push("officer");
+    if (!Array.isArray(row.supervisors) || row.supervisors.length === 0) missing.push("supervisor");
+    return `<span class="assignment-warning"><i class="bi bi-exclamation-triangle" aria-hidden="true"></i> Missing ${sEscape(missing.join(" and "))}</span>`;
+}
+
+function storePaginationMarkup(totalRows) {
+    const totalPages = Math.max(1, Math.ceil(totalRows / storePageSize));
+    const start = totalRows === 0 ? 0 : (storePage - 1) * storePageSize + 1;
+    const end = Math.min(storePage * storePageSize, totalRows);
+    return `<div class="store-pagination" aria-label="Store list pagination">
+        <span>${start}–${end} of ${totalRows} stores</span>
+        <div class="store-page-size"><label for="store-page-size">Rows</label><select id="store-page-size"><option value="10" ${storePageSize === 10 ? "selected" : ""}>10</option><option value="25" ${storePageSize === 25 ? "selected" : ""}>25</option><option value="50" ${storePageSize === 50 ? "selected" : ""}>50</option></select></div>
+        <div class="store-page-actions">
+            <button type="button" data-store-page="previous" ${storePage <= 1 ? "disabled" : ""} aria-label="Previous store page"><i class="bi bi-chevron-left" aria-hidden="true"></i></button>
+            <strong>Page ${storePage} of ${totalPages}</strong>
+            <button type="button" data-store-page="next" ${storePage >= totalPages ? "disabled" : ""} aria-label="Next store page"><i class="bi bi-chevron-right" aria-hidden="true"></i></button>
+        </div>
+    </div>`;
+}
+
 function renderStores(rows) {
     const gallery = document.getElementById("stores-gallery");
     if (!Array.isArray(rows) || rows.length === 0) {
@@ -295,33 +369,42 @@ function renderStores(rows) {
         return;
     }
 
-    gallery.innerHTML = rows.map((row) => {
-        const initials = String(row.store_name || "S")
-            .split(/\s+/)
-            .slice(0, 2)
-            .map((part) => part.charAt(0).toUpperCase())
-            .join("");
-        const logo = row.logo_url
-            ? `<img src="${sEscape(row.logo_url)}" alt="${sEscape(row.store_name)} logo" class="store-logo-img">`
-            : `<div class="store-logo-fallback">${sEscape(initials || "S")}</div>`;
+    const sortedRows = sortedStoreRows(rows);
+    const totalPages = Math.max(1, Math.ceil(sortedRows.length / storePageSize));
+    storePage = Math.min(Math.max(1, storePage), totalPages);
+    const visibleRows = sortedRows.slice((storePage - 1) * storePageSize, storePage * storePageSize);
+    const cards = visibleRows.map((row) => {
+        const supervisors = Array.isArray(row.supervisors) ? row.supervisors : [];
         const isActive = sBool(row.is_active);
         return `
-            <a href="${sEscape(storeDetailPrefix)}/${row.id}" class="store-card">
-                <div class="store-card-logo">${logo}</div>
+            <article class="store-card">
+                ${storeLogoMarkup(row)}
                 <div class="store-card-meta">
-                    <strong>${sEscape(row.store_name)}</strong>
-                    <span class="status-badge ${isActive ? "active" : "inactive"}">${isActive ? "Active" : "Inactive"}</span>
-                    <small>${sEscape(row.officer_name || "No assigned officer")}</small><br>
-                    ${row.officer_email ? `<small>${sEscape(row.officer_email)}</small><br>` : ""}
-                    ${Array.isArray(row.supervisors) && row.supervisors.length ? `<small>Supervisor: ${sEscape(row.supervisors.map((supervisor) => supervisor.name).join(", "))}</small><br>` : ""}
-                    <small>${row.created_at ? sEscape(sDateTime(row.created_at)) : "-"}</small>
+                    <div class="store-card-heading">
+                        <a href="${sEscape(storeDetailPrefix)}/${row.id}" class="store-card-title">${sEscape(row.store_name)}</a>
+                        <span class="status-badge ${isActive ? "active" : "inactive"}">${isActive ? "Active" : "Inactive"}</span>
+                    </div>
+                    ${assignmentWarningMarkup(row)}
+                    <dl class="store-mobile-details">
+                        <div><dt>Officer</dt><dd>${row.officer_name ? `<strong>${sEscape(row.officer_name)}</strong>${row.officer_email ? `<small>${sEscape(row.officer_email)}</small>` : ""}` : '<span class="not-assigned">Not assigned</span>'}</dd></div>
+                        <div><dt>Supervisors</dt><dd>${supervisors.length ? sEscape(supervisors.map((supervisor) => supervisor.name).join(", ")) : "Not assigned"}</dd></div>
+                    </dl>
+                    <div class="store-card-footer">
+                        <small>Created ${row.created_at ? sEscape(sDateOnly(row.created_at)) : "—"}</small>
+                        <div class="store-card-actions">
+                            <a href="${sEscape(storeDetailPrefix)}/${row.id}" class="store-view-link">View details <i class="bi bi-arrow-right" aria-hidden="true"></i></a>
+                            ${canManageStores ? `<button class="store-edit-icon" type="button" data-edit-store="${row.id}" aria-label="Edit ${sEscape(row.store_name)}" title="Edit store"><i class="bi bi-pencil" aria-hidden="true"></i></button>` : ""}
+                        </div>
+                    </div>
                 </div>
-                <div class="store-card-right">
-                    ${canManageStores ? `<button class="secondary-btn btn-sm" type="button" data-edit-store="${row.id}"><i class="bi bi-pencil"></i> Edit</button>` : ""}
-                </div>
-            </a>
+            </article>
         `;
     }).join("");
+
+    gallery.innerHTML = `
+        <div class="store-cards-grid">${cards}</div>
+        ${storePaginationMarkup(sortedRows.length)}
+    `;
 }
 
 async function loadOfficers() {
@@ -334,6 +417,7 @@ async function loadOfficers() {
 }
 
 async function loadStores() {
+    storePage = 1;
     const q = (document.getElementById("store-search").value || "").trim();
     const status = document.getElementById("store-status-filter")?.value || "";
     const params = new URLSearchParams();
@@ -359,12 +443,18 @@ function openStoreModal(mode, store) {
     setStoresResult("", "ok");
     editingStoreId = mode === "edit" ? Number(store.id) : null;
     document.getElementById("store-modal-title").textContent = mode === "edit" ? "Edit Store" : "Add Store";
+    document.getElementById("store-modal-description").textContent = mode === "edit"
+        ? "Update store information, assignments, and availability."
+        : "Configure store details, staff assignments, and availability.";
+    const saveButton = document.getElementById("store-save-btn");
+    saveButton.dataset.idleLabel = mode === "edit" ? "Save Changes" : "Create Store";
+    saveButton.textContent = saveButton.dataset.idleLabel;
     document.getElementById("store-name").value = mode === "edit" ? store.store_name || "" : "";
     editingCurrentLogoUrl = mode === "edit" ? String(store.logo_url || "") : "";
     document.getElementById("store-logo-url").value = "";
     document.getElementById("store-logo-file").value = "";
     editingInitialIsActive = mode === "edit" ? sBool(store.is_active) : false;
-    document.getElementById("store-active").value = editingInitialIsActive ? "1" : "0";
+    setSelectValue("store-active", editingInitialIsActive ? "1" : "0");
     document.getElementById("store-deactivation-reason").value = "";
     updateDeactivationReasonVisibility();
     const selectedOfficerId = mode === "edit" ? Number(store.officer_id || 0) : 0;
@@ -478,23 +568,39 @@ async function saveStore() {
         setStoresResult("Store request failed.", "error");
     } finally {
         button.disabled = false;
-        button.textContent = "Save";
+        button.textContent = button.dataset.idleLabel || "Save Changes";
     }
 }
 
 document.getElementById("store-search-btn").addEventListener("click", async () => {
     await loadStores();
 });
+document.getElementById("store-search").addEventListener("keydown", async (event) => {
+    if (event.key !== "Enter") return;
+    event.preventDefault();
+    await loadStores();
+});
 
 document.getElementById("store-refresh-btn").addEventListener("click", async () => {
     document.getElementById("store-search").value = "";
-    document.getElementById("store-status-filter").value = "";
+    suppressStoreFilterEvents = true;
+    setSelectValue("store-status-filter", "");
+    setSelectValue("store-sort", "name_asc");
+    suppressStoreFilterEvents = false;
     await loadStores();
 });
-document.getElementById("store-status-filter").addEventListener("change", loadStores);
+document.getElementById("store-status-filter").addEventListener("change", () => {
+    if (!suppressStoreFilterEvents) loadStores();
+});
+document.getElementById("store-sort").addEventListener("change", () => {
+    if (suppressStoreFilterEvents) return;
+    storePage = 1;
+    renderStores(storesData);
+});
 
 document.getElementById("open-store-modal")?.addEventListener("click", () => openStoreModal("create"));
 document.getElementById("close-store-modal")?.addEventListener("click", closeStoreModal);
+document.getElementById("cancel-store-modal")?.addEventListener("click", closeStoreModal);
 document.getElementById("store-modal")?.addEventListener("click", (event) => {
     if (event.target.id === "store-modal") closeStoreModal();
 });
@@ -581,6 +687,14 @@ document.querySelectorAll(".people-picker").forEach((picker) => {
 });
 
 document.getElementById("stores-gallery").addEventListener("click", async (event) => {
+    const pageButton = event.target.closest("[data-store-page]");
+    if (pageButton && !pageButton.disabled) {
+        const direction = pageButton.getAttribute("data-store-page");
+        storePage += direction === "next" ? 1 : -1;
+        renderStores(storesData);
+        document.getElementById("stores-gallery").scrollIntoView({ behavior: "smooth", block: "start" });
+        return;
+    }
     const editBtn = event.target.closest("[data-edit-store]");
     if (editBtn) {
         event.preventDefault();
@@ -589,6 +703,12 @@ document.getElementById("stores-gallery").addEventListener("click", async (event
         if (!store) return;
         openStoreModal("edit", store);
     }
+});
+document.getElementById("stores-gallery").addEventListener("change", (event) => {
+    if (event.target.id !== "store-page-size") return;
+    storePageSize = Number(event.target.value || 10);
+    storePage = 1;
+    renderStores(storesData);
 });
 
 document.addEventListener("click", (event) => {

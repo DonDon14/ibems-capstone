@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/admin') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/admin-stores.css') ?>?v=20260821d">
+<link rel="stylesheet" href="<?= base_url('assets/css/admin-stores.css') ?>?v=20260821f">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -30,7 +30,17 @@
                 <option value="">All Stores</option>
                 <option value="active">Active</option>
                 <option value="inactive">Inactive</option>
-                <option value="unassigned">Unassigned</option>
+                <option value="unassigned">Needs Assignment</option>
+            </select>
+        </div>
+        <div class="field">
+            <label for="store-sort">Sort By</label>
+            <select id="store-sort">
+                <option value="name_asc">Store Name (A–Z)</option>
+                <option value="name_desc">Store Name (Z–A)</option>
+                <option value="status">Status</option>
+                <option value="newest">Newest Created</option>
+                <option value="oldest">Oldest Created</option>
             </select>
         </div>
         <button id="store-search-btn" class="primary-btn" type="button">Search</button>
@@ -47,84 +57,104 @@
     <p id="stores-result" class="stores-result"></p>
 </section>
 
-<div id="store-modal" class="admin-modal admin-stores-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="store-modal-title">
+<div id="store-modal" class="admin-modal admin-stores-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="store-modal-title" aria-describedby="store-modal-description">
     <div class="admin-modal-card">
         <div class="admin-modal-head">
-            <h4 id="store-modal-title">Add Store</h4>
+            <div>
+                <h4 id="store-modal-title">Add Store</h4>
+                <p id="store-modal-description">Configure store details, staff assignments, and availability.</p>
+            </div>
             <button id="close-store-modal" type="button" class="admin-modal-close" aria-label="Close store form">x</button>
         </div>
 
         <div class="admin-stores-modal-body">
-        <div class="form-grid">
-            <div class="field">
-                <label for="store-name">Store Name</label>
-                <input id="store-name" type="text" placeholder="Store name">
-            </div>
-            <div class="field">
-                <label for="store-officer-search">Store Officer</label>
-                <div id="store-officer-picker" class="people-picker" data-selection-mode="single">
-                    <div id="store-officer-selected" class="people-picker-values"></div>
-                    <input id="store-officer-search" type="search" role="combobox" autocomplete="off"
-                        aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false" aria-controls="store-officer-suggestions"
-                        placeholder="Optional: type name, email, or employee ID">
+            <section class="store-form-section">
+                <div class="store-form-section-head">
+                    <span><i class="bi bi-shop" aria-hidden="true"></i></span>
+                    <div><h5>Store information</h5><p>Name and visual identity shown across the system.</p></div>
                 </div>
-                <input id="store-officer-id" type="hidden">
-                <div id="store-officer-suggestions" class="officer-suggestions is-hidden" role="listbox" aria-label="Store officer suggestions"></div>
-                <small id="store-officer-help" class="field-help">Optional while inactive. An active store requires a primary officer.</small>
-            </div>
-            <div class="field store-supervisors-field">
-                <label for="store-supervisor-search">Store Supervisors</label>
-                <div id="store-supervisor-picker" class="people-picker" data-selection-mode="multiple">
-                    <div id="store-supervisor-selected" class="people-picker-values"></div>
-                    <input id="store-supervisor-search" type="search" role="combobox" autocomplete="off"
-                        aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false" aria-controls="store-supervisor-suggestions"
-                        placeholder="Optional: type name, email, or employee ID">
-                </div>
-                <div id="store-supervisor-suggestions" class="officer-suggestions is-hidden" role="listbox" aria-multiselectable="true" aria-label="Store supervisor suggestions"></div>
-                <small class="field-help">Optional while inactive. An active store requires at least one supervisor.</small>
-            </div>
-            <div class="field store-logo-field">
-                <label for="store-logo-source">Store Logo</label>
-                <div class="store-logo-input-grid">
-                    <select id="store-logo-source" aria-label="Store logo source">
-                        <option value="upload">Upload File</option>
-                        <option value="url">Use Image URL</option>
-                    </select>
-                    <div id="store-logo-upload-wrap">
-                        <input id="store-logo-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+                <div class="form-grid">
+                    <div class="field store-name-field">
+                        <label for="store-name">Store Name</label>
+                        <input id="store-name" type="text" placeholder="Enter a clear store name">
                     </div>
-                    <div class="is-hidden" id="store-logo-url-wrap">
-                        <input id="store-logo-url" type="url" placeholder="https://...">
+                    <div class="field store-logo-field">
+                        <label for="store-logo-source">Store Logo <span class="optional-label">Optional</span></label>
+                        <div class="store-logo-input-grid">
+                            <select id="store-logo-source" aria-label="Store logo source">
+                                <option value="upload">Upload File</option>
+                                <option value="url">Use Image URL</option>
+                            </select>
+                            <div id="store-logo-upload-wrap"><input id="store-logo-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></div>
+                            <div class="is-hidden" id="store-logo-url-wrap"><input id="store-logo-url" type="url" placeholder="https://..."></div>
+                        </div>
+                        <div class="store-logo-preview-box">
+                            <img id="store-logo-preview" alt="Store logo preview" class="is-hidden">
+                            <span id="store-logo-preview-empty"><i class="bi bi-image" aria-hidden="true"></i> No logo selected</span>
+                        </div>
                     </div>
                 </div>
-                <div class="store-logo-preview-box">
-                    <img id="store-logo-preview" alt="Store logo preview" class="is-hidden">
-                    <span id="store-logo-preview-empty">No logo preview</span>
+            </section>
+
+            <section class="store-form-section">
+                <div class="store-form-section-head">
+                    <span><i class="bi bi-people" aria-hidden="true"></i></span>
+                    <div><h5>Staff assignments</h5><p>Choose the people responsible for operating and supervising this store.</p></div>
                 </div>
-            </div>
-            <div class="field">
-                <label for="store-active">Status</label>
-                <select id="store-active">
-                    <option value="0">Inactive — finish assignments later</option>
-                    <option value="1">Active — officer and supervisor required</option>
-                </select>
-                <small class="field-help">New stores default to inactive so they can be configured safely before opening.</small>
-            </div>
-            <div class="field is-hidden" id="store-deactivation-reason-field" hidden>
-                <label for="store-deactivation-reason">Deactivation Reason</label>
-                <textarea id="store-deactivation-reason" rows="3" placeholder="Required when deactivating a store"></textarea>
-                <small class="field-help">Open store days and unresolved variance cases must be completed first. History will remain available.</small>
-            </div>
-        </div>
+                <div class="form-grid">
+                    <div class="field store-officer-field">
+                        <label for="store-officer-search">Primary Store Officer</label>
+                        <div id="store-officer-picker" class="people-picker" data-selection-mode="single">
+                            <div id="store-officer-selected" class="people-picker-values"></div>
+                            <input id="store-officer-search" type="search" role="combobox" autocomplete="off" aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false" aria-controls="store-officer-suggestions" placeholder="Search name, email, or employee ID">
+                        </div>
+                        <input id="store-officer-id" type="hidden">
+                        <div id="store-officer-suggestions" class="officer-suggestions is-hidden" role="listbox" aria-label="Store officer suggestions"></div>
+                        <small id="store-officer-help" class="field-help">Required before the store can be activated.</small>
+                    </div>
+                    <div class="field store-supervisors-field">
+                        <label for="store-supervisor-search">Store Supervisors</label>
+                        <div id="store-supervisor-picker" class="people-picker" data-selection-mode="multiple">
+                            <div id="store-supervisor-selected" class="people-picker-values"></div>
+                            <input id="store-supervisor-search" type="search" role="combobox" autocomplete="off" aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false" aria-controls="store-supervisor-suggestions" placeholder="Search and add one or more supervisors">
+                        </div>
+                        <div id="store-supervisor-suggestions" class="officer-suggestions is-hidden" role="listbox" aria-multiselectable="true" aria-label="Store supervisor suggestions"></div>
+                        <small class="field-help">At least one supervisor is required before activation.</small>
+                    </div>
+                </div>
+            </section>
+
+            <section class="store-form-section">
+                <div class="store-form-section-head">
+                    <span><i class="bi bi-toggle-on" aria-hidden="true"></i></span>
+                    <div><h5>Availability</h5><p>Control whether this store can accept operations.</p></div>
+                </div>
+                <div class="form-grid">
+                    <div class="field store-status-field">
+                        <label for="store-active">Store Status</label>
+                        <select id="store-active">
+                            <option value="0">Inactive — finish setup first</option>
+                            <option value="1">Active — available for operations</option>
+                        </select>
+                        <small class="field-help">New stores default to inactive until setup is complete. An active store must have a primary officer and at least one supervisor.</small>
+                    </div>
+                    <div class="field is-hidden" id="store-deactivation-reason-field" hidden>
+                        <label for="store-deactivation-reason">Deactivation Reason</label>
+                        <textarea id="store-deactivation-reason" rows="3" placeholder="Explain why this store is being deactivated"></textarea>
+                        <small class="field-help">Open store days and unresolved variance cases must be completed first. History will remain available.</small>
+                    </div>
+                </div>
+            </section>
         </div>
 
         <div class="admin-modal-actions">
-            <button id="store-save-btn" class="primary-btn" type="button">Save</button>
+            <button id="cancel-store-modal" class="secondary-btn" type="button">Cancel</button>
+            <button id="store-save-btn" class="primary-btn" type="button">Create Store</button>
         </div>
     </div>
 </div>
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/admin-stores.js') ?>?v=20260821d"></script>
+<script src="<?= base_url('assets/js/admin-stores.js') ?>?v=20260821f"></script>
 <?= $this->endSection() ?>

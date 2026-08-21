@@ -47,7 +47,10 @@ public function storesData(RequestInterface $request, ResponseInterface $respons
         } elseif ($status === 'inactive') {
             $query->where('s.is_active', false);
         } elseif ($status === 'unassigned') {
-            $query->where('s.officer_id IS NULL', null, false);
+            $query->groupStart()
+                ->where('s.officer_id IS NULL', null, false)
+                ->orWhere('NOT EXISTS (SELECT 1 FROM store_supervisors ss WHERE ss.store_id = s.id)', null, false)
+                ->groupEnd();
         }
 
         $rows = $query->orderBy('s.store_name', 'ASC')->get()->getResultArray();
