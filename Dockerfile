@@ -1,15 +1,3 @@
-FROM composer:2 AS composer_deps
-
-WORKDIR /app
-COPY composer.json composer.lock ./
-RUN composer install \
-    --no-dev \
-    --prefer-dist \
-    --no-interaction \
-    --no-progress \
-    --optimize-autoloader \
-    --no-scripts
-
 FROM php:8.3-apache
 
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public \
@@ -31,8 +19,17 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /var/www/html
+COPY --from=composer:2 /usr/bin/composer /usr/local/bin/composer
+COPY composer.json composer.lock ./
+RUN composer install \
+    --no-dev \
+    --prefer-dist \
+    --no-interaction \
+    --no-progress \
+    --optimize-autoloader \
+    --no-scripts
+
 COPY . .
-COPY --from=composer_deps /app/vendor ./vendor
 COPY deploy/apache-vhost.conf /etc/apache2/sites-available/000-default.conf
 COPY deploy/render-entrypoint.sh /usr/local/bin/render-entrypoint
 
