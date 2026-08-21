@@ -2560,16 +2560,7 @@ class StoreController extends BaseController
         $productId = (int) ($this->request->getGet('product_id') ?? 0);
         $dateFrom = trim((string) $this->request->getGet('date_from'));
         $dateTo = trim((string) $this->request->getGet('date_to'));
-        $page = max(1, (int) ($this->request->getGet('page') ?? 1));
-        $pageSize = max(10, min(100, (int) ($this->request->getGet('page_size') ?? $this->request->getGet('limit') ?? 25)));
-        $sortBy = strtolower(trim((string) ($this->request->getGet('sort_by') ?? 'date')));
-        $sortDir = strtolower(trim((string) ($this->request->getGet('sort_dir') ?? 'desc'))) === 'asc' ? 'ASC' : 'DESC';
-        $sortColumns = [
-            'date' => 't.created_at',
-            'amount' => 't.amount',
-            'payment' => 't.payment_method',
-        ];
-        $sortColumn = $sortColumns[$sortBy] ?? $sortColumns['date'];
+        $limit = max(1, min(100, (int) ($this->request->getGet('limit') ?? 8)));
 
         $allowedTypes = ['sale', 'restock', 'adjustment'];
 

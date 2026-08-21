@@ -16,10 +16,38 @@ final class InventoryEndpointTest extends CIUnitTestCase
         parent::setUp();
         $this->resetSchema();
         $this->withRoutes([
+            ['GET', 'store/inventory/movements', 'StoreController::inventoryMovements'],
             ['POST', 'store/inventory/add-product', 'StoreController::addProduct'],
             ['POST', 'store/inventory/restock', 'StoreController::restock'],
             ['POST', 'store/inventory/adjust-stock', 'StoreController::adjustStock'],
         ]);
+    }
+
+    public function testInventoryMovementsHonorsRecentActivityLimit(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+        $this->seedStore($now);
+        $this->seedProduct(101, 'SKU-101', 'BAR-101', 20, $now);
+
+        for ($index = 1; $index <= 12; $index++) {
+            $db->table('inventory_movements')->insert([
+                'product_id' => 101,
+                'store_id' => 1,
+                'type' => 'restock',
+                'qty' => $index,
+                'reason' => 'Movement ' . $index,
+                'created_at' => $now,
+            ]);
+        }
+
+        $result = $this->actingAsStoreOfficer()->get('store/inventory/movements?store_id=1&limit=8');
+
+        $result->assertOK();
+        $body = $this->jsonBody($result);
+        $this->assertSame('success', $body['status'] ?? null);
+        $this->assertCount(8, $body['movements'] ?? []);
+        $this->assertSame('Movement 12', $body['movements'][0]['reason'] ?? null);
     }
 
     public function testAddProductPersistsMetadataAndInitialStockMovement(): void
