@@ -1,0 +1,47 @@
+services:
+  - type: web
+    name: ibems-development
+    runtime: docker
+    plan: free
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /healthz
+    autoDeployTrigger: commit
+    envVars:
+      - key: CI_ENVIRONMENT
+        value: production
+      - key: IBEMS_INDEX_PAGE
+        value: ""
+      - key: IBEMS_COOKIE_SECURE
+        value: "1"
+      - key: IBEMS_DATABASE_DEBUG
+        value: "0"
+      - key: IBEMS_DATABASE_DRIVER
+        value: Postgre
+      - key: IBEMS_DATABASE_HOSTNAME
+        value: aws-0-ap-southeast-1.pooler.supabase.com
+      - key: IBEMS_DATABASE_NAME
+        value: postgres
+      - key: IBEMS_DATABASE_USERNAME
+        value: postgres.pukjmscgjtmqvhdncjpo
+      - key: IBEMS_DATABASE_PASSWORD
+        sync: false
+      - key: IBEMS_DATABASE_PORT
+        value: "5432"
+      - key: IBEMS_DATABASE_SCHEMA
+        value: public
+      - key: IBEMS_DATABASE_SSLMODE
+        value: require
+      - key: IBEMS_SESSION_DRIVER
+        value: database
+      - key: IBEMS_SESSION_SAVE_PATH
+        value: ci_sessions
+      - key: IBEMS_HOSTED_BOOTSTRAP
+        value: "1"
+      - key: IBEMS_ASSET_STORAGE_DRIVER
+        value: supabase
+      - key: IBEMS_SUPABASE_URL
+        value: https://pukjmscgjtmqvhdncjpo.supabase.co
+      - key: IBEMS_SUPABASE_SECRET_KEY
+        sync: false
+      - key: IBEMS_SUPABASE_STORAGE_BUCKET
+        value: ibems-assets

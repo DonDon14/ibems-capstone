@@ -14,6 +14,11 @@ class App extends BaseConfig
         if (is_string($runtimeBaseUrl) && $runtimeBaseUrl !== '') {
             $this->baseURL = rtrim($runtimeBaseUrl, '/') . '/';
         }
+
+        $runtimeIndexPage = getenv('IBEMS_INDEX_PAGE');
+        if (is_string($runtimeIndexPage)) {
+            $this->indexPage = trim($runtimeIndexPage);
+        }
     }
 
     /**

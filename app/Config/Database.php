@@ -206,6 +206,10 @@ class Database extends Config
             $this->default['port'] = (int) getenv('IBEMS_DATABASE_PORT');
             $this->default['schema'] = (string) (getenv('IBEMS_DATABASE_SCHEMA') ?: 'public');
             $this->default['sslmode'] = (string) (getenv('IBEMS_DATABASE_SSLMODE') ?: 'require');
+            $runtimeDebug = strtolower(trim((string) getenv('IBEMS_DATABASE_DEBUG')));
+            if ($runtimeDebug !== '') {
+                $this->default['DBDebug'] = in_array($runtimeDebug, ['1', 'true', 'yes', 'on'], true);
+            }
             $this->default['charset'] = $runtimeDriver === 'Postgre' ? 'utf8' : $this->default['charset'];
             $this->default['DBCollat'] = $runtimeDriver === 'Postgre' ? '' : $this->default['DBCollat'];
         }

@@ -7,6 +7,14 @@ use CodeIgniter\HTTP\ResponseInterface;
 
 class PageController extends BaseController
 {
+    public function health()
+    {
+        return $this->response->setJSON([
+            'status' => 'ok',
+            'service' => 'ibems',
+        ]);
+    }
+
     public function index()
     {
         //

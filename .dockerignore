@@ -1,0 +1,16 @@
+.git
+.github
+.env
+.env.*
+!.env.*.example
+node_modules
+tests
+writable/cache/*
+writable/logs/*
+writable/session/*
+writable/uploads/*
+public/uploads/product-images/*
+public/uploads/store-logos/*
+php_errors.log
+*.docx
+*.pdf

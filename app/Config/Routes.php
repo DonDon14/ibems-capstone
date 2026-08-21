@@ -6,6 +6,7 @@ use CodeIgniter\Router\RouteCollection;
  * @var RouteCollection $routes
  */
 $routes->get('/', 'PageController::login');
+$routes->get('healthz', 'PageController::health');
 
 $routes->post('auth/login', 'AuthController::login');
 $routes->post('auth/logout', 'AuthController::logout');

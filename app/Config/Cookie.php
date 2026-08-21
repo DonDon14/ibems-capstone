@@ -7,6 +7,16 @@ use DateTimeInterface;
 
 class Cookie extends BaseConfig
 {
+    public function __construct()
+    {
+        parent::__construct();
+
+        $runtimeSecure = strtolower(trim((string) getenv('IBEMS_COOKIE_SECURE')));
+        if ($runtimeSecure !== '') {
+            $this->secure = in_array($runtimeSecure, ['1', 'true', 'yes', 'on'], true);
+        }
+    }
+
     /**
      * --------------------------------------------------------------------------
      * Cookie Prefix

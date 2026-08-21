@@ -4,10 +4,23 @@ namespace Config;
 
 use CodeIgniter\Config\BaseConfig;
 use CodeIgniter\Session\Handlers\BaseHandler;
+use CodeIgniter\Session\Handlers\DatabaseHandler;
 use CodeIgniter\Session\Handlers\FileHandler;
 
 class Session extends BaseConfig
 {
+    public function __construct()
+    {
+        parent::__construct();
+
+        $runtimeDriver = strtolower(trim((string) getenv('IBEMS_SESSION_DRIVER')));
+        if ($runtimeDriver === 'database') {
+            $this->driver = DatabaseHandler::class;
+            $this->savePath = trim((string) (getenv('IBEMS_SESSION_SAVE_PATH') ?: 'ci_sessions'));
+            $this->DBGroup = 'default';
+        }
+    }
+
     /**
      * --------------------------------------------------------------------------
      * Session Driver
