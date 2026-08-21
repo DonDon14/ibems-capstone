@@ -43,12 +43,14 @@ formEl.addEventListener("submit", async (event) => {
 
     const email = document.getElementById("email").value.trim();
     const password = document.getElementById("password").value;
+    const payload = new FormData(formEl);
+    payload.set("email", email);
+    payload.set("password", password);
 
     try {
         const response = await fetch("/auth/login", {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ email, password }),
+            body: payload,
         });
 
         const data = await response.json();

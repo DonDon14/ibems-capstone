@@ -11,6 +11,8 @@ let srReceiptTrigger = null;
 let srScannerTrigger = null;
 let srDebtRequestSequence = 0;
 let srTransactionRequestSequence = 0;
+let srDebtPage = 1;
+let srTransactionPage = 1;
 
 function srEscape(value) {
     return String(value ?? "")
@@ -227,6 +229,28 @@ async function srLoadStores() {
     srStoreId = Number(data.default_store_id || data.stores[0].id);
 }
 
+function srRenderPager(targetId, pagination, pageAttribute) {
+    const target = document.getElementById(targetId);
+    if (!target) return;
+    const page = Number(pagination?.page || 1);
+    const totalPages = Number(pagination?.total_pages || 1);
+    const total = Number(pagination?.total || 0);
+    const pageSize = Number(pagination?.page_size || 20);
+    if (total <= 0) {
+        target.innerHTML = "";
+        return;
+    }
+    const from = (page - 1) * pageSize + 1;
+    const to = Math.min(total, page * pageSize);
+    target.innerHTML = `
+        <span class="pagination-summary">${from}-${to} of ${total}</span>
+        <div class="pagination-actions">
+            <button class="secondary-btn btn-sm" type="button" data-${pageAttribute}="${page - 1}" ${page <= 1 ? "disabled" : ""}><i class="bi bi-chevron-left"></i> Previous</button>
+            <span>Page ${page} of ${totalPages}</span>
+            <button class="secondary-btn btn-sm" type="button" data-${pageAttribute}="${page + 1}" ${page >= totalPages ? "disabled" : ""}>Next <i class="bi bi-chevron-right"></i></button>
+        </div>`;
+}
+
 function srIsActive(value) {
     return value === true || value === 1 || value === "1" || value === "t" || value === "true";
 }
@@ -329,6 +353,11 @@ async function srLoadDebtRecords() {
     const q = document.getElementById("debt-search").value.trim();
     const params = new URLSearchParams();
     if (q) params.set("q", q);
+    const [sortBy, sortDir] = document.getElementById("debt-sort").value.split(":");
+    params.set("page", String(srDebtPage));
+    params.set("page_size", document.getElementById("debt-page-size").value);
+    params.set("sort_by", sortBy);
+    params.set("sort_dir", sortDir);
 
     const body = document.getElementById("debt-body");
     const countText = document.getElementById("staff-count-text");
@@ -345,6 +374,7 @@ async function srLoadDebtRecords() {
         if (requestId !== srDebtRequestSequence) return;
         const message = error?.message || "Unable to load debt records.";
         body.innerHTML = srDebtDataState("error", message);
+        document.getElementById("debt-pager").innerHTML = "";
         if (countText) countText.textContent = "Showing 0 records";
         srSetResult(message, "error");
         searchButton.disabled = false;
@@ -354,12 +384,16 @@ async function srLoadDebtRecords() {
     if (!data || data.status !== "success") {
         const message = data?.message || "Unable to load debt records.";
         body.innerHTML = srDebtDataState("error", message);
+        document.getElementById("debt-pager").innerHTML = "";
         if (countText) countText.textContent = "Showing 0 records";
         srSetResult(message, "error");
         searchButton.disabled = false;
         return;
     }
     srRenderDebts(data.customers);
+    srDebtPage = Number(data.pagination?.page || 1);
+    srRenderPager("debt-pager", data.pagination, "debt-page");
+    if (countText) countText.textContent = `${Number(data.pagination?.total || 0)} matching ${Number(data.pagination?.total || 0) === 1 ? "record" : "records"}`;
     searchButton.disabled = false;
 }
 
@@ -371,9 +405,13 @@ async function srLoadStaffTransactions() {
 
     const params = new URLSearchParams({
         store_id: String(srStoreId),
-        limit: "120",
         user_id: String(srSelectedEmployee.userId),
     });
+    const [sortBy, sortDir] = document.getElementById("txn-sort").value.split(":");
+    params.set("page", String(srTransactionPage));
+    params.set("page_size", document.getElementById("txn-page-size").value);
+    params.set("sort_by", sortBy);
+    params.set("sort_dir", sortDir);
 
     const dateFrom = document.getElementById("txn-date-from").value || "";
     const dateTo = document.getElementById("txn-date-to").value || "";
@@ -410,6 +448,7 @@ async function srLoadStaffTransactions() {
         if (requestId !== srTransactionRequestSequence) return;
         const message = error?.message || "Unable to load employee transactions.";
         body.innerHTML = srTransactionDataState("error", message);
+        document.getElementById("txn-pager").innerHTML = "";
         srSetTransactionResult(message, "error");
         applyButton.disabled = false;
         return;
@@ -418,18 +457,23 @@ async function srLoadStaffTransactions() {
     if (!data || data.status !== "success") {
         const message = data?.message || "Unable to load employee transactions.";
         body.innerHTML = srTransactionDataState("error", message);
+        document.getElementById("txn-pager").innerHTML = "";
         srSetTransactionResult(message, "error");
         applyButton.disabled = false;
         return;
     }
     srRenderTransactions(data.transactions);
-    srSetTransactionResult(`${data.transactions.length} transaction${data.transactions.length === 1 ? "" : "s"} shown for ${srActiveStoreName()}.`);
+    srTransactionPage = Number(data.pagination?.page || 1);
+    srRenderPager("txn-pager", data.pagination, "txn-page");
+    const total = Number(data.pagination?.total || 0);
+    srSetTransactionResult(`${total} matching transaction${total === 1 ? "" : "s"} for ${srActiveStoreName()}.`);
     applyButton.disabled = false;
 }
 
 function srOpenEmployeeModal(employee) {
     srEmployeeTrigger = document.activeElement;
     srSelectedEmployee = employee;
+    srTransactionPage = 1;
     srRenderTransactionStores();
     document.getElementById("staff-employee-summary").innerHTML = `
         <div><strong>Employee:</strong> ${srEscape(employee.name)}</div>
@@ -449,6 +493,7 @@ function srCloseEmployeeModal() {
     document.getElementById("txn-debt-only").checked = false;
     srSetTransactionResult("");
     document.getElementById("txn-body").innerHTML = '<tr><td class="px-3 py-4 text-sm text-slate-500" colspan="5">Select an employee to load transactions.</td></tr>';
+    document.getElementById("txn-pager").innerHTML = "";
     srEmployeeTrigger?.focus?.();
     srEmployeeTrigger = null;
 }
@@ -527,6 +572,7 @@ function srPrintReceipt() {
 
 document.getElementById("debt-search-btn").addEventListener("click", async () => {
     srSetResult("", "ok");
+    srDebtPage = 1;
     await srLoadDebtRecords();
 });
 
@@ -534,6 +580,7 @@ document.getElementById("debt-search").addEventListener("keydown", async (event)
     if (event.key !== "Enter") return;
     event.preventDefault();
     srSetResult("", "ok");
+    srDebtPage = 1;
     await srLoadDebtRecords();
 });
 
@@ -558,6 +605,7 @@ document.getElementById("staff-scanner-modal").addEventListener("click", async (
 
 document.getElementById("txn-search-btn").addEventListener("click", async () => {
     srSetResult("", "ok");
+    srTransactionPage = 1;
     await srLoadStaffTransactions();
 });
 
@@ -569,6 +617,7 @@ document.getElementById("txn-store-select").addEventListener("change", async (ev
         return;
     }
     srStoreId = requestedStoreId;
+    srTransactionPage = 1;
     srUpdateTransactionScope();
     await srLoadStaffTransactions();
 });
@@ -582,6 +631,7 @@ document.getElementById("debt-clear-btn").addEventListener("click", async () => 
     search.value = "";
     document.getElementById("debt-clear-btn").classList.add("is-hidden");
     srSetResult("", "ok");
+    srDebtPage = 1;
     await srLoadDebtRecords();
     search.focus();
 });
@@ -589,6 +639,7 @@ document.getElementById("debt-clear-btn").addEventListener("click", async () => 
 document.getElementById("debt-search").addEventListener("search", async (event) => {
     if (String(event.target.value || "").trim() !== "") return;
     srSetResult("", "ok");
+    srDebtPage = 1;
     await srLoadDebtRecords();
 });
 
@@ -598,6 +649,41 @@ document.getElementById("txn-clear-btn").addEventListener("click", async () => {
     document.getElementById("txn-debt-only").checked = false;
     document.getElementById("txn-date-from").removeAttribute("aria-invalid");
     document.getElementById("txn-date-to").removeAttribute("aria-invalid");
+    srTransactionPage = 1;
+    await srLoadStaffTransactions();
+});
+
+document.getElementById("debt-sort").addEventListener("change", async () => {
+    srDebtPage = 1;
+    await srLoadDebtRecords();
+});
+
+document.getElementById("debt-page-size").addEventListener("change", async () => {
+    srDebtPage = 1;
+    await srLoadDebtRecords();
+});
+
+document.getElementById("txn-sort").addEventListener("change", async () => {
+    srTransactionPage = 1;
+    await srLoadStaffTransactions();
+});
+
+document.getElementById("txn-page-size").addEventListener("change", async () => {
+    srTransactionPage = 1;
+    await srLoadStaffTransactions();
+});
+
+document.getElementById("debt-pager").addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-debt-page]");
+    if (!button || button.disabled) return;
+    srDebtPage = Number(button.getAttribute("data-debt-page") || 1);
+    await srLoadDebtRecords();
+});
+
+document.getElementById("txn-pager").addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-txn-page]");
+    if (!button || button.disabled) return;
+    srTransactionPage = Number(button.getAttribute("data-txn-page") || 1);
     await srLoadStaffTransactions();
 });
 

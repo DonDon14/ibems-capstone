@@ -401,6 +401,11 @@ class AdminController extends Controller
         return view('admin/audit');
     }
 
+    public function hierarchy()
+    {
+        return view('admin/hierarchy');
+    }
+
     public function auditData()
     {
         $q = trim((string) $this->request->getGet('q'));
@@ -408,7 +413,18 @@ class AdminController extends Controller
         $entity = trim((string) $this->request->getGet('entity'));
         $dateFrom = trim((string) $this->request->getGet('date_from'));
         $dateTo = trim((string) $this->request->getGet('date_to'));
-        $limit = max(25, min(200, (int) ($this->request->getGet('limit') ?? 100)));
+        $pageSize = max(25, min(200, (int) ($this->request->getGet('page_size') ?? 100)));
+        $page = max(1, (int) ($this->request->getGet('page') ?? 1));
+        $offset = ($page - 1) * $pageSize;
+        $sortBy = strtolower(trim((string) ($this->request->getGet('sort_by') ?? 'date')));
+        $sortDir = strtolower(trim((string) ($this->request->getGet('sort_dir') ?? 'desc'))) === 'asc' ? 'ASC' : 'DESC';
+        $sortColumns = [
+            'date' => 'al.created_at',
+            'action' => 'al.action',
+            'actor' => 'u.name',
+            'entity' => 'al.entity',
+        ];
+        $sortColumn = $sortColumns[$sortBy] ?? $sortColumns['date'];
 
         $db = Database::connect();
         $query = $db->table('audit_logs al')
@@ -437,9 +453,16 @@ class AdminController extends Controller
                 ->groupEnd();
         }
 
-        $rows = $query->orderBy('al.created_at', 'DESC')
-            ->orderBy('al.id', 'DESC')
-            ->limit($limit)
+        $filteredTotal = (clone $query)->countAllResults();
+        $totalPages = max(1, (int) ceil($filteredTotal / $pageSize));
+        if ($page > $totalPages) {
+            $page = $totalPages;
+            $offset = ($page - 1) * $pageSize;
+        }
+
+        $rows = $query->orderBy($sortColumn, $sortDir)
+            ->orderBy('al.id', $sortDir)
+            ->limit($pageSize, $offset)
             ->get()
             ->getResultArray();
 
@@ -475,7 +498,7 @@ class AdminController extends Controller
                 'today_events' => $todayEvents,
                 'actor_count' => (int) ($summary['actor_count'] ?? 0),
                 'action_count' => (int) ($summary['action_count'] ?? 0),
-                'visible_events' => count($rows),
+                'visible_events' => $filteredTotal,
             ],
             'actions' => array_values(array_map(static fn(array $row): string => (string) ($row['action'] ?? ''), $actions)),
             'entities' => array_values(array_map(static fn(array $row): string => (string) ($row['entity'] ?? ''), $entities)),
@@ -499,6 +522,12 @@ class AdminController extends Controller
                     'created_at' => (string) ($row['created_at'] ?? ''),
                 ];
             }, $rows),
+            'pagination' => [
+                'page' => $page,
+                'page_size' => $pageSize,
+                'total' => $filteredTotal,
+                'total_pages' => $totalPages,
+            ],
         ]);
     }
 
@@ -510,6 +539,21 @@ class AdminController extends Controller
         $category = trim((string) $this->request->getGet('category'));
         $supplier = trim((string) $this->request->getGet('supplier'));
         $includeInactive = (int) ($this->request->getGet('include_inactive') ?? 0) === 1;
+        $sortBy = strtolower(trim((string) ($this->request->getGet('sort_by') ?? 'store')));
+        $sortDir = strtolower(trim((string) ($this->request->getGet('sort_dir') ?? 'asc'))) === 'desc' ? 'DESC' : 'ASC';
+        $page = max(1, (int) ($this->request->getGet('page') ?? 1));
+        $pageSize = max(10, min(100, (int) ($this->request->getGet('page_size') ?? 25)));
+        $offset = ($page - 1) * $pageSize;
+        $sortColumns = [
+            'store' => 's.store_name',
+            'name' => 'p.name',
+            'category' => 'p.category',
+            'supplier' => 'p.supplier',
+            'price' => 'p.price',
+            'stock' => 'p.stock_qty',
+            'updated' => 'p.updated_at',
+        ];
+        $sortColumn = $sortColumns[$sortBy] ?? $sortColumns['store'];
 
         $db = Database::connect();
         $query = $db->table('products p')
@@ -548,9 +592,17 @@ class AdminController extends Controller
                 ->groupEnd();
         }
 
-        $rows = $query->orderBy('s.store_name', 'ASC')
+        $total = (clone $query)->countAllResults();
+        $totalPages = max(1, (int) ceil($total / $pageSize));
+        if ($page > $totalPages) {
+            $page = $totalPages;
+            $offset = ($page - 1) * $pageSize;
+        }
+
+        $rows = $query->orderBy($sortColumn, $sortDir)
             ->orderBy('p.name', 'ASC')
-            ->limit(500)
+            ->orderBy('p.id', 'ASC')
+            ->limit($pageSize, $offset)
             ->get()
             ->getResultArray();
 
@@ -595,7 +647,7 @@ class AdminController extends Controller
                 'out_of_stock' => (int) ($summary['out_of_stock'] ?? 0),
                 'low_stock' => (int) ($summary['low_stock'] ?? 0),
                 'inactive_products' => (int) ($summary['inactive_products'] ?? 0),
-                'visible_products' => count($rows),
+                'visible_products' => $total,
             ],
             'stores' => array_map(static function (array $row): array {
                 return [
@@ -629,6 +681,12 @@ class AdminController extends Controller
                     'updated_at' => (string) ($row['updated_at'] ?? ''),
                 ];
             }, $rows),
+            'pagination' => [
+                'page' => $page,
+                'page_size' => $pageSize,
+                'total' => $total,
+                'total_pages' => $totalPages,
+            ],
         ]);
     }
 

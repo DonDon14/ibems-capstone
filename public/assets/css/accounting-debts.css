@@ -970,3 +970,18 @@
         grid-template-columns: 1fr;
     }
 }
+.acct-pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    min-height: 46px;
+    color: #475569;
+    font-size: 0.86rem;
+    font-weight: 700;
+}
+
+.acct-pager button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}

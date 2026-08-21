@@ -118,7 +118,7 @@ final class AdminAccessRouteConfigTest extends CIUnitTestCase
 
         foreach ([
             'user/dashboard', 'user/dashboard/data', 'user/debt-pin/status', 'user/debt-pin/set',
-            'user/history', 'user/deductions', 'user/deductions/data', 'user/summary', 'user/transactions', 'user/transactions/(:num)',
+            'user/history', 'user/stores', 'user/stores/data', 'user/deductions', 'user/deductions/data', 'user/summary', 'user/transactions', 'user/transactions/(:num)',
             'user/receipt/(:num)', 'user/cashbook',
         ] as $route) {
             $this->assertMatchesRegularExpression(

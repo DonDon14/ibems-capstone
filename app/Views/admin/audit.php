@@ -63,6 +63,16 @@
                     <option value="200">200 rows</option>
                 </select>
             </label>
+            <label class="ui-field" for="audit-sort">
+                <span>Sort</span>
+                <select id="audit-sort">
+                    <option value="date:desc">Newest first</option>
+                    <option value="date:asc">Oldest first</option>
+                    <option value="action:asc">Action A-Z</option>
+                    <option value="actor:asc">Actor A-Z</option>
+                    <option value="entity:asc">Entity A-Z</option>
+                </select>
+            </label>
         </div>
         <div class="audit-filter-actions">
             <button id="audit-search-btn" class="primary-btn" type="button"><i class="bi bi-search"></i> Search</button>
@@ -94,6 +104,7 @@
             </tbody>
         </table>
     </div>
+    <div id="audit-pager" class="overview-pager" aria-label="Audit log pages"></div>
 </section>
 
 <div id="audit-view-modal" class="admin-modal admin-overview-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="audit-view-title">

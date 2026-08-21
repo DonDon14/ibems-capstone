@@ -1,5 +1,7 @@
 let uhSelectedReceipt = null;
 let uhReceiptTrigger = null;
+let uhTransactionPage = 1;
+let uhCashbookPage = 1;
 
 function uhMoney(value) {
     return window.IbemsFormat?.money(value) || `PHP ${Number(value || 0).toFixed(2)}`;
@@ -41,6 +43,45 @@ function uhDataState(type, message, colspan) {
     };
     const role = safeType === "error" ? "alert" : "status";
     return `<tr class="data-state-row"><td colspan="${Number(colspan)}"><div class="data-state data-state--${safeType}" role="${role}" aria-live="polite"><i class="${icons[safeType]}" aria-hidden="true"></i><div><strong>${uhEscape(message)}</strong></div></div></td></tr>`;
+}
+
+function uhSetStoreOptions(rows) {
+    const select = document.getElementById("uh-store");
+    const current = select.value;
+    select.innerHTML = '<option value="">All stores</option>' + (Array.isArray(rows) ? rows : []).map((row) =>
+        `<option value="${Number(row.id)}">${uhEscape(row.store_name || `Store #${row.id}`)}</option>`
+    ).join("");
+    if (current && select.querySelector(`option[value="${CSS.escape(current)}"]`)) select.value = current;
+}
+
+function uhRenderPager(id, meta, pageType) {
+    const pager = document.getElementById(id);
+    const page = Number(meta?.page || 1);
+    const totalPages = Number(meta?.total_pages || 1);
+    const total = Number(meta?.total || 0);
+    pager.innerHTML = `
+        <button class="secondary-btn btn-sm" type="button" data-${pageType}-page="${page - 1}" ${page <= 1 ? "disabled" : ""}><i class="bi bi-chevron-left"></i> Previous</button>
+        <span>Page ${page} of ${totalPages} · ${total} record${total === 1 ? "" : "s"}</span>
+        <button class="secondary-btn btn-sm" type="button" data-${pageType}-page="${page + 1}" ${page >= totalPages ? "disabled" : ""}>Next <i class="bi bi-chevron-right"></i></button>`;
+}
+
+function uhRenderStoreTotals(rows, grandTotals) {
+    const container = document.getElementById("uh-store-totals");
+    const totals = Array.isArray(rows) ? rows : [];
+    document.getElementById("uh-grand-total").textContent = uhMoney(grandTotals?.total_spent || 0);
+    if (!totals.length) {
+        container.innerHTML = '<div class="data-state data-state--empty" role="status"><i class="bi bi-inbox"></i><div><strong>No store spending in this period.</strong></div></div>';
+        return;
+    }
+    container.innerHTML = totals.map((row) => `
+        <article class="user-store-total-card">
+            <div><span>Store</span><strong>${uhEscape(row.store_name || "Store")}</strong></div>
+            <dl>
+                <div><dt>Purchases</dt><dd>${Number(row.purchase_count || 0)}</dd></div>
+                <div><dt>Total spent</dt><dd>${uhEscape(uhMoney(row.total_spent || 0))}</dd></div>
+                <div><dt>Debt charged</dt><dd>${uhEscape(uhMoney(row.debt_charged || 0))}</dd></div>
+            </dl>
+        </article>`).join("");
 }
 
 function uhApplyDebtStatus(summary) {
@@ -96,11 +137,19 @@ async function loadUserSummaryCards() {
 }
 
 async function loadUserTransactions() {
-    const params = new URLSearchParams({ limit: "120" });
+    const params = new URLSearchParams({
+        page: String(uhTransactionPage),
+        page_size: document.getElementById("uh-page-size").value || "25",
+    });
     const from = document.getElementById("uh-date-from").value || "";
     const to = document.getElementById("uh-date-to").value || "";
+    const storeId = document.getElementById("uh-store").value || "";
+    const [sortBy, sortDir] = (document.getElementById("uh-sort").value || "date:desc").split(":");
     if (from) params.set("date_from", from);
     if (to) params.set("date_to", to);
+    if (storeId) params.set("store_id", storeId);
+    params.set("sort_by", sortBy);
+    params.set("sort_dir", sortDir);
 
     const body = document.getElementById("uh-body");
     body.innerHTML = uhDataState("loading", "Loading transactions...", 6);
@@ -111,13 +160,19 @@ async function loadUserTransactions() {
         data = await response.json();
     } catch (error) {
         body.innerHTML = uhDataState("error", error.message || "Unable to load transactions.", 6);
+        document.getElementById("uh-transactions-pager").innerHTML = "";
         return;
     }
 
     if (!data || data.status !== "success" || !Array.isArray(data.data)) {
         body.innerHTML = uhDataState("error", data?.message || "Unable to load transactions.", 6);
+        document.getElementById("uh-transactions-pager").innerHTML = "";
         return;
     }
+
+    uhSetStoreOptions(data.stores || []);
+    uhRenderStoreTotals(data.store_totals || [], data.grand_totals || {});
+    uhRenderPager("uh-transactions-pager", data.pagination || {}, "transactions");
 
     if (data.data.length === 0) {
         body.innerHTML = uhDataState("empty", "No transactions found.", 6);
@@ -141,11 +196,17 @@ async function loadUserTransactions() {
 }
 
 async function loadUserCashbook() {
-    const params = new URLSearchParams({ limit: "150" });
+    const params = new URLSearchParams({
+        page: String(uhCashbookPage),
+        page_size: document.getElementById("uh-page-size").value || "25",
+    });
     const from = document.getElementById("uh-date-from").value || "";
     const to = document.getElementById("uh-date-to").value || "";
+    const [sortBy, sortDir] = (document.getElementById("uh-cashbook-sort").value || "date:desc").split(":");
     if (from) params.set("date_from", from);
     if (to) params.set("date_to", to);
+    params.set("sort_by", sortBy);
+    params.set("sort_dir", sortDir);
 
     const body = document.getElementById("uh-cashbook-body");
     body.innerHTML = uhDataState("loading", "Loading cashbook...", 8);
@@ -156,13 +217,17 @@ async function loadUserCashbook() {
         data = await response.json();
     } catch (error) {
         body.innerHTML = uhDataState("error", error.message || "Unable to load cashbook.", 8);
+        document.getElementById("uh-cashbook-pager").innerHTML = "";
         return;
     }
 
     if (!data || data.status !== "success" || !Array.isArray(data.data)) {
         body.innerHTML = uhDataState("error", data?.message || "Unable to load cashbook.", 8);
+        document.getElementById("uh-cashbook-pager").innerHTML = "";
         return;
     }
+
+    uhRenderPager("uh-cashbook-pager", data.pagination || {}, "cashbook");
 
     if (data.data.length === 0) {
         body.innerHTML = uhDataState("empty", "No debt cashbook entries found.", 8);
@@ -257,11 +322,48 @@ async function loadUserHistoryAll() {
     ]);
 }
 
-document.getElementById("uh-apply").addEventListener("click", loadUserHistoryAll);
+document.getElementById("uh-apply").addEventListener("click", () => {
+    uhTransactionPage = 1;
+    uhCashbookPage = 1;
+    loadUserHistoryAll();
+});
 document.getElementById("uh-clear").addEventListener("click", () => {
+    document.getElementById("uh-store").value = "";
     document.getElementById("uh-date-from").value = "";
     document.getElementById("uh-date-to").value = "";
+    document.getElementById("uh-sort").value = "date:desc";
+    document.getElementById("uh-cashbook-sort").value = "date:desc";
+    document.getElementById("uh-page-size").value = "25";
+    uhTransactionPage = 1;
+    uhCashbookPage = 1;
     loadUserHistoryAll();
+});
+
+["uh-store", "uh-sort", "uh-page-size"].forEach((id) => {
+    document.getElementById(id).addEventListener("change", () => {
+        uhTransactionPage = 1;
+        loadUserTransactions();
+    });
+});
+document.getElementById("uh-page-size").addEventListener("change", () => {
+    uhCashbookPage = 1;
+    loadUserCashbook();
+});
+document.getElementById("uh-cashbook-sort").addEventListener("change", () => {
+    uhCashbookPage = 1;
+    loadUserCashbook();
+});
+document.getElementById("uh-transactions-pager").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-transactions-page]");
+    if (!button || button.disabled) return;
+    uhTransactionPage = Math.max(1, Number(button.dataset.transactionsPage || 1));
+    loadUserTransactions();
+});
+document.getElementById("uh-cashbook-pager").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-cashbook-page]");
+    if (!button || button.disabled) return;
+    uhCashbookPage = Math.max(1, Number(button.dataset.cashbookPage || 1));
+    loadUserCashbook();
 });
 
 document.getElementById("uh-body").addEventListener("click", async (event) => {

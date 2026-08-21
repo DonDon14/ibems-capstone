@@ -26,6 +26,231 @@
     min-width: 170px;
 }
 
+.user-filters .field select {
+    min-width: 150px;
+    min-height: 42px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 8px 34px 8px 12px;
+    background: #fff;
+    color: #0f172a;
+}
+
+.user-search-field {
+    flex: 1 1 260px;
+}
+
+.user-search-field input {
+    width: 100%;
+}
+
+.user-section-title {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 16px;
+}
+
+.user-grand-total {
+    color: #1d4ed8;
+    font-size: 1.35rem;
+    white-space: nowrap;
+}
+
+.user-store-total-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+    gap: 12px;
+}
+
+.user-store-total-card {
+    border: 1px solid #dbe5f0;
+    border-radius: 14px;
+    padding: 14px;
+    background: linear-gradient(180deg, #fff 0%, #f8fbff 100%);
+}
+
+.user-store-total-card > div {
+    display: grid;
+    gap: 3px;
+}
+
+.user-store-total-card span,
+.user-store-total-card dt {
+    color: #64748b;
+    font-size: 0.76rem;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.user-store-total-card > div strong {
+    color: #0f172a;
+    font-size: 1rem;
+}
+
+.user-store-total-card dl {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+    margin: 12px 0 0;
+}
+
+.user-store-total-card dl div {
+    min-width: 0;
+}
+
+.user-store-total-card dd {
+    margin: 3px 0 0;
+    color: #0f172a;
+    font-size: 0.88rem;
+    font-weight: 800;
+    overflow-wrap: anywhere;
+}
+
+.user-subfilters {
+    display: flex;
+    justify-content: flex-end;
+}
+
+.user-subfilters label {
+    display: grid;
+    gap: 5px;
+    color: #64748b;
+    font-size: 0.8rem;
+    font-weight: 700;
+}
+
+.user-subfilters select {
+    min-height: 40px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    padding: 8px 34px 8px 12px;
+    background: #fff;
+}
+
+.user-pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    min-height: 44px;
+    color: #475569;
+    font-size: 0.86rem;
+    font-weight: 700;
+}
+
+.user-pager button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+.user-results-context {
+    margin: 0;
+    color: #64748b;
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+
+.user-product-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
+    gap: 14px;
+}
+
+.user-product-grid > .data-state {
+    grid-column: 1 / -1;
+}
+
+.user-product-card {
+    min-width: 0;
+    overflow: hidden;
+    border: 1px solid #dbe5f0;
+    border-radius: 16px;
+    background: #fff;
+    box-shadow: 0 10px 24px rgba(15, 23, 42, 0.07);
+}
+
+.user-product-image-wrap,
+.user-product-image-fallback {
+    display: flex;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    background: linear-gradient(135deg, #eff6ff, #f8fafc);
+    color: #3b82f6;
+    font-size: 2.4rem;
+}
+
+.user-product-image-wrap img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.user-product-card-body {
+    display: grid;
+    gap: 7px;
+    padding: 14px;
+}
+
+.user-product-store {
+    color: #1d4ed8;
+    font-size: 0.78rem;
+    font-weight: 800;
+}
+
+.user-product-card h3,
+.user-product-card p {
+    margin: 0;
+}
+
+.user-product-card h3 {
+    color: #0f172a;
+    font-size: 1rem;
+}
+
+.user-product-card p {
+    color: #64748b;
+    font-size: 0.82rem;
+}
+
+.user-product-variant {
+    width: fit-content;
+    border-radius: 999px;
+    padding: 3px 8px;
+    background: #eef2ff;
+    color: #4338ca;
+    font-size: 0.73rem;
+    font-weight: 800;
+}
+
+.user-product-card-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-top: 4px;
+}
+
+.user-availability {
+    border-radius: 999px;
+    padding: 4px 8px;
+    font-size: 0.72rem;
+    font-weight: 800;
+}
+
+.user-availability.is-available {
+    background: #dcfce7;
+    color: #047857;
+}
+
+.user-availability.is-out {
+    background: #fee2e2;
+    color: #b42318;
+}
+
 .user-deduction-filter {
     display: grid;
     grid-template-columns: minmax(220px, 420px) 1fr;
@@ -312,5 +537,14 @@
     .user-receipt-actions {
         align-items: stretch;
         flex-direction: column;
+    }
+
+    .user-section-title {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+
+    .user-store-total-card dl {
+        grid-template-columns: 1fr;
     }
 }

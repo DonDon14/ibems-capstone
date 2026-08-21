@@ -60,6 +60,25 @@
                 <input id="acct-debt-only" class="h-4 w-4" type="checkbox">
                 <span>Debt only</span>
             </label>
+            <label class="field min-w-[170px]" for="acct-sort">
+                <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Sort</span>
+                <select id="acct-sort" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm">
+                    <option value="name:asc">Name A-Z</option>
+                    <option value="name:desc">Name Z-A</option>
+                    <option value="debt:desc">Highest debt / amount</option>
+                    <option value="debt:asc">Lowest debt / amount</option>
+                    <option value="credit:desc">Highest credit</option>
+                    <option value="date:desc">Newest activity</option>
+                </select>
+            </label>
+            <label class="field min-w-[110px]" for="acct-page-size">
+                <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Rows</span>
+                <select id="acct-page-size" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm">
+                    <option value="10">10</option>
+                    <option value="25" selected>25</option>
+                    <option value="50">50</option>
+                </select>
+            </label>
         </div>
         <div class="acct-filters-actions flex flex-wrap gap-2">
             <div class="action-group action-group-primary">
@@ -276,6 +295,7 @@
             <button id="cancel-settlement-confirm" type="button" class="secondary-btn">Cancel</button>
             <button id="confirm-settlement-apply" type="button" class="primary-btn"><i class="bi bi-check2-circle"></i> Confirm Deduction</button>
         </div>
+        <div id="acct-pager" class="acct-pager" aria-label="Accounting record pages"></div>
     </div>
 </div>
 

@@ -46,6 +46,25 @@
                         <option value="out">Out of Stock</option>
                     </select>
                 </label>
+                <label class="inventory-filter-field" for="inventory-sort">
+                    <span>Sort</span>
+                    <select id="inventory-sort">
+                        <option value="name:asc">Product A-Z</option>
+                        <option value="name:desc">Product Z-A</option>
+                        <option value="stock:asc">Lowest stock</option>
+                        <option value="stock:desc">Highest stock</option>
+                        <option value="price:asc">Lowest price</option>
+                        <option value="price:desc">Highest price</option>
+                    </select>
+                </label>
+                <label class="inventory-filter-field" for="inventory-page-size">
+                    <span>Rows</span>
+                    <select id="inventory-page-size">
+                        <option value="10">10</option>
+                        <option value="25" selected>25</option>
+                        <option value="50">50</option>
+                    </select>
+                </label>
                 <button id="inventory-clear-filters" class="secondary-btn" type="button"><i class="bi bi-x-circle"></i> Clear</button>
             </div>
         </div>
@@ -72,6 +91,7 @@
                 </tbody>
             </table>
         </div>
+        <div id="inventory-pager" class="inventory-pager" aria-label="Inventory pages"></div>
     </article>
 
     <article class="inventory-card">

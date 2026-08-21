@@ -53,6 +53,28 @@
                     <option value="">All Suppliers</option>
                 </select>
             </label>
+            <label class="ap-filter-field" for="ap-sort">
+                <span>Sort</span>
+                <select id="ap-sort" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm">
+                    <option value="store:asc">Store A-Z</option>
+                    <option value="name:asc">Product A-Z</option>
+                    <option value="name:desc">Product Z-A</option>
+                    <option value="stock:asc">Lowest stock</option>
+                    <option value="stock:desc">Highest stock</option>
+                    <option value="price:asc">Lowest price</option>
+                    <option value="price:desc">Highest price</option>
+                    <option value="updated:desc">Recently updated</option>
+                </select>
+            </label>
+            <label class="ap-filter-field" for="ap-page-size">
+                <span>Rows</span>
+                <select id="ap-page-size" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm">
+                    <option value="10">10</option>
+                    <option value="25" selected>25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </label>
             <label class="ap-filter-check util-inline-flex-gap-6 h-11 items-center rounded-xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700">
                 <input id="ap-include-inactive" type="checkbox">
                 Inactive
@@ -91,6 +113,7 @@
             </tbody>
         </table>
     </div>
+    <div id="ap-pager" class="overview-pager" aria-label="Product pages"></div>
 </section>
 
 <div id="ap-view-modal" class="admin-modal admin-overview-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="ap-view-title">

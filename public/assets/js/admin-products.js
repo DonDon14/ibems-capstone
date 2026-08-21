@@ -1,5 +1,6 @@
 let apRows = [];
 let apStores = [];
+let apPage = 1;
 
 function apEscape(value) {
     return String(value ?? "")
@@ -88,11 +89,12 @@ function apRenderSummary(summary) {
     document.getElementById("ap-inactive-products").textContent = String(Number(safe.inactive_products || 0));
 }
 
-function apRenderTable(rows) {
+function apRenderTable(rows, pagination = {}) {
     const body = document.getElementById("ap-body");
     const countText = document.getElementById("ap-count-text");
     const list = Array.isArray(rows) ? rows : [];
-    if (countText) countText.textContent = `Showing ${list.length} product${list.length === 1 ? "" : "s"}`;
+    const total = Number(pagination.total ?? list.length);
+    if (countText) countText.textContent = `Showing ${list.length} of ${total} product${total === 1 ? "" : "s"}`;
 
     if (list.length === 0) {
         body.innerHTML = '<tr><td colspan="8">No products found.</td></tr>';
@@ -140,14 +142,27 @@ function apRenderTable(rows) {
     }).join("");
 }
 
+function apRenderPager(meta) {
+    const page = Number(meta?.page || 1);
+    const totalPages = Number(meta?.total_pages || 1);
+    document.getElementById("ap-pager").innerHTML = `
+        <button class="secondary-btn btn-sm" type="button" data-page="${page - 1}" ${page <= 1 ? "disabled" : ""}><i class="bi bi-chevron-left"></i> Previous</button>
+        <span>Page ${page} of ${totalPages}</span>
+        <button class="secondary-btn btn-sm" type="button" data-page="${page + 1}" ${page >= totalPages ? "disabled" : ""}>Next <i class="bi bi-chevron-right"></i></button>`;
+}
+
 async function apLoad() {
-    const params = new URLSearchParams();
+    const params = new URLSearchParams({
+        page: String(apPage),
+        page_size: document.getElementById("ap-page-size").value || "25",
+    });
     const q = (document.getElementById("ap-search").value || "").trim();
     const storeId = (document.getElementById("ap-store-filter").value || "").trim();
     const stockStatus = (document.getElementById("ap-stock-filter").value || "").trim();
     const category = (document.getElementById("ap-category-filter").value || "").trim();
     const supplier = (document.getElementById("ap-supplier-filter").value || "").trim();
     const includeInactive = document.getElementById("ap-include-inactive").checked ? "1" : "0";
+    const [sortBy, sortDir] = (document.getElementById("ap-sort").value || "store:asc").split(":");
 
     if (q) params.set("q", q);
     if (storeId) params.set("store_id", storeId);
@@ -155,12 +170,15 @@ async function apLoad() {
     if (category) params.set("category", category);
     if (supplier) params.set("supplier", supplier);
     params.set("include_inactive", includeInactive);
+    params.set("sort_by", sortBy);
+    params.set("sort_dir", sortDir);
 
     const response = await fetch(`/admin/products/data?${params.toString()}`);
     const data = await response.json();
     if (!data || data.status !== "success") {
         apRows = [];
-        apRenderTable([]);
+        apRenderTable([], {});
+        apRenderPager({});
         apRenderSummary({});
         apSetResult(data?.message || "Unable to load products.", "error");
         return;
@@ -169,7 +187,8 @@ async function apLoad() {
     apRows = Array.isArray(data.data) ? data.data : [];
     apRenderFilters(data);
     apRenderSummary(data.summary || {});
-    apRenderTable(apRows);
+    apRenderTable(apRows, data.pagination || {});
+    apRenderPager(data.pagination || {});
     apSetResult("", "ok");
 }
 
@@ -234,17 +253,26 @@ function apResetFilters() {
     document.getElementById("ap-category-filter").value = "";
     document.getElementById("ap-supplier-filter").value = "";
     document.getElementById("ap-include-inactive").checked = false;
+    document.getElementById("ap-sort").value = "store:asc";
+    document.getElementById("ap-page-size").value = "25";
+    apPage = 1;
     apLoad();
 }
 
-document.getElementById("ap-search-btn").addEventListener("click", apLoad);
+document.getElementById("ap-search-btn").addEventListener("click", () => { apPage = 1; apLoad(); });
 document.getElementById("ap-refresh-btn").addEventListener("click", apResetFilters);
-["ap-store-filter", "ap-stock-filter", "ap-category-filter", "ap-supplier-filter", "ap-include-inactive"].forEach((id) => {
-    document.getElementById(id).addEventListener("change", apLoad);
+["ap-store-filter", "ap-stock-filter", "ap-category-filter", "ap-supplier-filter", "ap-include-inactive", "ap-sort", "ap-page-size"].forEach((id) => {
+    document.getElementById(id).addEventListener("change", () => { apPage = 1; apLoad(); });
 });
 document.getElementById("ap-search").addEventListener("input", () => {
     clearTimeout(window.__apSearchTimer);
-    window.__apSearchTimer = setTimeout(apLoad, 220);
+    window.__apSearchTimer = setTimeout(() => { apPage = 1; apLoad(); }, 220);
+});
+document.getElementById("ap-pager").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-page]");
+    if (!button || button.disabled) return;
+    apPage = Math.max(1, Number(button.dataset.page || 1));
+    apLoad();
 });
 
 document.getElementById("ap-body").addEventListener("click", (event) => {

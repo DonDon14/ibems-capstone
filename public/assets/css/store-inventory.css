@@ -1070,3 +1070,18 @@ body.ibems-modern #inventory-product-modal :is(.inv-modal-head, .inv-modal-actio
         grid-column: auto;
     }
 }
+.inventory-pager {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    min-height: 46px;
+    color: #475569;
+    font-size: 0.86rem;
+    font-weight: 700;
+}
+
+.inventory-pager button:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}

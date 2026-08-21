@@ -25,6 +25,7 @@
             <p>Sign in to the Integrated Business Enterprise Management System.</p>
 
             <form id="login-form" class="auth-form" method="post" action="/auth/login">
+                <?= csrf_field() ?>
                 <label for="email">Username</label>
                 <input id="email" name="email" type="email" required autocomplete="username" placeholder="you@example.com">
 
@@ -57,7 +58,7 @@
     </main>
 
     <script src="<?= base_url('assets/js/csrf.js') ?>"></script>
-    <script src="<?= base_url('assets/js/auth-login.js') ?>"></script>
+    <script src="<?= base_url('assets/js/auth-login.js') ?>?v=20260821b"></script>
     <script src="<?= base_url('assets/js/password-visibility.js') ?>?v=20260813a"></script>
 </body>
 </html>

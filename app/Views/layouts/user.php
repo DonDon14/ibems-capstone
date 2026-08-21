@@ -9,6 +9,7 @@ $initials = ibems_initials($name, 'US');
 $availableRoles = ibems_available_roles();
 $navigation = [
     ['path' => 'user/dashboard', 'label' => 'Dashboard', 'icon' => 'bi bi-speedometer2'],
+    ['path' => 'user/stores', 'label' => 'Stores & Products', 'icon' => 'bi bi-shop-window'],
     ['path' => 'user/history', 'label' => 'History', 'icon' => 'bi bi-clock-history'],
     ['path' => 'user/deductions', 'label' => 'My Deductions', 'icon' => 'bi bi-receipt-cutoff'],
 ];

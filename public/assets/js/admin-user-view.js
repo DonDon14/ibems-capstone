@@ -2,6 +2,7 @@ let uvRows = [];
 let uvEditingUserId = null;
 let uvViewingUserId = null;
 let uvQuickFilter = "all";
+let uvPage = 1;
 
 function aMoney(value) {
     return window.IbemsFormat?.money(value) || `PHP ${Number(value || 0).toFixed(2)}`;
@@ -190,10 +191,38 @@ function renderUserTable(rows) {
 
 function applyUserFiltersAndRender() {
     const filtered = getFilteredRows();
+    const [sortBy, sortDir] = (document.getElementById("uv-sort").value || "name:asc").split(":");
+    const direction = sortDir === "desc" ? -1 : 1;
+    filtered.sort((left, right) => {
+        let a;
+        let b;
+        if (sortBy === "debt") {
+            a = Number(left.current_debt || 0);
+            b = Number(right.current_debt || 0);
+        } else if (sortBy === "credit") {
+            a = Number(left.credit_limit || 0);
+            b = Number(right.credit_limit || 0);
+        } else if (sortBy === "type") {
+            a = String(left.user_type || "").toLowerCase();
+            b = String(right.user_type || "").toLowerCase();
+        } else {
+            a = String(left.name || "").toLowerCase();
+            b = String(right.name || "").toLowerCase();
+        }
+        return (typeof a === "number" ? a - b : a.localeCompare(b)) * direction;
+    });
+    const pageSize = Math.max(10, Number(document.getElementById("uv-page-size").value || 25));
+    const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+    uvPage = Math.min(uvPage, totalPages);
+    const pageRows = filtered.slice((uvPage - 1) * pageSize, uvPage * pageSize);
     const countText = document.getElementById("uv-count-text");
-    if (countText) countText.textContent = `Showing ${filtered.length} of ${uvRows.length} records`;
+    if (countText) countText.textContent = `Showing ${pageRows.length} of ${filtered.length} matching records · ${uvRows.length} total`;
     renderTopSummary(filtered);
-    renderUserTable(filtered);
+    renderUserTable(pageRows);
+    document.getElementById("uv-pager").innerHTML = `
+        <button class="secondary-btn btn-sm" type="button" data-page="${uvPage - 1}" ${uvPage <= 1 ? "disabled" : ""}><i class="bi bi-chevron-left"></i> Previous</button>
+        <span>Page ${uvPage} of ${totalPages}</span>
+        <button class="secondary-btn btn-sm" type="button" data-page="${uvPage + 1}" ${uvPage >= totalPages ? "disabled" : ""}>Next <i class="bi bi-chevron-right"></i></button>`;
 }
 
 async function loadUserView() {
@@ -416,18 +445,23 @@ document.getElementById("uv-refresh-btn").addEventListener("click", () => {
     document.getElementById("uv-search").value = "";
     document.getElementById("uv-role-filter").value = "";
     document.getElementById("uv-type-filter").value = "";
+    document.getElementById("uv-sort").value = "name:asc";
+    document.getElementById("uv-page-size").value = "25";
+    uvPage = 1;
     uvQuickFilter = "all";
     document.querySelectorAll("[data-uv-quick]").forEach((chip) => {
         setQuickChipState(chip, chip.getAttribute("data-uv-quick") === "all");
     });
     loadUserView();
 });
-document.getElementById("uv-role-filter").addEventListener("change", applyUserFiltersAndRender);
-document.getElementById("uv-type-filter").addEventListener("change", applyUserFiltersAndRender);
-document.getElementById("uv-search").addEventListener("input", applyUserFiltersAndRender);
+["uv-role-filter", "uv-type-filter", "uv-sort", "uv-page-size"].forEach((id) => {
+    document.getElementById(id).addEventListener("change", () => { uvPage = 1; applyUserFiltersAndRender(); });
+});
+document.getElementById("uv-search").addEventListener("input", () => { uvPage = 1; applyUserFiltersAndRender(); });
 document.querySelectorAll("[data-uv-quick]").forEach((chip) => {
     chip.addEventListener("click", () => {
         uvQuickFilter = chip.getAttribute("data-uv-quick") || "all";
+        uvPage = 1;
         document.querySelectorAll("[data-uv-quick]").forEach((item) => {
             setQuickChipState(item, item === chip);
         });
@@ -471,6 +505,12 @@ document.getElementById("uv-body").addEventListener("click", (event) => {
     if (!viewTarget) return;
     const userId = Number(viewTarget.getAttribute("data-view-user") || viewTarget.getAttribute("data-user-id") || 0);
     if (userId) openViewUser(userId);
+});
+document.getElementById("uv-pager").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-page]");
+    if (!button || button.disabled) return;
+    uvPage = Math.max(1, Number(button.dataset.page || 1));
+    applyUserFiltersAndRender();
 });
 
 ["uv-add-modal", "uv-edit-modal", "uv-import-modal", "uv-view-modal"].forEach((id) => {

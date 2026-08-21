@@ -13,6 +13,7 @@ let invCategories = [];
 let invCreateSnapshot = null;
 let invMovements = [];
 let invVariantSequence = 0;
+let invPage = 1;
 let invBarcodeCamera = null;
 let invBarcodeCameraTarget = null;
 const invSelectedFamilyVariants = new Map();
@@ -253,16 +254,44 @@ function invRenderProductTable() {
             return familyState === stockFilter;
         })
         : contextualGroups;
-    const rows = groups.flatMap((group) => group.variants);
+    const [sortBy, sortDir] = (document.getElementById("inventory-sort").value || "name:asc").split(":");
+    const direction = sortDir === "desc" ? -1 : 1;
+    groups.sort((left, right) => {
+        const firstLeft = left.variants[0] || {};
+        const firstRight = right.variants[0] || {};
+        let a;
+        let b;
+        if (sortBy === "stock") {
+            a = left.variants.reduce((sum, row) => sum + Number(row.stock_qty || 0), 0);
+            b = right.variants.reduce((sum, row) => sum + Number(row.stock_qty || 0), 0);
+        } else if (sortBy === "price") {
+            a = Math.min(...left.variants.map((row) => Number(row.price || 0)));
+            b = Math.min(...right.variants.map((row) => Number(row.price || 0)));
+        } else {
+            a = String(firstLeft.name || "").toLowerCase();
+            b = String(firstRight.name || "").toLowerCase();
+        }
+        return (typeof a === "number" ? a - b : a.localeCompare(b)) * direction;
+    });
+    const pageSize = Math.max(10, Number(document.getElementById("inventory-page-size").value || 25));
+    const totalPages = Math.max(1, Math.ceil(groups.length / pageSize));
+    invPage = Math.min(invPage, totalPages);
+    const pageGroups = groups.slice((invPage - 1) * pageSize, invPage * pageSize);
+    const allRows = groups.flatMap((group) => group.variants);
+    const rows = pageGroups.flatMap((group) => group.variants);
     invRenderStockSummary(contextualGroups, stockFilter);
     invRenderResultsContext(groups, contextualGroups, search, categoryFilter, stockFilter);
+    document.getElementById("inventory-pager").innerHTML = `
+        <button class="secondary-btn btn-sm" type="button" data-page="${invPage - 1}" ${invPage <= 1 ? "disabled" : ""}><i class="bi bi-chevron-left"></i> Previous</button>
+        <span>Page ${invPage} of ${totalPages}</span>
+        <button class="secondary-btn btn-sm" type="button" data-page="${invPage + 1}" ${invPage >= totalPages ? "disabled" : ""}>Next <i class="bi bi-chevron-right"></i></button>`;
 
-    if (rows.length === 0) {
+    if (allRows.length === 0) {
         body.innerHTML = invDataState("empty", "No products match these filters. Clear a filter or try another search.", 5);
         return;
     }
 
-    body.innerHTML = groups.map(({key, variants}) => {
+    body.innerHTML = pageGroups.map(({key, variants}) => {
         const product = variants[0];
         const stock = invStockState(product);
         const variant = product.variant_label ? `<span>${invEscape(product.variant_label)}</span>` : "";
@@ -1199,13 +1228,21 @@ function invCloseProductModal() {
     invCreateSnapshot = null;
 }
 
-document.getElementById("inventory-search").addEventListener("input", invRenderProductTable);
-document.getElementById("inventory-category-filter").addEventListener("change", invRenderProductTable);
-document.getElementById("inventory-stock-filter").addEventListener("change", invRenderProductTable);
+document.getElementById("inventory-search").addEventListener("input", () => { invPage = 1; invRenderProductTable(); });
+["inventory-category-filter", "inventory-stock-filter", "inventory-sort", "inventory-page-size"].forEach((id) => {
+    document.getElementById(id).addEventListener("change", () => { invPage = 1; invRenderProductTable(); });
+});
+document.getElementById("inventory-pager").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-page]");
+    if (!button || button.disabled) return;
+    invPage = Math.max(1, Number(button.dataset.page || 1));
+    invRenderProductTable();
+});
 document.getElementById("inventory-stock-summary").addEventListener("click", (event) => {
     const button = event.target.closest("[data-stock-summary]");
     if (!button) return;
     document.getElementById("inventory-stock-filter").value = button.dataset.stockSummary || "";
+    invPage = 1;
     invRenderProductTable();
 });
 document.getElementById("inventory-toggle-families").addEventListener("click", (event) => {
@@ -1227,6 +1264,9 @@ document.getElementById("inventory-clear-filters").addEventListener("click", () 
     document.getElementById("inventory-search").value = "";
     document.getElementById("inventory-category-filter").value = "";
     document.getElementById("inventory-stock-filter").value = "";
+    document.getElementById("inventory-sort").value = "name:asc";
+    document.getElementById("inventory-page-size").value = "25";
+    invPage = 1;
     invRenderProductTable();
 });
 document.getElementById("inventory-movement-type").addEventListener("change", () => {

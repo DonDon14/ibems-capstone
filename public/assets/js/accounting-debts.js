@@ -16,6 +16,7 @@ let activeSettlementDetails = null;
 let deductionWorkflowPeriods = [];
 let deductionWorkflowRegister = [];
 let deductionWorkflowItems = [];
+let acctPage = 1;
 
 function aEscape(value) {
     return String(value ?? "")
@@ -393,17 +394,40 @@ function renderRows(rows) {
     const countText = document.getElementById("acct-count-text");
     if (!Array.isArray(rows) || rows.length === 0) {
         body.innerHTML = '<div class="acct-empty rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">No records found.</div>';
+        document.getElementById("acct-pager").innerHTML = "";
         if (countText) countText.textContent = "Showing 0 records";
         renderSummary([]);
         return;
     }
 
+    const allRows = [...rows];
+    const [sortBy, sortDir] = (document.getElementById("acct-sort").value || "name:asc").split(":");
+    const direction = sortDir === "desc" ? -1 : 1;
+    allRows.sort((left, right) => {
+        let a;
+        let b;
+        if (sortBy === "debt" || sortBy === "date") {
+            a = sortBy === "date" ? String(left.updated_at || left.created_at || "") : Number(left.current_debt || 0);
+            b = sortBy === "date" ? String(right.updated_at || right.created_at || "") : Number(right.current_debt || 0);
+        } else if (sortBy === "credit") {
+            a = Number(left.credit_limit || 0);
+            b = Number(right.credit_limit || 0);
+        } else {
+            a = String(left.name || "").toLowerCase();
+            b = String(right.name || "").toLowerCase();
+        }
+        return (typeof a === "number" ? a - b : a.localeCompare(b)) * direction;
+    });
+    const pageSize = Math.max(10, Number(document.getElementById("acct-page-size").value || 25));
+    const totalPages = Math.max(1, Math.ceil(allRows.length / pageSize));
+    acctPage = Math.min(acctPage, totalPages);
+    const pageRows = allRows.slice((acctPage - 1) * pageSize, acctPage * pageSize);
     if (countText) {
         const needsSetup = rows.filter((row) => !aBool(row.financial_profile_configured)).length;
-        countText.textContent = `Showing ${rows.length} eligible employees${needsSetup ? ` · ${needsSetup} need financial setup` : ""}`;
+        countText.textContent = `Showing ${pageRows.length} of ${rows.length} eligible employees${needsSetup ? ` · ${needsSetup} need financial setup` : ""}`;
     }
 
-    body.innerHTML = rows.map((row) => `
+    body.innerHTML = pageRows.map((row) => `
         <article data-row-user="${row.user_id}" class="acct-record-row acct-row-clickable flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:bg-slate-50">
             <div class="acct-person flex min-w-0 items-center gap-3">
                 <div class="acct-avatar inline-flex h-11 w-11 flex-none items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-sm font-bold text-blue-700">${aEscape(String(row.name || "U").split(" ").filter(Boolean).slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join("") || "U")}</div>
@@ -438,12 +462,20 @@ function renderRows(rows) {
     `).join("");
 
     renderSummary(rows);
+    renderAcctPager(totalPages);
+}
+
+function renderAcctPager(totalPages) {
+    document.getElementById("acct-pager").innerHTML = `
+        <button class="secondary-btn btn-sm" type="button" data-page="${acctPage - 1}" ${acctPage <= 1 ? "disabled" : ""}><i class="bi bi-chevron-left"></i> Previous</button>
+        <span>Page ${acctPage} of ${totalPages}</span>
+        <button class="secondary-btn btn-sm" type="button" data-page="${acctPage + 1}" ${acctPage >= totalPages ? "disabled" : ""}>Next <i class="bi bi-chevron-right"></i></button>`;
 }
 
 function renderCashbookRows(rows, type) {
     const body = document.getElementById("acct-body");
     const countText = document.getElementById("acct-count-text");
-    const list = Array.isArray(rows) ? rows : [];
+    const list = Array.isArray(rows) ? [...rows] : [];
     const isAdvance = type === "advance";
     const title = isAdvance ? "Direct payment received" : "Store operator shortage";
     const emptyText = isAdvance
@@ -452,14 +484,26 @@ function renderCashbookRows(rows, type) {
 
     if (list.length === 0) {
         body.innerHTML = `<div class="acct-empty rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">${emptyText}</div>`;
+        document.getElementById("acct-pager").innerHTML = "";
         if (countText) countText.textContent = "Showing 0 records";
         renderSummary(acctRows);
         return;
     }
 
-    if (countText) countText.textContent = `Showing ${list.length} ${isAdvance ? "direct payments" : "store operator shortages"}`;
+    const [sortBy, sortDir] = (document.getElementById("acct-sort").value || "date:desc").split(":");
+    const direction = sortDir === "asc" ? 1 : -1;
+    list.sort((left, right) => {
+        if (sortBy === "name") return String(left.name || "").localeCompare(String(right.name || "")) * (sortDir === "desc" ? -1 : 1);
+        if (sortBy === "date") return String(left.created_at || "").localeCompare(String(right.created_at || "")) * direction;
+        return (Number(left.amount || 0) - Number(right.amount || 0)) * direction;
+    });
+    const pageSize = Math.max(10, Number(document.getElementById("acct-page-size").value || 25));
+    const totalPages = Math.max(1, Math.ceil(list.length / pageSize));
+    acctPage = Math.min(acctPage, totalPages);
+    const pageRows = list.slice((acctPage - 1) * pageSize, acctPage * pageSize);
+    if (countText) countText.textContent = `Showing ${pageRows.length} of ${list.length} ${isAdvance ? "direct payments" : "store operator shortages"}`;
 
-    body.innerHTML = list.map((row) => {
+    body.innerHTML = pageRows.map((row) => {
         const store = row.store_name || row.meta?.store_name || "-";
         const channel = row.channel ? ` | ${aCategory(row.channel)}` : "";
         return `
@@ -497,6 +541,7 @@ function renderCashbookRows(rows, type) {
     }).join("");
 
     renderSummary(acctRows);
+    renderAcctPager(totalPages);
 }
 
 function renderActiveAccountingTab() {
@@ -1549,16 +1594,29 @@ async function approveInvestigation(button) {
 }
 
 document.getElementById("acct-search").addEventListener("input", () => {
+    acctPage = 1;
     applyMainFiltersAndRender();
 });
 
 document.getElementById("acct-debt-only").addEventListener("change", () => {
+    acctPage = 1;
     applyMainFiltersAndRender();
+});
+
+["acct-sort", "acct-page-size"].forEach((id) => {
+    document.getElementById(id).addEventListener("change", () => { acctPage = 1; renderActiveAccountingTab(); });
+});
+document.getElementById("acct-pager").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-page]");
+    if (!button || button.disabled) return;
+    acctPage = Math.max(1, Number(button.dataset.page || 1));
+    renderActiveAccountingTab();
 });
 
 document.querySelectorAll("[data-acct-tab]").forEach((button) => {
     button.addEventListener("click", () => {
         activeAcctTab = button.getAttribute("data-acct-tab") || "employee-debts";
+        acctPage = 1;
         renderActiveAccountingTab();
     });
 });

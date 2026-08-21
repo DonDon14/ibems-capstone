@@ -2210,16 +2210,23 @@ class StoreController extends BaseController
     public function debtCustomers()
     {
         $q = trim((string) $this->request->getGet('q'));
-        $limit = 20;
+        $page = max(1, (int) ($this->request->getGet('page') ?? 1));
+        $pageSize = max(10, min(100, (int) ($this->request->getGet('page_size') ?? 20)));
+        $sortBy = strtolower(trim((string) ($this->request->getGet('sort_by') ?? 'name')));
+        $sortDir = strtolower(trim((string) ($this->request->getGet('sort_dir') ?? 'asc'))) === 'desc' ? 'DESC' : 'ASC';
+        $sortColumns = [
+            'name' => 'u.name',
+            'debt' => 'b.current_debt',
+            'credit' => 'b.credit_limit',
+        ];
+        $sortColumn = $sortColumns[$sortBy] ?? $sortColumns['name'];
         $db = Database::connect();
 
         $builder = $db->table('users u')
             ->select('u.id, u.employee_id, u.name, u.email, u.user_type, u.is_active, u.debt_pin_hash, b.credit_limit, b.current_debt')
             ->join('balances b', 'b.user_id = u.id', 'inner')
             ->where('u.is_active', true)
-            ->whereIn('u.user_type', ['faculty', 'staff'])
-            ->orderBy('u.name', 'ASC')
-            ->limit($limit);
+            ->whereIn('u.user_type', ['faculty', 'staff']);
 
         if ($q !== '') {
             $builder->groupStart()
@@ -2229,7 +2236,15 @@ class StoreController extends BaseController
                 ->groupEnd();
         }
 
-        $rows = $builder->get()->getResultArray();
+        $total = (clone $builder)->countAllResults();
+        $totalPages = max(1, (int) ceil($total / $pageSize));
+        $page = min($page, $totalPages);
+        $rows = $builder
+            ->orderBy($sortColumn, $sortDir)
+            ->orderBy('u.id', 'ASC')
+            ->limit($pageSize, ($page - 1) * $pageSize)
+            ->get()
+            ->getResultArray();
 
         $customers = array_map(static function (array $row): array {
             $creditLimit = (float) $row['credit_limit'];
@@ -2244,6 +2259,12 @@ class StoreController extends BaseController
         return $this->response->setJSON([
             'status' => 'success',
             'customers' => $customers,
+            'pagination' => [
+                'page' => $page,
+                'page_size' => $pageSize,
+                'total' => $total,
+                'total_pages' => $totalPages,
+            ],
         ]);
     }
 
@@ -2273,8 +2294,19 @@ class StoreController extends BaseController
             ]);
         }
 
-        $limit = (int) ($this->request->getGet('limit') ?? 50);
-        $limit = max(1, min(100, $limit));
+        $page = max(1, (int) ($this->request->getGet('page') ?? 1));
+        $pageSize = max(10, min(100, (int) ($this->request->getGet('page_size') ?? $this->request->getGet('limit') ?? 25)));
+        $offset = ($page - 1) * $pageSize;
+        $sortBy = strtolower(trim((string) ($this->request->getGet('sort_by') ?? 'date')));
+        $sortDir = strtolower(trim((string) ($this->request->getGet('sort_dir') ?? 'desc'))) === 'asc' ? 'ASC' : 'DESC';
+        $sortColumns = [
+            'date' => 't.created_at',
+            'customer' => 'u.name',
+            'payment' => 't.payment_method',
+            'amount' => 't.amount',
+            'reference' => 't.client_txn_id',
+        ];
+        $sortColumn = $sortColumns[$sortBy] ?? $sortColumns['date'];
         $dateFrom = trim((string) $this->request->getGet('date_from'));
         $dateTo = trim((string) $this->request->getGet('date_to'));
         $paymentMethod = trim((string) $this->request->getGet('payment_method'));
@@ -2307,8 +2339,36 @@ class StoreController extends BaseController
             }
         }
 
-        $rows = $query->orderBy('t.id', 'DESC')
-            ->limit($limit)
+        $total = (clone $query)->countAllResults();
+        $summaryQuery = $db->table('transactions t')
+            ->select('COUNT(t.id) AS transaction_count, COALESCE(SUM(t.amount), 0) AS total_amount')
+            ->where('t.store_id', $storeId);
+        if ($dateFrom !== '') {
+            $summaryQuery->where('t.created_at >=', $dateFrom . ' 00:00:00');
+        }
+        if ($dateTo !== '') {
+            $summaryQuery->where('t.created_at <=', $dateTo . ' 23:59:59');
+        }
+        if ($paymentMethod !== '' && in_array($paymentMethod, $allowedPaymentMethods, true)) {
+            if ($hasPaymentLines) {
+                $summaryQuery->groupStart()
+                    ->where('t.payment_method', $paymentMethod)
+                    ->orWhere("EXISTS (SELECT 1 FROM transaction_payments tp_filter WHERE tp_filter.transaction_id = t.id AND tp_filter.payment_method = " . $db->escape($paymentMethod) . ")", null, false)
+                    ->groupEnd();
+            } else {
+                $summaryQuery->where('t.payment_method', $paymentMethod);
+            }
+        }
+        $filteredSummary = $summaryQuery->get()->getRowArray() ?? [];
+        $totalPages = max(1, (int) ceil($total / $pageSize));
+        if ($page > $totalPages) {
+            $page = $totalPages;
+            $offset = ($page - 1) * $pageSize;
+        }
+
+        $rows = $query->orderBy($sortColumn, $sortDir)
+            ->orderBy('t.id', $sortDir)
+            ->limit($pageSize, $offset)
             ->get()
             ->getResultArray();
 
@@ -2359,6 +2419,16 @@ class StoreController extends BaseController
             'status' => 'success',
             'store_id' => $storeId,
             'transactions' => $transactions,
+            'summary' => [
+                'transaction_count' => (int) ($filteredSummary['transaction_count'] ?? 0),
+                'total_amount' => (float) ($filteredSummary['total_amount'] ?? 0),
+            ],
+            'pagination' => [
+                'page' => $page,
+                'page_size' => $pageSize,
+                'total' => $total,
+                'total_pages' => $totalPages,
+            ],
         ]);
     }
 
@@ -2490,8 +2560,16 @@ class StoreController extends BaseController
         $productId = (int) ($this->request->getGet('product_id') ?? 0);
         $dateFrom = trim((string) $this->request->getGet('date_from'));
         $dateTo = trim((string) $this->request->getGet('date_to'));
-        $limit = (int) ($this->request->getGet('limit') ?? 100);
-        $limit = max(1, min(200, $limit));
+        $page = max(1, (int) ($this->request->getGet('page') ?? 1));
+        $pageSize = max(10, min(100, (int) ($this->request->getGet('page_size') ?? $this->request->getGet('limit') ?? 25)));
+        $sortBy = strtolower(trim((string) ($this->request->getGet('sort_by') ?? 'date')));
+        $sortDir = strtolower(trim((string) ($this->request->getGet('sort_dir') ?? 'desc'))) === 'asc' ? 'ASC' : 'DESC';
+        $sortColumns = [
+            'date' => 't.created_at',
+            'amount' => 't.amount',
+            'payment' => 't.payment_method',
+        ];
+        $sortColumn = $sortColumns[$sortBy] ?? $sortColumns['date'];
 
         $allowedTypes = ['sale', 'restock', 'adjustment'];
 
@@ -3281,8 +3359,12 @@ class StoreController extends BaseController
             $query->where('u.id', $employeeUserId);
         }
 
-        $rows = $query->orderBy('t.id', 'DESC')
-            ->limit($limit)
+        $total = (clone $query)->countAllResults();
+        $totalPages = max(1, (int) ceil($total / $pageSize));
+        $page = min($page, $totalPages);
+        $rows = $query->orderBy($sortColumn, $sortDir)
+            ->orderBy('t.id', $sortDir)
+            ->limit($pageSize, ($page - 1) * $pageSize)
             ->get()
             ->getResultArray();
 
@@ -3308,6 +3390,12 @@ class StoreController extends BaseController
             'status' => 'success',
             'store_id' => $storeId,
             'transactions' => $transactions,
+            'pagination' => [
+                'page' => $page,
+                'page_size' => $pageSize,
+                'total' => $total,
+                'total_pages' => $totalPages,
+            ],
         ]);
     }
 

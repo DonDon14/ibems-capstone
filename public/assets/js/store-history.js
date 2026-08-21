@@ -1,6 +1,7 @@
 let historyStores = [];
 let historyActiveStoreId = null;
 let selectedReceipt = null;
+let historyPage = 1;
 let historyFilters = {
     dateFrom: "",
     dateTo: "",
@@ -48,22 +49,23 @@ function setHistoryResult(message, type) {
     el.style.color = type === "error" ? "#b91c1c" : "#166534";
 }
 
-function renderSummary(transactions) {
+function renderSummary(transactions, summary = null) {
     const countEl = document.getElementById("history-summary-count");
     const totalEl = document.getElementById("history-summary-total");
     const list = Array.isArray(transactions) ? transactions : [];
-    const total = list.reduce((sum, txn) => sum + Number(txn.amount || 0), 0);
+    const total = summary ? Number(summary.total_amount || 0) : list.reduce((sum, txn) => sum + Number(txn.amount || 0), 0);
+    const count = summary ? Number(summary.transaction_count || 0) : list.length;
 
-    countEl.textContent = String(list.length);
+    countEl.textContent = String(count);
     totalEl.textContent = hMoney(total);
 }
 
-function renderTransactions(transactions) {
+function renderTransactions(transactions, summary = null) {
     const body = document.getElementById("history-body");
 
     if (!Array.isArray(transactions) || transactions.length === 0) {
         body.innerHTML = hDataState("empty", "No transactions found.");
-        renderSummary([]);
+        renderSummary([], summary);
         return;
     }
 
@@ -87,7 +89,7 @@ function renderTransactions(transactions) {
         )
         .join("");
 
-    renderSummary(transactions);
+    renderSummary(transactions, summary);
 }
 
 async function loadStores() {
@@ -108,8 +110,12 @@ async function loadTransactions() {
 
     const params = new URLSearchParams({
         store_id: String(historyActiveStoreId),
-        limit: "100",
+        page: String(historyPage),
+        page_size: document.getElementById("history-page-size").value || "25",
     });
+    const [sortBy, sortDir] = (document.getElementById("history-sort").value || "date:desc").split(":");
+    params.set("sort_by", sortBy);
+    params.set("sort_dir", sortDir);
 
     if (historyFilters.dateFrom) {
         params.set("date_from", historyFilters.dateFrom);
@@ -132,7 +138,14 @@ async function loadTransactions() {
         return;
     }
 
-    renderTransactions(data.transactions);
+    renderTransactions(data.transactions, data.summary || null);
+    const meta = data.pagination || {};
+    const page = Number(meta.page || 1);
+    const totalPages = Number(meta.total_pages || 1);
+    document.getElementById("history-pager").innerHTML = `
+        <button class="secondary-btn btn-sm" type="button" data-page="${page - 1}" ${page <= 1 ? "disabled" : ""}><i class="bi bi-chevron-left"></i> Previous</button>
+        <span>Page ${page} of ${totalPages} · ${Number(meta.total || 0)} records</span>
+        <button class="secondary-btn btn-sm" type="button" data-page="${page + 1}" ${page >= totalPages ? "disabled" : ""}>Next <i class="bi bi-chevron-right"></i></button>`;
     setHistoryResult("", "ok");
 }
 
@@ -185,6 +198,7 @@ document.getElementById("history-apply-filters").addEventListener("click", async
     historyFilters.dateFrom = document.getElementById("history-date-from").value || "";
     historyFilters.dateTo = document.getElementById("history-date-to").value || "";
     historyFilters.paymentMethod = document.getElementById("history-payment-filter").value || "";
+    historyPage = 1;
     await loadTransactions();
 });
 
@@ -198,6 +212,23 @@ document.getElementById("history-clear-filters").addEventListener("click", async
     document.getElementById("history-date-from").value = "";
     document.getElementById("history-date-to").value = "";
     document.getElementById("history-payment-filter").value = "";
+    document.getElementById("history-sort").value = "date:desc";
+    document.getElementById("history-page-size").value = "25";
+    historyPage = 1;
+    await loadTransactions();
+});
+
+["history-payment-filter", "history-sort", "history-page-size"].forEach((id) => {
+    document.getElementById(id).addEventListener("change", async () => {
+        historyFilters.paymentMethod = document.getElementById("history-payment-filter").value || "";
+        historyPage = 1;
+        await loadTransactions();
+    });
+});
+document.getElementById("history-pager").addEventListener("click", async (event) => {
+    const button = event.target.closest("[data-page]");
+    if (!button || button.disabled) return;
+    historyPage = Math.max(1, Number(button.dataset.page || 1));
     await loadTransactions();
 });
 

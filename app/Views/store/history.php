@@ -36,6 +36,26 @@
                 <option value="advance_payment">Advance Payment</option>
             </select>
         </div>
+        <div class="history-filter-field">
+            <label for="history-sort">Sort</label>
+            <select id="history-sort">
+                <option value="date:desc">Newest first</option>
+                <option value="date:asc">Oldest first</option>
+                <option value="customer:asc">Customer A-Z</option>
+                <option value="amount:desc">Highest total</option>
+                <option value="amount:asc">Lowest total</option>
+                <option value="payment:asc">Payment A-Z</option>
+            </select>
+        </div>
+        <div class="history-filter-field">
+            <label for="history-page-size">Rows</label>
+            <select id="history-page-size">
+                <option value="10">10</option>
+                <option value="25" selected>25</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+            </select>
+        </div>
         <div class="history-filter-actions">
             <button id="history-apply-filters" class="primary-btn" type="button">Apply Filters</button>
             <button id="history-clear-filters" class="secondary-btn" type="button">Clear</button>
@@ -69,6 +89,7 @@
             </tbody>
         </table>
     </div>
+    <div id="history-pager" class="history-pager" aria-label="Store transaction pages"></div>
 
     <p id="history-result" class="history-result"></p>
 </section>

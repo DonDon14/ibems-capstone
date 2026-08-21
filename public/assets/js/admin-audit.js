@@ -1,4 +1,5 @@
 let auditRows = [];
+let auditPage = 1;
 
 function auditEscape(value) {
     return String(value ?? "")
@@ -43,10 +44,11 @@ function auditRenderSummary(summary) {
     document.getElementById("audit-action-count").textContent = String(Number(safe.action_count || 0));
 }
 
-function auditRenderRows(rows) {
+function auditRenderRows(rows, pagination = {}) {
     const body = document.getElementById("audit-body");
     const list = Array.isArray(rows) ? rows : [];
-    document.getElementById("audit-count-text").textContent = `Showing ${list.length} event${list.length === 1 ? "" : "s"}`;
+    const total = Number(pagination.total ?? list.length);
+    document.getElementById("audit-count-text").textContent = `Showing ${list.length} of ${total} event${total === 1 ? "" : "s"}`;
 
     if (list.length === 0) {
         body.innerHTML = '<tr><td colspan="5">No audit events found.</td></tr>';
@@ -72,14 +74,24 @@ function auditRenderRows(rows) {
     `).join("");
 }
 
+function auditRenderPager(meta) {
+    const page = Number(meta?.page || 1);
+    const totalPages = Number(meta?.total_pages || 1);
+    document.getElementById("audit-pager").innerHTML = `
+        <button class="secondary-btn btn-sm" type="button" data-page="${page - 1}" ${page <= 1 ? "disabled" : ""}><i class="bi bi-chevron-left"></i> Previous</button>
+        <span>Page ${page} of ${totalPages}</span>
+        <button class="secondary-btn btn-sm" type="button" data-page="${page + 1}" ${page >= totalPages ? "disabled" : ""}>Next <i class="bi bi-chevron-right"></i></button>`;
+}
+
 async function auditLoad() {
-    const params = new URLSearchParams();
+    const params = new URLSearchParams({ page: String(auditPage) });
     const q = (document.getElementById("audit-search").value || "").trim();
     const action = (document.getElementById("audit-action-filter").value || "").trim();
     const entity = (document.getElementById("audit-entity-filter").value || "").trim();
     const dateFrom = (document.getElementById("audit-date-from").value || "").trim();
     const dateTo = (document.getElementById("audit-date-to").value || "").trim();
     const limit = (document.getElementById("audit-limit").value || "100").trim();
+    const [sortBy, sortDir] = (document.getElementById("audit-sort").value || "date:desc").split(":");
 
     if (dateFrom && dateTo && dateFrom > dateTo) {
         auditSetResult("The start date must be on or before the end date.", "error");
@@ -91,7 +103,9 @@ async function auditLoad() {
     if (entity) params.set("entity", entity);
     if (dateFrom) params.set("date_from", dateFrom);
     if (dateTo) params.set("date_to", dateTo);
-    params.set("limit", limit);
+    params.set("page_size", limit);
+    params.set("sort_by", sortBy);
+    params.set("sort_dir", sortDir);
 
     try {
         const response = await fetch(`/admin/audit/data?${params.toString()}`);
@@ -104,11 +118,13 @@ async function auditLoad() {
         auditSetOptions("audit-action-filter", "All Actions", data.actions || []);
         auditSetOptions("audit-entity-filter", "All Entities", data.entities || []);
         auditRenderSummary(data.summary || {});
-        auditRenderRows(auditRows);
+        auditRenderRows(auditRows, data.pagination || {});
+        auditRenderPager(data.pagination || {});
         auditSetResult("", "ok");
     } catch (error) {
         auditRows = [];
-        auditRenderRows([]);
+        auditRenderRows([], {});
+        auditRenderPager({});
         auditRenderSummary({});
         auditSetResult(error instanceof Error ? error.message : "Unable to load audit events.", "error");
     }
@@ -163,17 +179,25 @@ function auditReset() {
     document.getElementById("audit-date-from").value = "";
     document.getElementById("audit-date-to").value = "";
     document.getElementById("audit-limit").value = "100";
+    document.getElementById("audit-sort").value = "date:desc";
+    auditPage = 1;
     auditLoad();
 }
 
-document.getElementById("audit-search-btn").addEventListener("click", auditLoad);
+document.getElementById("audit-search-btn").addEventListener("click", () => { auditPage = 1; auditLoad(); });
 document.getElementById("audit-refresh-btn").addEventListener("click", auditReset);
-["audit-action-filter", "audit-entity-filter", "audit-date-from", "audit-date-to", "audit-limit"].forEach((id) => {
-    document.getElementById(id).addEventListener("change", auditLoad);
+["audit-action-filter", "audit-entity-filter", "audit-date-from", "audit-date-to", "audit-limit", "audit-sort"].forEach((id) => {
+    document.getElementById(id).addEventListener("change", () => { auditPage = 1; auditLoad(); });
 });
 document.getElementById("audit-search").addEventListener("input", () => {
     clearTimeout(window.__auditSearchTimer);
-    window.__auditSearchTimer = setTimeout(auditLoad, 250);
+    window.__auditSearchTimer = setTimeout(() => { auditPage = 1; auditLoad(); }, 250);
+});
+document.getElementById("audit-pager").addEventListener("click", (event) => {
+    const button = event.target.closest("[data-page]");
+    if (!button || button.disabled) return;
+    auditPage = Math.max(1, Number(button.dataset.page || 1));
+    auditLoad();
 });
 document.getElementById("audit-body").addEventListener("click", (event) => {
     const row = event.target.closest(".audit-row");

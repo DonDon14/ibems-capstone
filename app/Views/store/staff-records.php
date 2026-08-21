@@ -30,6 +30,23 @@
                 </div>
             </div>
             <div class="staff-filter-actions">
+                <label class="field">
+                    <span>Sort</span>
+                    <select id="debt-sort">
+                        <option value="name:asc">Name A-Z</option>
+                        <option value="name:desc">Name Z-A</option>
+                        <option value="debt:desc">Highest Debt</option>
+                        <option value="credit:desc">Highest Credit Limit</option>
+                    </select>
+                </label>
+                <label class="field">
+                    <span>Rows</span>
+                    <select id="debt-page-size">
+                        <option value="10">10</option>
+                        <option value="20" selected>20</option>
+                        <option value="50">50</option>
+                    </select>
+                </label>
                 <button id="debt-search-btn" class="secondary-btn" type="button"><i class="bi bi-search"></i> Search</button>
             </div>
         </div>
@@ -41,6 +58,7 @@
                 <?= view('components/data_state', ['type' => 'loading', 'message' => 'Loading debt records...']) ?>
             </div>
         </div>
+        <div id="debt-pager" class="table-pagination"></div>
     </article>
 
     <p id="staff-result" class="staff-result text-sm font-semibold"></p>
@@ -71,6 +89,23 @@
             <div class="field checkbox-field">
                 <label class="inline-flex h-11 items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700"><input id="txn-debt-only" class="h-4 w-4" type="checkbox"> Debt only</label>
             </div>
+            <div class="field">
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500" for="txn-sort">Sort</label>
+                <select id="txn-sort">
+                    <option value="date:desc">Newest First</option>
+                    <option value="date:asc">Oldest First</option>
+                    <option value="amount:desc">Highest Amount</option>
+                    <option value="amount:asc">Lowest Amount</option>
+                </select>
+            </div>
+            <div class="field">
+                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500" for="txn-page-size">Rows</label>
+                <select id="txn-page-size">
+                    <option value="10">10</option>
+                    <option value="25" selected>25</option>
+                    <option value="50">50</option>
+                </select>
+            </div>
             <button id="txn-search-btn" class="primary-btn" type="button">Apply</button>
             <button id="txn-clear-btn" class="secondary-btn" type="button"><i class="bi bi-x-circle"></i> Clear</button>
         </div>
@@ -93,6 +128,7 @@
                 </tbody>
             </table>
         </div>
+        <div id="txn-pager" class="table-pagination"></div>
     </div>
 </div>
 

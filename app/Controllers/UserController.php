@@ -252,6 +252,138 @@ class UserController extends Controller
         return view('user/history');
     }
 
+    public function stores()
+    {
+        return view('user/stores');
+    }
+
+    public function storesData()
+    {
+        $userId = (int) session()->get('user_id');
+        if ($userId <= 0) {
+            return $this->response->setStatusCode(401)->setJSON([
+                'status' => 'error',
+                'message' => 'Not authenticated.',
+            ]);
+        }
+
+        $q = trim((string) $this->request->getGet('q'));
+        $storeId = max(0, (int) ($this->request->getGet('store_id') ?? 0));
+        $category = trim((string) $this->request->getGet('category'));
+        $availability = strtolower(trim((string) $this->request->getGet('availability')));
+        $sortBy = strtolower(trim((string) ($this->request->getGet('sort_by') ?? 'store')));
+        $sortDir = strtolower(trim((string) ($this->request->getGet('sort_dir') ?? 'asc'))) === 'desc' ? 'DESC' : 'ASC';
+        $page = max(1, (int) ($this->request->getGet('page') ?? 1));
+        $pageSize = max(12, min(60, (int) ($this->request->getGet('page_size') ?? 24)));
+        $offset = ($page - 1) * $pageSize;
+
+        $sortColumns = [
+            'store' => 's.store_name',
+            'name' => 'p.name',
+            'price' => 'p.price',
+            'stock' => 'p.stock_qty',
+            'category' => 'p.category',
+        ];
+        $sortColumn = $sortColumns[$sortBy] ?? $sortColumns['store'];
+
+        $db = Database::connect();
+        $applyFilters = static function ($query) use ($q, $storeId, $category, $availability) {
+            $query->where('s.is_active', true)->where('p.is_active', true);
+            if ($storeId > 0) {
+                $query->where('p.store_id', $storeId);
+            }
+            if ($category !== '') {
+                $query->where('p.category', $category);
+            }
+            if ($availability === 'available') {
+                $query->where('p.stock_qty >', 0);
+            } elseif ($availability === 'out') {
+                $query->where('p.stock_qty <=', 0);
+            }
+            if ($q !== '') {
+                $query->groupStart()
+                    ->like('p.name', $q)
+                    ->orLike('p.variant_label', $q)
+                    ->orLike('p.category', $q)
+                    ->orLike('p.sku', $q)
+                    ->orLike('s.store_name', $q)
+                    ->groupEnd();
+            }
+            return $query;
+        };
+
+        $countQuery = $applyFilters($db->table('products p')->join('stores s', 's.id = p.store_id', 'inner'));
+        $total = $countQuery->countAllResults();
+        $totalPages = max(1, (int) ceil($total / $pageSize));
+        if ($page > $totalPages) {
+            $page = $totalPages;
+            $offset = ($page - 1) * $pageSize;
+        }
+
+        $query = $db->table('products p')
+            ->select('p.id, p.store_id, p.family_id, p.sku, p.name, p.variant_label, p.category, p.image_url, p.price, p.stock_qty, p.updated_at, s.store_name, s.logo_url AS store_logo_url')
+            ->join('stores s', 's.id = p.store_id', 'inner');
+        $rows = $applyFilters($query)
+            ->orderBy($sortColumn, $sortDir)
+            ->orderBy('p.name', 'ASC')
+            ->orderBy('p.id', 'ASC')
+            ->limit($pageSize, $offset)
+            ->get()
+            ->getResultArray();
+
+        $stores = $db->table('stores s')
+            ->select('s.id, s.store_name, s.logo_url, COUNT(p.id) AS product_count')
+            ->join('products p', 'p.store_id = s.id AND p.is_active = TRUE', 'left', false)
+            ->where('s.is_active', true)
+            ->groupBy('s.id, s.store_name, s.logo_url')
+            ->orderBy('s.store_name', 'ASC')
+            ->get()
+            ->getResultArray();
+        $categories = $db->table('products p')
+            ->select('p.category')
+            ->join('stores s', 's.id = p.store_id', 'inner')
+            ->where('p.is_active', true)
+            ->where('s.is_active', true)
+            ->where('p.category IS NOT NULL', null, false)
+            ->where('p.category !=', '')
+            ->groupBy('p.category')
+            ->orderBy('p.category', 'ASC')
+            ->get()
+            ->getResultArray();
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'data' => array_map(static fn(array $row): array => [
+                'id' => (int) ($row['id'] ?? 0),
+                'store_id' => (int) ($row['store_id'] ?? 0),
+                'family_id' => isset($row['family_id']) ? (int) $row['family_id'] : null,
+                'store_name' => (string) ($row['store_name'] ?? ''),
+                'store_logo_url' => (string) ($row['store_logo_url'] ?? ''),
+                'sku' => (string) ($row['sku'] ?? ''),
+                'name' => (string) ($row['name'] ?? ''),
+                'variant_label' => (string) ($row['variant_label'] ?? ''),
+                'category' => (string) ($row['category'] ?? ''),
+                'image_url' => (string) ($row['image_url'] ?? ''),
+                'price' => (float) ($row['price'] ?? 0),
+                'availability' => (int) ($row['stock_qty'] ?? 0) > 0 ? 'available' : 'out',
+                'updated_at' => (string) ($row['updated_at'] ?? ''),
+            ], $rows),
+            'stores' => array_map(static fn(array $row): array => [
+                'id' => (int) ($row['id'] ?? 0),
+                'store_name' => (string) ($row['store_name'] ?? ''),
+                'logo_url' => (string) ($row['logo_url'] ?? ''),
+                'product_count' => (int) ($row['product_count'] ?? 0),
+            ], $stores),
+            'categories' => array_values(array_map(static fn(array $row): string => (string) ($row['category'] ?? ''), $categories)),
+            'pagination' => [
+                'page' => $page,
+                'page_size' => $pageSize,
+                'total' => $total,
+                'total_pages' => $totalPages,
+            ],
+        ]);
+    }
+
     public function deductions()
     {
         return view('user/deductions');
@@ -407,23 +539,45 @@ class UserController extends Controller
 
         $dateFrom = trim((string) $this->request->getGet('date_from'));
         $dateTo = trim((string) $this->request->getGet('date_to'));
-        $limit = (int) ($this->request->getGet('limit') ?? 150);
-        $limit = max(1, min(300, $limit));
+        $sortBy = strtolower(trim((string) ($this->request->getGet('sort_by') ?? 'date')));
+        $sortDir = strtolower(trim((string) ($this->request->getGet('sort_dir') ?? 'desc'))) === 'asc' ? 'ASC' : 'DESC';
+        $page = max(1, (int) ($this->request->getGet('page') ?? 1));
+        $pageSize = max(10, min(100, (int) ($this->request->getGet('page_size') ?? $this->request->getGet('limit') ?? 25)));
+        $offset = ($page - 1) * $pageSize;
+        $sortColumns = [
+            'date' => 'dce.created_at',
+            'entry' => 'dce.entry_type',
+            'direction' => 'dce.direction',
+            'amount' => 'dce.amount',
+            'balance' => 'dce.debt_after',
+        ];
+        $sortColumn = $sortColumns[$sortBy] ?? $sortColumns['date'];
 
         $db = Database::connect();
+        $applyFilters = static function ($query) use ($userId, $dateFrom, $dateTo) {
+            $query->where('dce.user_id', $userId);
+            if ($dateFrom !== '') {
+                $query->where('dce.created_at >=', $dateFrom . ' 00:00:00');
+            }
+            if ($dateTo !== '') {
+                $query->where('dce.created_at <=', $dateTo . ' 23:59:59');
+            }
+            return $query;
+        };
+
+        $total = $applyFilters($db->table('debt_cashbook_entries dce'))->countAllResults();
+        $totalPages = max(1, (int) ceil($total / $pageSize));
+        if ($page > $totalPages) {
+            $page = $totalPages;
+            $offset = ($page - 1) * $pageSize;
+        }
+
         $query = $db->table('debt_cashbook_entries dce')
-            ->select('dce.id, dce.created_at, dce.entry_type, dce.direction, dce.amount, dce.debt_before, dce.debt_after, dce.credit_limit_snapshot, dce.available_credit_snapshot, dce.reference_type, dce.reference_id, dce.remarks')
-            ->where('dce.user_id', $userId);
-
-        if ($dateFrom !== '') {
-            $query->where('dce.created_at >=', $dateFrom . ' 00:00:00');
-        }
-        if ($dateTo !== '') {
-            $query->where('dce.created_at <=', $dateTo . ' 23:59:59');
-        }
-
-        $rows = $query->orderBy('dce.id', 'DESC')
-            ->limit($limit)
+            ->select('dce.id, dce.created_at, dce.entry_type, dce.direction, dce.amount, dce.debt_before, dce.debt_after, dce.credit_limit_snapshot, dce.available_credit_snapshot, dce.reference_type, dce.reference_id, dce.remarks');
+        $rows = $applyFilters($query)
+            ->orderBy($sortColumn, $sortDir)
+            ->orderBy('dce.id', $sortDir)
+            ->limit($pageSize, $offset)
             ->get()
             ->getResultArray();
 
@@ -445,6 +599,12 @@ class UserController extends Controller
                     'remarks' => (string) ($row['remarks'] ?? ''),
                 ];
             }, $rows),
+            'pagination' => [
+                'page' => $page,
+                'page_size' => $pageSize,
+                'total' => $total,
+                'total_pages' => $totalPages,
+            ],
         ]);
     }
 
@@ -460,24 +620,85 @@ class UserController extends Controller
 
         $dateFrom = trim((string) $this->request->getGet('date_from'));
         $dateTo = trim((string) $this->request->getGet('date_to'));
-        $limit = (int) ($this->request->getGet('limit') ?? 100);
-        $limit = max(1, min(200, $limit));
+        $storeId = max(0, (int) ($this->request->getGet('store_id') ?? 0));
+        $sortBy = strtolower(trim((string) ($this->request->getGet('sort_by') ?? 'date')));
+        $sortDir = strtolower(trim((string) ($this->request->getGet('sort_dir') ?? 'desc'))) === 'asc' ? 'ASC' : 'DESC';
+        $page = max(1, (int) ($this->request->getGet('page') ?? 1));
+        $pageSize = max(10, min(100, (int) ($this->request->getGet('page_size') ?? $this->request->getGet('limit') ?? 25)));
+        $offset = ($page - 1) * $pageSize;
+        $sortColumns = [
+            'date' => 't.created_at',
+            'store' => 's.store_name',
+            'payment' => 't.payment_method',
+            'amount' => 't.amount',
+            'reference' => 't.client_txn_id',
+        ];
+        $sortColumn = $sortColumns[$sortBy] ?? $sortColumns['date'];
 
         $db = Database::connect();
+        $applyFilters = static function ($query) use ($userId, $dateFrom, $dateTo, $storeId) {
+            $query->where('t.user_id', $userId);
+            if ($dateFrom !== '') {
+                $query->where('t.created_at >=', $dateFrom . ' 00:00:00');
+            }
+            if ($dateTo !== '') {
+                $query->where('t.created_at <=', $dateTo . ' 23:59:59');
+            }
+            if ($storeId > 0) {
+                $query->where('t.store_id', $storeId);
+            }
+            return $query;
+        };
+
+        $countQuery = $db->table('transactions t')->join('stores s', 's.id = t.store_id', 'left');
+        $total = $applyFilters($countQuery)->countAllResults();
+        $totalPages = max(1, (int) ceil($total / $pageSize));
+        if ($page > $totalPages) {
+            $page = $totalPages;
+            $offset = ($page - 1) * $pageSize;
+        }
+
         $query = $db->table('transactions t')
             ->select('t.id, t.client_txn_id, t.created_at, t.payment_method, t.amount, t.store_id, s.store_name')
+            ->join('stores s', 's.id = t.store_id', 'left');
+        $rows = $applyFilters($query)
+            ->orderBy($sortColumn, $sortDir)
+            ->orderBy('t.id', $sortDir)
+            ->limit($pageSize, $offset)
+            ->get()
+            ->getResultArray();
+
+        $storeOptions = $db->table('transactions t')
+            ->select('t.store_id, s.store_name')
             ->join('stores s', 's.id = t.store_id', 'left')
-            ->where('t.user_id', $userId);
+            ->where('t.user_id', $userId)
+            ->groupBy('t.store_id, s.store_name')
+            ->orderBy('s.store_name', 'ASC')
+            ->get()
+            ->getResultArray();
 
+        $hasPaymentLines = in_array('transaction_payments', $db->listTables(), true);
+        $totalsQuery = $db->table('transactions t')->join('stores s', 's.id = t.store_id', 'left');
+        if ($hasPaymentLines) {
+            $paymentTotals = '(SELECT transaction_id, SUM(CASE WHEN LOWER(payment_method) = \'debt\' THEN amount ELSE 0 END) AS debt_amount FROM transaction_payments GROUP BY transaction_id) tp';
+            $totalsQuery
+                ->select("t.store_id, s.store_name, COUNT(t.id) AS purchase_count, COALESCE(SUM(t.amount), 0) AS total_spent, COALESCE(SUM(CASE WHEN tp.transaction_id IS NOT NULL THEN tp.debt_amount WHEN LOWER(COALESCE(t.payment_method, '')) = 'debt' THEN t.amount ELSE 0 END), 0) AS debt_charged", false)
+                ->join($paymentTotals, 'tp.transaction_id = t.id', 'left', false);
+        } else {
+            $totalsQuery->select("t.store_id, s.store_name, COUNT(t.id) AS purchase_count, COALESCE(SUM(t.amount), 0) AS total_spent, COALESCE(SUM(CASE WHEN LOWER(COALESCE(t.payment_method, '')) = 'debt' THEN t.amount ELSE 0 END), 0) AS debt_charged", false);
+        }
+        $totalsQuery->where('t.user_id', $userId);
         if ($dateFrom !== '') {
-            $query->where('t.created_at >=', $dateFrom . ' 00:00:00');
+            $totalsQuery->where('t.created_at >=', $dateFrom . ' 00:00:00');
         }
-
         if ($dateTo !== '') {
-            $query->where('t.created_at <=', $dateTo . ' 23:59:59');
+            $totalsQuery->where('t.created_at <=', $dateTo . ' 23:59:59');
         }
-
-        $rows = $query->orderBy('t.id', 'DESC')->limit($limit)->get()->getResultArray();
+        $storeTotals = $totalsQuery
+            ->groupBy('t.store_id, s.store_name')
+            ->orderBy('total_spent', 'DESC')
+            ->get()
+            ->getResultArray();
 
         return $this->response->setJSON([
             'status' => 'success',
@@ -488,9 +709,32 @@ class UserController extends Controller
                     'created_at' => $row['created_at'],
                     'payment_method' => $row['payment_method'],
                     'amount' => (float) $row['amount'],
+                    'store_id' => (int) ($row['store_id'] ?? 0),
                     'store_name' => $row['store_name'] ?: ('Store #' . (int) $row['store_id']),
                 ];
             }, $rows),
+            'stores' => array_map(static fn(array $row): array => [
+                'id' => (int) ($row['store_id'] ?? 0),
+                'store_name' => (string) (($row['store_name'] ?? '') ?: ('Store #' . (int) ($row['store_id'] ?? 0))),
+            ], $storeOptions),
+            'store_totals' => array_map(static fn(array $row): array => [
+                'store_id' => (int) ($row['store_id'] ?? 0),
+                'store_name' => (string) (($row['store_name'] ?? '') ?: ('Store #' . (int) ($row['store_id'] ?? 0))),
+                'purchase_count' => (int) ($row['purchase_count'] ?? 0),
+                'total_spent' => (float) ($row['total_spent'] ?? 0),
+                'debt_charged' => (float) ($row['debt_charged'] ?? 0),
+            ], $storeTotals),
+            'grand_totals' => [
+                'purchase_count' => array_sum(array_column($storeTotals, 'purchase_count')),
+                'total_spent' => array_sum(array_column($storeTotals, 'total_spent')),
+                'debt_charged' => array_sum(array_column($storeTotals, 'debt_charged')),
+            ],
+            'pagination' => [
+                'page' => $page,
+                'page_size' => $pageSize,
+                'total' => $total,
+                'total_pages' => $totalPages,
+            ],
         ]);
     }
 

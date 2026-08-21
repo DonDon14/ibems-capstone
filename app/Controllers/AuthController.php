@@ -9,7 +9,10 @@ class AuthController extends Controller
 {
     public function login()
     {
-        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $contentType = strtolower($this->request->getHeaderLine('Content-Type'));
+        $request = str_contains($contentType, 'application/json')
+            ? ($this->request->getJSON(true) ?? [])
+            : $this->request->getPost();
 
         $email    = strtolower(trim((string) ($request['email'] ?? '')));
         $password = $request['password'] ?? null;

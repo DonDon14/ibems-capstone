@@ -43,6 +43,25 @@
                 </select>
             </label>
             <label class="uv-select-field min-w-[170px] grow basis-[170px]">
+                <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Sort</span>
+                <select id="uv-sort" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300">
+                    <option value="name:asc">Name A-Z</option>
+                    <option value="name:desc">Name Z-A</option>
+                    <option value="debt:desc">Highest debt</option>
+                    <option value="debt:asc">Lowest debt</option>
+                    <option value="credit:desc">Highest credit limit</option>
+                    <option value="type:asc">Employment type</option>
+                </select>
+            </label>
+            <label class="uv-select-field min-w-[120px] grow basis-[120px]">
+                <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Rows</span>
+                <select id="uv-page-size" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300">
+                    <option value="10">10</option>
+                    <option value="25" selected>25</option>
+                    <option value="50">50</option>
+                </select>
+            </label>
+            <label class="uv-select-field min-w-[170px] grow basis-[170px]">
                 <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Employment Type</span>
                 <select id="uv-type-filter" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300">
                     <option value="">All Types</option>
@@ -72,6 +91,7 @@
             ]) ?>
         </div>
     </section>
+    <div id="uv-pager" class="overview-pager" aria-label="User management pages"></div>
 </section>
 
 <div id="uv-edit-modal" class="admin-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="uv-edit-title">

@@ -1,0 +1,183 @@
+.hierarchy-shell {
+    display: grid;
+    gap: 18px;
+}
+
+.hierarchy-panel {
+    border: 1px solid #dbe5f0;
+    border-radius: 18px;
+    padding: 20px;
+    background: #fff;
+    box-shadow: 0 14px 30px rgba(15, 23, 42, 0.07);
+}
+
+.hierarchy-heading {
+    display: flex;
+    align-items: end;
+    justify-content: space-between;
+    gap: 20px;
+    margin-bottom: 20px;
+}
+
+.hierarchy-heading span {
+    color: #2563eb;
+    font-size: 0.75rem;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+}
+
+.hierarchy-heading h3,
+.hierarchy-heading p {
+    margin: 0;
+}
+
+.hierarchy-heading h3 {
+    margin-top: 4px;
+    color: #0f172a;
+    font-size: 1.2rem;
+}
+
+.hierarchy-heading p {
+    max-width: 560px;
+    color: #64748b;
+    line-height: 1.5;
+}
+
+.hierarchy-tree {
+    display: grid;
+    justify-items: center;
+}
+
+.hierarchy-level {
+    display: grid;
+    width: 100%;
+    gap: 18px;
+}
+
+.hierarchy-level--two {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.hierarchy-connector {
+    width: 2px;
+    height: 28px;
+    background: #bfdbfe;
+}
+
+.hierarchy-node {
+    display: flex;
+    align-items: flex-start;
+    gap: 13px;
+    min-width: 0;
+    border: 1px solid #dbe5f0;
+    border-top: 4px solid #3b82f6;
+    border-radius: 15px;
+    padding: 15px;
+    background: linear-gradient(180deg, #fff 0%, #f8fbff 100%);
+}
+
+.hierarchy-node--root {
+    width: min(600px, 100%);
+    border-top-color: #1d4ed8;
+}
+
+.hierarchy-node--finance { border-top-color: #7c3aed; }
+.hierarchy-node--review { border-top-color: #d97706; }
+.hierarchy-node--store { border-top-color: #059669; }
+.hierarchy-node--user { border-top-color: #0ea5e9; }
+
+.hierarchy-node > i {
+    display: inline-flex;
+    width: 42px;
+    height: 42px;
+    flex: 0 0 42px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 12px;
+    background: #eff6ff;
+    color: #1d4ed8;
+    font-size: 1.2rem;
+}
+
+.hierarchy-node div {
+    display: grid;
+    gap: 3px;
+}
+
+.hierarchy-node span {
+    color: #64748b;
+    font-size: 0.72rem;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.hierarchy-node strong { color: #0f172a; }
+.hierarchy-node small { color: #475569; line-height: 1.45; }
+
+.hierarchy-flow {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    counter-reset: hierarchy-step;
+}
+
+.hierarchy-flow li {
+    position: relative;
+    display: grid;
+    align-content: start;
+    gap: 10px;
+    min-width: 0;
+    border: 1px solid #dbe5f0;
+    border-radius: 14px;
+    padding: 14px;
+    background: #f8fafc;
+    counter-increment: hierarchy-step;
+}
+
+.hierarchy-flow li::before {
+    content: counter(hierarchy-step);
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    color: #94a3b8;
+    font-size: 0.72rem;
+    font-weight: 900;
+}
+
+.hierarchy-flow i { color: #2563eb; font-size: 1.35rem; }
+.hierarchy-flow div { display: grid; gap: 5px; }
+.hierarchy-flow strong { color: #0f172a; }
+.hierarchy-flow span { color: #64748b; font-size: 0.82rem; line-height: 1.45; }
+
+.hierarchy-responsibility-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.hierarchy-responsibility-grid article {
+    border: 1px solid #dbe5f0;
+    border-radius: 15px;
+    padding: 16px;
+    background: #fff;
+}
+
+.hierarchy-responsibility-grid i { color: #2563eb; font-size: 1.3rem; }
+.hierarchy-responsibility-grid h4 { margin: 9px 0 5px; color: #0f172a; }
+.hierarchy-responsibility-grid p { margin: 0; color: #64748b; line-height: 1.5; }
+
+@media (max-width: 980px) {
+    .hierarchy-flow { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 720px) {
+    .hierarchy-heading { align-items: flex-start; flex-direction: column; }
+    .hierarchy-level--two,
+    .hierarchy-flow,
+    .hierarchy-responsibility-grid { grid-template-columns: 1fr; }
+}
