@@ -19,6 +19,12 @@ final class RoleFilterIntegrationTest extends CIUnitTestCase
             ['GET', 'test/admin-only', static fn () => service('response')->setJSON([
                 'status' => 'success',
             ]), ['filter' => 'access:system.manage']],
+            ['POST', 'test/admin-only', static fn () => service('response')->setJSON([
+                'status' => 'success',
+            ]), ['filter' => 'access:system.manage']],
+            ['OPTIONS', 'test/admin-only', static fn () => service('response')->setJSON([
+                'status' => 'success',
+            ]), ['filter' => 'access:system.manage']],
             ['GET', 'test/store-admin-only', static fn () => service('response')->setJSON([
                 'status' => 'success',
             ]), ['filter' => 'access:store.review_assigned']],
@@ -155,6 +161,60 @@ final class RoleFilterIntegrationTest extends CIUnitTestCase
         ])->withHeaders(['Accept' => 'application/json'])
             ->get('test/unknown-policy')
             ->assertStatus(403);
+    }
+
+    public function testRecentReadRequestCanReuseVerifiedSessionRoles(): void
+    {
+        $this->seedUser(11, 'ADMIN');
+        Database::connect()->table('users')->where('id', 11)->update(['role' => 'STORE_SYSTEM']);
+        Database::connect()->table('user_roles')->where('user_id', 11)->delete();
+        Database::connect()->table('user_roles')->insert([
+            'user_id' => 11,
+            'role' => 'STORE_SYSTEM',
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
+        putenv('IBEMS_ROLE_REFRESH_INTERVAL=30');
+
+        try {
+            $this->withSession([
+                'logged_in' => true,
+                'user_id' => 11,
+                'role' => 'ADMIN',
+                'available_roles' => ['ADMIN'],
+                'roles_refreshed_at' => time(),
+            ])->withHeaders(['Accept' => 'application/json'])
+                ->get('test/admin-only')
+                ->assertOK();
+        } finally {
+            putenv('IBEMS_ROLE_REFRESH_INTERVAL');
+        }
+    }
+
+    public function testWriteRequestAlwaysRefreshesRolesBeforeAuthorization(): void
+    {
+        $this->seedUser(12, 'ADMIN');
+        Database::connect()->table('users')->where('id', 12)->update(['role' => 'STORE_SYSTEM']);
+        Database::connect()->table('user_roles')->where('user_id', 12)->delete();
+        Database::connect()->table('user_roles')->insert([
+            'user_id' => 12,
+            'role' => 'STORE_SYSTEM',
+            'created_at' => date('Y-m-d H:i:s'),
+        ]);
+        putenv('IBEMS_ROLE_REFRESH_INTERVAL=30');
+
+        try {
+            $this->withSession([
+                'logged_in' => true,
+                'user_id' => 12,
+                'role' => 'ADMIN',
+                'available_roles' => ['ADMIN'],
+                'roles_refreshed_at' => time(),
+            ])->withHeaders(['Accept' => 'application/json'])
+                ->call('options', 'test/admin-only')
+                ->assertStatus(403);
+        } finally {
+            putenv('IBEMS_ROLE_REFRESH_INTERVAL');
+        }
     }
 
     private function seedUser(int $id, string $role): void

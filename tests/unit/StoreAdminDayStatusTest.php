@@ -179,10 +179,13 @@ final class StoreAdminDayStatusTest extends CIUnitTestCase
     public function testVarianceEvidenceIsPrivateAndHandoffsStayStoreScoped(): void
     {
         $service = (string) file_get_contents(APPPATH . 'Services/StoreOversightService.php');
+        $storage = (string) file_get_contents(APPPATH . 'Services/AssetStorageService.php');
         $routes = (string) file_get_contents(APPPATH . 'Config/Routes.php');
         $script = (string) file_get_contents(FCPATH . 'assets/js/admin-store-details.js');
 
-        $this->assertStringContainsString("WRITEPATH . 'private/variance-evidence/'", $service);
+        $this->assertStringContainsString('storeEvidence($file, $folder)', $service);
+        $this->assertStringContainsString('ensureSupabaseBucket($this->privateBucket, false', $storage);
+        $this->assertStringContainsString("WRITEPATH . 'private/'", $storage);
         $this->assertStringContainsString("['application/pdf' => 'pdf', 'image/jpeg' => 'jpg', 'image/png' => 'png']", $service);
         $this->assertStringContainsString("5 * 1024 * 1024", $service);
         $this->assertStringContainsString("hash_equals", $service);

@@ -6,6 +6,9 @@ use CodeIgniter\Model;
 
 class StoreModel extends Model
 {
+    /** @var array<string, array<int, array<string, mixed>>> */
+    private static array $accessibleStoresRequestCache = [];
+
     protected $table            = 'stores';
     protected $primaryKey       = 'id';
     protected $useAutoIncrement = true;
@@ -49,6 +52,11 @@ class StoreModel extends Model
 
     public function getAccessibleStores(int $userId, string $role): array
     {
+        $cacheKey = $userId . '|' . strtoupper(trim($role));
+        if (array_key_exists($cacheKey, self::$accessibleStoresRequestCache)) {
+            return self::$accessibleStoresRequestCache[$cacheKey];
+        }
+
         $builder = $this->where('is_active', true);
 
         if ($role === 'STORE_SYSTEM') {
@@ -56,14 +64,14 @@ class StoreModel extends Model
         } elseif ($role === 'STORE_SUPERVISOR') {
             $storeIds = (new StoreSupervisorModel())->getStoreIdsBySupervisor($userId);
             if ($storeIds === []) {
-                return [];
+                return self::$accessibleStoresRequestCache[$cacheKey] = [];
             }
             $builder->whereIn('id', $storeIds);
         } elseif ($role !== 'ADMIN') {
-            return [];
+            return self::$accessibleStoresRequestCache[$cacheKey] = [];
         }
 
-        return $builder->orderBy('store_name', 'ASC')->findAll();
+        return self::$accessibleStoresRequestCache[$cacheKey] = $builder->orderBy('store_name', 'ASC')->findAll();
     }
 
     public function canUserAccessStore(int $userId, string $role, int $storeId): bool

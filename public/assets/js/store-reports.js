@@ -436,6 +436,13 @@ async function rOpenReceipt(id, trigger) {
 function rCloseReceipt(){document.getElementById("reports-receipt-modal").style.display="none";reportsReceiptTrigger?.focus?.();reportsReceiptTrigger=null;}
 
 async function rLoadStores() {
+    const context = window.IBEMS_PORTAL_CONTEXT || {};
+    if (Array.isArray(context.stores) && context.stores.length > 0) {
+        reportsStores = context.stores;
+        reportsActiveStoreId = Number(context.default_store_id || reportsStores[0].id);
+        return;
+    }
+
     const response = await fetch("/store/my-stores");
     const data = await response.json();
     if (!data || data.status !== "success" || !Array.isArray(data.stores) || data.stores.length === 0) {

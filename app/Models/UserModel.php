@@ -50,6 +50,11 @@ class UserModel extends Model
                     ->first();
     }
 
+    public function getActiveUserWithRolesByEmail(string $email): ?array
+    {
+        return $this->getActiveUserWithRoles('u.email', $email);
+    }
+
     public function getByQrToken(string $qrToken): ?array
     {
         return $this->where('qr_token', $qrToken)
@@ -64,8 +69,20 @@ class UserModel extends Model
                     ->first();
     }
 
+    public function getActiveUserWithRolesById(int $userId): ?array
+    {
+        return $this->getActiveUserWithRoles('u.id', $userId);
+    }
+
     public function getEffectiveRoles(array $user): array
     {
+        if (isset($user['_effective_roles']) && is_array($user['_effective_roles'])) {
+            return array_values(array_unique(array_filter(array_map(
+                static fn ($role): string => strtoupper(trim((string) $role)),
+                $user['_effective_roles']
+            ))));
+        }
+
         $userId = (int) ($user['id'] ?? 0);
         $roles = [];
 
@@ -84,5 +101,39 @@ class UserModel extends Model
         }
 
         return array_values(array_unique($roles));
+    }
+
+    private function getActiveUserWithRoles(string $field, string|int $value): ?array
+    {
+        $rows = $this->db->table('users u')
+            ->select('u.*, ur.role AS assigned_role')
+            ->join('user_roles ur', 'ur.user_id = u.id', 'left')
+            ->where($field, $value)
+            ->where('u.is_active', true)
+            ->orderBy('ur.role', 'ASC')
+            ->get()
+            ->getResultArray();
+
+        if ($rows === []) {
+            return null;
+        }
+
+        $user = $rows[0];
+        $roles = [];
+        foreach ($rows as $row) {
+            $assignedRole = strtoupper(trim((string) ($row['assigned_role'] ?? '')));
+            if ($assignedRole !== '') {
+                $roles[] = $assignedRole;
+            }
+        }
+        unset($user['assigned_role']);
+
+        $legacyRole = strtoupper(trim((string) ($user['role'] ?? '')));
+        if ($legacyRole !== '') {
+            $roles[] = $legacyRole;
+        }
+        $user['_effective_roles'] = $roles !== [] ? array_values(array_unique($roles)) : ['USER'];
+
+        return $user;
     }
 }

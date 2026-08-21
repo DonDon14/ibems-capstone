@@ -10,6 +10,13 @@ $storeModel = new \App\Models\StoreModel();
 $stores = $storeModel->getAccessibleStores((int) session()->get('user_id'), $role);
 $activeStore = $stores[0] ?? null;
 $storeName = (string) ($activeStore['store_name'] ?? 'Store Portal');
+$portalContext = [
+    'stores' => array_map(static fn (array $store): array => [
+        'id' => (int) ($store['id'] ?? 0),
+        'store_name' => (string) ($store['store_name'] ?? ''),
+    ], $stores),
+    'default_store_id' => (int) ($activeStore['id'] ?? 0),
+];
 
 $pageTitle = 'Store System';
 $portalTitle = $storeName;

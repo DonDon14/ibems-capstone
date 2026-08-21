@@ -47,3 +47,5 @@ services:
         sync: false
       - key: IBEMS_SUPABASE_STORAGE_BUCKET
         value: ibems-assets
+      - key: IBEMS_SUPABASE_PRIVATE_STORAGE_BUCKET
+        value: ibems-private

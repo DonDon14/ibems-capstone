@@ -35,7 +35,8 @@ class RoleFilter implements FilterInterface
                 ]);
         }
 
-        $availableRoles = ibems_refresh_session_roles();
+        $method = strtoupper($request->getMethod());
+        $availableRoles = ibems_refresh_session_roles(! in_array($method, ['GET', 'HEAD'], true));
         $userRole = ibems_current_role();
 
         if ($userRole === null) {
