@@ -56,6 +56,8 @@ final class DeductionPeriodServiceTest extends CIUnitTestCase
         $this->assertSame(201, $result['code']);
         $this->assertSame('draft', $result['period']['status'] ?? null);
         $this->assertSame('semi_monthly', $result['period']['frequency'] ?? null);
+        $this->assertSame('PAY-20260801-20260815', $result['period']['period_code'] ?? null);
+        $this->assertSame('August 1-15, 2026', $result['period']['label'] ?? null);
         $this->assertSame(900, (int) ($result['period']['created_by'] ?? 0));
     }
 
@@ -81,7 +83,7 @@ final class DeductionPeriodServiceTest extends CIUnitTestCase
 
         $this->assertSame('error', $second['status']);
         $this->assertSame(409, $second['code']);
-        $this->assertStringContainsString('overlaps 2026-08-A', $second['message']);
+        $this->assertStringContainsString('overlaps PAY-20260801-20260815', $second['message']);
     }
 
     public function testAllowsPeriodAfterCancelledOverlap(): void
@@ -109,6 +111,7 @@ final class DeductionPeriodServiceTest extends CIUnitTestCase
         ], 900);
 
         $this->assertSame('success', $replacement['status']);
+        $this->assertSame('PAY-20260801-20260815-2', $replacement['period']['period_code'] ?? null);
     }
 
     public function testRejectsInvalidDateOrderAndUnknownFrequency(): void

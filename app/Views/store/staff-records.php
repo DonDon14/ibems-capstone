@@ -33,7 +33,7 @@
                 <button id="debt-search-btn" class="secondary-btn" type="button"><i class="bi bi-search"></i> Search</button>
             </div>
         </div>
-        <p class="staff-scope-note">Showing active Faculty and Staff with an employee credit account. Debt, credit limit, and available credit are totals across all stores; purchase history is filtered to an authorized store.</p>
+        <p class="staff-scope-note">Showing active Faculty and Staff whose financial profiles have been configured by Accounting. Debt, credit limit, and available credit are totals across all stores; purchase history is filtered to an authorized store.</p>
         <p id="staff-count-text" class="staff-count-text text-sm text-slate-500">Showing 0 records</p>
 
         <div class="staff-record-list-wrap record-panel">

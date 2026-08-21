@@ -157,8 +157,11 @@ if (! function_exists('ibems_bool')) {
 if (! function_exists('ibems_datetime')) {
     function ibems_datetime(?string $value, string $format = 'M d, h:i A'): string
     {
-        $timestamp = strtotime((string) ($value ?: 'now'));
-
-        return $timestamp !== false ? date($format, $timestamp) : '-';
+        try {
+            $stored = new \DateTimeImmutable((string) ($value ?: 'now'), new \DateTimeZone('UTC'));
+            return $stored->setTimezone(new \DateTimeZone('Asia/Manila'))->format($format);
+        } catch (\Throwable) {
+            return '-';
+        }
     }
 }

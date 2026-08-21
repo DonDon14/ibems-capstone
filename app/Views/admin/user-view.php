@@ -5,7 +5,7 @@
     <?= view('components/page_header', [
         'eyebrow' => 'Identity administration',
         'title' => 'Employee records',
-        'description' => 'Manage employee and student profiles, roles, salary, credit, and account status.',
+        'description' => 'Manage employee and student identity, roles, and account status. New Faculty and Staff receive a PHP 1,000 base credit limit; Accounting can update it with salary details.',
         'icon' => 'bi bi-people',
     ]) ?>
 
@@ -101,8 +101,6 @@
                     <option value="student">Student</option>
                 </select>
             </div>
-            <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-e-salary">Base Salary</label><input id="uv-e-salary" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="number" step="0.01" min="0"></div>
-            <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-e-credit-limit">Credit Limit</label><input id="uv-e-credit-limit" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="number" step="0.01" min="0"></div>
             <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-e-active">Status</label>
                 <select id="uv-e-active" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm">
                     <option value="1">Active</option>
@@ -168,8 +166,7 @@
                     <option value="student">Student</option>
                 </select>
             </div>
-            <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-a-salary">Base Salary</label><input id="uv-a-salary" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="number" step="0.01" min="0"></div>
-            <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-a-credit-limit">Credit Limit</label><input id="uv-a-credit-limit" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="number" step="0.01" min="0"></div>
+            <div class="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900 md:col-span-2">Salary and credit limit are managed by Accounting after the employee account is created.</div>
         </div>
         <div class="admin-modal-actions">
             <button id="uv-add-save" class="primary-btn" type="button">Create User</button>
@@ -186,7 +183,8 @@
         <div class="field space-y-1">
             <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-import-file">CSV File</label>
             <input id="uv-import-file" class="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-blue-700" type="file" accept=".csv,text/csv">
-            <small class="text-sm text-slate-500">Required columns: name, email, role, user_type. Use comma, pipe, semicolon, or spaces for multiple roles. Optional: employee_id, base_salary, credit_limit, is_active.</small>
+            <small class="text-sm text-slate-500">Required columns: name, email, user_type. Role is optional and defaults to USER. Optional: employee_id, role, is_active. New Faculty and Staff receive PHP 1,000 base credit; Accounting manages later salary and credit-limit changes.</small>
+            <p id="uv-import-result" class="min-h-5 text-sm font-semibold" role="status" aria-live="polite"></p>
         </div>
         <div class="admin-modal-actions">
             <button id="uv-import-submit" class="primary-btn" type="button">Import</button>

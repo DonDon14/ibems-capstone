@@ -66,7 +66,7 @@
                 </div>
                 <input id="store-officer-id" type="hidden">
                 <div id="store-officer-suggestions" class="officer-suggestions is-hidden"></div>
-                <small id="store-officer-help" class="field-help">Stores can be created first and assigned to an officer later.</small>
+                <small id="store-officer-help" class="field-help">Optional while inactive. An active store requires a primary officer.</small>
             </div>
             <div class="field store-supervisors-field">
                 <label for="store-supervisor-search">Store Supervisors</label>
@@ -75,7 +75,7 @@
                 </div>
                 <div id="store-supervisor-selected" class="supervisor-selected-list"></div>
                 <div id="store-supervisor-suggestions" class="officer-suggestions is-hidden"></div>
-                <small class="field-help">Supervisors can review store-day shortages for this store only.</small>
+                <small class="field-help">Optional while inactive. An active store requires at least one supervisor.</small>
             </div>
             <div class="field store-logo-field">
                 <label for="store-logo-source">Store Logo</label>
@@ -99,9 +99,15 @@
             <div class="field">
                 <label for="store-active">Status</label>
                 <select id="store-active">
-                    <option value="1">Active</option>
-                    <option value="0">Inactive</option>
+                    <option value="0">Inactive — finish assignments later</option>
+                    <option value="1">Active — officer and supervisor required</option>
                 </select>
+                <small class="field-help">New stores default to inactive so they can be configured safely before opening.</small>
+            </div>
+            <div class="field is-hidden" id="store-deactivation-reason-field">
+                <label for="store-deactivation-reason">Deactivation Reason</label>
+                <textarea id="store-deactivation-reason" rows="3" placeholder="Required when deactivating a store"></textarea>
+                <small class="field-help">Open store days and unresolved variance cases must be completed first. History will remain available.</small>
             </div>
         </div>
 

@@ -57,6 +57,7 @@ public function storesData(RequestInterface $request, ResponseInterface $respons
             'status' => 'success',
             'data' => array_map(static function (array $row) use ($supervisorsMap): array {
                 $storeId = (int) ($row['id'] ?? 0);
+                $row['is_active'] = ibems_bool($row['is_active'] ?? false);
                 $row['supervisors'] = $supervisorsMap[$storeId] ?? [];
                 $row['supervisor_ids'] = array_map(static fn(array $supervisor): int => (int) ($supervisor['id'] ?? 0), $row['supervisors']);
                 return $row;

@@ -30,6 +30,7 @@ class IbemsDatabaseTransfer extends BaseCommand
         'balances',
         'stores',
         'store_supervisors',
+        'store_supervisor_assignment_history',
         'store_categories',
         'store_payment_methods',
         'products',

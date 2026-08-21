@@ -6,6 +6,7 @@ let editingCurrentLogoUrl = "";
 let logoInputMode = "upload";
 let storeLogoPreviewObjectUrl = null;
 let selectedSupervisorIds = [];
+let editingInitialIsActive = true;
 const storeShell = document.querySelector(".admin-stores-shell");
 const canManageStores = storeShell?.getAttribute("data-can-manage-stores") === "1";
 const storesDataUrl = storeShell?.getAttribute("data-stores-data-url") || "/admin/stores/data";
@@ -22,6 +23,11 @@ function sEscape(value) {
 
 function sDateTime(value) {
     return window.IbemsFormat?.dateTime(value) || new Date(value).toLocaleString();
+}
+
+function sBool(value) {
+    if (typeof value === "boolean") return value;
+    return ["1", "t", "true", "yes", "on"].includes(String(value ?? "").trim().toLowerCase());
 }
 
 function setStoresResult(message, type) {
@@ -204,7 +210,7 @@ function renderStores(rows) {
         const logo = row.logo_url
             ? `<img src="${sEscape(row.logo_url)}" alt="${sEscape(row.store_name)} logo" class="store-logo-img">`
             : `<div class="store-logo-fallback">${sEscape(initials || "S")}</div>`;
-        const isActive = Number(row.is_active) === 1;
+        const isActive = sBool(row.is_active);
         return `
             <a href="${sEscape(storeDetailPrefix)}/${row.id}" class="store-card">
                 <div class="store-card-logo">${logo}</div>
@@ -256,13 +262,17 @@ async function loadStores() {
 
 function openStoreModal(mode, store) {
     if (!canManageStores) return;
+    setStoresResult("", "ok");
     editingStoreId = mode === "edit" ? Number(store.id) : null;
     document.getElementById("store-modal-title").textContent = mode === "edit" ? "Edit Store" : "Add Store";
     document.getElementById("store-name").value = mode === "edit" ? store.store_name || "" : "";
     editingCurrentLogoUrl = mode === "edit" ? String(store.logo_url || "") : "";
     document.getElementById("store-logo-url").value = "";
     document.getElementById("store-logo-file").value = "";
-    document.getElementById("store-active").value = mode === "edit" ? String(Number(store.is_active) === 1 ? 1 : 0) : "1";
+    editingInitialIsActive = mode === "edit" ? sBool(store.is_active) : false;
+    document.getElementById("store-active").value = editingInitialIsActive ? "1" : "0";
+    document.getElementById("store-deactivation-reason").value = "";
+    updateDeactivationReasonVisibility();
     const selectedOfficerId = mode === "edit" ? Number(store.officer_id || 0) : 0;
     document.getElementById("store-officer-id").value = selectedOfficerId > 0 ? String(selectedOfficerId) : "";
     if (selectedOfficerId > 0) {
@@ -313,12 +323,25 @@ async function saveStore() {
     const logoUrlInput = (document.getElementById("store-logo-url").value || "").trim();
     const logoFile = document.getElementById("store-logo-file").files?.[0] || null;
     const isActive = Number(document.getElementById("store-active").value || 1);
+    const deactivationReason = (document.getElementById("store-deactivation-reason").value || "").trim();
     const button = document.getElementById("store-save-btn");
 
     if (!name) {
         setStoresResult("Store name is required.", "error");
         return;
     }
+    if (isActive === 1 && (officerId <= 0 || selectedSupervisorIds.length === 0)) {
+        setStoresResult("To create an active store, select a primary officer and at least one supervisor. Otherwise, choose Inactive and assign them later.", "error");
+        (officerId <= 0 ? document.getElementById("store-officer-search") : document.getElementById("store-supervisor-search")).focus();
+        return;
+    }
+    const isDeactivating = Boolean(editingStoreId) && editingInitialIsActive && isActive === 0;
+    if (isDeactivating && !deactivationReason) {
+        setStoresResult("A deactivation reason is required.", "error");
+        document.getElementById("store-deactivation-reason").focus();
+        return;
+    }
+    if (isDeactivating && !window.confirm("Deactivate this store? New operations will be blocked, while historical records remain available.")) return;
 
     const endpoint = editingStoreId ? "/admin/stores/update" : "/admin/stores/create";
     const formData = new FormData();
@@ -333,12 +356,13 @@ async function saveStore() {
     formData.append("officer_id", String(officerId));
     selectedSupervisorIds.forEach((supervisorId) => formData.append("supervisor_ids[]", String(supervisorId)));
     formData.append("logo_url", logoUrl);
+    formData.append("is_active", String(isActive));
     if (logoInputMode === "upload" && logoFile) {
         formData.append("logo_file", logoFile);
     }
     if (editingStoreId) {
         formData.append("store_id", String(editingStoreId));
-        formData.append("is_active", String(isActive));
+        if (isDeactivating) formData.append("deactivation_reason", deactivationReason);
     }
 
     button.disabled = true;
@@ -382,6 +406,13 @@ document.getElementById("store-modal")?.addEventListener("click", (event) => {
     if (event.target.id === "store-modal") closeStoreModal();
 });
 document.getElementById("store-save-btn")?.addEventListener("click", saveStore);
+function updateDeactivationReasonVisibility() {
+    const isDeactivating = Boolean(editingStoreId)
+        && editingInitialIsActive
+        && document.getElementById("store-active").value === "0";
+    document.getElementById("store-deactivation-reason-field")?.classList.toggle("is-hidden", !isDeactivating);
+}
+document.getElementById("store-active")?.addEventListener("change", updateDeactivationReasonVisibility);
 document.getElementById("store-logo-source")?.addEventListener("change", (event) => {
     logoInputMode = event.target.value === "url" ? "url" : "upload";
     toggleLogoSourceUI();

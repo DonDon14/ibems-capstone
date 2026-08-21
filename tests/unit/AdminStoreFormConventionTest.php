@@ -35,4 +35,44 @@ final class AdminStoreFormConventionTest extends CIUnitTestCase
         $this->assertStringContainsString("'STORE_SYSTEM' => 'Store Officer'", $shell);
         $this->assertStringContainsString('$readableRole', $shell);
     }
+
+    public function testStoreDeactivationRequiresReasonAndConfirmation(): void
+    {
+        $view = (string) file_get_contents(APPPATH . 'Views/admin/stores.php');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js');
+
+        $this->assertStringContainsString('store-deactivation-reason', $view);
+        $this->assertStringContainsString('A deactivation reason is required.', $script);
+        $this->assertStringContainsString('window.confirm', $script);
+        $this->assertStringContainsString('historical records remain available', $script);
+    }
+
+    public function testStoreStatusSupportsPostgreSqlBooleanValues(): void
+    {
+        $service = (string) file_get_contents(APPPATH . 'Services/StoreOversightService.php');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js');
+
+        $this->assertStringContainsString("\$row['is_active'] = ibems_bool", $service);
+        $this->assertStringContainsString('function sBool(value)', $script);
+        $this->assertStringContainsString('const isActive = sBool(row.is_active)', $script);
+        $this->assertStringNotContainsString('Number(row.is_active) === 1', $script);
+        $this->assertStringNotContainsString("'is_active'  => 'boolean'", (string) file_get_contents(APPPATH . 'Models/StoreModel.php'));
+        $this->assertStringContainsString("'is_active' => true", (string) file_get_contents(APPPATH . 'Services/StoreLifecycleService.php'));
+        $this->assertStringContainsString("'is_active' => false", (string) file_get_contents(APPPATH . 'Services/StoreLifecycleService.php'));
+        $this->assertStringContainsString("\$storePayload['is_active'] = \$isActive === 1;", (string) file_get_contents(APPPATH . 'Controllers/AdminController.php'));
+    }
+
+    public function testNewStoreDefaultsInactiveAndExplainsActivationRequirements(): void
+    {
+        $controller = (string) file_get_contents(APPPATH . 'Controllers/AdminController.php');
+        $view = (string) file_get_contents(APPPATH . 'Views/admin/stores.php');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js');
+
+        $this->assertStringContainsString("\$isActive = (int) (\$request['is_active'] ?? 0) === 1;", $controller);
+        $this->assertStringContainsString('if ($isActive && ($officerId <= 0 || $supervisorIds === []))', $controller);
+        $this->assertStringContainsString('mode === "edit" ? sBool(store.is_active) : false', $script);
+        $this->assertStringContainsString('formData.append("is_active", String(isActive))', $script);
+        $this->assertStringContainsString('Otherwise, choose Inactive and assign them later.', $script);
+        $this->assertStringContainsString('New stores default to inactive', $view);
+    }
 }

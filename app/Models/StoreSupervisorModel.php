@@ -46,7 +46,7 @@ class StoreSupervisorModel extends Model
         return array_values(array_unique(array_map(static fn(array $row): int => (int) ($row['store_id'] ?? 0), $rows)));
     }
 
-    public function syncStoreSupervisors(int $storeId, array $supervisorIds): void
+    public function syncStoreSupervisors(int $storeId, array $supervisorIds, ?int $actorId = null): void
     {
         if ($storeId <= 0) {
             return;
@@ -60,6 +60,13 @@ class StoreSupervisorModel extends Model
         $toInsert = array_values(array_diff($supervisorIds, $existingIds));
 
         if ($toDelete !== []) {
+            if ($this->db->tableExists('store_supervisor_assignment_history')) {
+                $this->db->table('store_supervisor_assignment_history')
+                    ->where('store_id', $storeId)
+                    ->whereIn('user_id', $toDelete)
+                    ->where('ended_at', null)
+                    ->update(['ended_at' => date('Y-m-d H:i:s'), 'ended_by' => $actorId]);
+            }
             $this->where('store_id', $storeId)->whereIn('user_id', $toDelete)->delete();
         }
 
@@ -71,6 +78,14 @@ class StoreSupervisorModel extends Model
                 'created_at' => $now,
                 'updated_at' => $now,
             ]);
+            if ($this->db->tableExists('store_supervisor_assignment_history')) {
+                $this->db->table('store_supervisor_assignment_history')->insert([
+                    'store_id' => $storeId,
+                    'user_id' => $userId,
+                    'assigned_at' => $now,
+                    'assigned_by' => $actorId,
+                ]);
+            }
         }
     }
 }

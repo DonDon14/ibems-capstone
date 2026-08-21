@@ -148,6 +148,7 @@ function renderUserTable(rows) {
         const statusText = row.is_active ? "Active" : "Inactive";
         const debt = Number(row.current_debt || 0);
         const creditLimit = Number(row.credit_limit || 0);
+        const profileConfigured = Boolean(row.financial_profile_configured);
         const initials = String(row.name || "U")
             .split(" ")
             .filter(Boolean)
@@ -168,6 +169,7 @@ function renderUserTable(rows) {
                 </div>
             </button>
             <div class="uv-finance flex flex-wrap items-center justify-end gap-4">
+                ${profileConfigured ? `
                 <div class="uv-fin-kv grid gap-0.5">
                     <span class="text-xs text-slate-500">Debt</span>
                     <strong class="text-sm font-semibold ${debt > 0 ? "uv-money-debt text-rose-600" : "text-slate-900"}">${aEscape(aMoney(debt))}</strong>
@@ -176,6 +178,7 @@ function renderUserTable(rows) {
                     <span class="text-xs text-slate-500">Credit Limit</span>
                     <strong class="text-sm font-semibold text-slate-900">${aEscape(aMoney(creditLimit))}</strong>
                 </div>
+                ` : '<div class="uv-fin-kv grid gap-0.5"><span class="text-xs text-slate-500">Financial Profile</span><strong class="text-sm font-semibold text-amber-700">Not configured</strong></div>'}
                 <button class="secondary-btn btn-sm uv-edit-btn" type="button" data-edit-user="${row.id}" title="Edit employee profile">
                     <i class="bi bi-pencil"></i> Edit
                 </button>
@@ -228,8 +231,6 @@ async function openEditUser(userId) {
     document.getElementById("uv-e-email").value = row.email || "";
     setRoleChecks("uv-e", row.roles, row.role);
     document.getElementById("uv-e-type").value = row.user_type || "staff";
-    document.getElementById("uv-e-salary").value = Number(row.base_salary || 0);
-    document.getElementById("uv-e-credit-limit").value = Number(row.credit_limit || 0);
     document.getElementById("uv-e-active").value = row.is_active ? "1" : "0";
     openModal("uv-edit-modal");
 }
@@ -250,9 +251,10 @@ async function openViewUser(userId) {
     document.getElementById("uv-v-roles").value = normalizeRoles(row.roles, row.role).map(formatRoleLabel).join(", ");
     document.getElementById("uv-v-type").value = formatTypeLabel(row.user_type);
     document.getElementById("uv-v-status").value = row.is_active ? "Active" : "Inactive";
-    document.getElementById("uv-v-salary").value = aMoney(row.base_salary || 0);
-    document.getElementById("uv-v-credit-limit").value = aMoney(row.credit_limit || 0);
-    document.getElementById("uv-v-current-debt").value = aMoney(row.current_debt || 0);
+    const profileConfigured = Boolean(row.financial_profile_configured);
+    document.getElementById("uv-v-salary").value = profileConfigured ? aMoney(row.base_salary || 0) : "Not configured by Accounting";
+    document.getElementById("uv-v-credit-limit").value = profileConfigured ? aMoney(row.credit_limit || 0) : "Not configured by Accounting";
+    document.getElementById("uv-v-current-debt").value = profileConfigured ? aMoney(row.current_debt || 0) : "Not configured by Accounting";
     document.getElementById("uv-v-created-at").value = row.created_at || "-";
     openModal("uv-view-modal");
 }
@@ -273,8 +275,6 @@ async function saveEditedUser() {
         email: (document.getElementById("uv-e-email").value || "").trim(),
         roles,
         user_type: document.getElementById("uv-e-type").value,
-        base_salary: Number(document.getElementById("uv-e-salary").value || 0),
-        credit_limit: Number(document.getElementById("uv-e-credit-limit").value || 0),
         is_active: Number(document.getElementById("uv-e-active").value || 1),
     };
 
@@ -308,8 +308,6 @@ async function createUser() {
         password: (document.getElementById("uv-a-password").value || "").trim(),
         roles,
         user_type: document.getElementById("uv-a-type").value,
-        base_salary: Number(document.getElementById("uv-a-salary").value || 0),
-        credit_limit: Number(document.getElementById("uv-a-credit-limit").value || 0),
         is_active: 1,
     };
 
@@ -325,34 +323,55 @@ async function createUser() {
     }
 
     closeModal("uv-add-modal");
-    setUvResult("User created.", "ok");
+    const initialCredit = Number(data.initial_credit_limit || 0);
+    setUvResult(`User created${initialCredit > 0 ? ` with ${aMoney(initialCredit)} base credit` : ""}.`, "ok");
     await loadUserView();
 }
 
 async function importUsersCsv() {
+    const button = document.getElementById("uv-import-submit");
+    const result = document.getElementById("uv-import-result");
+    if (button.disabled) return;
     const file = document.getElementById("uv-import-file").files?.[0];
     if (!file) {
-        setUvResult("Please choose a CSV file.", "error");
+        result.textContent = "Please choose a CSV file.";
+        result.style.color = "#b91c1c";
         return;
     }
 
     const fd = new FormData();
     fd.append("csv_file", file);
 
-    const response = await fetch("/admin/user-view/import-csv", {
-        method: "POST",
-        body: fd,
-    });
-    const data = await response.json();
-    if (!data || data.status !== "success") {
-        setUvResult(data?.message || "Import failed.", "error");
-        return;
-    }
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
+    button.innerHTML = '<i class="bi bi-arrow-repeat" style="display:inline-block;animation:data-state-spin .9s linear infinite" aria-hidden="true"></i> Importing...';
+    result.textContent = "Uploading and validating employee records...";
+    result.style.color = "#475569";
 
-    closeModal("uv-import-modal");
-    const invalidNote = Number(data.invalid || 0) > 0 ? ` ${data.invalid} row(s) skipped.` : "";
-    setUvResult(`Import done. Created: ${data.created}, updated: ${data.updated}.${invalidNote}`, Number(data.invalid || 0) > 0 ? "error" : "ok");
-    await loadUserView();
+    try {
+        const response = await fetch("/admin/user-view/import-csv", {
+            method: "POST",
+            body: fd,
+        });
+        const data = await response.json().catch(() => null);
+        if (!response.ok || !data || data.status !== "success") {
+            throw new Error(data?.message || "Import failed. Please check the server log and CSV values.");
+        }
+
+        result.textContent = `Import complete. Created: ${data.created}, updated: ${data.updated}.`;
+        result.style.color = "#166534";
+        const invalidNote = Number(data.invalid || 0) > 0 ? ` ${data.invalid} row(s) skipped.` : "";
+        closeModal("uv-import-modal");
+        setUvResult(`Import done. Created: ${data.created}, updated: ${data.updated}.${invalidNote}`, Number(data.invalid || 0) > 0 ? "error" : "ok");
+        await loadUserView();
+    } catch (error) {
+        result.textContent = error.message || "Import failed.";
+        result.style.color = "#b91c1c";
+    } finally {
+        button.disabled = false;
+        button.removeAttribute("aria-busy");
+        button.textContent = "Import";
+    }
 }
 
 function exportFilteredRowsToCsv() {

@@ -94,9 +94,12 @@ class StoreController extends BaseController
             $hasPaymentLines = in_array('transaction_payments', $db->listTables(), true);
             $paymentMethodSql = $hasPaymentLines ? 'COALESCE(tp.payment_method, t.payment_method)' : 't.payment_method';
             $paymentAmountSql = $hasPaymentLines ? 'COALESCE(tp.amount, t.amount)' : 't.amount';
-            $todayStart = date('Y-m-d 00:00:00');
-            $todayEnd = date('Y-m-d 23:59:59');
-            $todayDate = date('Y-m-d');
+            $businessZone = new \DateTimeZone('Asia/Manila');
+            $storageZone = new \DateTimeZone('UTC');
+            $businessNow = new \DateTimeImmutable('now', $businessZone);
+            $todayDate = $businessNow->format('Y-m-d');
+            $todayStart = $businessNow->setTime(0, 0)->setTimezone($storageZone)->format('Y-m-d H:i:s');
+            $todayEnd = $businessNow->setTime(23, 59, 59)->setTimezone($storageZone)->format('Y-m-d H:i:s');
 
             $txn = $db->table('transactions')
                 ->select('COUNT(*) AS txn_count, COALESCE(SUM(amount), 0) AS total_sales')
@@ -120,7 +123,7 @@ class StoreController extends BaseController
 
             $sessionModel = new StoreDaySessionModel();
             $daySession = $sessionModel->getByStoreAndDate($storeId, $todayDate);
-            $sessionStartTs = $todayDate . ' 00:00:00';
+            $sessionStartTs = $todayStart;
 
             $asOfPaymentBuilder = $db->table('transactions t')
                 ->select($paymentMethodSql . ' AS payment_method, COUNT(DISTINCT t.id) AS txn_count, COALESCE(SUM(' . $paymentAmountSql . '), 0) AS total_sales', false);

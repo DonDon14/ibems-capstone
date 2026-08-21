@@ -19,6 +19,8 @@ use Config\Database;
 
 class AdminController extends Controller
 {
+    private const DEFAULT_EMPLOYEE_CREDIT_LIMIT = 1000.00;
+
     public function dashboard()
     {
         return view('admin/dashboard');
@@ -111,13 +113,31 @@ class AdminController extends Controller
                 ->get()
                 ->getResultArray();
 
-            $unresolvedReviewRows = $db->table('store_day_sessions sds')
-                ->select('sds.id, sds.store_id, sds.business_date, sds.variance_cash, sds.variance_ecash, sds.variance_status, sds.review_status, s.store_name, closer.name AS closed_by_name, c.case_ref, c.owner_user_id, h.status AS handoff_status, h.due_at AS handoff_due_at, owner.name AS owner_name')
+            $hasVarianceCases = $db->tableExists('store_day_variance_cases');
+            $hasVarianceHandoffs = $hasVarianceCases && $db->tableExists('store_day_variance_case_handoffs');
+            $reviewSelect = 'sds.id, sds.store_id, sds.business_date, sds.variance_cash, sds.variance_ecash, sds.variance_status, sds.review_status, s.store_name, closer.name AS closed_by_name';
+            if ($hasVarianceCases) {
+                $reviewSelect .= ', c.case_ref, c.owner_user_id, owner.name AS owner_name';
+            } else {
+                $reviewSelect .= ', NULL AS case_ref, NULL AS owner_user_id, NULL AS owner_name';
+            }
+            if ($hasVarianceHandoffs) {
+                $reviewSelect .= ', h.status AS handoff_status, h.due_at AS handoff_due_at';
+            } else {
+                $reviewSelect .= ', NULL AS handoff_status, NULL AS handoff_due_at';
+            }
+            $unresolvedReviewQuery = $db->table('store_day_sessions sds')
+                ->select($reviewSelect, false)
                 ->join('stores s', 's.id = sds.store_id', 'inner')
-                ->join('users closer', 'closer.id = sds.closed_by', 'left')
-                ->join('store_day_variance_cases c', 'c.store_day_session_id = sds.id', 'left')
-                ->join('store_day_variance_case_handoffs h', 'h.id = (SELECT MAX(h2.id) FROM store_day_variance_case_handoffs h2 WHERE h2.case_id = c.id)', 'left', false)
-                ->join('users owner', 'owner.id = c.owner_user_id', 'left')
+                ->join('users closer', 'closer.id = sds.closed_by', 'left');
+            if ($hasVarianceCases) {
+                $unresolvedReviewQuery->join('store_day_variance_cases c', 'c.store_day_session_id = sds.id', 'left')
+                    ->join('users owner', 'owner.id = c.owner_user_id', 'left');
+            }
+            if ($hasVarianceHandoffs) {
+                $unresolvedReviewQuery->join('store_day_variance_case_handoffs h', 'h.id = (SELECT MAX(h2.id) FROM store_day_variance_case_handoffs h2 WHERE h2.case_id = c.id)', 'left', false);
+            }
+            $unresolvedReviewRows = $unresolvedReviewQuery
                 ->where('sds.status', 'closed')
                 ->whereIn('sds.review_status', ['pending', 'needs_investigation'])
                 ->orderBy('sds.business_date', 'ASC')
@@ -626,7 +646,7 @@ class AdminController extends Controller
         $barcode = trim((string) ($request['barcode'] ?? ''));
         $inputImageUrl = trim((string) ($request['image_url'] ?? ''));
         $price = (float) ($request['price'] ?? -1);
-        $isActive = (int) ($request['is_active'] ?? 1) === 1 ? 1 : 0;
+        $isActive = (int) ($request['is_active'] ?? 1) === 1;
 
         if ($productId <= 0 || $storeId <= 0 || $sku === '' || $name === '' || $price < 0) {
             return $this->response->setStatusCode(400)->setJSON([
@@ -757,7 +777,7 @@ class AdminController extends Controller
         $inputImageUrl = trim((string) ($request['image_url'] ?? ''));
         $price = (float) ($request['price'] ?? -1);
         $stockQty = (int) ($request['stock_qty'] ?? 0);
-        $isActive = (int) ($request['is_active'] ?? 1) === 1 ? 1 : 0;
+        $isActive = (int) ($request['is_active'] ?? 1) === 1;
 
         if ($storeId <= 0 || $sku === '' || $name === '' || $price < 0 || $stockQty < 0) {
             return $this->response->setStatusCode(400)->setJSON([
@@ -992,7 +1012,7 @@ class AdminController extends Controller
         $q = trim((string) $this->request->getGet('q'));
         $db = Database::connect();
         $query = $db->table('users u')
-            ->select('u.id, u.employee_id, u.name, u.email, u.role, u.user_type, u.is_active, b.current_debt, b.credit_limit')
+            ->select('u.id, u.employee_id, u.name, u.email, u.role, u.user_type, u.is_active, b.user_id AS balance_user_id, b.current_debt, b.credit_limit')
             ->join('balances b', 'b.user_id = u.id', 'left');
 
         if ($q !== '') {
@@ -1018,6 +1038,7 @@ class AdminController extends Controller
                     'roles' => $rolesMap[$userId] ?? [strtoupper((string) ($row['role'] ?? 'USER'))],
                     'user_type' => $row['user_type'],
                     'is_active' => ibems_bool($row['is_active']),
+                    'financial_profile_configured' => $row['balance_user_id'] !== null,
                     'current_debt' => (float) ($row['current_debt'] ?? 0),
                     'credit_limit' => (float) ($row['credit_limit'] ?? 0),
                 ];
@@ -1036,7 +1057,7 @@ class AdminController extends Controller
 
         $db = Database::connect();
         $row = $db->table('users u')
-            ->select('u.id, u.employee_id, u.name, u.email, u.role, u.user_type, u.base_salary, u.is_active, u.created_at, b.current_debt, b.credit_limit')
+            ->select('u.id, u.employee_id, u.name, u.email, u.role, u.user_type, u.base_salary, u.is_active, u.created_at, b.user_id AS balance_user_id, b.current_debt, b.credit_limit')
             ->join('balances b', 'b.user_id = u.id', 'left')
             ->where('u.id', $userId)
             ->get()
@@ -1062,6 +1083,7 @@ class AdminController extends Controller
                 'base_salary' => (float) ($row['base_salary'] ?? 0),
                 'is_active' => ibems_bool($row['is_active']),
                 'created_at' => $row['created_at'],
+                'financial_profile_configured' => $row['balance_user_id'] !== null,
                 'current_debt' => (float) ($row['current_debt'] ?? 0),
                 'credit_limit' => (float) ($row['credit_limit'] ?? 0),
             ],
@@ -1078,9 +1100,7 @@ class AdminController extends Controller
         $email = strtolower(trim((string) ($request['email'] ?? '')));
         $userType = strtolower(trim((string) ($request['user_type'] ?? 'staff')));
         $roles = $this->extractRolesFromRequest($request);
-        $baseSalary = (float) ($request['base_salary'] ?? 0);
-        $creditLimit = (float) ($request['credit_limit'] ?? 0);
-        $isActive = (int) ($request['is_active'] ?? 1) === 1 ? 1 : 0;
+        $isActive = (int) ($request['is_active'] ?? 1) === 1;
         $password = (string) ($request['password'] ?? '');
 
         if ($name === '' || $email === '') {
@@ -1135,10 +1155,11 @@ class AdminController extends Controller
 
         $primaryRole = $this->pickPrimaryRole($roles);
         $passwordHash = $password !== '' ? password_hash($password, PASSWORD_BCRYPT) : password_hash('123456', PASSWORD_BCRYPT);
+        $initialCreditLimit = $this->initialCreditLimitForUserType($userType);
 
         $db->transStart();
 
-        $userId = $userModel->insert([
+        $db->table('users')->insert([
             'employee_id' => $employeeId !== '' ? $employeeId : null,
             'name' => $name,
             'email' => $email,
@@ -1146,17 +1167,19 @@ class AdminController extends Controller
             'role' => $primaryRole,
             'user_type' => $userType,
             'qr_token' => bin2hex(random_bytes(16)),
-            'base_salary' => max(0, $baseSalary),
+            'base_salary' => 0,
             'is_active' => $isActive,
             'created_at' => date('Y-m-d H:i:s'),
         ]);
+        $createdUser = $db->table('users')->select('id')->where('email', $email)->get()->getRowArray();
+        $userId = (int) ($createdUser['id'] ?? 0);
 
         if ($userId) {
             $this->syncUserRoles((int) $userId, $roles);
 
             $balanceModel->insert([
                 'user_id' => (int) $userId,
-                'credit_limit' => max(0, $creditLimit),
+                'credit_limit' => $initialCreditLimit,
                 'current_debt' => 0,
                 'updated_at' => date('Y-m-d H:i:s'),
             ]);
@@ -1172,6 +1195,7 @@ class AdminController extends Controller
                 'role' => $primaryRole,
                 'roles' => $roles,
                 'user_type' => $userType,
+                'initial_credit_limit' => $initialCreditLimit,
             ]),
             'created_at' => date('Y-m-d H:i:s'),
         ]);
@@ -1187,6 +1211,7 @@ class AdminController extends Controller
         return $this->response->setJSON([
             'status' => 'success',
             'user_id' => (int) $userId,
+            'initial_credit_limit' => $initialCreditLimit,
         ]);
     }
 
@@ -1201,9 +1226,7 @@ class AdminController extends Controller
         $email = strtolower(trim((string) ($request['email'] ?? '')));
         $userType = strtolower(trim((string) ($request['user_type'] ?? 'staff')));
         $roles = $this->extractRolesFromRequest($request);
-        $baseSalary = (float) ($request['base_salary'] ?? 0);
-        $creditLimit = (float) ($request['credit_limit'] ?? 0);
-        $isActive = (int) ($request['is_active'] ?? 1) === 1 ? 1 : 0;
+        $isActive = (int) ($request['is_active'] ?? 1) === 1;
 
         if ($userId <= 0 || $name === '' || $email === '') {
             return $this->response->setStatusCode(400)->setJSON([
@@ -1269,13 +1292,12 @@ class AdminController extends Controller
         $primaryRole = $this->pickPrimaryRole($roles);
         $db->transStart();
 
-        $userModel->update($userId, [
+        $db->table('users')->where('id', $userId)->update([
             'employee_id' => $employeeId !== '' ? $employeeId : null,
             'name' => $name,
             'email' => $email,
             'role' => $primaryRole,
             'user_type' => $userType,
-            'base_salary' => max(0, $baseSalary),
             'is_active' => $isActive,
         ]);
         $this->syncUserRoles($userId, $roles);
@@ -1283,13 +1305,12 @@ class AdminController extends Controller
         $balance = $balanceModel->find($userId);
         if ($balance) {
             $balanceModel->update($userId, [
-                'credit_limit' => max(0, $creditLimit),
                 'updated_at' => date('Y-m-d H:i:s'),
             ]);
         } else {
             $balanceModel->insert([
                 'user_id' => $userId,
-                'credit_limit' => max(0, $creditLimit),
+                'credit_limit' => $this->initialCreditLimitForUserType($userType),
                 'current_debt' => 0,
                 'updated_at' => date('Y-m-d H:i:s'),
             ]);
@@ -1342,9 +1363,9 @@ class AdminController extends Controller
             ]);
         }
 
-        $headersRaw = fgetcsv($handle);
+        $headersRaw = fgetcsv($handle, null, ',', '"', '');
         $headers = is_array($headersRaw) ? array_map(static fn($h): string => strtolower(trim((string) $h)), $headersRaw) : [];
-        $required = ['name', 'email', 'role', 'user_type'];
+        $required = ['name', 'email', 'user_type'];
         foreach ($required as $field) {
             if (!in_array($field, $headers, true)) {
                 fclose($handle);
@@ -1367,8 +1388,9 @@ class AdminController extends Controller
         $updated = 0;
         $invalid = 0;
 
-        $db->transStart();
-        while (($values = fgetcsv($handle)) !== false) {
+        $db->transException(true)->transStart();
+        try {
+        while (($values = fgetcsv($handle, null, ',', '"', '')) !== false) {
             $total++;
             $row = [];
             foreach ($headers as $i => $key) {
@@ -1377,13 +1399,14 @@ class AdminController extends Controller
 
             $name = $row['name'] ?? '';
             $email = strtolower($row['email'] ?? '');
-            $role = strtoupper($row['role'] ?? '');
+            $role = strtoupper($row['role'] ?? 'USER');
+            if ($role === '') {
+                $role = 'USER';
+            }
             $roles = $this->parseRoleList($role);
             $userType = strtolower($row['user_type'] ?? '');
             $employeeId = $row['employee_id'] ?? '';
-            $baseSalary = isset($row['base_salary']) ? (float) $row['base_salary'] : 0;
-            $creditLimit = isset($row['credit_limit']) ? (float) $row['credit_limit'] : 0;
-            $isActive = isset($row['is_active']) ? ((int) $row['is_active'] === 1 ? 1 : 0) : 1;
+            $isActive = isset($row['is_active']) ? (int) $row['is_active'] === 1 : true;
 
             if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || empty($roles) || !in_array($userType, $allowedTypes, true)) {
                 $invalid++;
@@ -1403,19 +1426,18 @@ class AdminController extends Controller
             }
 
             if ($existing) {
-                $userModel->update((int) $existing['id'], [
+                $db->table('users')->where('id', (int) $existing['id'])->update([
                     'employee_id' => $employeeId !== '' ? $employeeId : $existing['employee_id'],
                     'name' => $name,
                     'email' => $email,
                     'role' => $primaryRole,
                     'user_type' => $userType,
-                    'base_salary' => max(0, $baseSalary),
                     'is_active' => $isActive,
                 ]);
                 $userId = (int) $existing['id'];
                 $updated++;
             } else {
-                $userId = (int) $userModel->insert([
+                $db->table('users')->insert([
                     'employee_id' => $employeeId !== '' ? $employeeId : null,
                     'name' => $name,
                     'email' => $email,
@@ -1423,10 +1445,12 @@ class AdminController extends Controller
                     'role' => $primaryRole,
                     'user_type' => $userType,
                     'qr_token' => bin2hex(random_bytes(16)),
-                    'base_salary' => max(0, $baseSalary),
+                    'base_salary' => 0,
                     'is_active' => $isActive,
                     'created_at' => date('Y-m-d H:i:s'),
                 ]);
+                $createdUser = $db->table('users')->select('id')->where('email', $email)->get()->getRowArray();
+                $userId = (int) ($createdUser['id'] ?? 0);
                 if ($userId <= 0) {
                     $invalid++;
                     continue;
@@ -1438,13 +1462,12 @@ class AdminController extends Controller
             $balance = $balanceModel->find($userId);
             if ($balance) {
                 $balanceModel->update($userId, [
-                    'credit_limit' => max(0, $creditLimit),
                     'updated_at' => date('Y-m-d H:i:s'),
                 ]);
             } else {
                 $balanceModel->insert([
                     'user_id' => $userId,
-                    'credit_limit' => max(0, $creditLimit),
+                    'credit_limit' => $this->initialCreditLimitForUserType($userType),
                     'current_debt' => 0,
                     'updated_at' => date('Y-m-d H:i:s'),
                 ]);
@@ -1467,10 +1490,15 @@ class AdminController extends Controller
         ]);
 
         $db->transComplete();
-        if (!$db->transStatus()) {
+        } catch (\Throwable $exception) {
+            if (is_resource($handle)) {
+                fclose($handle);
+            }
+            $db->transRollback();
+            log_message('error', 'User CSV import rolled back: {message}', ['message' => $exception->getMessage()]);
             return $this->response->setStatusCode(500)->setJSON([
                 'status' => 'error',
-                'message' => 'Failed to import users.',
+                'message' => 'Import failed and no employee records were applied. Please try again or contact the administrator.',
             ]);
         }
 
@@ -1488,6 +1516,13 @@ class AdminController extends Controller
         return view('admin/stores', [
             'canManageStores' => ibems_current_role() === 'ADMIN',
         ]);
+    }
+
+    private function initialCreditLimitForUserType(string $userType): float
+    {
+        return in_array(strtolower($userType), ['faculty', 'staff'], true)
+            ? self::DEFAULT_EMPLOYEE_CREDIT_LIMIT
+            : 0.00;
     }
 
     public function storesData()
@@ -1572,6 +1607,7 @@ class AdminController extends Controller
         $officerId = (int) ($request['officer_id'] ?? 0);
         $supervisorIds = $this->extractIntegerList($request['supervisor_ids'] ?? []);
         $logoUrl = trim((string) ($request['logo_url'] ?? ''));
+        $isActive = (int) ($request['is_active'] ?? 0) === 1;
 
         if ($storeName === '') {
             return $this->response->setStatusCode(400)->setJSON([
@@ -1610,7 +1646,7 @@ class AdminController extends Controller
                 'message' => $e->getMessage(),
             ]);
         }
-        if ($officerId <= 0 || $supervisorIds === []) {
+        if ($isActive && ($officerId <= 0 || $supervisorIds === [])) {
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
                 'message' => 'An active store requires a primary officer and at least one supervisor.',
@@ -1632,7 +1668,7 @@ class AdminController extends Controller
             'store_name' => $storeName,
             'officer_id' => $officerId > 0 ? $officerId : null,
             'logo_url' => $logoUrl !== '' ? $logoUrl : null,
-            'is_active' => true,
+            'is_active' => $isActive,
             'created_at' => date('Y-m-d H:i:s'),
         ]);
 
@@ -1640,7 +1676,7 @@ class AdminController extends Controller
             $this->addRoleToUser($officerId, 'STORE_SYSTEM', $userModel);
         }
         if ($storeId) {
-            (new StoreSupervisorModel())->syncStoreSupervisors((int) $storeId, $supervisorIds);
+            (new StoreSupervisorModel())->syncStoreSupervisors((int) $storeId, $supervisorIds, $actorId);
             foreach ($supervisorIds as $supervisorId) {
                 $this->addRoleToUser($supervisorId, 'STORE_SUPERVISOR', $userModel);
             }
@@ -1656,6 +1692,7 @@ class AdminController extends Controller
                 'officer_id' => $officerId > 0 ? $officerId : null,
                 'supervisor_ids' => $supervisorIds,
                 'logo_url' => $logoUrl,
+                'is_active' => $isActive,
             ]),
             'created_at' => date('Y-m-d H:i:s'),
         ]);
@@ -1685,6 +1722,7 @@ class AdminController extends Controller
         $logoUrl = trim((string) ($request['logo_url'] ?? ''));
 
         $isActive = isset($request['is_active']) ? (int) $request['is_active'] : null;
+        $deactivationReason = trim((string) ($request['deactivation_reason'] ?? ''));
 
         if ($storeId <= 0 || $storeName === '') {
             return $this->response->setStatusCode(400)->setJSON([
@@ -1745,6 +1783,16 @@ class AdminController extends Controller
                 'message' => 'An active store requires a primary officer and at least one supervisor.',
             ]);
         }
+        $statusIsChanging = $isActive !== null && $isActive !== (int) ibems_bool($store['is_active'] ?? false);
+        if ($statusIsChanging && $isActive === 0) {
+            $lifecycleErrors = (new \App\Services\StoreLifecycleService($db))->validateDeactivation($storeId, $deactivationReason);
+            if ($lifecycleErrors !== []) {
+                return $this->response->setStatusCode(409)->setJSON([
+                    'status' => 'error',
+                    'message' => implode(' ', $lifecycleErrors),
+                ]);
+            }
+        }
 
         try {
             $logoUrl = $this->resolveStoreLogoUrl($logoUrl, $store['logo_url'] ?? null);
@@ -1765,7 +1813,13 @@ class AdminController extends Controller
             'logo_url' => $logoUrl !== '' ? $logoUrl : null,
         ];
         if ($isActive !== null) {
-            $storePayload['is_active'] = $isActive;
+            $storePayload['is_active'] = $isActive === 1;
+            if ($statusIsChanging) {
+                $storePayload = array_merge(
+                    $storePayload,
+                    (new \App\Services\StoreLifecycleService($db))->lifecyclePayload($isActive === 1, $actorId, $deactivationReason)
+                );
+            }
         }
 
         $storeModel->update($storeId, $storePayload);
@@ -1773,7 +1827,7 @@ class AdminController extends Controller
         if ($officerId > 0) {
             $this->addRoleToUser($officerId, 'STORE_SYSTEM', $userModel);
         }
-        (new StoreSupervisorModel())->syncStoreSupervisors($storeId, $supervisorIds);
+        (new StoreSupervisorModel())->syncStoreSupervisors($storeId, $supervisorIds, $actorId);
         foreach ($supervisorIds as $supervisorId) {
             $this->addRoleToUser($supervisorId, 'STORE_SUPERVISOR', $userModel);
         }
@@ -1810,6 +1864,7 @@ class AdminController extends Controller
                     'supervisor_ids' => $supervisorIds,
                     'logo_url' => $logoUrl !== '' ? $logoUrl : null,
                     'is_active' => $isActive !== null ? $isActive : (int) ($store['is_active'] ?? 0),
+                    'deactivation_reason' => $isActive === 0 ? $deactivationReason : null,
                 ],
             ]),
             'created_at' => date('Y-m-d H:i:s'),
@@ -1854,30 +1909,33 @@ class AdminController extends Controller
         $actorId = (int) session()->get('user_id');
         $storeId = (int) ($request['store_id'] ?? 0);
         $isActive = (int) ($request['is_active'] ?? -1);
+        $reason = trim((string) ($request['deactivation_reason'] ?? ''));
 
         if ($storeId <= 0 || !in_array($isActive, [0, 1], true)) {
-            return $this->response->setStatusCode(400)->setJSON([
-                'status' => 'error',
-                'message' => 'Invalid status payload.',
-            ]);
+            return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => 'Invalid status payload.']);
         }
 
         $storeModel = new StoreModel();
-        $auditLogModel = new AuditLogModel();
         $store = $storeModel->find($storeId);
         if (!$store) {
-            return $this->response->setStatusCode(404)->setJSON([
-                'status' => 'error',
-                'message' => 'Store not found.',
-            ]);
+            return $this->response->setStatusCode(404)->setJSON(['status' => 'error', 'message' => 'Store not found.']);
+        }
+        if ($isActive === (int) ibems_bool($store['is_active'] ?? false)) {
+            return $this->response->setJSON(['status' => 'success']);
+        }
+
+        $lifecycle = new \App\Services\StoreLifecycleService();
+        if ($isActive === 1 && ($errors = $lifecycle->validateReactivation($store)) !== []) {
+            return $this->response->setStatusCode(409)->setJSON(['status' => 'error', 'message' => implode(' ', $errors)]);
+        }
+        if ($isActive === 0 && ($errors = $lifecycle->validateDeactivation($storeId, $reason)) !== []) {
+            return $this->response->setStatusCode(409)->setJSON(['status' => 'error', 'message' => implode(' ', $errors)]);
         }
 
         $db = Database::connect();
         $db->transStart();
-
-        $storeModel->update($storeId, ['is_active' => $isActive]);
-
-        $auditLogModel->insert([
+        $storeModel->update($storeId, $lifecycle->lifecyclePayload($isActive === 1, $actorId, $reason));
+        (new AuditLogModel())->insert([
             'actor_id' => $actorId,
             'action' => 'ADMIN_TOGGLE_STORE_STATUS',
             'entity' => 'stores',
@@ -1885,21 +1943,17 @@ class AdminController extends Controller
             'payload_json' => json_encode([
                 'previous_is_active' => (int) $store['is_active'],
                 'new_is_active' => $isActive,
+                'deactivation_reason' => $isActive === 0 ? $reason : null,
             ]),
             'created_at' => date('Y-m-d H:i:s'),
         ]);
-
         $db->transComplete();
+
         if (!$db->transStatus()) {
-            return $this->response->setStatusCode(500)->setJSON([
-                'status' => 'error',
-                'message' => 'Failed to update store status.',
-            ]);
+            return $this->response->setStatusCode(500)->setJSON(['status' => 'error', 'message' => 'Failed to update store status.']);
         }
 
-        return $this->response->setJSON([
-            'status' => 'success',
-        ]);
+        return $this->response->setJSON(['status' => 'success']);
     }
 
     private function getRequestData(): array

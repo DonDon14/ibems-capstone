@@ -68,14 +68,31 @@ class StoreAdminController extends Controller
         $latestSessionsByStore = [];
         $pendingRows = [];
         if ($db->tableExists('store_day_sessions')) {
-            $sessionRows = $db->table('store_day_sessions sds')
-                ->select('sds.id, sds.store_id, sds.business_date, sds.status, sds.expected_cash, sds.expected_ecash, sds.counted_cash, sds.counted_ecash, sds.variance_cash, sds.variance_ecash, sds.variance_status, sds.review_status, sds.closed_at, sds.accountability_amount, s.store_name, closer.name AS closed_by_name, c.case_ref, c.owner_user_id, owner.name AS owner_name, h.status AS handoff_status, h.due_at AS handoff_due_at')
+            $hasVarianceCases = $db->tableExists('store_day_variance_cases');
+            $hasVarianceHandoffs = $hasVarianceCases && $db->tableExists('store_day_variance_case_handoffs');
+            $sessionSelect = 'sds.id, sds.store_id, sds.business_date, sds.status, sds.expected_cash, sds.expected_ecash, sds.counted_cash, sds.counted_ecash, sds.variance_cash, sds.variance_ecash, sds.variance_status, sds.review_status, sds.closed_at, sds.accountability_amount, s.store_name, closer.name AS closed_by_name';
+            if ($hasVarianceCases) {
+                $sessionSelect .= ', c.case_ref, c.owner_user_id, owner.name AS owner_name';
+            } else {
+                $sessionSelect .= ', NULL AS case_ref, NULL AS owner_user_id, NULL AS owner_name';
+            }
+            if ($hasVarianceHandoffs) {
+                $sessionSelect .= ', h.status AS handoff_status, h.due_at AS handoff_due_at';
+            } else {
+                $sessionSelect .= ', NULL AS handoff_status, NULL AS handoff_due_at';
+            }
+            $sessionQuery = $db->table('store_day_sessions sds')
+                ->select($sessionSelect, false)
                 ->join('stores s', 's.id = sds.store_id', 'left')
-                ->join('users closer', 'closer.id = sds.closed_by', 'left')
-                ->join('store_day_variance_cases c', 'c.store_day_session_id = sds.id', 'left')
-                ->join('users owner', 'owner.id = c.owner_user_id', 'left')
-                ->join('store_day_variance_case_handoffs h', 'h.id = (SELECT MAX(h2.id) FROM store_day_variance_case_handoffs h2 WHERE h2.case_id = c.id)', 'left', false)
-                ->whereIn('sds.store_id', $storeIds)
+                ->join('users closer', 'closer.id = sds.closed_by', 'left');
+            if ($hasVarianceCases) {
+                $sessionQuery->join('store_day_variance_cases c', 'c.store_day_session_id = sds.id', 'left')
+                    ->join('users owner', 'owner.id = c.owner_user_id', 'left');
+            }
+            if ($hasVarianceHandoffs) {
+                $sessionQuery->join('store_day_variance_case_handoffs h', 'h.id = (SELECT MAX(h2.id) FROM store_day_variance_case_handoffs h2 WHERE h2.case_id = c.id)', 'left', false);
+            }
+            $sessionRows = $sessionQuery->whereIn('sds.store_id', $storeIds)
                 ->orderBy('sds.business_date', 'DESC')
                 ->orderBy('sds.id', 'DESC')
                 ->get()

@@ -16,6 +16,103 @@ use Config\Database;
 
 class AccountingController extends Controller
 {
+    public function deductions()
+    {
+        return view('accounting/debts', ['deductionsPage' => true]);
+    }
+
+    public function exportDeductionBatch(int $batchId)
+    {
+        $db = Database::connect();
+        $batch = $db->table('deduction_batches db')
+            ->select('db.id, db.status, dp.period_code')
+            ->join('deduction_periods dp', 'dp.id = db.period_id', 'inner')
+            ->where('db.id', $batchId)->get()->getRowArray();
+        if (!$batch) {
+            return $this->response->setStatusCode(404)->setJSON(['status' => 'error', 'message' => 'Deduction batch not found.']);
+        }
+        $itemFields = array_flip($db->getFieldNames('deduction_batch_items'));
+        $select = 'dbi.id, dbi.debt_snapshot, dbi.requested_amount, u.employee_id, u.name, u.email';
+        if (isset($itemFields['deduction_choice'])) $select .= ', dbi.deduction_choice';
+        if (isset($itemFields['preparation_reason'])) $select .= ', dbi.preparation_reason';
+        $items = $db->table('deduction_batch_items dbi')
+            ->select($select)
+            ->join('users u', 'u.id = dbi.user_id', 'inner')
+            ->where('dbi.batch_id', $batchId)->orderBy('u.name', 'ASC')->get()->getResultArray();
+
+        $handle = fopen('php://temp', 'w+');
+        fputcsv($handle, ['batch_item_id', 'period_code', 'employee_id', 'employee_name', 'email', 'debt_at_cutoff', 'requested_deduction', 'deduction_choice', 'actual_deduction', 'payroll_reference', 'result_code', 'result_notes']);
+        foreach ($items as $item) {
+            fputcsv($handle, [$item['id'], $batch['period_code'], $item['employee_id'], $item['name'], $item['email'], $item['debt_snapshot'], $item['requested_amount'], $item['deduction_choice'] ?? 'partial', '', '', '', $item['preparation_reason'] ?? '']);
+        }
+        rewind($handle);
+        $csv = stream_get_contents($handle);
+        fclose($handle);
+
+        return $this->response
+            ->setHeader('Content-Type', 'text/csv; charset=UTF-8')
+            ->setHeader('Content-Disposition', 'attachment; filename="' . strtolower((string) $batch['period_code']) . '-deduction-advice.csv"')
+            ->setBody("\xEF\xBB\xBF" . $csv);
+    }
+
+    public function importDeductionResults(int $batchId)
+    {
+        $file = $this->request->getFile('csv_file');
+        if (!$file || !$file->isValid()) {
+            return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => 'Select a valid payroll results CSV.']);
+        }
+        $handle = fopen($file->getTempName(), 'r');
+        $headers = array_map(static fn($value) => strtolower(trim((string) $value)), fgetcsv($handle) ?: []);
+        $required = ['batch_item_id', 'actual_deduction', 'payroll_reference', 'result_code'];
+        foreach ($required as $header) {
+            if (!in_array($header, $headers, true)) {
+                fclose($handle);
+                return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => 'Missing required CSV header: ' . $header]);
+            }
+        }
+        $rows = [];
+        while (($values = fgetcsv($handle)) !== false) {
+            if (count(array_filter($values, static fn($value) => trim((string) $value) !== '')) === 0) continue;
+            $row = array_combine($headers, array_pad($values, count($headers), ''));
+            $rows[] = $row;
+        }
+        fclose($handle);
+        if ($rows === []) {
+            return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => 'The payroll results CSV has no data rows.']);
+        }
+
+        $db = Database::connect();
+        $items = $db->table('deduction_batch_items')->where('batch_id', $batchId)->get()->getResultArray();
+        $itemsById = array_column($items, null, 'id');
+        foreach ($rows as $index => $row) {
+            $item = $itemsById[(int) $row['batch_item_id']] ?? null;
+            $amount = round((float) $row['actual_deduction'], 2);
+            if (!$item || $amount < 0 || $amount > (float) $item['requested_amount'] || trim((string) $row['payroll_reference']) === '') {
+                return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => 'Invalid payroll result on CSV row ' . ($index + 2) . '.']);
+            }
+        }
+        $service = new DeductionBatchService();
+        $db->transBegin();
+        foreach ($rows as $row) {
+            $result = $service->confirmResult((int) $row['batch_item_id'], [
+                'confirmed_amount' => (float) $row['actual_deduction'],
+                'result_reference' => trim((string) $row['payroll_reference']),
+                'reason_code' => trim((string) $row['result_code']),
+                'result_notes' => trim((string) ($row['result_notes'] ?? '')),
+            ], (int) session()->get('user_id'));
+            if (($result['status'] ?? 'error') !== 'success') {
+                $db->transRollback();
+                return $this->response->setStatusCode((int) ($result['code'] ?? 400))->setJSON($result);
+            }
+        }
+        if ($db->transStatus() === false) {
+            $db->transRollback();
+            return $this->response->setStatusCode(500)->setJSON(['status' => 'error', 'message' => 'Payroll results import was rolled back.']);
+        }
+        $db->transCommit();
+        return $this->response->setJSON(['status' => 'success', 'processed_rows' => count($rows)]);
+    }
+
     public function debtInvestigationsData()
     {
         $db = Database::connect();
@@ -82,6 +179,7 @@ class AccountingController extends Controller
     {
         $db = Database::connect();
         $batchId = max(0, (int) ($this->request->getGet('batch_id') ?? 0));
+        $periodId = max(0, (int) ($this->request->getGet('period_id') ?? 0));
         $periods = $db->table('deduction_periods dp')
             ->select('dp.*, db.id AS batch_id, db.status AS batch_status, db.total_accounts, db.total_requested, db.total_confirmed, db.total_carryover, db.created_by AS batch_created_by')
             ->join('deduction_batches db', 'db.period_id = dp.id', 'left')
@@ -102,10 +200,19 @@ class AccountingController extends Controller
                 ->getResultArray();
         }
 
+        $register = [];
+        if ($periodId > 0) {
+            $period = $db->table('deduction_periods')->where('id', $periodId)->get()->getRowArray();
+            if ($period) {
+                $register = (new \App\Services\DebtPeriodRegisterService())->build($period);
+            }
+        }
+
         return $this->response->setJSON([
             'status' => 'success',
             'periods' => $periods,
             'items' => $items,
+            'register' => $register,
         ]);
     }
 
@@ -148,9 +255,9 @@ class AccountingController extends Controller
             ->setJSON($result);
     }
 
-    public function submitDeductionBatch(int $batchId)
+    public function applyDeductionBatch(int $batchId)
     {
-        $result = (new DeductionBatchService())->submit($batchId, (int) session()->get('user_id'));
+        $result = (new DeductionBatchService())->applyPrepared($batchId, (int) session()->get('user_id'));
         return $this->response->setStatusCode((int) ($result['code'] ?? 400))->setJSON($result);
     }
 
@@ -216,19 +323,10 @@ class AccountingController extends Controller
             ->get()
             ->getRowArray() ?? [];
 
-        $todayStart = date('Y-m-d 00:00:00');
-        $todayEnd = date('Y-m-d 23:59:59');
-        $todayCashbook = $db->table('debt_cashbook_entries')
-            ->select('COUNT(*) AS entry_count, COALESCE(SUM(amount), 0) AS total_amount')
-            ->where('direction', 'credit')
-            ->whereIn('entry_type', ['confirmed_salary_deduction', 'salary_deduction', 'manual_deduction', 'full_deduction'])
-            ->where('created_at >=', $todayStart)
-            ->where('created_at <=', $todayEnd)
-            ->get()
-            ->getRowArray() ?? [];
-
-        $todayDeductionCount = (int) ($todayCashbook['entry_count'] ?? 0);
-        $todayDeductionAmount = (float) ($todayCashbook['total_amount'] ?? 0);
+        [$todayStart, $todayEnd] = $this->businessDayStorageBounds();
+        $todayDeductions = $this->deductionSummaryForStorageRange($db, $todayStart, $todayEnd);
+        $todayDeductionCount = $todayDeductions['count'];
+        $todayDeductionAmount = $todayDeductions['amount'];
 
         $lastPeriod = $db->table('deduction_periods')
             ->select('period_code, label, status, updated_at')
@@ -472,9 +570,9 @@ class AccountingController extends Controller
 
         $db = Database::connect();
 
-        $query = $db->table('balances b')
-            ->select('u.id AS user_id, u.employee_id, u.name, u.email, u.user_type, u.is_active, b.credit_limit, b.current_debt, b.updated_at')
-            ->join('users u', 'u.id = b.user_id', 'inner')
+        $query = $db->table('users u')
+            ->select('u.id AS user_id, u.employee_id, u.name, u.email, u.user_type, u.is_active, u.base_salary, b.user_id AS balance_user_id, b.credit_limit, b.current_debt, b.updated_at')
+            ->join('balances b', 'b.user_id = u.id', 'left')
             ->where('u.is_active', true)
             ->whereIn('u.user_type', ['faculty', 'staff']);
 
@@ -497,8 +595,12 @@ class AccountingController extends Controller
             ->getResultArray();
 
         $data = array_map(function (array $row): array {
-            $creditLimit = (float) $row['credit_limit'];
-            $currentDebt = (float) $row['current_debt'];
+            $row['financial_profile_configured'] = $row['balance_user_id'] !== null;
+            unset($row['balance_user_id']);
+            $creditLimit = (float) ($row['credit_limit'] ?? 0);
+            $currentDebt = (float) ($row['current_debt'] ?? 0);
+            $row['credit_limit'] = $creditLimit;
+            $row['current_debt'] = $currentDebt;
             $row['available_credit'] = max(0, $creditLimit - $currentDebt);
             $row += $this->buildDebtStatus($creditLimit, $currentDebt);
             return $row;
@@ -514,6 +616,9 @@ class AccountingController extends Controller
             'count' => count($data),
             'data' => $data,
             'summary' => [
+                'employee_account_count' => count($data),
+                'configured_account_count' => count(array_filter($data, static fn(array $row): bool => (bool) ($row['financial_profile_configured'] ?? false))),
+                'needs_setup_count' => count(array_filter($data, static fn(array $row): bool => !(bool) ($row['financial_profile_configured'] ?? false))),
                 'employee_debt_accounts' => count(array_filter($data, static fn(array $row): bool => (float) ($row['current_debt'] ?? 0) > 0)),
                 'employee_debt_total' => $employeeDebtTotal,
                 'advance_payment_count' => count($advancePayments),
@@ -537,9 +642,9 @@ class AccountingController extends Controller
         }
 
         $db = Database::connect();
-        $row = $db->table('balances b')
-            ->select('u.id AS user_id, u.employee_id, u.name, u.email, u.user_type, b.credit_limit, b.current_debt, b.updated_at')
-            ->join('users u', 'u.id = b.user_id', 'inner')
+        $row = $db->table('users u')
+            ->select('u.id AS user_id, u.employee_id, u.name, u.email, u.user_type, u.base_salary, b.user_id AS balance_user_id, b.credit_limit, b.current_debt, b.updated_at')
+            ->join('balances b', 'b.user_id = u.id', 'left')
             ->where('u.is_active', true)
             ->where('u.id', $userId)
             ->get()
@@ -552,8 +657,12 @@ class AccountingController extends Controller
             ]);
         }
 
-        $creditLimit = (float) $row['credit_limit'];
-        $currentDebt = (float) $row['current_debt'];
+        $row['financial_profile_configured'] = $row['balance_user_id'] !== null;
+        unset($row['balance_user_id']);
+        $creditLimit = (float) ($row['credit_limit'] ?? 0);
+        $currentDebt = (float) ($row['current_debt'] ?? 0);
+        $row['credit_limit'] = $creditLimit;
+        $row['current_debt'] = $currentDebt;
         $row['available_credit'] = max(0, $creditLimit - $currentDebt);
         $row += $this->buildDebtStatus($creditLimit, $currentDebt);
 
@@ -586,6 +695,7 @@ class AccountingController extends Controller
                 'ACCOUNTING_DEDUCT_DEBT',
                 'ACCOUNTING_DEDUCT_FULL_DEBT',
                 'ACCOUNTING_UPDATE_CREDIT_LIMIT',
+                'ACCOUNTING_UPDATE_FINANCIAL_PROFILE',
                 'STORE_DEBT_REPAYMENT',
             ])
             ->orderBy('al.id', 'DESC')
@@ -620,28 +730,44 @@ class AccountingController extends Controller
     public function dailySummary()
     {
         $db = Database::connect();
-        $start = date('Y-m-d 00:00:00');
-        $end = date('Y-m-d 23:59:59');
+        [$start, $end, $businessDate] = $this->businessDayStorageBounds();
 
-        $summary = $db->table('debt_cashbook_entries')
-            ->select('COUNT(*) AS deduction_count, COALESCE(SUM(amount), 0) AS deducted_amount')
-            ->whereIn('entry_type', [
-                'confirmed_salary_deduction',
-                'salary_deduction',
-                'manual_deduction',
-                'full_deduction',
-            ])
+        $summary = $this->deductionSummaryForStorageRange($db, $start, $end);
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'date' => $businessDate,
+            'deduction_count' => $summary['count'],
+            'deducted_amount' => $summary['amount'],
+        ]);
+    }
+
+    /** @return array{count:int,amount:float} */
+    private function deductionSummaryForStorageRange($db, string $start, string $end): array
+    {
+        // Confirmed batch items are authoritative for the new payroll workflow.
+        // Exclude their mirrored cashbook rows so the same result is not counted twice.
+        $legacy = $db->table('debt_cashbook_entries')
+            ->select('COUNT(*) AS entry_count, COALESCE(SUM(amount), 0) AS total_amount')
+            ->where('direction', 'credit')
+            ->whereIn('entry_type', ['salary_deduction', 'manual_deduction', 'full_deduction'])
             ->where('created_at >=', $start)
             ->where('created_at <=', $end)
             ->get()
             ->getRowArray() ?? [];
 
-        return $this->response->setJSON([
-            'status' => 'success',
-            'date' => date('Y-m-d'),
-            'deduction_count' => (int) ($summary['deduction_count'] ?? 0),
-            'deducted_amount' => (float) ($summary['deducted_amount'] ?? 0),
-        ]);
+        $batch = $db->table('deduction_batch_items')
+            ->select('COUNT(*) AS entry_count, COALESCE(SUM(confirmed_amount), 0) AS total_amount')
+            ->where('confirmed_amount >', 0)
+            ->where('confirmed_at >=', $start)
+            ->where('confirmed_at <=', $end)
+            ->get()
+            ->getRowArray() ?? [];
+
+        return [
+            'count' => (int) ($legacy['entry_count'] ?? 0) + (int) ($batch['entry_count'] ?? 0),
+            'amount' => (float) ($legacy['total_amount'] ?? 0) + (float) ($batch['total_amount'] ?? 0),
+        ];
     }
 
     public function settlementPreview()
@@ -1314,6 +1440,23 @@ class AccountingController extends Controller
         ]);
     }
 
+    /**
+     * Cashbook timestamps are stored as UTC values, while IBEMS reporting days
+     * follow the university's Asia/Manila business date.
+     *
+     * @return array{0:string,1:string,2:string}
+     */
+    private function businessDayStorageBounds(): array
+    {
+        $businessZone = new \DateTimeZone('Asia/Manila');
+        $storageZone = new \DateTimeZone('UTC');
+        $businessNow = new \DateTimeImmutable('now', $businessZone);
+        $start = $businessNow->setTime(0, 0)->setTimezone($storageZone);
+        $end = $businessNow->setTime(23, 59, 59)->setTimezone($storageZone);
+
+        return [$start->format('Y-m-d H:i:s'), $end->format('Y-m-d H:i:s'), $businessNow->format('Y-m-d')];
+    }
+
     public function previewImportCsv()
     {
         $file = $this->request->getFile('csv_file');
@@ -1733,12 +1876,81 @@ class AccountingController extends Controller
         ]);
     }
 
+    public function updateFinancialProfile()
+    {
+        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $actorId = (int) session()->get('user_id');
+        $userId = (int) ($request['user_id'] ?? 0);
+        $salary = (float) ($request['base_salary'] ?? -1);
+        $creditLimit = (float) ($request['credit_limit'] ?? -1);
+        $reason = trim((string) ($request['reason'] ?? ''));
+
+        if ($userId <= 0 || $salary < 0 || $creditLimit < 0 || $reason === '') {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Employee, salary, credit limit, and reason are required.',
+            ]);
+        }
+
+        $db = Database::connect();
+        $current = $db->table('users u')
+            ->select('u.base_salary, u.user_type, u.is_active, b.user_id AS balance_user_id, b.credit_limit')
+            ->join('balances b', 'b.user_id = u.id', 'left')
+            ->where('u.id', $userId)->get()->getRowArray();
+        if (!$current) {
+            return $this->response->setStatusCode(404)->setJSON(['status' => 'error', 'message' => 'Employee not found.']);
+        }
+        if (!ibems_bool($current['is_active'] ?? false) || !in_array(strtolower((string) ($current['user_type'] ?? '')), ['faculty', 'staff'], true)) {
+            return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => 'Only active Faculty and Staff can have an employee financial profile.']);
+        }
+
+        $wasConfigured = $current['balance_user_id'] !== null;
+        $beforeSalary = (float) ($current['base_salary'] ?? 0);
+        $beforeLimit = (float) ($current['credit_limit'] ?? 0);
+        $now = date('Y-m-d H:i:s');
+        $db->transException(true)->transStart();
+        try {
+            $db->table('users')->where('id', $userId)->update(['base_salary' => $salary]);
+            if ($wasConfigured) {
+                $db->table('balances')->where('user_id', $userId)->update(['credit_limit' => $creditLimit, 'updated_at' => $now]);
+            } else {
+                $db->table('balances')->insert(['user_id' => $userId, 'credit_limit' => $creditLimit, 'current_debt' => 0, 'updated_at' => $now]);
+            }
+            $db->table('audit_logs')->insert([
+                'actor_id' => $actorId,
+                'action' => 'ACCOUNTING_UPDATE_FINANCIAL_PROFILE',
+                'entity' => 'balances',
+                'entity_id' => $userId,
+                'payload_json' => json_encode([
+                    'previous_base_salary' => $beforeSalary,
+                    'new_base_salary' => $salary,
+                    'previous_credit_limit' => $beforeLimit,
+                    'new_credit_limit' => $creditLimit,
+                    'reason' => $reason,
+                    'financial_profile_created' => !$wasConfigured,
+                ]),
+                'created_at' => $now,
+            ]);
+            $db->transComplete();
+        } catch (\Throwable $exception) {
+            $db->transRollback();
+            return $this->response->setStatusCode(500)->setJSON(['status' => 'error', 'message' => 'Financial profile update failed and was rolled back.']);
+        }
+
+        return $this->response->setJSON([
+            'status' => 'success', 'user_id' => $userId,
+            'previous_base_salary' => $beforeSalary, 'new_base_salary' => $salary,
+            'previous_credit_limit' => $beforeLimit, 'new_credit_limit' => $creditLimit,
+            'financial_profile_created' => !$wasConfigured,
+        ]);
+    }
+
     private function buildDebtStatus(float $creditLimit, float $currentDebt): array
     {
         if ($currentDebt <= 0) {
             return [
-                'debt_status' => 'settled',
-                'debt_status_label' => 'Settled',
+                'debt_status' => 'no_outstanding_debt',
+                'debt_status_label' => 'No Outstanding Debt',
                 'debt_status_tone' => 'success',
                 'debt_ratio' => 0.0,
             ];
@@ -1754,18 +1966,18 @@ class AccountingController extends Controller
         }
 
         $ratio = $creditLimit > 0 ? $currentDebt / $creditLimit : 1.0;
-        if ($ratio >= 0.5) {
+        if ($creditLimit > 0 && $ratio >= 1.0) {
             return [
-                'debt_status' => 'partially_settled',
-                'debt_status_label' => 'Partially Settled',
+                'debt_status' => 'at_credit_limit',
+                'debt_status_label' => 'At Credit Limit',
                 'debt_status_tone' => 'warning',
                 'debt_ratio' => $ratio,
             ];
         }
 
         return [
-            'debt_status' => 'pending',
-            'debt_status_label' => 'Pending',
+            'debt_status' => 'outstanding',
+            'debt_status_label' => 'Outstanding',
             'debt_status_tone' => 'info',
             'debt_ratio' => $ratio,
         ];

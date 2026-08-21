@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/accounting') ?>
 
 <?= $this->section('content') ?>
-<section class="acct-shell space-y-5">
+<section class="acct-shell space-y-5"<?= !empty($deductionsPage) ? ' style="display:none" aria-hidden="true"' : '' ?>>
     <div class="dashboard-title acct-head">
         <div>
             <h3 class="text-3xl font-bold tracking-tight text-slate-900">Accounting Debt Center</h3>
@@ -42,7 +42,7 @@
             <div class="acct-flow-item">
                 <span>4</span>
                 <strong>Prepare and Confirm Deductions</strong>
-                <p>Accounting prepares requests first, then records official payroll results. Only confirmed amounts reduce debt.</p>
+                <p>Accounting prepares and reviews the deductions, then confirms them in IBEMS. Only confirmed amounts reduce debt.</p>
             </div>
         </div>
     </article>
@@ -66,7 +66,9 @@
                 <button id="acct-refresh-btn" class="secondary-btn" type="button"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
             </div>
             <div class="action-group action-group-tools flex flex-wrap gap-2">
-                <button id="open-deduction-workflow" class="primary-btn" type="button"><i class="bi bi-diagram-3"></i> Deduction Workflow</button>
+                <?php if (!empty($deductionsPage)): ?>
+                    <button id="open-deduction-workflow" class="primary-btn" type="button"><i class="bi bi-diagram-3"></i> Deduction Workflow</button>
+                <?php endif; ?>
                 <button id="open-debt-investigations" class="secondary-btn" type="button"><i class="bi bi-shield-check"></i> Investigations</button>
                 <button id="open-settlement-run" class="secondary-btn" type="button"><i class="bi bi-clock-history"></i> Legacy History</button>
                 <button id="open-deduction-mode" class="hidden" type="button" tabindex="-1" aria-hidden="true">Retired manual deduction</button>
@@ -78,7 +80,7 @@
 
     <article class="dash-panel rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
     <div class="acct-tabs" role="tablist" aria-label="Accounting debt sections">
-        <button class="acct-tab is-active" type="button" data-acct-tab="employee-debts" role="tab" aria-selected="true"><i class="bi bi-bag-check"></i> Employee Debts for Payroll <span id="acct-tab-employee-count">0</span></button>
+        <button class="acct-tab is-active" type="button" data-acct-tab="employee-debts" role="tab" aria-selected="true"><i class="bi bi-bag-check"></i> Employee Accounts <span id="acct-tab-employee-count">0</span></button>
         <button class="acct-tab" type="button" data-acct-tab="advance-payments" role="tab" aria-selected="false"><i class="bi bi-wallet2"></i> Direct Payments Received <span id="acct-tab-advance-count">0</span></button>
         <button class="acct-tab" type="button" data-acct-tab="operator-accountabilities" role="tab" aria-selected="false"><i class="bi bi-exclamation-octagon"></i> Store Operator Shortages <span id="acct-tab-operator-count">0</span></button>
     </div>
@@ -144,14 +146,15 @@
         <div id="employee-modal-profile" class="mode-profile-empty rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">Loading profile...</div>
 
         <div id="employee-modal-actions" class="mode-actions hidden">
-            <h5 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Credit Limit</h5>
+            <h5 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Salary and Credit</h5>
             <div class="inline-actions">
-                <span id="employee-limit-current" class="limit-label">PHP 0.00</span>
+                <span id="employee-limit-current" class="limit-label">Salary PHP 0.00 | Credit PHP 0.00</span>
                 <button id="employee-open-limit-edit" type="button" class="secondary-btn btn-sm">Edit</button>
             </div>
             <div id="employee-limit-box" class="inline-box mt-2 flex flex-col gap-2 hidden">
-                <label class="field" for="employee-limit-value"><span class="text-xs font-semibold text-slate-500">New credit limit</span><input id="employee-limit-value" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700" type="number" min="0" step="0.01" value="0"></label>
-                <label class="field" for="employee-limit-reason"><span class="text-xs font-semibold text-slate-500">Reason</span><input id="employee-limit-reason" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700" type="text" value="Manual credit limit update"></label>
+                <label class="field" for="employee-salary-value"><span class="text-xs font-semibold text-slate-500">Base salary</span><input id="employee-salary-value" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700" type="number" min="0" step="0.01" value="0"></label>
+                <label class="field" for="employee-limit-value"><span class="text-xs font-semibold text-slate-500">Credit limit</span><input id="employee-limit-value" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700" type="number" min="0" step="0.01" value="0"></label>
+                <label class="field" for="employee-limit-reason"><span class="text-xs font-semibold text-slate-500">Reason</span><input id="employee-limit-reason" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700" type="text" value="Accounting financial profile setup"></label>
                 <div class="inline-actions">
                     <button id="employee-limit-save" type="button" class="primary-btn btn-sm">Save</button>
                     <button id="employee-limit-cancel" type="button" class="secondary-btn btn-sm">Cancel</button>
@@ -315,14 +318,19 @@
     </div>
 </div>
 
-<div id="deduction-workflow-modal" class="acct-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="deduction-workflow-title" data-current-role="<?= esc((string) session()->get('role')) ?>" data-current-user="<?= (int) session()->get('user_id') ?>">
-    <div class="acct-modal-card max-h-[94vh] w-[min(1380px,97vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+<div id="deduction-workflow-modal" class="acct-modal is-hidden<?= !empty($deductionsPage) ? ' deductions-page-shell' : '' ?>" role="dialog" aria-modal="true" aria-labelledby="deduction-workflow-title" data-current-role="<?= esc((string) session()->get('role')) ?>" data-current-user="<?= (int) session()->get('user_id') ?>">
+    <div class="acct-modal-card max-h-[94vh] w-[min(1380px,97vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl<?= !empty($deductionsPage) ? ' deductions-page-card' : '' ?>">
         <div class="acct-modal-head">
             <div>
-                <h4 id="deduction-workflow-title" class="text-lg font-bold text-slate-900">Payroll Deduction Workflow</h4>
-                <p class="mt-1 text-sm text-slate-500">Prepare requests first. Employee debt changes only after an official payroll result is confirmed.</p>
+                <?php if (!empty($deductionsPage)): ?>
+                        <h3 id="deduction-workflow-title">Payroll Deductions</h3>
+                        <p>Choose employee deductions by pay period, apply them in IBEMS, and preserve a reconciled history.</p>
+                <?php else: ?>
+                    <h4 id="deduction-workflow-title" class="text-lg font-bold text-slate-900">Payroll Deduction Workflow</h4>
+                    <p class="mt-1 text-sm text-slate-500">Prepare requests first. Employee debt changes only after Accounting confirms the deduction in IBEMS.</p>
+                <?php endif; ?>
             </div>
-            <button id="close-deduction-workflow" type="button" class="acct-modal-close" aria-label="Close deduction workflow"></button>
+            <button id="close-deduction-workflow" type="button" class="acct-modal-close"<?= !empty($deductionsPage) ? ' style="display:none" aria-hidden="true" tabindex="-1"' : '' ?> aria-label="Close deduction workflow"></button>
         </div>
 
         <div class="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
@@ -330,14 +338,10 @@
                 <section class="rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <h5 class="text-sm font-bold text-slate-900">1. Create deduction period</h5>
                     <div class="mt-3 grid gap-3">
-                        <label class="field">
-                            <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Period code</span>
-                            <input id="workflow-period-code" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" maxlength="40" placeholder="2026-08-A">
-                        </label>
-                        <label class="field">
-                            <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Label</span>
-                            <input id="workflow-period-label" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" maxlength="120" placeholder="August 1-15, 2026">
-                        </label>
+                        <div class="rounded-xl border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
+                            <strong class="block text-slate-900">Automatic period identity</strong>
+                            <span id="workflow-period-preview">Choose the start and end dates. The period code and label will be generated automatically.</span>
+                        </div>
                         <label class="field">
                             <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Frequency</span>
                             <select id="workflow-period-frequency" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm">
@@ -362,7 +366,7 @@
 
                 <section class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
                     <strong class="block">Workflow safeguard</strong>
-                    <p class="mt-1">Prepared means sent for processing—not deducted. Only a confirmed payroll reference may reduce the balance.</p>
+                    <p class="mt-1">Prepared means reviewed but not yet deducted. Only Apply deductions changes employee balances.</p>
                 </section>
             </div>
 
@@ -384,18 +388,52 @@
                     <div class="flex flex-wrap items-center justify-between gap-2">
                         <div>
                             <h5 class="text-sm font-bold text-slate-900">2. Prepare employee requests</h5>
-                            <p class="text-sm text-slate-500">Select employees and enter the requested payroll amount.</p>
+                            <p class="text-sm text-slate-500">Review the period summary, then open the employee register only when adjustments are needed.</p>
                         </div>
-                        <button id="workflow-prepare-batch" type="button" class="primary-btn">Prepare batch</button>
+                        <button id="workflow-open-employees" type="button" class="primary-btn"><i class="bi bi-people"></i> Review employees</button>
                     </div>
-                    <div id="workflow-candidates" class="mt-3 max-h-72 space-y-2 overflow-auto"></div>
+                    <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3"><span class="text-xs text-slate-500">Employees with debt</span><strong id="workflow-summary-employees" class="mt-1 block text-xl text-slate-900">0</strong></div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3"><span class="text-xs text-slate-500">Debt at cutoff</span><strong id="workflow-summary-debt" class="mt-1 block text-xl text-slate-900">PHP 0.00</strong></div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3"><span class="text-xs text-slate-500">Salary not provided</span><strong id="workflow-summary-missing" class="mt-1 block text-xl text-slate-900">0</strong></div>
+                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3"><span class="text-xs text-slate-500">Selected for batch</span><strong id="workflow-summary-selected" class="mt-1 block text-xl text-slate-900">0</strong></div>
+                    </div>
                 </section>
+
+                <div id="workflow-employees-modal" class="acct-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="workflow-employees-title">
+                    <div class="acct-modal-card max-h-[94vh] overflow-hidden rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+                        <div class="acct-modal-head">
+                            <div><h4 id="workflow-employees-title" class="text-lg font-bold text-slate-900">Employee deduction register</h4><p class="mt-1 text-sm text-slate-500">Search and adjust full, partial, or no-deduction requests for this period.</p></div>
+                            <button id="workflow-close-employees" type="button" class="acct-modal-close" aria-label="Close employee deduction register"></button>
+                        </div>
+                        <div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
+                        <input id="workflow-candidate-search" type="search" class="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm" placeholder="Search name or employee ID">
+                        <button id="workflow-toggle-filters" type="button" class="secondary-btn" aria-expanded="false"><i class="bi bi-funnel"></i> Filters</button>
+                        <button id="workflow-select-matching" type="button" class="secondary-btn">Select matching</button>
+                        <button id="workflow-clear-selection" type="button" class="secondary-btn">Clear</button>
+                    </div>
+                    <div id="workflow-filter-options" class="mt-2 flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-2" style="display:none">
+                            <select id="workflow-candidate-type" class="h-10 min-w-40 rounded-xl border border-slate-200 bg-white px-3 text-sm" aria-label="Filter employee type">
+                                <option value="all">All employee types</option>
+                                <option value="faculty">Faculty</option>
+                                <option value="staff">Staff</option>
+                            </select>
+                            <select id="workflow-candidate-salary" class="h-10 min-w-48 rounded-xl border border-slate-200 bg-white px-3 text-sm" aria-label="Filter salary reference">
+                                <option value="all">Any salary reference</option>
+                                <option value="provided">Salary provided</option>
+                                <option value="missing">Salary not provided</option>
+                            </select>
+                        </div>
+                        <div class="mt-2 flex items-center justify-between gap-3"><div id="workflow-candidate-count" class="text-sm text-slate-500">No employees loaded.</div><button id="workflow-prepare-batch" type="button" class="primary-btn">Prepare selected batch</button></div>
+                        <div id="workflow-candidates" class="mt-2 max-h-[65vh] space-y-2 overflow-auto pr-1"></div>
+                    </div>
+                </div>
 
                 <section id="workflow-results-section" class="hidden rounded-xl border border-slate-200 bg-white p-4">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div>
-                            <h5 class="text-sm font-bold text-slate-900">3. Process and finalize payroll results</h5>
-                            <p class="text-sm text-slate-500">Submit the prepared batch, confirm official results, reconcile totals, then finalize independently.</p>
+                            <h5 class="text-sm font-bold text-slate-900">3. Apply and finalize deductions</h5>
+                            <p class="text-sm text-slate-500">The assigned Accounting Officer applies deductions, reconciles totals, and finalizes with a complete audit trail.</p>
                         </div>
                         <div id="workflow-batch-actions"></div>
                     </div>
@@ -495,5 +533,114 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
+<?php if (!empty($deductionsPage)): ?>
+<style>
+    .deductions-page-shell {
+        display: block !important;
+        position: static !important;
+        inset: auto !important;
+        width: 100% !important;
+        min-height: 0 !important;
+        padding: 1.5rem !important;
+        overflow: visible !important;
+        background: transparent !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+        transform: none !important;
+        filter: none !important;
+        box-sizing: border-box;
+    }
+    .deductions-page-card {
+        width: 100% !important;
+        max-width: 1380px !important;
+        max-height: none !important;
+        margin: 0 auto !important;
+        padding: 0 !important;
+        overflow: visible !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        background: transparent !important;
+        box-shadow: none !important;
+        box-sizing: border-box;
+    }
+    .deductions-page-card > .acct-modal-head {
+        display: block;
+        margin-bottom: 1.25rem;
+        padding: 0 0 1rem;
+        border-bottom: 1px solid #dbe3ee;
+    }
+    .deductions-page-card > .acct-modal-head h3 {
+        margin: 0;
+        color: #0f172a;
+        font-size: 1.875rem;
+        font-weight: 800;
+        letter-spacing: -0.025em;
+    }
+    .deductions-page-card > .acct-modal-head p {
+        margin: .35rem 0 0;
+        color: #64748b;
+        font-size: 1rem;
+    }
+    .deductions-page-card > .grid {
+        min-width: 0;
+    }
+    body #workflow-employees-modal {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100vw !important;
+        height: 100dvh !important;
+        max-width: none !important;
+        margin: 0 !important;
+        padding: 14px !important;
+        /* Keep this below the body-portalled select menu (z-index 1400). */
+        z-index: 1350 !important;
+        background: rgba(15, 23, 42, .62) !important;
+        backdrop-filter: none !important;
+        -webkit-backdrop-filter: none !important;
+    }
+    body #workflow-employees-modal > .acct-modal-card {
+        width: min(1720px, calc(100vw - 28px)) !important;
+        height: min(94vh, 920px) !important;
+        max-height: calc(100dvh - 28px) !important;
+        display: flex;
+        flex-direction: column;
+    }
+    body #workflow-employees-modal #workflow-candidates {
+        flex: 1 1 auto;
+        max-height: none !important;
+        min-height: 0;
+    }
+    body #workflow-employees-modal .workflow-candidate {
+        display: grid !important;
+        grid-template-columns: 18px minmax(320px, 1fr) 180px 240px !important;
+        align-items: center !important;
+        column-gap: 10px !important;
+    }
+    body #workflow-employees-modal .workflow-candidate > .workflow-deduction-choice,
+    body #workflow-employees-modal .workflow-candidate > span:last-child,
+    body #workflow-employees-modal .workflow-candidate .workflow-request-amount,
+    body #workflow-employees-modal .workflow-candidate .workflow-preparation-reason {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        box-sizing: border-box !important;
+    }
+    @media (max-width: 900px) {
+        body #workflow-employees-modal .workflow-candidate {
+            grid-template-columns: 18px minmax(0, 1fr) !important;
+        }
+        body #workflow-employees-modal .workflow-candidate > .workflow-deduction-choice,
+        body #workflow-employees-modal .workflow-candidate > span:last-child {
+            grid-column: 2;
+        }
+    }
+    @media (max-width: 1279px) {
+        .deductions-page-card > .grid {
+            grid-template-columns: minmax(0, 1fr) !important;
+        }
+    }
+</style>
+<?php endif; ?>
+<script>window.IBEMS_DEDUCTIONS_PAGE = <?= !empty($deductionsPage) ? 'true' : 'false' ?>;</script>
 <script src="<?= base_url('assets/js/accounting-debts.js') ?>"></script>
 <?= $this->endSection() ?>

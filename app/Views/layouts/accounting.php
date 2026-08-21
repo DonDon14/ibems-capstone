@@ -10,6 +10,7 @@ $availableRoles = ibems_available_roles();
 $navigation = [
     ['path' => 'accounting/dashboard', 'label' => 'Dashboard', 'icon' => 'bi bi-speedometer2'],
     ['path' => 'accounting/debts', 'label' => 'Debt Monitoring', 'icon' => 'bi bi-cash-stack'],
+    ['path' => 'accounting/deductions', 'label' => 'Payroll Deductions', 'icon' => 'bi bi-file-earmark-spreadsheet'],
 ];
 
 include APPPATH . 'Views/components/portal_shell.php';

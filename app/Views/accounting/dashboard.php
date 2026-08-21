@@ -34,7 +34,7 @@
                     </span>
                     <i class="bi bi-arrow-right quick-link-arrow"></i>
                 </a>
-                <a href="<?= site_url('accounting/debts') ?>">
+                <a href="<?= site_url('accounting/deductions') ?>">
                     <span class="quick-link-icon"><i class="bi bi-diagram-3"></i></span>
                     <span class="quick-link-copy">
                         <strong>Open Deduction Workflow</strong>

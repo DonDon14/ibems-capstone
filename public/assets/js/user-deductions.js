@@ -1,0 +1,69 @@
+const udPeriod = document.getElementById("ud-period");
+const udBody = document.getElementById("ud-body");
+
+function udEscape(value) {
+    const node = document.createElement("div");
+    node.textContent = String(value ?? "");
+    return node.innerHTML;
+}
+
+function udMoney(value) {
+    return `PHP ${Number(value || 0).toLocaleString("en-PH", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function udStatus(value) {
+    return String(value || "applied").replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function udState(message, type = "empty") {
+    return `<tr><td colspan="7"><div class="data-state is-${udEscape(type)}">${udEscape(message)}</div></td></tr>`;
+}
+
+function udRender(data) {
+    const periods = Array.isArray(data.periods) ? data.periods : [];
+    const rows = Array.isArray(data.deductions) ? data.deductions : [];
+    const summary = data.summary || {};
+
+    udPeriod.innerHTML = periods.length
+        ? periods.map((period) => `<option value="${Number(period.id)}" ${Number(period.id) === Number(data.selected_period_id) ? "selected" : ""}>${udEscape(period.label || period.period_code)} (${udEscape(period.date_start)} to ${udEscape(period.date_end)})</option>`).join("")
+        : '<option value="">No applied deduction periods</option>';
+    udPeriod.disabled = periods.length === 0;
+
+    document.getElementById("ud-total").textContent = udMoney(summary.total_deducted);
+    document.getElementById("ud-before").textContent = udMoney(summary.debt_before);
+    document.getElementById("ud-after").textContent = udMoney(summary.debt_after);
+    document.getElementById("ud-count").textContent = String(Number(summary.entry_count || 0));
+
+    if (!rows.length) {
+        udBody.innerHTML = udState("No applied deduction was recorded for this pay period.");
+        return;
+    }
+
+    udBody.innerHTML = rows.map((row) => `
+        <tr>
+            <td><strong>${udEscape(row.period_label || row.period_code)}</strong><br><span class="meta">${udEscape(row.date_start)} to ${udEscape(row.date_end)}</span></td>
+            <td>${udEscape(window.IbemsFormat?.dateTime(row.applied_at) || row.applied_at || "-")}</td>
+            <td>${udEscape(udMoney(row.requested_amount))}</td>
+            <td><strong>${udEscape(udMoney(row.deducted_amount))}</strong></td>
+            <td>${udEscape(udMoney(row.debt_before))}</td>
+            <td>${udEscape(udMoney(row.debt_after))}</td>
+            <td><span class="user-deduction-status">${udEscape(udStatus(row.status))}</span></td>
+        </tr>
+    `).join("");
+}
+
+async function udLoad(periodId = "") {
+    udBody.innerHTML = udState("Loading deductions...", "loading");
+    const query = periodId ? `?period_id=${encodeURIComponent(periodId)}` : "";
+    try {
+        const response = await fetch(`/user/deductions/data${query}`);
+        const data = await response.json();
+        if (!response.ok || data.status !== "success") throw new Error(data.message || "Unable to load deductions.");
+        udRender(data);
+    } catch (error) {
+        udBody.innerHTML = udState(error.message || "Unable to load deductions.", "error");
+    }
+}
+
+udPeriod?.addEventListener("change", () => udLoad(udPeriod.value));
+udLoad();

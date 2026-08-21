@@ -1,0 +1,11 @@
+employee_id,name,email,role,user_type,base_salary,credit_limit,is_active
+FAC-2026-001,Dr. Andrea Villanueva,andrea.villanueva@ibems.local,USER,faculty,48000.00,8000.00,1
+FAC-2026-002,Prof. Ramon Castillo,ramon.castillo@ibems.local,USER,faculty,45000.00,7500.00,1
+FAC-2026-003,Engr. Camille Navarro,camille.navarro@ibems.local,USER,faculty,46000.00,7500.00,1
+FAC-2026-004,Prof. Jerome Bautista,jerome.bautista@ibems.local,USER,faculty,43000.00,7000.00,1
+FAC-2026-005,Dr. Liza Mendoza,liza.mendoza@ibems.local,USER,faculty,50000.00,8500.00,1
+STF-2026-001,Angela Reyes,angela.reyes@ibems.local,USER,staff,28000.00,5000.00,1
+STF-2026-002,Michael Flores,michael.flores@ibems.local,USER,staff,30000.00,5000.00,1
+STF-2026-003,Kristine Garcia,kristine.garcia@ibems.local,USER,staff,27500.00,4500.00,1
+STF-2026-004,Paolo Fernandez,paolo.fernandez@ibems.local,USER,staff,32000.00,5500.00,1
+STF-2026-005,Marissa Aquino,marissa.aquino@ibems.local,USER,staff,29000.00,5000.00,1

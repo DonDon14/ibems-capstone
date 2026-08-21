@@ -14,6 +14,8 @@ let settlementRunsCache = [];
 let importCsvPreviewReady = false;
 let activeSettlementDetails = null;
 let deductionWorkflowPeriods = [];
+let deductionWorkflowRegister = [];
+let deductionWorkflowItems = [];
 
 function aEscape(value) {
     return String(value ?? "")
@@ -46,6 +48,12 @@ function aCategory(value) {
     return text.charAt(0).toUpperCase() + text.slice(1).toLowerCase();
 }
 
+function aBool(value) {
+    if (typeof value === "boolean") return value;
+    if (typeof value === "number") return value === 1;
+    return ["1", "true", "t", "yes", "on"].includes(String(value ?? "").trim().toLowerCase());
+}
+
 function getDebtStatus(row) {
     const key = String(row?.debt_status || "").trim() || "pending";
     const label = String(row?.debt_status_label || "").trim() || aCategory(key.replace(/_/g, " "));
@@ -69,7 +77,7 @@ function renderSummary(rows) {
     const totalDebt = acctDataSummary ? Number(acctDataSummary.employee_debt_total || 0) : list.reduce((sum, row) => sum + Number(row.current_debt || 0), 0);
     document.getElementById("acct-count").textContent = String(list.length);
     document.getElementById("acct-total-debt").textContent = aMoney(totalDebt);
-    document.getElementById("acct-tab-employee-count").textContent = String(acctDataSummary?.employee_debt_accounts ?? list.filter((row) => Number(row.current_debt || 0) > 0).length);
+    document.getElementById("acct-tab-employee-count").textContent = String(acctDataSummary?.employee_account_count ?? list.length);
     document.getElementById("acct-tab-advance-count").textContent = String(acctDataSummary?.advance_payment_count ?? acctAdvanceRows.length);
     document.getElementById("acct-tab-operator-count").textContent = String(acctDataSummary?.operator_accountability_count ?? acctOperatorRows.length);
 }
@@ -390,7 +398,10 @@ function renderRows(rows) {
         return;
     }
 
-    if (countText) countText.textContent = `Showing ${rows.length} records`;
+    if (countText) {
+        const needsSetup = rows.filter((row) => !aBool(row.financial_profile_configured)).length;
+        countText.textContent = `Showing ${rows.length} eligible employees${needsSetup ? ` · ${needsSetup} need financial setup` : ""}`;
+    }
 
     body.innerHTML = rows.map((row) => `
         <article data-row-user="${row.user_id}" class="acct-record-row acct-row-clickable flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:bg-slate-50">
@@ -400,13 +411,14 @@ function renderRows(rows) {
                     <div class="acct-name-line flex flex-wrap items-center gap-2">
                         <strong class="text-base font-bold text-slate-900">${aEscape(row.name)}</strong>
                         <span class="table-chip acct-chip">${aEscape(aCategory(row.user_type))}</span>
-                        <span class="table-status acct-status ${Number(row.is_active || 0) === 1 ? "is-active" : "is-inactive"}">${Number(row.is_active || 0) === 1 ? "Active" : "Inactive"}</span>
-                        ${debtStatusPill(row)}
+                        <span class="table-status acct-status ${aBool(row.is_active) ? "is-active" : "is-inactive"}">${aBool(row.is_active) ? "Active" : "Inactive"}</span>
+                        ${aBool(row.financial_profile_configured) ? debtStatusPill(row) : '<span class="acct-debt-status is-warning">Needs Financial Setup</span>'}
                     </div>
                     <div class="acct-subline truncate text-sm text-slate-500">${aEscape(row.employee_id || "-")} | ${aEscape(row.email)}</div>
                 </div>
             </div>
             <div class="acct-finance flex flex-wrap items-center justify-end gap-4">
+                ${!aBool(row.financial_profile_configured) ? '<div class="text-sm font-semibold text-amber-700">Open to set salary and credit limit</div>' : `
                 <div class="acct-fin-kv grid gap-0.5">
                     <span class="text-xs text-slate-500">Current Debt</span>
                     <strong class="text-sm font-semibold ${Number(row.current_debt || 0) > 0 ? "acct-money-debt text-rose-600" : "text-slate-900"}">${aEscape(aMoney(row.current_debt))}</strong>
@@ -420,6 +432,7 @@ function renderRows(rows) {
                     <span class="text-xs text-slate-500">Available</span>
                     <strong class="text-sm font-semibold text-slate-900">${aEscape(aMoney(row.available_credit))}</strong>
                 </div>
+                `}
             </div>
         </article>
     `).join("");
@@ -539,7 +552,7 @@ function applyMainFiltersAndRender() {
 async function loadData() {
     const params = new URLSearchParams({ limit: "500" });
 
-    const response = await fetch(`/accounting/debts/data?${params.toString()}`);
+    const response = await fetch(`/accounting/debts/data?${params.toString()}`, { cache: "no-store" });
     const data = await response.json();
 
     if (!data || data.status !== "success") {
@@ -682,14 +695,14 @@ async function confirmSettlementRunApply() {
 }
 
 async function loadProfile(userId) {
-    const response = await fetch(`/accounting/debts/profile?user_id=${userId}`);
+    const response = await fetch(`/accounting/debts/profile?user_id=${userId}`, { cache: "no-store" });
     const data = await response.json();
     if (!data || data.status !== "success" || !data.data) return null;
     return data.data;
 }
 
 async function loadHistory(userId) {
-    const response = await fetch(`/accounting/debts/history?user_id=${userId}&limit=20`);
+    const response = await fetch(`/accounting/debts/history?user_id=${userId}&limit=20`, { cache: "no-store" });
     const data = await response.json();
     if (!data || data.status !== "success" || !Array.isArray(data.data)) return [];
     return data.data;
@@ -707,6 +720,7 @@ function buildProfileHtml(p) {
                 <div class="kv rounded-lg border border-slate-200 bg-white p-2.5"><span class="block text-xs text-slate-500">Employee ID</span><strong class="text-sm text-slate-900">${aEscape(p.employee_id || "-")}</strong></div>
                 <div class="kv rounded-lg border border-slate-200 bg-white p-2.5"><span class="block text-xs text-slate-500">Email</span><strong class="text-sm text-slate-900">${aEscape(p.email)}</strong></div>
                 <div class="kv rounded-lg border border-slate-200 bg-white p-2.5"><span class="block text-xs text-slate-500">Category</span><strong class="text-sm text-slate-900">${aEscape(aCategory(p.user_type))}</strong></div>
+                <div class="kv rounded-lg border border-slate-200 bg-white p-2.5"><span class="block text-xs text-slate-500">Base Salary</span><strong class="text-sm text-slate-900">${aEscape(aMoney(p.base_salary))}</strong></div>
                 <div class="kv rounded-lg border border-slate-200 bg-white p-2.5"><span class="block text-xs text-slate-500">Current Debt</span><strong class="text-sm text-slate-900">${aEscape(aMoney(p.current_debt))}</strong></div>
                 <div class="kv rounded-lg border border-slate-200 bg-white p-2.5"><span class="block text-xs text-slate-500">Credit Limit</span><strong class="text-sm text-slate-900">${aEscape(aMoney(p.credit_limit))}</strong></div>
                 <div class="kv rounded-lg border border-slate-200 bg-white p-2.5"><span class="block text-xs text-slate-500">Available Credit</span><strong class="text-sm text-slate-900">${aEscape(aMoney(p.available_credit))}</strong></div>
@@ -728,6 +742,8 @@ function buildHistoryHtml(rows) {
             detail = `Store payment ${aMoney(payload.paid_amount)} (Debt: ${aMoney(payload.previous_debt)} -> ${aMoney(payload.new_debt)})`;
         } else if (row.action === "ACCOUNTING_UPDATE_CREDIT_LIMIT") {
             detail = `Credit Limit: ${aMoney(payload.previous_credit_limit)} -> ${aMoney(payload.new_credit_limit)}`;
+        } else if (row.action === "ACCOUNTING_UPDATE_FINANCIAL_PROFILE") {
+            detail = `Salary: ${aMoney(payload.previous_base_salary)} -> ${aMoney(payload.new_base_salary)} | Credit: ${aMoney(payload.previous_credit_limit)} -> ${aMoney(payload.new_credit_limit)}`;
         } else {
             detail = row.action;
         }
@@ -865,7 +881,10 @@ async function openEmployeeModal(userId) {
     }
 
     profileEl.innerHTML = buildProfileHtml(employeeModalProfile);
-    document.getElementById("employee-limit-current").textContent = aMoney(employeeModalProfile.credit_limit || 0);
+    document.getElementById("employee-limit-current").textContent = aBool(employeeModalProfile.financial_profile_configured)
+        ? `Salary ${aMoney(employeeModalProfile.base_salary || 0)} | Credit ${aMoney(employeeModalProfile.credit_limit || 0)}`
+        : "Financial profile not configured";
+    document.getElementById("employee-salary-value").value = Number(employeeModalProfile.base_salary || 0).toFixed(2);
     document.getElementById("employee-limit-value").value = Number(employeeModalProfile.credit_limit || 0).toFixed(2);
     document.getElementById("employee-modal-actions").classList.remove("hidden");
 
@@ -1087,19 +1106,55 @@ function setWorkflowMessage(message, type = "ok") {
     element.className = `text-sm font-semibold ${type === "error" ? "text-red-700" : "text-emerald-700"}`;
 }
 
+function filterWorkflowCandidates() {
+    const query = document.getElementById("workflow-candidate-search").value.trim().toLowerCase();
+    const type = document.getElementById("workflow-candidate-type").value;
+    const salary = document.getElementById("workflow-candidate-salary").value;
+    const candidates = Array.from(document.querySelectorAll(".workflow-candidate"));
+    let matching = 0;
+    candidates.forEach((candidate) => {
+        const matches = (!query || candidate.dataset.search.includes(query))
+            && (type === "all" || candidate.dataset.employeeType === type)
+            && (salary === "all" || candidate.dataset.salaryState === salary);
+        candidate.classList.toggle("hidden", !matches);
+        if (matches) matching++;
+    });
+    const selected = candidates.filter((candidate) => candidate.querySelector(".workflow-candidate-check").checked).length;
+    document.getElementById("workflow-candidate-count").textContent = `Showing ${matching} of ${candidates.length} employees with debt · ${selected} selected`;
+    document.getElementById("workflow-summary-selected").textContent = String(selected);
+}
+
 function renderWorkflowCandidates() {
     const container = document.getElementById("workflow-candidates");
-    const rows = acctRows.filter((row) => Number(row.current_debt || 0) > 0);
-    container.innerHTML = rows.length ? rows.map((row) => `
-        <label class="grid gap-3 rounded-xl border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[auto_minmax(0,1fr)_170px] sm:items-center">
-            <input type="checkbox" class="workflow-candidate-check h-4 w-4" data-workflow-user="${aEscape(row.user_id)}">
-            <span>
-                <strong class="block text-sm text-slate-900">${aEscape(row.name || "Employee")}</strong>
-                <small class="text-slate-500">${aEscape(row.employee_id || "-")} · Current debt ${aEscape(aMoney(row.current_debt || 0))}</small>
+    const rows = deductionWorkflowRegister.filter((row) => Number(row.cutoff_debt || 0) > 0);
+    const existingByUser = new Map(deductionWorkflowItems.map((item) => [Number(item.user_id), item]));
+    document.getElementById("workflow-summary-employees").textContent = String(rows.length);
+    document.getElementById("workflow-summary-debt").textContent = aMoney(rows.reduce((sum, row) => sum + Number(row.cutoff_debt || 0), 0));
+    document.getElementById("workflow-summary-missing").textContent = String(rows.filter((row) => Number(row.salary_reference || 0) <= 0).length);
+    container.innerHTML = rows.length ? rows.map((row) => {
+        const existing = existingByUser.get(Number(row.user_id));
+        const choice = existing?.deduction_choice || (existing && Number(existing.requested_amount || 0) === 0 ? "none" : "full");
+        const requested = existing ? Number(existing.requested_amount || 0) : Number(row.cutoff_debt || 0);
+        const reason = existing?.preparation_reason || "";
+        return `
+        <label class="workflow-candidate grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2 lg:grid-cols-[auto_minmax(420px,1fr)_190px_160px] lg:items-center" data-search="${aEscape(`${row.name || ""} ${row.employee_id || ""} ${row.email || ""}`.toLowerCase())}" data-employee-type="${aEscape(String(row.user_type || "").toLowerCase())}" data-salary-state="${Number(row.salary_reference || 0) > 0 ? "provided" : "missing"}">
+            <input type="checkbox" class="workflow-candidate-check h-4 w-4" data-workflow-user="${aEscape(row.user_id)}" ${existing ? "checked" : ""}>
+            <span class="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap">
+                <strong class="shrink-0 text-sm text-slate-900">${aEscape(row.name || "Employee")}</strong>
+                <small class="truncate text-slate-500">${aEscape(row.employee_id || "-")} · Cutoff ${aEscape(aMoney(row.cutoff_debt || 0))} · Salary ${Number(row.salary_reference || 0) > 0 ? aEscape(aMoney(row.salary_reference)) : "Not provided"} · Opening ${aEscape(aMoney(row.opening_debt || 0))}</small>
             </span>
-            <input type="number" class="workflow-request-amount h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm" min="0.01" max="${aEscape(row.current_debt || 0)}" step="0.01" value="${aEscape(Number(row.current_debt || 0).toFixed(2))}" aria-label="Requested amount for ${aEscape(row.name || "employee")}">
+            <select class="workflow-deduction-choice h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm" aria-label="Deduction choice for ${aEscape(row.name || "employee")}">
+                <option value="full" ${choice === "full" ? "selected" : ""}>Deduct full debt</option>
+                <option value="partial" ${choice === "partial" ? "selected" : ""}>Partial deduction</option>
+                <option value="none" ${choice === "none" ? "selected" : ""}>No deduction</option>
+            </select>
+            <span class="grid gap-2">
+                <input type="number" class="workflow-request-amount ${choice === "none" ? "hidden" : ""} h-10 rounded-xl border border-slate-200 ${choice === "full" ? "bg-slate-100 text-slate-600" : "bg-white"} px-3 text-sm" min="0" max="${aEscape(row.cutoff_debt || 0)}" step="0.01" value="${aEscape(requested.toFixed(2))}" data-cutoff-debt="${aEscape(row.cutoff_debt || 0)}" aria-label="Requested amount for ${aEscape(row.name || "employee")}" ${choice === "full" ? "readonly" : ""}>
+                <input type="text" class="workflow-preparation-reason ${choice === "none" ? "" : "hidden"} h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm" maxlength="200" value="${aEscape(reason)}" placeholder="Reason for no deduction" aria-label="No deduction reason for ${aEscape(row.name || "employee")}">
+            </span>
         </label>
-    `).join("") : '<div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-500">No active faculty/staff debt accounts are available.</div>';
+    `}).join("") : '<div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-500">No active faculty/staff debt accounts are available.</div>';
+    filterWorkflowCandidates();
 }
 
 function workflowStatusLabel(value) {
@@ -1113,20 +1168,22 @@ function renderWorkflowResults(items, batchStatus, batchCreatedBy) {
     const workflowModal = document.getElementById("deduction-workflow-modal");
     const currentRole = workflowModal.dataset.currentRole || "";
     const currentUser = Number(workflowModal.dataset.currentUser || 0);
-    const canConfirm = ["submitted", "partially_processed"].includes(String(batchStatus || ""));
+    const selectedPeriod = deductionWorkflowPeriods.find((row) => Number(row.id) === Number(document.getElementById("workflow-period-select").value || 0));
     section.classList.remove("hidden");
     if (batchStatus === "prepared") {
-        actions.innerHTML = '<button type="button" data-workflow-batch-action="submit" class="primary-btn">Submit for payroll processing</button>';
+        actions.innerHTML = '<button type="button" id="workflow-edit-deductions" class="secondary-btn">Edit deductions</button> <button type="button" data-workflow-batch-action="apply" class="primary-btn">Apply deductions</button>';
+    } else if (batchStatus === "submitted") {
+        actions.innerHTML = '<button type="button" data-workflow-batch-action="apply" class="primary-btn">Apply pending deductions</button>';
     } else if (batchStatus === "processed") {
         actions.innerHTML = '<button type="button" data-workflow-batch-action="reconcile" class="primary-btn">Reconcile batch totals</button>';
     } else if (batchStatus === "reconciled") {
-        actions.innerHTML = currentRole === "ACCOUNTING_OFFICE" && Number(batchCreatedBy || 0) !== currentUser
+        actions.innerHTML = currentRole === "ACCOUNTING_OFFICE" && Number(batchCreatedBy || 0) === currentUser
             ? '<button type="button" data-workflow-batch-action="finalize" class="primary-btn">Finalize period</button>'
-            : '<span class="inline-flex rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">Awaiting a different Accounting user for finalization</span>';
+            : '<span class="inline-flex rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">Only the assigned Accounting Officer can finalize this period</span>';
     } else if (batchStatus === "finalized") {
         actions.innerHTML = '<span class="inline-flex rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">Finalized and locked</span>';
     } else {
-        actions.innerHTML = '<span class="inline-flex rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800">Record each official payroll result below</span>';
+        actions.innerHTML = '<span class="inline-flex rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800">Review the current batch status</span>';
     }
     if (!items.length) {
         container.innerHTML = '<div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-500">No batch items found.</div>';
@@ -1144,22 +1201,8 @@ function renderWorkflowResults(items, batchStatus, batchCreatedBy) {
                     </div>
                     <span class="acct-debt-status ${pending ? "is-info" : "is-success"}">${aEscape(workflowStatusLabel(item.result_status))}</span>
                 </div>
-                ${pending && canConfirm ? `
-                    <div class="mt-3 grid gap-2 md:grid-cols-[150px_210px_minmax(200px,1fr)_auto]">
-                        <input class="workflow-confirmed-amount h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm" type="number" min="0" max="${aEscape(item.requested_amount || 0)}" step="0.01" value="${aEscape(Number(item.requested_amount || 0).toFixed(2))}" aria-label="Confirmed amount">
-                        <select class="workflow-reason h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm" aria-label="Result reason">
-                            <option value="">No exception</option>
-                            <option value="insufficient_salary">Insufficient salary</option>
-                            <option value="not_deducted">Not deducted</option>
-                            <option value="employee_not_found">Employee not found</option>
-                            <option value="duplicate">Duplicate</option>
-                            <option value="returned_for_correction">Returned for correction</option>
-                        </select>
-                        <input class="workflow-reference h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm" maxlength="120" placeholder="Official payroll reference" aria-label="Official payroll reference">
-                        <button type="button" class="workflow-confirm-result primary-btn btn-sm">Confirm</button>
-                    </div>
-                ` : pending ? `
-                    <div class="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-2 text-sm text-blue-800">Submit this prepared batch before recording results.</div>
+                ${pending ? `
+                    <div class="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-2 text-sm text-blue-800">This amount will be processed when Apply deductions is selected.</div>
                 ` : `
                     <div class="mt-2 text-sm text-slate-600">Confirmed ${aEscape(aMoney(item.confirmed_amount || 0))} · Carryover ${aEscape(aMoney(item.carryover_amount || 0))} · Reference ${aEscape(item.result_reference || "-")}</div>
                 `}
@@ -1172,7 +1215,10 @@ async function loadDeductionWorkflow(preferredPeriodId = null) {
     const select = document.getElementById("workflow-period-select");
     const currentPeriodId = preferredPeriodId || Number(select.value || 0);
     const selectedBefore = deductionWorkflowPeriods.find((period) => Number(period.id) === Number(currentPeriodId));
-    const query = selectedBefore?.batch_id ? `?batch_id=${encodeURIComponent(selectedBefore.batch_id)}` : "";
+    const params = new URLSearchParams();
+    if (currentPeriodId) params.set("period_id", String(currentPeriodId));
+    if (selectedBefore?.batch_id) params.set("batch_id", String(selectedBefore.batch_id));
+    const query = params.toString() ? `?${params.toString()}` : "";
     const response = await fetch(`/accounting/deduction-workflow${query}`);
     const data = await response.json();
     if (!data || data.status !== "success") {
@@ -1181,6 +1227,8 @@ async function loadDeductionWorkflow(preferredPeriodId = null) {
     }
 
     deductionWorkflowPeriods = Array.isArray(data.periods) ? data.periods : [];
+    deductionWorkflowRegister = Array.isArray(data.register) ? data.register : [];
+    deductionWorkflowItems = Array.isArray(data.items) ? data.items : [];
     select.innerHTML = '<option value="">Select a period</option>' + deductionWorkflowPeriods.map((period) =>
         `<option value="${aEscape(period.id)}">${aEscape(period.period_code)} · ${aEscape(period.label)}</option>`
     ).join("");
@@ -1203,8 +1251,9 @@ async function loadDeductionWorkflow(preferredPeriodId = null) {
     if (selected.batch_id) {
         prepareSection.classList.add("hidden");
         if (!query || Number(selected.batch_id) !== Number(selectedBefore?.batch_id)) {
-            const detailResponse = await fetch(`/accounting/deduction-workflow?batch_id=${encodeURIComponent(selected.batch_id)}`);
+            const detailResponse = await fetch(`/accounting/deduction-workflow?period_id=${encodeURIComponent(selected.id)}&batch_id=${encodeURIComponent(selected.batch_id)}`);
             const detail = await detailResponse.json();
+            deductionWorkflowItems = Array.isArray(detail.items) ? detail.items : [];
             renderWorkflowResults(Array.isArray(detail.items) ? detail.items : [], selected.batch_status, selected.batch_created_by);
         } else {
             renderWorkflowResults(Array.isArray(data.items) ? data.items : [], selected.batch_status, selected.batch_created_by);
@@ -1226,6 +1275,22 @@ function closeDeductionWorkflow() {
     document.getElementById("deduction-workflow-modal").style.display = "none";
 }
 
+function updateWorkflowPeriodPreview() {
+    const start = document.getElementById("workflow-period-start").value;
+    const end = document.getElementById("workflow-period-end").value;
+    const preview = document.getElementById("workflow-period-preview");
+    if (!start || !end) {
+        preview.textContent = "Choose the start and end dates. The period code and label will be generated automatically.";
+        return;
+    }
+    if (end < start) {
+        preview.textContent = "End date cannot be before the start date.";
+        return;
+    }
+    const format = (value) => new Intl.DateTimeFormat("en-PH", { month: "long", day: "numeric", year: "numeric" }).format(new Date(`${value}T00:00:00`));
+    preview.innerHTML = `<strong>${aEscape(`PAY-${start.replace(/-/g, "")}-${end.replace(/-/g, "")}`)}</strong><br>${aEscape(`${format(start)} - ${format(end)}`)}`;
+}
+
 async function createWorkflowPeriod() {
     const button = document.getElementById("workflow-create-period");
     button.disabled = true;
@@ -1234,8 +1299,6 @@ async function createWorkflowPeriod() {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-                period_code: document.getElementById("workflow-period-code").value.trim(),
-                label: document.getElementById("workflow-period-label").value.trim(),
                 frequency: document.getElementById("workflow-period-frequency").value,
                 date_start: document.getElementById("workflow-period-start").value,
                 date_end: document.getElementById("workflow-period-end").value,
@@ -1255,11 +1318,26 @@ async function createWorkflowPeriod() {
 
 async function prepareWorkflowBatch() {
     const periodId = Number(document.getElementById("workflow-period-select").value || 0);
-    const requests = Array.from(document.querySelectorAll(".workflow-candidate-check:checked")).map((checkbox) => {
+    const selected = Array.from(document.querySelectorAll(".workflow-candidate-check:checked"));
+    const invalid = selected.find((checkbox) => {
+        const row = checkbox.closest("label");
+        const choice = row.querySelector(".workflow-deduction-choice").value;
+        const amount = Number(row.querySelector(".workflow-request-amount").value || 0);
+        const cutoff = Number(row.querySelector(".workflow-request-amount").dataset.cutoffDebt || 0);
+        const reason = row.querySelector(".workflow-preparation-reason").value.trim();
+        return (choice === "partial" && (amount <= 0 || amount >= cutoff)) || (choice === "none" && !reason);
+    });
+    if (invalid) {
+        setWorkflowMessage("Partial deductions must be greater than zero and below the full debt. No deduction requires a reason.", "error");
+        return;
+    }
+    const requests = selected.map((checkbox) => {
         const row = checkbox.closest("label");
         return {
             user_id: Number(checkbox.dataset.workflowUser || 0),
+            deduction_choice: row.querySelector(".workflow-deduction-choice").value,
             requested_amount: Number(row.querySelector(".workflow-request-amount").value || 0),
+            preparation_reason: row.querySelector(".workflow-preparation-reason").value.trim(),
         };
     });
     if (!periodId || !requests.length) {
@@ -1278,40 +1356,14 @@ async function prepareWorkflowBatch() {
         return;
     }
     setWorkflowMessage("Batch prepared. No employee debt has been reduced yet.");
+    document.getElementById("workflow-employees-modal").style.display = "none";
     await loadDeductionWorkflow(periodId);
-}
-
-async function confirmWorkflowResult(button) {
-    const row = button.closest("[data-workflow-item]");
-    const itemId = Number(row?.dataset.workflowItem || 0);
-    button.disabled = true;
-    try {
-        const response = await fetch(`/accounting/deduction-batch-items/${itemId}/confirm`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                confirmed_amount: Number(row.querySelector(".workflow-confirmed-amount").value || 0),
-                reason_code: row.querySelector(".workflow-reason").value,
-                result_reference: row.querySelector(".workflow-reference").value.trim(),
-            }),
-        });
-        const data = await response.json();
-        if (!data || data.status !== "success") {
-            setWorkflowMessage(data?.message || "Failed to confirm payroll result.", "error");
-            return;
-        }
-        setWorkflowMessage(`Payroll result confirmed. Employee debt is now ${aMoney(data.debt_after)}.`);
-        await loadData();
-        await loadDeductionWorkflow(Number(document.getElementById("workflow-period-select").value || 0));
-    } finally {
-        button.disabled = false;
-    }
 }
 
 async function advanceWorkflowBatch(action) {
     const periodId = Number(document.getElementById("workflow-period-select").value || 0);
     const period = deductionWorkflowPeriods.find((row) => Number(row.id) === periodId);
-    if (!period?.batch_id || !["submit", "reconcile", "finalize"].includes(action)) return;
+    if (!period?.batch_id || !["apply", "reconcile", "finalize"].includes(action)) return;
     const response = await fetch(`/accounting/deduction-batches/${Number(period.batch_id)}/${action}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1323,9 +1375,9 @@ async function advanceWorkflowBatch(action) {
         return;
     }
     const messages = {
-        submit: "Batch submitted. Official payroll results may now be recorded.",
+        apply: "Prepared deductions were applied atomically in IBEMS.",
         reconcile: "Batch totals reconciled. It now requires independent finalization.",
-        finalize: "Deduction period finalized and locked.",
+        finalize: "Deduction period finalized, locked, and recorded in the audit trail.",
     };
     setWorkflowMessage(messages[action]);
     await loadDeductionWorkflow(periodId);
@@ -1519,7 +1571,7 @@ document.getElementById("acct-body").addEventListener("click", async (event) => 
 });
 
 document.getElementById("open-deduction-mode").addEventListener("click", openMode);
-document.getElementById("open-deduction-workflow").addEventListener("click", openDeductionWorkflow);
+document.getElementById("open-deduction-workflow")?.addEventListener("click", openDeductionWorkflow);
 document.getElementById("open-debt-investigations").addEventListener("click", openInvestigationsModal);
 document.getElementById("open-settlement-run").addEventListener("click", openSettlementModal);
 document.getElementById("open-import-csv").addEventListener("click", openImportModal);
@@ -1552,16 +1604,75 @@ document.getElementById("investigation-list").addEventListener("click", (event) 
     if (approveButton) approveInvestigation(approveButton);
 });
 document.getElementById("workflow-create-period").addEventListener("click", createWorkflowPeriod);
+document.getElementById("workflow-period-start").addEventListener("change", updateWorkflowPeriodPreview);
+document.getElementById("workflow-period-end").addEventListener("change", updateWorkflowPeriodPreview);
 document.getElementById("workflow-refresh").addEventListener("click", () => loadDeductionWorkflow());
 document.getElementById("workflow-period-select").addEventListener("change", (event) => {
     loadDeductionWorkflow(Number(event.target.value || 0));
 });
 document.getElementById("workflow-prepare-batch").addEventListener("click", prepareWorkflowBatch);
-document.getElementById("workflow-results").addEventListener("click", (event) => {
-    const button = event.target.closest(".workflow-confirm-result");
-    if (button) confirmWorkflowResult(button);
+document.getElementById("workflow-open-employees").addEventListener("click", () => {
+    document.getElementById("workflow-employees-modal").style.display = "grid";
+    document.getElementById("workflow-candidate-search").focus();
+});
+document.getElementById("workflow-close-employees").addEventListener("click", () => {
+    document.getElementById("workflow-employees-modal").style.display = "none";
+});
+document.getElementById("workflow-employees-modal").addEventListener("click", (event) => {
+    if (event.target.id === "workflow-employees-modal") event.currentTarget.style.display = "none";
+});
+document.getElementById("workflow-candidates").addEventListener("change", (event) => {
+    if (event.target.closest(".workflow-candidate-check")) {
+        filterWorkflowCandidates();
+        return;
+    }
+    const choice = event.target.closest(".workflow-deduction-choice");
+    if (!choice) return;
+    const row = choice.closest(".workflow-candidate");
+    const amount = row.querySelector(".workflow-request-amount");
+    const reason = row.querySelector(".workflow-preparation-reason");
+    const cutoff = Number(amount.dataset.cutoffDebt || 0);
+    amount.readOnly = choice.value === "full";
+    amount.disabled = choice.value === "none";
+    amount.classList.toggle("hidden", choice.value === "none");
+    reason.classList.toggle("hidden", choice.value !== "none");
+    amount.classList.toggle("bg-slate-100", choice.value === "full");
+    amount.classList.toggle("text-slate-600", choice.value === "full");
+    amount.classList.toggle("bg-white", choice.value === "partial");
+    amount.title = choice.value === "full" ? "Full deduction uses the complete cutoff debt" : "";
+    if (choice.value === "full") amount.value = cutoff.toFixed(2);
+    if (choice.value === "none") amount.value = "0.00";
+    if (choice.value === "partial" && (Number(amount.value || 0) <= 0 || Number(amount.value || 0) >= cutoff)) {
+        amount.value = (cutoff / 2).toFixed(2);
+    }
+});
+document.getElementById("workflow-candidate-search").addEventListener("input", filterWorkflowCandidates);
+document.getElementById("workflow-toggle-filters").addEventListener("click", (event) => {
+    const panel = document.getElementById("workflow-filter-options");
+    const opening = panel.style.display === "none";
+    panel.style.display = opening ? "flex" : "none";
+    event.currentTarget.setAttribute("aria-expanded", opening ? "true" : "false");
+});
+document.getElementById("workflow-candidate-type").addEventListener("change", filterWorkflowCandidates);
+document.getElementById("workflow-candidate-salary").addEventListener("change", filterWorkflowCandidates);
+document.getElementById("workflow-select-matching").addEventListener("click", () => {
+    document.querySelectorAll(".workflow-candidate:not(.hidden) .workflow-candidate-check").forEach((checkbox) => {
+        checkbox.checked = true;
+    });
+    filterWorkflowCandidates();
+});
+document.getElementById("workflow-clear-selection").addEventListener("click", () => {
+    document.querySelectorAll(".workflow-candidate-check").forEach((checkbox) => {
+        checkbox.checked = false;
+    });
+    filterWorkflowCandidates();
 });
 document.getElementById("workflow-batch-actions").addEventListener("click", (event) => {
+    if (event.target.closest("#workflow-edit-deductions")) {
+        renderWorkflowCandidates();
+        document.getElementById("workflow-employees-modal").style.display = "grid";
+        return;
+    }
     const button = event.target.closest("[data-workflow-batch-action]");
     if (button) advanceWorkflowBatch(button.dataset.workflowBatchAction || "");
 });
@@ -1617,6 +1728,12 @@ document.getElementById("settlement-confirm-modal").addEventListener("click", (e
 });
 document.getElementById("close-settlement-run-details").addEventListener("click", closeSettlementRunDetails);
 document.getElementById("settlement-details-export").addEventListener("click", exportSettlementDetailsCsv);
+
+if (window.IBEMS_DEDUCTIONS_PAGE) {
+    const workflow = document.getElementById("deduction-workflow-modal");
+    workflow.style.display = "block";
+    openDeductionWorkflow();
+}
 document.getElementById("settlement-details-print").addEventListener("click", printSettlementDetails);
 document.getElementById("settlement-runs-list").addEventListener("click", async (event) => {
     const button = event.target.closest("[data-settle-run]");
@@ -1713,27 +1830,33 @@ document.getElementById("employee-limit-cancel").addEventListener("click", () =>
 
 document.getElementById("employee-limit-save").addEventListener("click", async () => {
     if (!employeeModalUserId) return;
+    const salary = Number(document.getElementById("employee-salary-value").value || -1);
     const value = Number(document.getElementById("employee-limit-value").value || -1);
-    const reason = (document.getElementById("employee-limit-reason").value || "Manual credit limit update").trim();
+    const reason = (document.getElementById("employee-limit-reason").value || "").trim();
 
-    if (value < 0) {
-        setAcctResult("Credit limit must be 0 or higher.", "error");
+    if (salary < 0 || value < 0 || !reason) {
+        setAcctResult("Salary, credit limit, and reason are required.", "error");
         return;
     }
 
     if (!await window.IbemsDialog.confirm(`Set this person’s credit limit to ${aMoney(value)}?`, {
-        title: "Update credit limit?",
-        confirmLabel: "Update limit",
+        title: "Update financial profile?",
+        confirmLabel: "Save profile",
     })) return;
 
-    const data = await updateCreditLimit(employeeModalUserId, value, reason);
+    const response = await fetch("/accounting/debts/financial-profile", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ user_id: employeeModalUserId, base_salary: salary, credit_limit: value, reason }),
+    });
+    const data = await response.json();
     if (!data || data.status !== "success") {
-        setAcctResult(data?.message || "Failed to update credit limit.", "error");
+        setAcctResult(data?.message || "Failed to update financial profile.", "error");
         return;
     }
 
     setAcctResult(
-        `Credit limit updated. Previous: ${aMoney(data.previous_credit_limit)} | New: ${aMoney(data.new_credit_limit)}`,
+        `${data.financial_profile_created ? "Financial profile created" : "Financial profile updated"}. Salary: ${aMoney(data.new_base_salary)} | Credit: ${aMoney(data.new_credit_limit)}`,
         "ok"
     );
 

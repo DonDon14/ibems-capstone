@@ -42,7 +42,7 @@ final class AdminAccessRouteConfigTest extends CIUnitTestCase
             "store/inventory/adjust-stock', 'StoreController::adjustStock', ['filter' => 'access:store.operate']",
             "store/inventory/add-product', 'StoreController::addProduct', ['filter' => 'access:store.operate']",
             "store/inventory/update-product', 'StoreController::updateProduct', ['filter' => 'access:store.operate']",
-            "accounting/deduction-batches/(:num)/submit', 'AccountingController::submitDeductionBatch/$1', ['filter' => 'access:accounting.operate']",
+            "accounting/deduction-batches/(:num)/apply', 'AccountingController::applyDeductionBatch/$1', ['filter' => 'access:accounting.operate']",
             "accounting/deduction-batches/(:num)/reconcile', 'AccountingController::reconcileDeductionBatch/$1', ['filter' => 'access:accounting.operate']",
             "accounting/deduction-batches/(:num)/finalize', 'AccountingController::finalizeDeductionBatch/$1', ['filter' => 'access:accounting.operate']",
             "accounting/debt-investigations', 'AccountingController::openDebtInvestigation', ['filter' => 'access:accounting.operate']",
@@ -118,7 +118,7 @@ final class AdminAccessRouteConfigTest extends CIUnitTestCase
 
         foreach ([
             'user/dashboard', 'user/dashboard/data', 'user/debt-pin/status', 'user/debt-pin/set',
-            'user/history', 'user/summary', 'user/transactions', 'user/transactions/(:num)',
+            'user/history', 'user/deductions', 'user/deductions/data', 'user/summary', 'user/transactions', 'user/transactions/(:num)',
             'user/receipt/(:num)', 'user/cashbook',
         ] as $route) {
             $this->assertMatchesRegularExpression(

@@ -35,13 +35,18 @@ class DeductionBatchService
         foreach ($requests as $request) {
             $userId = (int) ($request['user_id'] ?? 0);
             $amount = round((float) ($request['requested_amount'] ?? 0), 2);
-            if ($userId <= 0 || $amount <= 0) {
-                return $this->error('Each batch row requires an employee and a positive requested amount.');
+            $choice = strtolower(trim((string) ($request['deduction_choice'] ?? 'partial')));
+            $reason = trim((string) ($request['preparation_reason'] ?? ''));
+            if ($userId <= 0 || !in_array($choice, ['full', 'partial', 'none'], true)) {
+                return $this->error('Each batch row requires an employee and a valid deduction choice.');
+            }
+            if (($choice === 'none' && ($amount !== 0.0 || $reason === '')) || ($choice !== 'none' && $amount <= 0)) {
+                return $this->error('Full or partial deductions require an amount; no deduction requires a reason.');
             }
             if (isset($normalized[$userId])) {
                 return $this->error('Each employee may appear only once in a deduction batch.');
             }
-            $normalized[$userId] = $amount;
+            $normalized[$userId] = ['amount' => $amount, 'choice' => $choice, 'reason' => $reason];
         }
 
         $db = Database::connect();
@@ -56,13 +61,23 @@ class DeductionBatchService
             $eligible[(int) $row['user_id']] = $row;
         }
 
-        foreach ($normalized as $userId => $amount) {
+        $register = (new DebtPeriodRegisterService())->build($period);
+        $registerByUser = [];
+        foreach ($register as $row) {
+            $registerByUser[(int) $row['user_id']] = $row;
+        }
+
+        foreach ($normalized as $userId => $request) {
             $row = $eligible[$userId] ?? null;
-            if (!$row || (int) ($row['is_active'] ?? 0) !== 1 || !in_array($row['user_type'] ?? '', ['faculty', 'staff'], true)) {
+            if (!$row || !$this->toBool($row['is_active'] ?? false) || !in_array($row['user_type'] ?? '', ['faculty', 'staff'], true)) {
                 return $this->error('Every deduction account must be an active faculty/staff employee.');
             }
-            if ($amount > round((float) ($row['current_debt'] ?? 0), 2)) {
-                return $this->error('Requested deduction cannot exceed the employee current debt.');
+            $cutoffDebt = round((float) ($registerByUser[$userId]['cutoff_debt'] ?? $row['current_debt'] ?? 0), 2);
+            if ($request['amount'] > $cutoffDebt) {
+                return $this->error('Requested deduction cannot exceed the employee debt at the period cutoff.');
+            }
+            if ($request['choice'] === 'full' && $request['amount'] !== $cutoffDebt) {
+                return $this->error('A full deduction must equal the employee debt at the period cutoff.');
             }
         }
 
@@ -70,43 +85,72 @@ class DeductionBatchService
         try {
             $now = date('Y-m-d H:i:s');
             $batchModel = new DeductionBatchModel();
-            $batchId = $batchModel->insert([
-                'period_id' => $periodId,
+            $existingBatch = $batchModel->where('period_id', $periodId)->first();
+            if ($existingBatch && ($existingBatch['status'] ?? '') !== 'prepared') {
+                throw new \DomainException('Deductions may be edited only while the batch is prepared.');
+            }
+            if ($existingBatch && (int) ($existingBatch['created_by'] ?? 0) !== $actorId) {
+                throw new \DomainException('Only the assigned Accounting Officer may edit this deduction batch.');
+            }
+            $batchValues = [
                 'status' => 'prepared',
                 'total_accounts' => count($normalized),
-                'total_requested' => array_sum($normalized),
+                'total_requested' => array_sum(array_column($normalized, 'amount')),
                 'total_confirmed' => 0,
                 'total_carryover' => 0,
                 'notes' => trim((string) $notes) ?: null,
-                'created_by' => $actorId > 0 ? $actorId : null,
-                'created_at' => $now,
                 'updated_at' => $now,
-            ]);
+            ];
+            if ($existingBatch) {
+                $batchId = (int) $existingBatch['id'];
+                $batchModel->update($batchId, $batchValues);
+                $db->table('deduction_batch_items')->where('batch_id', $batchId)->delete();
+            } else {
+                $batchId = $batchModel->insert($batchValues + [
+                    'period_id' => $periodId,
+                    'created_by' => $actorId > 0 ? $actorId : null,
+                    'created_at' => $now,
+                ]);
+            }
             if (!$batchId) {
                 throw new \RuntimeException('Failed to create deduction batch.');
             }
 
             $itemModel = new DeductionBatchItemModel();
-            foreach ($normalized as $userId => $amount) {
-                if (!$itemModel->insert([
+            $itemFields = array_flip($db->getFieldNames('deduction_batch_items'));
+            foreach ($normalized as $userId => $request) {
+                $snapshot = $registerByUser[$userId] ?? [];
+                $itemData = [
                     'batch_id' => $batchId,
                     'user_id' => $userId,
-                    'debt_snapshot' => (float) $eligible[$userId]['current_debt'],
-                    'requested_amount' => $amount,
+                    'debt_snapshot' => (float) ($snapshot['cutoff_debt'] ?? $eligible[$userId]['current_debt']),
+                    'requested_amount' => $request['amount'],
                     'confirmed_amount' => 0,
                     'carryover_amount' => 0,
                     'result_status' => 'pending',
                     'created_at' => $now,
                     'updated_at' => $now,
-                ])) {
+                ];
+                $optional = [
+                    'opening_debt_snapshot' => (float) ($snapshot['opening_debt'] ?? 0),
+                    'period_debits_snapshot' => (float) ($snapshot['period_debits'] ?? 0),
+                    'period_credits_snapshot' => (float) ($snapshot['period_credits'] ?? 0),
+                    'salary_snapshot' => (float) ($snapshot['salary_reference'] ?? 0),
+                    'deduction_choice' => $request['choice'],
+                    'preparation_reason' => $request['reason'] ?: null,
+                ];
+                foreach ($optional as $field => $value) {
+                    if (isset($itemFields[$field])) $itemData[$field] = $value;
+                }
+                if (!$itemModel->insert($itemData)) {
                     throw new \RuntimeException('Failed to create deduction batch item.');
                 }
             }
 
-            $this->audit('ACCOUNTING_PREPARE_DEDUCTION_BATCH', 'deduction_batches', (int) $batchId, $actorId, [
+            $this->audit($existingBatch ? 'ACCOUNTING_EDIT_DEDUCTION_BATCH' : 'ACCOUNTING_PREPARE_DEDUCTION_BATCH', 'deduction_batches', (int) $batchId, $actorId, [
                 'period_id' => $periodId,
                 'total_accounts' => count($normalized),
-                'total_requested' => array_sum($normalized),
+                'total_requested' => array_sum(array_column($normalized, 'amount')),
             ]);
             $db->transCommit();
 
@@ -117,6 +161,9 @@ class DeductionBatchService
             ];
         } catch (Throwable $e) {
             $db->transRollback();
+            if ($e instanceof \DomainException) {
+                return $this->error($e->getMessage(), 409);
+            }
             if ((int) ($db->error()['code'] ?? 0) === 1062 || str_contains(strtolower($e->getMessage()), 'unique')) {
                 return $this->error('A deduction batch already exists for this period.', 409);
             }
@@ -124,6 +171,14 @@ class DeductionBatchService
 
             return $this->error('Failed to prepare deduction batch.', 500);
         }
+    }
+
+    private function toBool(mixed $value): bool
+    {
+        if (is_bool($value)) {
+            return $value;
+        }
+        return in_array(strtolower(trim((string) $value)), ['1', 'true', 't', 'yes', 'on'], true);
     }
 
     public function confirmResult(int $itemId, array $result, int $actorId): array
@@ -276,6 +331,9 @@ class DeductionBatchService
         if (!$batch || ($batch['status'] ?? '') !== 'prepared') {
             return $this->error('Only a prepared deduction batch may be submitted.', 409);
         }
+        if ((int) ($batch['created_by'] ?? 0) !== $actorId) {
+            return $this->error('Only the assigned Accounting Officer may submit this deduction batch.', 403);
+        }
 
         $now = date('Y-m-d H:i:s');
         $batchModel->update($batchId, ['status' => 'submitted', 'updated_at' => $now]);
@@ -296,12 +354,71 @@ class DeductionBatchService
         return ['status' => 'success', 'code' => 200, 'batch' => $batchModel->find($batchId)];
     }
 
+    public function applyPrepared(int $batchId, int $actorId): array
+    {
+        $batchModel = new DeductionBatchModel();
+        $batch = $batchModel->find($batchId);
+        if (!$batch || !in_array((string) ($batch['status'] ?? ''), ['prepared', 'submitted'], true)) {
+            return $this->error('Only a prepared or previously submitted deduction batch may be applied.', 409);
+        }
+        if ((int) ($batch['created_by'] ?? 0) !== $actorId) {
+            return $this->error('Only the assigned Accounting Officer may apply this deduction batch.', 403);
+        }
+
+        $db = Database::connect();
+        $items = $db->table('deduction_batch_items')
+            ->where('batch_id', $batchId)
+            ->orderBy('id', 'ASC')
+            ->get()
+            ->getResultArray();
+        if ($items === []) {
+            return $this->error('The prepared batch has no deduction items.', 409);
+        }
+
+        $db->transBegin();
+        try {
+            if (($batch['status'] ?? '') === 'prepared') {
+                $submitted = $this->submit($batchId, $actorId);
+                if (($submitted['status'] ?? 'error') !== 'success') {
+                    throw new \RuntimeException((string) ($submitted['message'] ?? 'Failed to apply deduction batch.'));
+                }
+            }
+
+            foreach ($items as $item) {
+                $amount = round((float) ($item['requested_amount'] ?? 0), 2);
+                $result = $this->confirmResult((int) $item['id'], [
+                    'confirmed_amount' => $amount,
+                    'reason_code' => $amount > 0 ? '' : 'not_deducted',
+                    'result_reference' => 'IBEMS-' . $batchId . '-' . (int) $item['id'],
+                    'result_notes' => $amount > 0 ? 'Applied from prepared deduction batch.' : (string) ($item['preparation_reason'] ?? 'No deduction'),
+                ], $actorId);
+                if (($result['status'] ?? 'error') !== 'success') {
+                    throw new \RuntimeException((string) ($result['message'] ?? 'Failed to apply an employee deduction.'));
+                }
+            }
+
+            if ($db->transStatus() === false) {
+                throw new \RuntimeException('The deduction batch could not be applied.');
+            }
+            $db->transCommit();
+
+            return ['status' => 'success', 'code' => 200, 'batch' => $batchModel->find($batchId)];
+        } catch (Throwable $e) {
+            $db->transRollback();
+            log_message('error', 'Prepared deduction batch application failed: {message}', ['message' => $e->getMessage()]);
+            return $this->error($e->getMessage(), 409);
+        }
+    }
+
     public function reconcile(int $batchId, int $actorId): array
     {
         $batchModel = new DeductionBatchModel();
         $batch = $batchModel->find($batchId);
         if (!$batch || ($batch['status'] ?? '') !== 'processed') {
             return $this->error('Resolve every deduction result before reconciliation.', 409);
+        }
+        if ((int) ($batch['created_by'] ?? 0) !== $actorId) {
+            return $this->error('Only the assigned Accounting Officer may reconcile this deduction batch.', 403);
         }
 
         $db = Database::connect();
@@ -334,8 +451,8 @@ class DeductionBatchService
         if (!$batch || ($batch['status'] ?? '') !== 'reconciled') {
             return $this->error('Only a reconciled deduction batch may be finalized.', 409);
         }
-        if ((int) ($batch['created_by'] ?? 0) === $actorId) {
-            return $this->error('A different Accounting user must finalize this deduction period.', 403);
+        if ((int) ($batch['created_by'] ?? 0) !== $actorId) {
+            return $this->error('Only the assigned Accounting Officer may finalize this deduction period.', 403);
         }
 
         $now = date('Y-m-d H:i:s');

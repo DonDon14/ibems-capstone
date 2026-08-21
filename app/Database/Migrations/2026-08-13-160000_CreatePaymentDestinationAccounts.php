@@ -55,7 +55,7 @@ class CreatePaymentDestinationAccounts extends Migration
             $this->forge->addKey('id', true);
             $this->forge->addUniqueKey(['store_day_session_id', 'destination_account_id']);
             $this->forge->addForeignKey('store_day_session_id', 'store_day_sessions', 'id', 'CASCADE', 'CASCADE');
-            $this->forge->addForeignKey('destination_account_id', 'payment_destination_accounts', 'id', 'RESTRICT', 'CASCADE');
+            $this->forge->addForeignKey('destination_account_id', 'payment_destination_accounts', 'id', 'RESTRICT', 'CASCADE', 'fk_day_balance_destination');
             $this->forge->createTable('store_day_payment_account_balances');
         }
     }

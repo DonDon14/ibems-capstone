@@ -21,20 +21,12 @@ class DeductionPeriodService
 
     public function create(array $input, int $actorId): array
     {
-        $periodCode = strtoupper(trim((string) ($input['period_code'] ?? '')));
-        $label = trim((string) ($input['label'] ?? ''));
         $frequency = strtolower(trim((string) ($input['frequency'] ?? '')));
         $dateStart = $this->date((string) ($input['date_start'] ?? ''));
         $dateEnd = $this->date((string) ($input['date_end'] ?? ''));
         $expectedDate = $this->optionalDate((string) ($input['expected_processing_date'] ?? ''));
         $deadline = $this->optionalDate((string) ($input['preparation_deadline'] ?? ''));
 
-        if (!preg_match('/^[A-Z0-9][A-Z0-9._-]{2,39}$/', $periodCode)) {
-            return $this->error('Period code must be 3 to 40 letters, numbers, dots, dashes, or underscores.');
-        }
-        if ($label === '' || mb_strlen($label) > 120) {
-            return $this->error('Period label is required and must not exceed 120 characters.');
-        }
         if (!in_array($frequency, self::FREQUENCIES, true)) {
             return $this->error('Frequency must be semi-monthly, monthly, or custom.');
         }
@@ -44,6 +36,8 @@ class DeductionPeriodService
         if ($dateEnd < $dateStart) {
             return $this->error('End date cannot be before start date.');
         }
+        $periodCodeBase = 'PAY-' . $dateStart->format('Ymd') . '-' . $dateEnd->format('Ymd');
+        $label = $this->periodLabel($dateStart, $dateEnd);
         if ($expectedDate && $expectedDate < $dateStart) {
             return $this->error('Expected processing date cannot be before the period starts.');
         }
@@ -52,10 +46,6 @@ class DeductionPeriodService
         }
 
         $model = new DeductionPeriodModel();
-        if ($model->where('period_code', $periodCode)->countAllResults() > 0) {
-            return $this->error('Period code already exists.', 409);
-        }
-
         $overlap = $model
             ->where('status !=', 'cancelled')
             ->where('date_start <=', $dateEnd->format('Y-m-d'))
@@ -66,6 +56,13 @@ class DeductionPeriodService
                 'Deduction period overlaps ' . (string) ($overlap['period_code'] ?? 'an existing period') . '.',
                 409
             );
+        }
+
+        $periodCode = $periodCodeBase;
+        $suffix = 2;
+        while ($model->where('period_code', $periodCode)->countAllResults() > 0) {
+            $periodCode = $periodCodeBase . '-' . $suffix;
+            $suffix++;
         }
 
         $now = date('Y-m-d H:i:s');
@@ -109,6 +106,17 @@ class DeductionPeriodService
     private function optionalDate(string $value): ?DateTimeImmutable
     {
         return trim($value) === '' ? null : $this->date($value);
+    }
+
+    private function periodLabel(DateTimeImmutable $start, DateTimeImmutable $end): string
+    {
+        if ($start->format('Y-m') === $end->format('Y-m')) {
+            return $start->format('F j') . '-' . $end->format('j, Y');
+        }
+        if ($start->format('Y') === $end->format('Y')) {
+            return $start->format('F j') . ' - ' . $end->format('F j, Y');
+        }
+        return $start->format('F j, Y') . ' - ' . $end->format('F j, Y');
     }
 
     private function error(string $message, int $code = 400): array

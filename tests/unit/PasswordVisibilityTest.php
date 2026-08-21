@@ -20,6 +20,7 @@ final class PasswordVisibilityTest extends TestCase
         $shell = (string) file_get_contents(ROOTPATH . 'app/Views/components/portal_shell.php');
         $login = (string) file_get_contents(ROOTPATH . 'app/Views/auth/login.php');
         $script = (string) file_get_contents(ROOTPATH . 'public/assets/js/password-visibility.js');
+        $styles = (string) file_get_contents(ROOTPATH . 'public/assets/css/password-visibility.css');
 
         $this->assertSame(6, $passwordFieldCount);
         $this->assertStringContainsString('password-visibility.js', $shell);
@@ -28,5 +29,8 @@ final class PasswordVisibilityTest extends TestCase
         $this->assertStringContainsString('aria-pressed', $script);
         $this->assertStringContainsString('bi-eye-slash', $script);
         $this->assertStringContainsString('MutationObserver', $script);
+        $this->assertStringContainsString('.password-field-shell > .password-visibility-toggle', $styles);
+        $this->assertStringContainsString('min-height: 0', $styles);
+        $this->assertStringContainsString('transform: translateY(-50%)', $styles);
     }
 }

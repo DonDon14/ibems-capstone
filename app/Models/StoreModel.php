@@ -17,6 +17,11 @@ class StoreModel extends Model
         'officer_id',
         'logo_url',
         'is_active',
+        'deactivated_at',
+        'deactivated_by',
+        'deactivation_reason',
+        'reactivated_at',
+        'reactivated_by',
         'created_at',
     ];
 
@@ -26,7 +31,6 @@ class StoreModel extends Model
     protected array $casts = [
         'id'         => 'integer',
         'officer_id' => '?integer',
-        'is_active'  => 'boolean',
     ];
 
     protected $useTimestamps = false;

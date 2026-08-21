@@ -252,6 +252,93 @@ class UserController extends Controller
         return view('user/history');
     }
 
+    public function deductions()
+    {
+        return view('user/deductions');
+    }
+
+    public function deductionsData()
+    {
+        $userId = (int) session()->get('user_id');
+        if ($userId <= 0) {
+            return $this->response->setStatusCode(401)->setJSON([
+                'status' => 'error',
+                'message' => 'Not authenticated.',
+            ]);
+        }
+
+        $db = Database::connect();
+        $periodRows = $db->table('deduction_batch_items dbi')
+            ->select('dp.id, dp.period_code, dp.label, dp.date_start, dp.date_end')
+            ->join('deduction_batches db', 'db.id = dbi.batch_id', 'inner')
+            ->join('deduction_periods dp', 'dp.id = db.period_id', 'inner')
+            ->where('dbi.user_id', $userId)
+            ->where('dbi.result_status !=', 'pending')
+            ->whereIn('db.status', ['processed', 'reconciled', 'finalized'])
+            ->groupBy('dp.id, dp.period_code, dp.label, dp.date_start, dp.date_end')
+            ->orderBy('dp.date_end', 'DESC')
+            ->orderBy('dp.id', 'DESC')
+            ->get()
+            ->getResultArray();
+
+        $periods = array_map(static fn(array $row): array => [
+            'id' => (int) ($row['id'] ?? 0),
+            'period_code' => (string) ($row['period_code'] ?? ''),
+            'label' => (string) ($row['label'] ?? ''),
+            'date_start' => (string) ($row['date_start'] ?? ''),
+            'date_end' => (string) ($row['date_end'] ?? ''),
+        ], $periodRows);
+
+        $requestedPeriodId = (int) ($this->request->getGet('period_id') ?? 0);
+        $allowedPeriodIds = array_column($periods, 'id');
+        $selectedPeriodId = $requestedPeriodId > 0 && in_array($requestedPeriodId, $allowedPeriodIds, true)
+            ? $requestedPeriodId
+            : (int) ($periods[0]['id'] ?? 0);
+
+        $deductions = [];
+        if ($selectedPeriodId > 0) {
+            $rows = $db->table('deduction_batch_items dbi')
+                ->select('dbi.id, dbi.requested_amount, dbi.confirmed_amount, dbi.debt_snapshot, dbi.carryover_amount, dbi.result_status, dbi.confirmed_at, dp.period_code, dp.label, dp.date_start, dp.date_end')
+                ->join('deduction_batches db', 'db.id = dbi.batch_id', 'inner')
+                ->join('deduction_periods dp', 'dp.id = db.period_id', 'inner')
+                ->where('dbi.user_id', $userId)
+                ->where('dp.id', $selectedPeriodId)
+                ->where('dbi.result_status !=', 'pending')
+                ->whereIn('db.status', ['processed', 'reconciled', 'finalized'])
+                ->orderBy('dbi.confirmed_at', 'DESC')
+                ->orderBy('dbi.id', 'DESC')
+                ->get()
+                ->getResultArray();
+
+            $deductions = array_map(static fn(array $row): array => [
+                'id' => (int) ($row['id'] ?? 0),
+                'period_code' => (string) ($row['period_code'] ?? ''),
+                'period_label' => (string) ($row['label'] ?? ''),
+                'date_start' => (string) ($row['date_start'] ?? ''),
+                'date_end' => (string) ($row['date_end'] ?? ''),
+                'requested_amount' => (float) ($row['requested_amount'] ?? 0),
+                'deducted_amount' => (float) ($row['confirmed_amount'] ?? 0),
+                'debt_before' => (float) ($row['debt_snapshot'] ?? 0),
+                'debt_after' => (float) ($row['carryover_amount'] ?? 0),
+                'status' => (string) ($row['result_status'] ?? ''),
+                'applied_at' => (string) ($row['confirmed_at'] ?? ''),
+            ], $rows);
+        }
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'periods' => $periods,
+            'selected_period_id' => $selectedPeriodId,
+            'deductions' => $deductions,
+            'summary' => [
+                'entry_count' => count($deductions),
+                'total_deducted' => array_sum(array_column($deductions, 'deducted_amount')),
+                'debt_before' => (float) ($deductions[0]['debt_before'] ?? 0),
+                'debt_after' => (float) ($deductions[0]['debt_after'] ?? 0),
+            ],
+        ]);
+    }
+
     public function summary()
     {
         $userId = (int) session()->get('user_id');
