@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/admin') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/admin-stores.css') ?>?v=20260821c">
+<link rel="stylesheet" href="<?= base_url('assets/css/admin-stores.css') ?>?v=20260821d">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -126,5 +126,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/admin-stores.js') ?>?v=20260821c"></script>
+<script src="<?= base_url('assets/js/admin-stores.js') ?>?v=20260821d"></script>
 <?= $this->endSection() ?>

@@ -24,6 +24,8 @@ final class AdminStoreFormConventionTest extends CIUnitTestCase
         $this->assertSame(2, substr_count($view, 'role="combobox"'));
         $this->assertStringContainsString('aria-multiselectable="true"', $view);
         $this->assertStringContainsString('.people-picker:focus-within', $styles);
+        $this->assertStringContainsString('.people-picker input[type="search"]:focus', $styles);
+        $this->assertStringContainsString('padding: 5px 4px 5px 38px', $styles);
         $this->assertStringContainsString('renderSelectedOfficer', $script);
         $this->assertStringContainsString('handlePeoplePickerKeydown', $script);
     }
