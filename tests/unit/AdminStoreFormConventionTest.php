@@ -14,6 +14,19 @@ final class AdminStoreFormConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('data-remove-supervisor', (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js'));
     }
 
+    public function testStoreModalKeepsChromeFixedAndHidesConditionalTextarea(): void
+    {
+        $view = (string) file_get_contents(APPPATH . 'Views/admin/stores.php');
+        $styles = (string) file_get_contents(FCPATH . 'assets/css/admin-stores.css');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js');
+
+        $this->assertStringContainsString('admin-stores-modal-body', $view);
+        $this->assertStringContainsString('grid-template-rows: auto minmax(0, 1fr) auto', $styles);
+        $this->assertStringContainsString('.admin-stores-modal .field.is-hidden', $styles);
+        $this->assertStringContainsString('.field textarea', $styles);
+        $this->assertStringContainsString('admin-stores-modal-open', $script);
+    }
+
     public function testStoreLogoMatchesTheProductMediaInputPattern(): void
     {
         $view = (string) file_get_contents(APPPATH . 'Views/admin/stores.php');

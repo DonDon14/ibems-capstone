@@ -301,6 +301,10 @@ function openStoreModal(mode, store) {
     }
     toggleLogoSourceUI();
     document.getElementById("store-modal").style.display = "grid";
+    document.body.classList.add("admin-stores-modal-open");
+    const modalBody = document.querySelector("#store-modal .admin-stores-modal-body");
+    if (modalBody) modalBody.scrollTop = 0;
+    requestAnimationFrame(() => document.getElementById("store-name")?.focus());
 }
 
 function closeStoreModal() {
@@ -314,6 +318,7 @@ function closeStoreModal() {
     document.getElementById("store-officer-suggestions").style.display = "none";
     document.getElementById("store-supervisor-suggestions").style.display = "none";
     document.getElementById("store-modal").style.display = "none";
+    document.body.classList.remove("admin-stores-modal-open");
 }
 
 async function saveStore() {

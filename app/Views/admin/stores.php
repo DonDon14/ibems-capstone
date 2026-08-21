@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/admin') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/admin-stores.css') ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/admin-stores.css') ?>?v=20260821a">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -54,6 +54,7 @@
             <button id="close-store-modal" type="button" class="admin-modal-close" aria-label="Close store form">x</button>
         </div>
 
+        <div class="admin-stores-modal-body">
         <div class="form-grid">
             <div class="field">
                 <label for="store-name">Store Name</label>
@@ -110,6 +111,7 @@
                 <small class="field-help">Open store days and unresolved variance cases must be completed first. History will remain available.</small>
             </div>
         </div>
+        </div>
 
         <div class="admin-modal-actions">
             <button id="store-save-btn" class="primary-btn" type="button">Save</button>
@@ -119,5 +121,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/admin-stores.js') ?>"></script>
+<script src="<?= base_url('assets/js/admin-stores.js') ?>?v=20260821a"></script>
 <?= $this->endSection() ?>
