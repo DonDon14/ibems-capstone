@@ -23,6 +23,10 @@ class UserModel extends Model
         'qr_token',
         'profile_image_url',
         'base_salary',
+        'employment_type',
+        'salary_grade',
+        'salary_step',
+        'salary_effective_date',
         'is_active',
         'created_at',
     ];
@@ -33,6 +37,7 @@ class UserModel extends Model
     protected array $casts = [
         'id'          => 'integer',
         'base_salary' => 'float',
+        'salary_step' => '?integer',
         'is_active'   => 'boolean',
     ];
 

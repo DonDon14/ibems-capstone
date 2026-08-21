@@ -282,6 +282,9 @@ async function openViewUser(userId) {
     document.getElementById("uv-v-status").value = row.is_active ? "Active" : "Inactive";
     const profileConfigured = Boolean(row.financial_profile_configured);
     document.getElementById("uv-v-salary").value = profileConfigured ? aMoney(row.base_salary || 0) : "Not configured by Accounting";
+    document.getElementById("uv-v-employment").value = profileConfigured ? aCategory(row.employment_type || "-") : "Not configured by Accounting";
+    document.getElementById("uv-v-grade").value = profileConfigured ? `${row.salary_grade || "-"}${row.salary_step ? ` Step ${row.salary_step}` : ""}` : "Not configured by Accounting";
+    document.getElementById("uv-v-effective").value = profileConfigured ? (row.salary_effective_date || "-") : "Not configured by Accounting";
     document.getElementById("uv-v-credit-limit").value = profileConfigured ? aMoney(row.credit_limit || 0) : "Not configured by Accounting";
     document.getElementById("uv-v-current-debt").value = profileConfigured ? aMoney(row.current_debt || 0) : "Not configured by Accounting";
     document.getElementById("uv-v-created-at").value = row.created_at || "-";

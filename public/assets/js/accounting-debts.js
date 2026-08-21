@@ -805,19 +805,6 @@ function buildHistoryHtml(rows) {
     }).join("");
 }
 
-async function updateCreditLimit(userId, creditLimit, reason) {
-    const response = await fetch("/accounting/debts/credit-limit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            user_id: Number(userId),
-            credit_limit: Number(creditLimit),
-            reason,
-        }),
-    });
-    return response.json();
-}
-
 function getModeFilters() {
     const q = (document.getElementById("mode-search").value || "").trim().toLowerCase();
     const debtOnly = document.getElementById("mode-debt-only").checked;
@@ -927,10 +914,14 @@ async function openEmployeeModal(userId) {
 
     profileEl.innerHTML = buildProfileHtml(employeeModalProfile);
     document.getElementById("employee-limit-current").textContent = aBool(employeeModalProfile.financial_profile_configured)
-        ? `Salary ${aMoney(employeeModalProfile.base_salary || 0)} | Credit ${aMoney(employeeModalProfile.credit_limit || 0)}`
-        : "Financial profile not configured";
+        ? `${aCategory(employeeModalProfile.employment_type)} | ${employeeModalProfile.salary_grade || "-"}${employeeModalProfile.salary_step ? ` Step ${employeeModalProfile.salary_step}` : ""} | Salary ${aMoney(employeeModalProfile.base_salary || 0)} | Credit ${aMoney(employeeModalProfile.credit_limit || 0)}`
+        : "Salary-grade profile not configured";
+    document.getElementById("employee-employment-type").value = employeeModalProfile.employment_type || "plantilla";
+    document.getElementById("employee-salary-grade").value = employeeModalProfile.salary_grade || "";
+    document.getElementById("employee-salary-step").value = employeeModalProfile.salary_step || "";
+    document.getElementById("employee-salary-effective-date").value = employeeModalProfile.salary_effective_date || new Date().toISOString().slice(0, 10);
     document.getElementById("employee-salary-value").value = Number(employeeModalProfile.base_salary || 0).toFixed(2);
-    document.getElementById("employee-limit-value").value = Number(employeeModalProfile.credit_limit || 0).toFixed(2);
+    document.getElementById("employee-limit-value").value = aMoney(Number(employeeModalProfile.base_salary || 0) * 0.25);
     document.getElementById("employee-modal-actions").classList.remove("hidden");
 
     const history = await loadHistory(employeeModalUserId);
@@ -971,7 +962,7 @@ function renderCsvPreview(data) {
         <div class="import-preview-item is-valid rounded-xl border border-emerald-200 bg-emerald-50 p-3">
             <strong>Line ${row.line}: ${aEscape(row.action === "create" ? "Create" : "Update")}</strong><br>
             ${aEscape(row.name || "-")} (${aEscape(row.email || "-")})<br>
-            <span>${aEscape(aCategory(row.user_type))} | Salary ${aEscape(aMoney(row.monthly_salary || 0))}${row.credit_limit !== null ? ` | Credit ${aEscape(aMoney(row.credit_limit || 0))}` : ""}</span>
+            <span>${aEscape(aCategory(row.user_type))} | ${aEscape(aCategory(row.employment_type))} | ${aEscape(row.salary_grade || "-")}${row.salary_step ? ` Step ${aEscape(row.salary_step)}` : ""} | Salary ${aEscape(aMoney(row.monthly_salary || 0))} | Credit ${aEscape(aMoney(row.credit_limit || 0))}</span>
         </div>
     `).join("") : "";
 
@@ -1886,26 +1877,50 @@ document.getElementById("employee-limit-cancel").addEventListener("click", () =>
     document.getElementById("employee-limit-box").classList.add("hidden");
 });
 
+function refreshDynamicCreditPreview() {
+    const salary = Math.max(0, Number(document.getElementById("employee-salary-value").value || 0));
+    document.getElementById("employee-limit-value").value = aMoney(salary * 0.25);
+}
+
+document.getElementById("employee-salary-value").addEventListener("input", refreshDynamicCreditPreview);
+document.getElementById("employee-employment-type").addEventListener("change", (event) => {
+    const step = document.getElementById("employee-salary-step");
+    step.required = event.target.value === "plantilla";
+    if (event.target.value !== "plantilla") step.value = "";
+});
+
 document.getElementById("employee-limit-save").addEventListener("click", async () => {
     if (!employeeModalUserId) return;
     const salary = Number(document.getElementById("employee-salary-value").value || -1);
-    const value = Number(document.getElementById("employee-limit-value").value || -1);
+    const employmentType = document.getElementById("employee-employment-type").value;
+    const salaryGrade = (document.getElementById("employee-salary-grade").value || "").trim();
+    const salaryStep = (document.getElementById("employee-salary-step").value || "").trim();
+    const effectiveDate = document.getElementById("employee-salary-effective-date").value;
+    const value = salary * 0.25;
     const reason = (document.getElementById("employee-limit-reason").value || "").trim();
 
-    if (salary < 0 || value < 0 || !reason) {
-        setAcctResult("Salary, credit limit, and reason are required.", "error");
+    if (salary <= 0 || !salaryGrade || !effectiveDate || !reason || (employmentType === "plantilla" && !salaryStep)) {
+        setAcctResult("Employment type, salary grade, valid salary, effective date, and reason are required. Plantilla also requires a step.", "error");
         return;
     }
 
-    if (!await window.IbemsDialog.confirm(`Set this person’s credit limit to ${aMoney(value)}?`, {
-        title: "Update financial profile?",
+    if (!await window.IbemsDialog.confirm(`Save this salary profile? The credit limit will be ${aMoney(value)} (25%).`, {
+        title: "Update salary-grade profile?",
         confirmLabel: "Save profile",
     })) return;
 
     const response = await fetch("/accounting/debts/financial-profile", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ user_id: employeeModalUserId, base_salary: salary, credit_limit: value, reason }),
+        body: JSON.stringify({
+            user_id: employeeModalUserId,
+            base_salary: salary,
+            employment_type: employmentType,
+            salary_grade: salaryGrade,
+            salary_step: salaryStep,
+            salary_effective_date: effectiveDate,
+            reason,
+        }),
     });
     const data = await response.json();
     if (!data || data.status !== "success") {

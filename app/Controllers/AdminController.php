@@ -19,7 +19,6 @@ use Config\Database;
 
 class AdminController extends Controller
 {
-    private const DEFAULT_EMPLOYEE_CREDIT_LIMIT = 1000.00;
 
     public function dashboard()
     {
@@ -399,11 +398,6 @@ class AdminController extends Controller
     public function audit()
     {
         return view('admin/audit');
-    }
-
-    public function hierarchy()
-    {
-        return view('admin/hierarchy');
     }
 
     public function auditData()
@@ -1114,8 +1108,12 @@ class AdminController extends Controller
         }
 
         $db = Database::connect();
+        $salaryProfileSelect = [];
+        foreach (['employment_type', 'salary_grade', 'salary_step', 'salary_effective_date'] as $field) {
+            $salaryProfileSelect[] = $db->fieldExists($field, 'users') ? 'u.' . $field : 'NULL AS ' . $field;
+        }
         $row = $db->table('users u')
-            ->select('u.id, u.employee_id, u.name, u.email, u.role, u.user_type, u.base_salary, u.is_active, u.created_at, b.user_id AS balance_user_id, b.current_debt, b.credit_limit')
+            ->select('u.id, u.employee_id, u.name, u.email, u.role, u.user_type, u.base_salary, ' . implode(', ', $salaryProfileSelect) . ', u.is_active, u.created_at, b.user_id AS balance_user_id, b.current_debt, b.credit_limit', false)
             ->join('balances b', 'b.user_id = u.id', 'left')
             ->where('u.id', $userId)
             ->get()
@@ -1139,9 +1137,16 @@ class AdminController extends Controller
                 'roles' => $this->resolveUserRoles((int) $row['id'], (string) ($row['role'] ?? 'USER')),
                 'user_type' => $row['user_type'],
                 'base_salary' => (float) ($row['base_salary'] ?? 0),
+                'employment_type' => $row['employment_type'] ?? null,
+                'salary_grade' => $row['salary_grade'] ?? null,
+                'salary_step' => isset($row['salary_step']) ? (int) $row['salary_step'] : null,
+                'salary_effective_date' => $row['salary_effective_date'] ?? null,
                 'is_active' => ibems_bool($row['is_active']),
                 'created_at' => $row['created_at'],
-                'financial_profile_configured' => $row['balance_user_id'] !== null,
+                'financial_profile_configured' => $row['balance_user_id'] !== null
+                    && trim((string) ($row['employment_type'] ?? '')) !== ''
+                    && trim((string) ($row['salary_grade'] ?? '')) !== ''
+                    && trim((string) ($row['salary_effective_date'] ?? '')) !== '',
                 'current_debt' => (float) ($row['current_debt'] ?? 0),
                 'credit_limit' => (float) ($row['credit_limit'] ?? 0),
             ],
@@ -1578,9 +1583,7 @@ class AdminController extends Controller
 
     private function initialCreditLimitForUserType(string $userType): float
     {
-        return in_array(strtolower($userType), ['faculty', 'staff'], true)
-            ? self::DEFAULT_EMPLOYEE_CREDIT_LIMIT
-            : 0.00;
+        return 0.00;
     }
 
     public function storesData()

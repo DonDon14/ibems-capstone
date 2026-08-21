@@ -141,6 +141,16 @@ class InitialSeeder extends Seeder
             ],
         ];
 
+        foreach ($users as &$user) {
+            if (in_array($user['user_type'], ['faculty', 'staff'], true)) {
+                $user['employment_type'] = 'plantilla';
+                $user['salary_grade'] = 'DEMO-' . strtoupper($user['user_type']);
+                $user['salary_step'] = 1;
+                $user['salary_effective_date'] = date('Y-m-d');
+            }
+        }
+        unset($user);
+
         $db->table('users')->insertBatch($users);
 
         $userRows = $db->table('users')
@@ -234,13 +244,13 @@ class InitialSeeder extends Seeder
         $db->table('balances')->insertBatch([
             [
                 'user_id' => $userIdsByEmail['maria.santos@ibems.local'] ?? 0,
-                'credit_limit' => 7000,
+                'credit_limit' => 9500,
                 'current_debt' => 850,
                 'updated_at' => $now,
             ],
             [
                 'user_id' => $userIdsByEmail['mark.delacruz@ibems.local'] ?? 0,
-                'credit_limit' => 5000,
+                'credit_limit' => 5500,
                 'current_debt' => 320,
                 'updated_at' => $now,
             ],
@@ -252,13 +262,13 @@ class InitialSeeder extends Seeder
             ],
             [
                 'user_id' => $userIdsByEmail['leo.mercado@ibems.local'] ?? 0,
-                'credit_limit' => 1500,
+                'credit_limit' => 6000,
                 'current_debt' => 1250,
                 'updated_at' => $now,
             ],
             [
                 'user_id' => $userIdsByEmail['store.main@ibems.local'] ?? 0,
-                'credit_limit' => 2500,
+                'credit_limit' => 7000,
                 'current_debt' => 120,
                 'updated_at' => $now,
             ],

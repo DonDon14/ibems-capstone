@@ -22,7 +22,7 @@ class PortalAccountsSeeder extends Seeder
                 'base_salary' => 50000,
                 'is_active' => true,
                 'created_at' => $now,
-                'credit_limit' => 10000,
+                'credit_limit' => 12500,
                 'current_debt' => 0,
             ],
             [
@@ -36,7 +36,7 @@ class PortalAccountsSeeder extends Seeder
                 'base_salary' => 28000,
                 'is_active' => true,
                 'created_at' => $now,
-                'credit_limit' => 3000,
+                'credit_limit' => 7000,
                 'current_debt' => 0,
             ],
             [
@@ -50,7 +50,7 @@ class PortalAccountsSeeder extends Seeder
                 'base_salary' => 32000,
                 'is_active' => true,
                 'created_at' => $now,
-                'credit_limit' => 5000,
+                'credit_limit' => 8000,
                 'current_debt' => 0,
             ],
             [
@@ -64,7 +64,7 @@ class PortalAccountsSeeder extends Seeder
                 'base_salary' => 30000,
                 'is_active' => true,
                 'created_at' => $now,
-                'credit_limit' => 5000,
+                'credit_limit' => 7500,
                 'current_debt' => 1200,
             ],
         ];
@@ -81,6 +81,10 @@ class PortalAccountsSeeder extends Seeder
                 'user_type' => $account['user_type'],
                 'qr_token' => $account['qr_token'],
                 'base_salary' => $account['base_salary'],
+                'employment_type' => 'plantilla',
+                'salary_grade' => 'DEMO-' . $account['user_type'],
+                'salary_step' => 1,
+                'salary_effective_date' => date('Y-m-d'),
                 'is_active' => $account['is_active'],
                 'created_at' => $account['created_at'],
             ];

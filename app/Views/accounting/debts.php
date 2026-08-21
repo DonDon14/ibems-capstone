@@ -165,14 +165,19 @@
         <div id="employee-modal-profile" class="mode-profile-empty rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">Loading profile...</div>
 
         <div id="employee-modal-actions" class="mode-actions hidden">
-            <h5 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Salary and Credit</h5>
+            <h5 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Salary Grade and Dynamic Credit</h5>
             <div class="inline-actions">
                 <span id="employee-limit-current" class="limit-label">Salary PHP 0.00 | Credit PHP 0.00</span>
                 <button id="employee-open-limit-edit" type="button" class="secondary-btn btn-sm">Edit</button>
             </div>
             <div id="employee-limit-box" class="inline-box mt-2 flex flex-col gap-2 hidden">
-                <label class="field" for="employee-salary-value"><span class="text-xs font-semibold text-slate-500">Base salary</span><input id="employee-salary-value" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700" type="number" min="0" step="0.01" value="0"></label>
-                <label class="field" for="employee-limit-value"><span class="text-xs font-semibold text-slate-500">Credit limit</span><input id="employee-limit-value" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700" type="number" min="0" step="0.01" value="0"></label>
+                <label class="field" for="employee-employment-type"><span class="text-xs font-semibold text-slate-500">Employment type</span><select id="employee-employment-type" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700"><option value="plantilla">Plantilla</option><option value="cos">COS</option><option value="part_time">Part-time</option></select></label>
+                <label class="field" for="employee-salary-grade"><span class="text-xs font-semibold text-slate-500">Salary grade / classification</span><input id="employee-salary-grade" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700" type="text" maxlength="30" placeholder="Example: SG-11, COS-1, PT-LECTURER"></label>
+                <label class="field" for="employee-salary-step"><span class="text-xs font-semibold text-slate-500">Salary step (required for Plantilla)</span><input id="employee-salary-step" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700" type="number" min="1" max="8" step="1"></label>
+                <label class="field" for="employee-salary-effective-date"><span class="text-xs font-semibold text-slate-500">Effective date</span><input id="employee-salary-effective-date" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700" type="date"></label>
+                <label class="field" for="employee-salary-value"><span class="text-xs font-semibold text-slate-500">Monthly salary / compensation</span><input id="employee-salary-value" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700" type="number" min="0.01" step="0.01" value="0"></label>
+                <label class="field" for="employee-limit-value"><span class="text-xs font-semibold text-slate-500">Credit limit (automatic 25%)</span><input id="employee-limit-value" class="h-11 rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm text-slate-700" type="text" readonly value="PHP 0.00"></label>
+                <p class="text-xs text-slate-500">The server calculates this limit. Salary reductions never erase debt; they only reduce available credit.</p>
                 <label class="field" for="employee-limit-reason"><span class="text-xs font-semibold text-slate-500">Reason</span><input id="employee-limit-reason" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700" type="text" value="Accounting financial profile setup"></label>
                 <div class="inline-actions">
                     <button id="employee-limit-save" type="button" class="primary-btn btn-sm">Save</button>
@@ -531,9 +536,8 @@
 
         <div class="import-guide rounded-xl border border-slate-200 bg-slate-50 p-3">
             <p class="mb-1 text-sm text-slate-700">Required headers:</p>
-            <code class="mb-2 block rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800">employee_id,name,email,user_type,monthly_salary</code>
-            <p class="mb-1 text-sm text-slate-700">Optional header:</p>
-            <code class="mb-2 block rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800">credit_limit</code>
+            <code class="mb-2 block overflow-x-auto rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm text-slate-800">employee_id,name,email,user_type,employment_type,salary_grade,salary_step,salary_effective_date,monthly_salary</code>
+            <p class="mb-1 text-sm text-slate-700">Credit limit is not imported. It is calculated automatically as 25% of monthly salary.</p>
             <p class="text-sm text-slate-700">Allowed category (`user_type`) values: <strong>faculty</strong>, <strong>staff</strong></p>
         </div>
 

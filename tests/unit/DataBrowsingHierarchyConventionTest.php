@@ -17,8 +17,7 @@ final class DataBrowsingHierarchyConventionTest extends CIUnitTestCase
             );
         }
 
-        $this->assertStringContainsString("\$routes->get('admin/hierarchy'", $routes);
-        $this->assertStringContainsString("'filter' => 'access:system.manage'", $routes);
+        $this->assertStringNotContainsString("\$routes->get('admin/hierarchy'", $routes);
     }
 
     public function testEmployeeHistoryProvidesScopedTotalsSortingAndPagination(): void
@@ -82,15 +81,14 @@ final class DataBrowsingHierarchyConventionTest extends CIUnitTestCase
 
     public function testHierarchyHasPortalAndTransactionFlowReferences(): void
     {
-        $view = (string) file_get_contents(APPPATH . 'Views/admin/hierarchy.php');
         $document = (string) file_get_contents(ROOTPATH . 'docs/system-hierarchy.md');
         $layout = (string) file_get_contents(APPPATH . 'Views/layouts/admin.php');
 
         foreach (['Administrator', 'Accounting Office', 'Store Supervisor', 'Store Officer / Cashier', 'Employee / User'] as $role) {
-            $this->assertStringContainsString($role, $view);
             $this->assertStringContainsString($role, $document);
         }
         $this->assertStringContainsString('Connected transaction flow', $document);
-        $this->assertStringContainsString("'path' => 'admin/hierarchy'", $layout);
+        $this->assertStringNotContainsString("'path' => 'admin/hierarchy'", $layout);
+        $this->assertFileDoesNotExist(APPPATH . 'Views/admin/hierarchy.php');
     }
 }

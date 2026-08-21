@@ -34,7 +34,6 @@ $routes->get('admin/products', 'AdminController::products', ['filter' => 'access
 $routes->get('admin/products/data', 'AdminController::productsData', ['filter' => 'access:system.manage']);
 $routes->get('admin/audit', 'AdminController::audit', ['filter' => 'access:system.manage']);
 $routes->get('admin/audit/data', 'AdminController::auditData', ['filter' => 'access:system.manage']);
-$routes->get('admin/hierarchy', 'AdminController::hierarchy', ['filter' => 'access:system.manage']);
 $routes->get('admin/stores', 'AdminController::stores', ['filter' => 'access:system.manage']);
 $routes->get('admin/stores/data', 'AdminController::storesData', ['filter' => 'access:system.manage']);
 $routes->get('admin/stores/(:num)', 'AdminController::storeDetails/$1', ['filter' => 'access:system.manage']);
@@ -146,5 +145,4 @@ $routes->get('accounting/settlement/runs', 'AccountingController::settlementRuns
 $routes->get('accounting/settlement/runs/(:num)', 'AccountingController::settlementRunDetails/$1', ['filter' => 'access:accounting.inspect']);
 $routes->post('accounting/debts/preview-csv', 'AccountingController::previewImportCsv', ['filter' => 'access:accounting.inspect']);
 $routes->post('accounting/debts/import-csv', 'AccountingController::importCsv', ['filter' => 'access:accounting.operate']);
-$routes->post('accounting/debts/credit-limit', 'AccountingController::updateCreditLimit', ['filter' => 'access:accounting.operate']);
 $routes->post('accounting/debts/financial-profile', 'AccountingController::updateFinancialProfile', ['filter' => 'access:accounting.operate']);

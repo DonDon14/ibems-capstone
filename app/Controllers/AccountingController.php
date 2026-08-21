@@ -11,6 +11,7 @@ use App\Models\DebtCashbookEntryModel;
 use App\Services\DeductionBatchService;
 use App\Services\DeductionPeriodService;
 use App\Services\DebtInvestigationService;
+use App\Services\SalaryCreditPolicy;
 use CodeIgniter\Controller;
 use Config\Database;
 
@@ -569,9 +570,10 @@ class AccountingController extends Controller
         $limit = max(1, min(500, $limit));
 
         $db = Database::connect();
+        $salaryProfileSelect = $this->salaryProfileSelect($db, 'u');
 
         $query = $db->table('users u')
-            ->select('u.id AS user_id, u.employee_id, u.name, u.email, u.user_type, u.is_active, u.base_salary, b.user_id AS balance_user_id, b.credit_limit, b.current_debt, b.updated_at')
+            ->select('u.id AS user_id, u.employee_id, u.name, u.email, u.user_type, u.is_active, u.base_salary, ' . $salaryProfileSelect . ', b.user_id AS balance_user_id, b.credit_limit, b.current_debt, b.updated_at', false)
             ->join('balances b', 'b.user_id = u.id', 'left')
             ->where('u.is_active', true)
             ->whereIn('u.user_type', ['faculty', 'staff']);
@@ -595,7 +597,10 @@ class AccountingController extends Controller
             ->getResultArray();
 
         $data = array_map(function (array $row): array {
-            $row['financial_profile_configured'] = $row['balance_user_id'] !== null;
+            $row['financial_profile_configured'] = $row['balance_user_id'] !== null
+                && trim((string) ($row['employment_type'] ?? '')) !== ''
+                && trim((string) ($row['salary_grade'] ?? '')) !== ''
+                && trim((string) ($row['salary_effective_date'] ?? '')) !== '';
             unset($row['balance_user_id']);
             $creditLimit = (float) ($row['credit_limit'] ?? 0);
             $currentDebt = (float) ($row['current_debt'] ?? 0);
@@ -642,8 +647,9 @@ class AccountingController extends Controller
         }
 
         $db = Database::connect();
+        $salaryProfileSelect = $this->salaryProfileSelect($db, 'u');
         $row = $db->table('users u')
-            ->select('u.id AS user_id, u.employee_id, u.name, u.email, u.user_type, u.base_salary, b.user_id AS balance_user_id, b.credit_limit, b.current_debt, b.updated_at')
+            ->select('u.id AS user_id, u.employee_id, u.name, u.email, u.user_type, u.base_salary, ' . $salaryProfileSelect . ', b.user_id AS balance_user_id, b.credit_limit, b.current_debt, b.updated_at', false)
             ->join('balances b', 'b.user_id = u.id', 'left')
             ->where('u.is_active', true)
             ->where('u.id', $userId)
@@ -657,7 +663,10 @@ class AccountingController extends Controller
             ]);
         }
 
-        $row['financial_profile_configured'] = $row['balance_user_id'] !== null;
+        $row['financial_profile_configured'] = $row['balance_user_id'] !== null
+            && trim((string) ($row['employment_type'] ?? '')) !== ''
+            && trim((string) ($row['salary_grade'] ?? '')) !== ''
+            && trim((string) ($row['salary_effective_date'] ?? '')) !== '';
         unset($row['balance_user_id']);
         $creditLimit = (float) ($row['credit_limit'] ?? 0);
         $currentDebt = (float) ($row['current_debt'] ?? 0);
@@ -1217,7 +1226,7 @@ class AccountingController extends Controller
             return strtolower(trim((string) $value));
         }, $rawHeaders);
 
-        $required = ['employee_id', 'name', 'email', 'user_type', 'monthly_salary'];
+        $required = ['employee_id', 'name', 'email', 'user_type', 'employment_type', 'salary_grade', 'salary_step', 'salary_effective_date', 'monthly_salary'];
         foreach ($required as $field) {
             if (!in_array($field, $headers, true)) {
                 fclose($handle);
@@ -1227,8 +1236,6 @@ class AccountingController extends Controller
                 ]);
             }
         }
-
-        $hasCreditLimit = in_array('credit_limit', $headers, true);
 
         $batchModel = new SalaryImportBatchModel();
         $rowModel = new SalaryImportRowModel();
@@ -1264,10 +1271,14 @@ class AccountingController extends Controller
             $name = $rowAssoc['name'] ?? '';
             $email = $rowAssoc['email'] ?? '';
             $userType = strtolower((string) ($rowAssoc['user_type'] ?? ''));
+            $employmentType = SalaryCreditPolicy::normalizeEmploymentType((string) ($rowAssoc['employment_type'] ?? ''));
+            $salaryGrade = SalaryCreditPolicy::normalizeSalaryGrade((string) ($rowAssoc['salary_grade'] ?? ''));
+            $salaryStepRaw = trim((string) ($rowAssoc['salary_step'] ?? ''));
+            $salaryStep = $salaryStepRaw === '' ? null : (int) $salaryStepRaw;
+            $effectiveDate = trim((string) ($rowAssoc['salary_effective_date'] ?? ''));
             $monthlySalaryRaw = $rowAssoc['monthly_salary'] ?? '';
-            $creditLimitRaw = $rowAssoc['credit_limit'] ?? '';
             $monthlySalary = is_numeric($monthlySalaryRaw) ? (float) $monthlySalaryRaw : -1;
-            $creditLimit = $hasCreditLimit && $creditLimitRaw !== '' && is_numeric($creditLimitRaw) ? (float) $creditLimitRaw : null;
+            $creditLimit = SalaryCreditPolicy::creditLimit($monthlySalary);
 
             $errors = [];
             if ($name === '') {
@@ -1279,11 +1290,23 @@ class AccountingController extends Controller
             if (!in_array($userType, ['faculty', 'staff'], true)) {
                 $errors[] = 'user_type must be faculty or staff';
             }
-            if (!is_numeric($monthlySalaryRaw) || $monthlySalary < 0) {
-                $errors[] = 'monthly_salary must be a number >= 0';
+            if (!in_array($employmentType, SalaryCreditPolicy::EMPLOYMENT_TYPES, true)) {
+                $errors[] = 'employment_type must be plantilla, cos, or part_time';
             }
-            if ($hasCreditLimit && $creditLimitRaw !== '' && (!is_numeric($creditLimitRaw) || (float) $creditLimitRaw < 0)) {
-                $errors[] = 'credit_limit must be a number >= 0';
+            if ($salaryGrade === '' || strlen($salaryGrade) > 30) {
+                $errors[] = 'salary_grade is required (maximum 30 characters)';
+            }
+            if ($employmentType === 'plantilla' && ($salaryStep === null || $salaryStep < 1 || $salaryStep > 8)) {
+                $errors[] = 'salary_step must be 1 to 8 for plantilla';
+            }
+            if ($employmentType !== 'plantilla' && $salaryStep !== null && ($salaryStep < 1 || $salaryStep > 8)) {
+                $errors[] = 'salary_step must be blank or 1 to 8';
+            }
+            if (!SalaryCreditPolicy::isValidEffectiveDate($effectiveDate)) {
+                $errors[] = 'salary_effective_date must be YYYY-MM-DD';
+            }
+            if (!is_numeric($monthlySalaryRaw) || $monthlySalary <= 0) {
+                $errors[] = 'monthly_salary must be a number greater than 0';
             }
 
             if ($errors !== []) {
@@ -1325,6 +1348,10 @@ class AccountingController extends Controller
                     'email' => $email,
                     'user_type' => $userType,
                     'base_salary' => $monthlySalary,
+                    'employment_type' => $employmentType,
+                    'salary_grade' => $salaryGrade,
+                    'salary_step' => $salaryStep,
+                    'salary_effective_date' => $effectiveDate,
                     'is_active' => true,
                 ]);
                 $userId = (int) $existingUser['id'];
@@ -1341,6 +1368,10 @@ class AccountingController extends Controller
                     'user_type' => $userType,
                     'qr_token' => $qrToken,
                     'base_salary' => $monthlySalary,
+                    'employment_type' => $employmentType,
+                    'salary_grade' => $salaryGrade,
+                    'salary_step' => $salaryStep,
+                    'salary_effective_date' => $effectiveDate,
                     'is_active' => true,
                     'created_at' => date('Y-m-d H:i:s'),
                 ]);
@@ -1372,15 +1403,12 @@ class AccountingController extends Controller
 
             $balance = $balanceModel->getBalanceByUserId((int) $userId);
             if ($balance) {
-                $updateData = ['updated_at' => date('Y-m-d H:i:s')];
-                if ($hasCreditLimit && $creditLimit !== null) {
-                    $updateData['credit_limit'] = $creditLimit;
-                }
+                $updateData = ['credit_limit' => $creditLimit, 'updated_at' => date('Y-m-d H:i:s')];
                 $balanceModel->update((int) $userId, $updateData);
             } else {
                 $balanceModel->insert([
                     'user_id' => (int) $userId,
-                    'credit_limit' => $hasCreditLimit && $creditLimit !== null ? $creditLimit : 0,
+                    'credit_limit' => $creditLimit,
                     'current_debt' => 0,
                     'updated_at' => date('Y-m-d H:i:s'),
                 ]);
@@ -1497,7 +1525,7 @@ class AccountingController extends Controller
             return strtolower(trim((string) $value));
         }, $rawHeaders);
 
-        $required = ['employee_id', 'name', 'email', 'user_type', 'monthly_salary'];
+        $required = ['employee_id', 'name', 'email', 'user_type', 'employment_type', 'salary_grade', 'salary_step', 'salary_effective_date', 'monthly_salary'];
         foreach ($required as $field) {
             if (!in_array($field, $headers, true)) {
                 fclose($handle);
@@ -1508,7 +1536,6 @@ class AccountingController extends Controller
             }
         }
 
-        $hasCreditLimit = in_array('credit_limit', $headers, true);
         $db = Database::connect();
         $totalRows = 0;
         $validRows = 0;
@@ -1530,10 +1557,14 @@ class AccountingController extends Controller
             $name = $rowAssoc['name'] ?? '';
             $email = $rowAssoc['email'] ?? '';
             $userType = strtolower((string) ($rowAssoc['user_type'] ?? ''));
+            $employmentType = SalaryCreditPolicy::normalizeEmploymentType((string) ($rowAssoc['employment_type'] ?? ''));
+            $salaryGrade = SalaryCreditPolicy::normalizeSalaryGrade((string) ($rowAssoc['salary_grade'] ?? ''));
+            $salaryStepRaw = trim((string) ($rowAssoc['salary_step'] ?? ''));
+            $salaryStep = $salaryStepRaw === '' ? null : (int) $salaryStepRaw;
+            $effectiveDate = trim((string) ($rowAssoc['salary_effective_date'] ?? ''));
             $monthlySalaryRaw = $rowAssoc['monthly_salary'] ?? '';
-            $creditLimitRaw = $rowAssoc['credit_limit'] ?? '';
             $monthlySalary = is_numeric($monthlySalaryRaw) ? (float) $monthlySalaryRaw : -1;
-            $creditLimit = $hasCreditLimit && $creditLimitRaw !== '' && is_numeric($creditLimitRaw) ? (float) $creditLimitRaw : null;
+            $creditLimit = SalaryCreditPolicy::creditLimit($monthlySalary);
 
             $errors = [];
             if ($name === '') {
@@ -1545,11 +1576,23 @@ class AccountingController extends Controller
             if (!in_array($userType, ['faculty', 'staff'], true)) {
                 $errors[] = 'user_type must be faculty or staff';
             }
-            if (!is_numeric($monthlySalaryRaw) || $monthlySalary < 0) {
-                $errors[] = 'monthly_salary must be a number >= 0';
+            if (!in_array($employmentType, SalaryCreditPolicy::EMPLOYMENT_TYPES, true)) {
+                $errors[] = 'employment_type must be plantilla, cos, or part_time';
             }
-            if ($hasCreditLimit && $creditLimitRaw !== '' && (!is_numeric($creditLimitRaw) || (float) $creditLimitRaw < 0)) {
-                $errors[] = 'credit_limit must be a number >= 0';
+            if ($salaryGrade === '' || strlen($salaryGrade) > 30) {
+                $errors[] = 'salary_grade is required (maximum 30 characters)';
+            }
+            if ($employmentType === 'plantilla' && ($salaryStep === null || $salaryStep < 1 || $salaryStep > 8)) {
+                $errors[] = 'salary_step must be 1 to 8 for plantilla';
+            }
+            if ($employmentType !== 'plantilla' && $salaryStep !== null && ($salaryStep < 1 || $salaryStep > 8)) {
+                $errors[] = 'salary_step must be blank or 1 to 8';
+            }
+            if (!SalaryCreditPolicy::isValidEffectiveDate($effectiveDate)) {
+                $errors[] = 'salary_effective_date must be YYYY-MM-DD';
+            }
+            if (!is_numeric($monthlySalaryRaw) || $monthlySalary <= 0) {
+                $errors[] = 'monthly_salary must be a number greater than 0';
             }
 
             if ($errors !== []) {
@@ -1581,9 +1624,7 @@ class AccountingController extends Controller
             } else {
                 $createCount++;
             }
-            if ($hasCreditLimit && $creditLimit !== null) {
-                $creditLimitUpdateCount++;
-            }
+            $creditLimitUpdateCount++;
 
             if (count($validPreview) < 20) {
                 $validPreview[] = [
@@ -1592,6 +1633,10 @@ class AccountingController extends Controller
                     'name' => $name,
                     'email' => $email,
                     'user_type' => $userType,
+                    'employment_type' => $employmentType,
+                    'salary_grade' => $salaryGrade,
+                    'salary_step' => $salaryStep,
+                    'salary_effective_date' => $effectiveDate,
                     'monthly_salary' => $monthlySalary,
                     'credit_limit' => $creditLimit,
                     'action' => $action,
@@ -1808,93 +1853,41 @@ class AccountingController extends Controller
         ]);
     }
 
-    public function updateCreditLimit()
-    {
-        $request = $this->request->getJSON(true) ?? $this->request->getPost();
-        $actorId = (int) session()->get('user_id');
-        $userId = (int) ($request['user_id'] ?? 0);
-        $creditLimit = (float) ($request['credit_limit'] ?? -1);
-        $reason = trim((string) ($request['reason'] ?? 'Manual credit limit update'));
-
-        if ($userId <= 0 || $creditLimit < 0) {
-            return $this->response->setStatusCode(400)->setJSON([
-                'status' => 'error',
-                'message' => 'Invalid credit limit payload.',
-            ]);
-        }
-
-        $db = Database::connect();
-        $balanceModel = new BalanceModel();
-        $auditLogModel = new AuditLogModel();
-
-        $db->transBegin();
-        $balance = $balanceModel->getBalanceForUpdate($userId);
-        if (!$balance) {
-            $db->transRollback();
-            return $this->response->setStatusCode(404)->setJSON([
-                'status' => 'error',
-                'message' => 'Balance record not found.',
-            ]);
-        }
-
-        $previousLimit = (float) $balance['credit_limit'];
-
-        $balanceModel->update($userId, [
-            'credit_limit' => $creditLimit,
-            'updated_at' => date('Y-m-d H:i:s'),
-        ]);
-
-        $auditLogModel->insert([
-            'actor_id' => $actorId,
-            'action' => 'ACCOUNTING_UPDATE_CREDIT_LIMIT',
-            'entity' => 'balances',
-            'entity_id' => $userId,
-            'payload_json' => json_encode([
-                'user_id' => $userId,
-                'previous_credit_limit' => $previousLimit,
-                'new_credit_limit' => $creditLimit,
-                'reason' => $reason,
-            ]),
-            'created_at' => date('Y-m-d H:i:s'),
-        ]);
-
-        if (!$db->transStatus()) {
-            $db->transRollback();
-            return $this->response->setStatusCode(500)->setJSON([
-                'status' => 'error',
-                'message' => 'Failed to update credit limit.',
-            ]);
-        }
-
-        $db->transCommit();
-
-        return $this->response->setJSON([
-            'status' => 'success',
-            'user_id' => $userId,
-            'previous_credit_limit' => $previousLimit,
-            'new_credit_limit' => $creditLimit,
-        ]);
-    }
-
     public function updateFinancialProfile()
     {
         $request = $this->request->getJSON(true) ?? $this->request->getPost();
         $actorId = (int) session()->get('user_id');
         $userId = (int) ($request['user_id'] ?? 0);
         $salary = (float) ($request['base_salary'] ?? -1);
-        $creditLimit = (float) ($request['credit_limit'] ?? -1);
+        $employmentType = SalaryCreditPolicy::normalizeEmploymentType((string) ($request['employment_type'] ?? ''));
+        $salaryGrade = SalaryCreditPolicy::normalizeSalaryGrade((string) ($request['salary_grade'] ?? ''));
+        $salaryStepRaw = trim((string) ($request['salary_step'] ?? ''));
+        $salaryStep = $salaryStepRaw === '' ? null : (int) $salaryStepRaw;
+        $effectiveDate = trim((string) ($request['salary_effective_date'] ?? ''));
         $reason = trim((string) ($request['reason'] ?? ''));
 
-        if ($userId <= 0 || $salary < 0 || $creditLimit < 0 || $reason === '') {
+        if ($userId <= 0 || $salary <= 0 || !in_array($employmentType, SalaryCreditPolicy::EMPLOYMENT_TYPES, true)
+            || $salaryGrade === '' || strlen($salaryGrade) > 30 || !SalaryCreditPolicy::isValidEffectiveDate($effectiveDate)
+            || $reason === '' || ($employmentType === 'plantilla' && ($salaryStep === null || $salaryStep < 1 || $salaryStep > 8))
+            || ($employmentType !== 'plantilla' && $salaryStep !== null && ($salaryStep < 1 || $salaryStep > 8))) {
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
-                'message' => 'Employee, salary, credit limit, and reason are required.',
+                'message' => 'Employment type, salary grade, valid salary details, effective date, and reason are required. Plantilla step must be 1 to 8.',
             ]);
         }
+        $creditLimit = SalaryCreditPolicy::creditLimit($salary);
 
         $db = Database::connect();
+        foreach (['employment_type', 'salary_grade', 'salary_step', 'salary_effective_date'] as $field) {
+            if (!$db->fieldExists($field, 'users')) {
+                return $this->response->setStatusCode(503)->setJSON([
+                    'status' => 'error',
+                    'message' => 'Salary-grade setup is temporarily unavailable until database migration 2026-08-21-000001 is applied.',
+                ]);
+            }
+        }
         $current = $db->table('users u')
-            ->select('u.base_salary, u.user_type, u.is_active, b.user_id AS balance_user_id, b.credit_limit')
+            ->select('u.base_salary, u.employment_type, u.salary_grade, u.salary_step, u.salary_effective_date, u.user_type, u.is_active, b.user_id AS balance_user_id, b.credit_limit')
             ->join('balances b', 'b.user_id = u.id', 'left')
             ->where('u.id', $userId)->get()->getRowArray();
         if (!$current) {
@@ -1907,10 +1900,22 @@ class AccountingController extends Controller
         $wasConfigured = $current['balance_user_id'] !== null;
         $beforeSalary = (float) ($current['base_salary'] ?? 0);
         $beforeLimit = (float) ($current['credit_limit'] ?? 0);
+        $beforeProfile = [
+            'employment_type' => $current['employment_type'] ?? null,
+            'salary_grade' => $current['salary_grade'] ?? null,
+            'salary_step' => $current['salary_step'] ?? null,
+            'salary_effective_date' => $current['salary_effective_date'] ?? null,
+        ];
         $now = date('Y-m-d H:i:s');
         $db->transException(true)->transStart();
         try {
-            $db->table('users')->where('id', $userId)->update(['base_salary' => $salary]);
+            $db->table('users')->where('id', $userId)->update([
+                'base_salary' => $salary,
+                'employment_type' => $employmentType,
+                'salary_grade' => $salaryGrade,
+                'salary_step' => $salaryStep,
+                'salary_effective_date' => $effectiveDate,
+            ]);
             if ($wasConfigured) {
                 $db->table('balances')->where('user_id', $userId)->update(['credit_limit' => $creditLimit, 'updated_at' => $now]);
             } else {
@@ -1926,6 +1931,14 @@ class AccountingController extends Controller
                     'new_base_salary' => $salary,
                     'previous_credit_limit' => $beforeLimit,
                     'new_credit_limit' => $creditLimit,
+                    'previous_salary_profile' => $beforeProfile,
+                    'new_salary_profile' => [
+                        'employment_type' => $employmentType,
+                        'salary_grade' => $salaryGrade,
+                        'salary_step' => $salaryStep,
+                        'salary_effective_date' => $effectiveDate,
+                    ],
+                    'credit_rate' => SalaryCreditPolicy::CREDIT_RATE,
                     'reason' => $reason,
                     'financial_profile_created' => !$wasConfigured,
                 ]),
@@ -1941,8 +1954,23 @@ class AccountingController extends Controller
             'status' => 'success', 'user_id' => $userId,
             'previous_base_salary' => $beforeSalary, 'new_base_salary' => $salary,
             'previous_credit_limit' => $beforeLimit, 'new_credit_limit' => $creditLimit,
+            'employment_type' => $employmentType, 'salary_grade' => $salaryGrade,
+            'salary_step' => $salaryStep, 'salary_effective_date' => $effectiveDate,
+            'credit_rate' => SalaryCreditPolicy::CREDIT_RATE,
             'financial_profile_created' => !$wasConfigured,
         ]);
+    }
+
+    private function salaryProfileSelect($db, string $alias): string
+    {
+        $parts = [];
+        foreach (['employment_type', 'salary_grade', 'salary_step', 'salary_effective_date'] as $field) {
+            $parts[] = $db->fieldExists($field, 'users')
+                ? $alias . '.' . $field
+                : 'NULL AS ' . $field;
+        }
+
+        return implode(', ', $parts);
     }
 
     private function buildDebtStatus(float $creditLimit, float $currentDebt): array

@@ -48,7 +48,7 @@ final class AdminAccessRouteConfigTest extends CIUnitTestCase
             "accounting/debt-investigations', 'AccountingController::openDebtInvestigation', ['filter' => 'access:accounting.operate']",
             "accounting/debt-investigations/(:num)/recommend', 'AccountingController::recommendDebtInvestigation/$1', ['filter' => 'access:accounting.operate']",
             "accounting/debts/import-csv', 'AccountingController::importCsv', ['filter' => 'access:accounting.operate']",
-            "accounting/debts/credit-limit', 'AccountingController::updateCreditLimit', ['filter' => 'access:accounting.operate']",
+            "accounting/debts/financial-profile', 'AccountingController::updateFinancialProfile', ['filter' => 'access:accounting.operate']",
         ] as $expectedRoute) {
             $this->assertStringContainsString($expectedRoute, $routes);
         }
@@ -57,6 +57,7 @@ final class AdminAccessRouteConfigTest extends CIUnitTestCase
             "accounting/settlement/apply'",
             "accounting/debts/deduct'",
             "accounting/debts/deduct-full'",
+            "accounting/debts/credit-limit'",
         ] as $retiredWriteRoute) {
             $this->assertStringNotContainsString($retiredWriteRoute, $routes);
         }

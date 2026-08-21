@@ -1,11 +1,11 @@
 # IBEMS System Hierarchy
 
-This hierarchy is the reference for portal responsibilities, system diagrams, and future workflow discussions.
+This is the source reference for the external client document at `docs/client/IBEMS-System-Hierarchy.docx`. It is intentionally not a portal page.
 
 ```mermaid
 flowchart TD
     ADMIN[Administrator<br/>System governance and school-wide oversight]
-    ACCT[Accounting Office<br/>Credit, debt, deductions, settlements]
+    ACCT[Accounting Office<br/>Salary-grade profiles, dynamic credit, debt, deductions, settlements]
     SUP[Store Supervisor<br/>Assigned-store review and variance handling]
     STORE[Store Officer / Cashier<br/>POS, inventory, receipts, store-day custody]
     USER[Employee / User<br/>Catalog, history, credit, deductions]
@@ -40,7 +40,7 @@ flowchart LR
 ## Responsibility rules
 
 - Administrator: users, stores, products, school-wide operations, and audit records.
-- Accounting Office: employee financial profiles, credit balances, deductions, settlements, and debt investigations.
+- Accounting Office: employee salary-grade profiles, policy-derived credit balances, deductions, settlements, and debt investigations.
 - Store Supervisor: assigned-store review, store-day variances, supporting evidence, and handoffs.
 - Store Officer / Cashier: POS transactions, products, inventory, receipts, repayments, and store-day custody.
 - Employee / User: active store catalog, personal transactions, receipts, credit status, and deduction history.

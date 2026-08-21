@@ -56,7 +56,6 @@ final class AccountingDebtEndpointTest extends CIUnitTestCase
             ['GET', 'accounting/debts/daily-summary', 'AccountingController::dailySummary'],
             ['POST', 'accounting/debts/deduct', 'AccountingController::deductDebt'],
             ['POST', 'accounting/debts/deduct-full', 'AccountingController::deductFullDebt'],
-            ['POST', 'accounting/debts/credit-limit', 'AccountingController::updateCreditLimit'],
             ['POST', 'accounting/debts/financial-profile', 'AccountingController::updateFinancialProfile'],
             ['POST', 'accounting/settlement/apply', 'AccountingController::applySettlementRun'],
         ]);
@@ -203,26 +202,30 @@ final class AccountingDebtEndpointTest extends CIUnitTestCase
         $this->assertSame(500.0, (float) ($cashbook['available_credit_snapshot'] ?? 0));
     }
 
-    public function testCreditLimitUpdatePreservesDebtAndWritesAudit(): void
+    public function testSalaryReductionPreservesDebtAndDerivesCreditLimit(): void
     {
-        $this->seedBalance(501, 500, 125);
+        $this->seedBalance(501, 5000, 1200, 32000);
 
-        $result = $this->accountingPost('accounting/debts/credit-limit', [
+        $result = $this->accountingPost('accounting/debts/financial-profile', [
             'user_id' => 501,
-            'credit_limit' => 750,
-            'reason' => 'Approved increase',
+            'base_salary' => 4000,
+            'employment_type' => 'cos',
+            'salary_grade' => 'COS-1',
+            'salary_step' => '',
+            'salary_effective_date' => '2026-08-21',
+            'reason' => 'Contract compensation adjustment',
         ]);
 
         $result->assertOK();
         $body = $this->jsonBody($result);
-        $this->assertSame(500.0, (float) ($body['previous_credit_limit'] ?? 0));
-        $this->assertSame(750.0, (float) ($body['new_credit_limit'] ?? 0));
+        $this->assertSame(5000.0, (float) ($body['previous_credit_limit'] ?? 0));
+        $this->assertSame(1000.0, (float) ($body['new_credit_limit'] ?? 0));
 
         $db = Database::connect();
         $balance = $db->table('balances')->where('user_id', 501)->get()->getRowArray();
-        $audit = $db->table('audit_logs')->where('action', 'ACCOUNTING_UPDATE_CREDIT_LIMIT')->get()->getRowArray();
-        $this->assertSame(750.0, (float) ($balance['credit_limit'] ?? 0));
-        $this->assertSame(125.0, (float) ($balance['current_debt'] ?? 0));
+        $audit = $db->table('audit_logs')->where('action', 'ACCOUNTING_UPDATE_FINANCIAL_PROFILE')->get()->getRowArray();
+        $this->assertSame(1000.0, (float) ($balance['credit_limit'] ?? 0));
+        $this->assertSame(1200.0, (float) ($balance['current_debt'] ?? 0));
         $this->assertNotNull($audit);
     }
 
@@ -231,23 +234,26 @@ final class AccountingDebtEndpointTest extends CIUnitTestCase
         $adminSource = file_get_contents(APPPATH . 'Controllers/AdminController.php');
         $adminView = file_get_contents(APPPATH . 'Views/admin/user-view.php');
         $this->assertStringContainsString("'base_salary' => 0", $adminSource);
-        $this->assertStringContainsString('DEFAULT_EMPLOYEE_CREDIT_LIMIT = 1000.00', $adminSource);
+        $this->assertStringNotContainsString('DEFAULT_EMPLOYEE_CREDIT_LIMIT', $adminSource);
         $this->assertStringContainsString('initialCreditLimitForUserType', $adminSource);
-        $this->assertStringContainsString('PHP 1,000 base credit limit', $adminView);
+        $this->assertStringContainsString('start with no credit', $adminView);
 
         $this->seedBalance(501, 0, 0, 0);
 
         $result = $this->accountingPost('accounting/debts/financial-profile', [
             'user_id' => 501,
             'base_salary' => 32000,
-            'credit_limit' => 5000,
+            'employment_type' => 'plantilla',
+            'salary_grade' => 'SG-18',
+            'salary_step' => 3,
+            'salary_effective_date' => '2026-08-21',
             'reason' => 'Initial financial profile assignment',
         ]);
 
         $result->assertOK();
         $body = $this->jsonBody($result);
         $this->assertSame(32000.0, (float) ($body['new_base_salary'] ?? 0));
-        $this->assertSame(5000.0, (float) ($body['new_credit_limit'] ?? 0));
+        $this->assertSame(8000.0, (float) ($body['new_credit_limit'] ?? 0));
 
         $db = Database::connect();
         $user = $db->table('users')->where('id', 501)->get()->getRowArray();
@@ -255,7 +261,9 @@ final class AccountingDebtEndpointTest extends CIUnitTestCase
         $audit = $db->table('audit_logs')->where('action', 'ACCOUNTING_UPDATE_FINANCIAL_PROFILE')->get()->getRowArray();
 
         $this->assertSame(32000.0, (float) ($user['base_salary'] ?? 0));
-        $this->assertSame(5000.0, (float) ($balance['credit_limit'] ?? 0));
+        $this->assertSame('plantilla', $user['employment_type'] ?? null);
+        $this->assertSame('SG-18', $user['salary_grade'] ?? null);
+        $this->assertSame(8000.0, (float) ($balance['credit_limit'] ?? 0));
         $this->assertSame(0.0, (float) ($balance['current_debt'] ?? -1));
         $this->assertSame(900, (int) ($audit['actor_id'] ?? 0));
         $payload = json_decode((string) ($audit['payload_json'] ?? ''), true);
@@ -292,14 +300,17 @@ final class AccountingDebtEndpointTest extends CIUnitTestCase
         $save = $this->accountingPost('accounting/debts/financial-profile', [
             'user_id' => 504,
             'base_salary' => 28000,
-            'credit_limit' => 3500,
+            'employment_type' => 'part_time',
+            'salary_grade' => 'PT-LECTURER',
+            'salary_step' => '',
+            'salary_effective_date' => '2026-08-21',
             'reason' => 'Initial Accounting setup',
         ]);
         $save->assertOK();
         $saved = $this->jsonBody($save);
         $this->assertTrue((bool) ($saved['financial_profile_created'] ?? false));
         $balance = $db->table('balances')->where('user_id', 504)->get()->getRowArray();
-        $this->assertSame(3500.0, (float) ($balance['credit_limit'] ?? 0));
+        $this->assertSame(7000.0, (float) ($balance['credit_limit'] ?? 0));
         $this->assertSame(0.0, (float) ($balance['current_debt'] ?? -1));
     }
 
@@ -388,6 +399,10 @@ final class AccountingDebtEndpointTest extends CIUnitTestCase
             'role' => 'USER',
             'user_type' => 'staff',
             'base_salary' => $baseSalary,
+            'employment_type' => 'plantilla',
+            'salary_grade' => 'SG-TEST',
+            'salary_step' => 1,
+            'salary_effective_date' => '2026-08-21',
             'is_active' => 1,
             'created_at' => date('Y-m-d H:i:s'),
         ]);
@@ -417,6 +432,10 @@ final class AccountingDebtEndpointTest extends CIUnitTestCase
             role TEXT NOT NULL,
             user_type TEXT NOT NULL,
             base_salary REAL NOT NULL DEFAULT 0,
+            employment_type TEXT,
+            salary_grade TEXT,
+            salary_step INTEGER,
+            salary_effective_date TEXT,
             is_active INTEGER NOT NULL DEFAULT 1,
             created_at TEXT
         )');

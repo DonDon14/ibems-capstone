@@ -23,6 +23,10 @@ create table if not exists public.users (
     user_type varchar(20) not null check (user_type in ('faculty','staff','student')),
     qr_token varchar(255) not null unique,
     base_salary numeric(12,2) not null default 0 check (base_salary >= 0),
+    employment_type varchar(20) check (employment_type is null or employment_type in ('plantilla','cos','part_time')),
+    salary_grade varchar(30),
+    salary_step smallint check (salary_step is null or salary_step between 1 and 8),
+    salary_effective_date date,
     is_active boolean not null default true,
     created_at timestamp without time zone
 );
@@ -40,8 +44,7 @@ create table if not exists public.balances (
     user_id bigint primary key references public.users(id) on delete cascade,
     credit_limit numeric(12,2) not null default 0 check (credit_limit >= 0),
     current_debt numeric(12,2) not null default 0 check (current_debt >= 0),
-    updated_at timestamp without time zone,
-    check (current_debt <= credit_limit)
+    updated_at timestamp without time zone
 );
 
 create table if not exists public.stores (
