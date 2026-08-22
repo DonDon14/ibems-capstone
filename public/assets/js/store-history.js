@@ -100,7 +100,7 @@ function renderTransactions(transactions, summary = null) {
             <tr class="history-row-clickable table-row-clickable" data-txn-id="${txn.id}">
                 <td>${txn.id}</td>
                 <td><span class="history-date">${hEscape(hDateTime(txn.created_at))}</span><small>${hEscape(txn.client_txn_id || "")}</small></td>
-                <td><strong>${hEscape(txn.customer_name)}</strong><small>${hEscape(hPaymentLabel(txn.customer_type || ""))}</small></td>
+                <td><span class="table-person-cell">${window.IbemsAvatar.html(txn.customer_name, txn.customer_profile_image_url, "table-person-avatar")}<span><strong>${hEscape(txn.customer_name)}</strong><small>${hEscape(hPaymentLabel(txn.customer_type || ""))}</small></span></span></td>
                 <td><span class="history-payment-pill payment-${hEscape(String(txn.payment_method || "").toLowerCase())}">${hEscape(hPaymentLabel(txn.payment_method))}</span></td>
                 <td><strong class="history-amount">${hEscape(hMoney(txn.amount))}</strong></td>
                 <td>

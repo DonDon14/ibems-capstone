@@ -14,6 +14,7 @@ use App\Models\UserRoleModel;
 use App\Models\DebtCashbookEntryModel;
 use App\Services\StoreOversightService;
 use App\Services\AssetStorageService;
+use App\Services\DashboardAlertPagination;
 use App\Services\SalaryCreditPolicy;
 use App\Services\SalaryScheduleService;
 use CodeIgniter\Controller;
@@ -30,6 +31,7 @@ class AdminController extends Controller
     public function dashboardData()
     {
         $db = Database::connect();
+        $requestedAlertsPage = max(1, (int) ($this->request->getGet('alerts_page') ?? 1));
         $today = new \DateTimeImmutable('today');
         $rangeStartDate = $today->modify('-6 days')->format('Y-m-d');
         $rangeStartTs = $rangeStartDate . ' 00:00:00';
@@ -85,9 +87,9 @@ class AdminController extends Controller
             'closed_today' => 0,
             'not_open_today' => 0,
         ];
-        $storesNotOpenRows = [];
-        $unresolvedReviewRows = [];
         $unresolvedReviewCount = 0;
+        $hasVarianceCases = false;
+        $hasVarianceHandoffs = false;
         if ($db->tableExists('store_day_sessions')) {
             $sessionSummary = $db->table('stores s')
                 ->select("SUM(CASE WHEN sds.status = 'open' THEN 1 ELSE 0 END) AS open_today, SUM(CASE WHEN sds.status = 'closed' THEN 1 ELSE 0 END) AS closed_today", false)
@@ -103,49 +105,8 @@ class AdminController extends Controller
                 (int) ($storeSummary['active_stores'] ?? 0) - $storeDaySummary['open_today'] - $storeDaySummary['closed_today']
             );
 
-            $storesNotOpenRows = $db->table('stores s')
-                ->select('s.id, s.store_name, u.name AS officer_name')
-                ->join('store_day_sessions sds', 'sds.store_id = s.id AND sds.business_date = ' . $db->escape($todayDate), 'left', false)
-                ->join('users u', 'u.id = s.officer_id', 'left')
-                ->where('s.is_active', true)
-                ->where('sds.id IS NULL', null, false)
-                ->orderBy('s.store_name', 'ASC')
-                ->limit(5)
-                ->get()
-                ->getResultArray();
-
             $hasVarianceCases = $db->tableExists('store_day_variance_cases');
             $hasVarianceHandoffs = $hasVarianceCases && $db->tableExists('store_day_variance_case_handoffs');
-            $reviewSelect = 'sds.id, sds.store_id, sds.business_date, sds.variance_cash, sds.variance_ecash, sds.variance_status, sds.review_status, s.store_name, closer.name AS closed_by_name';
-            if ($hasVarianceCases) {
-                $reviewSelect .= ', c.case_ref, c.owner_user_id, owner.name AS owner_name';
-            } else {
-                $reviewSelect .= ', NULL AS case_ref, NULL AS owner_user_id, NULL AS owner_name';
-            }
-            if ($hasVarianceHandoffs) {
-                $reviewSelect .= ', h.status AS handoff_status, h.due_at AS handoff_due_at';
-            } else {
-                $reviewSelect .= ', NULL AS handoff_status, NULL AS handoff_due_at';
-            }
-            $unresolvedReviewQuery = $db->table('store_day_sessions sds')
-                ->select($reviewSelect, false)
-                ->join('stores s', 's.id = sds.store_id', 'inner')
-                ->join('users closer', 'closer.id = sds.closed_by', 'left');
-            if ($hasVarianceCases) {
-                $unresolvedReviewQuery->join('store_day_variance_cases c', 'c.store_day_session_id = sds.id', 'left')
-                    ->join('users owner', 'owner.id = c.owner_user_id', 'left');
-            }
-            if ($hasVarianceHandoffs) {
-                $unresolvedReviewQuery->join('store_day_variance_case_handoffs h', 'h.id = (SELECT MAX(h2.id) FROM store_day_variance_case_handoffs h2 WHERE h2.case_id = c.id)', 'left', false);
-            }
-            $unresolvedReviewRows = $unresolvedReviewQuery
-                ->where('sds.status', 'closed')
-                ->whereIn('sds.review_status', ['pending', 'needs_investigation'])
-                ->orderBy('sds.business_date', 'ASC')
-                ->orderBy('sds.id', 'ASC')
-                ->limit(12)
-                ->get()
-                ->getResultArray();
             $unresolvedReviewCount = $db->table('store_day_sessions')
                 ->where('status', 'closed')
                 ->whereIn('review_status', ['pending', 'needs_investigation'])
@@ -253,27 +214,78 @@ class AdminController extends Controller
         $openAlerts = $inactiveStores + $storesNotOpenToday + $outOfStockProducts + $lowStockProducts + $overCreditAccounts + $unresolvedReviews;
 
         $healthMessages = [];
+        $healthItems = [];
         if ($inactiveStores > 0) {
             $healthMessages[] = $inactiveStores . ' inactive store(s)';
+            $healthItems[] = ['icon' => 'bi-shop', 'text' => $inactiveStores . ' inactive store(s)'];
         }
         if ($storesNotOpenToday > 0) {
             $healthMessages[] = $storesNotOpenToday . ' store(s) not opened today';
+            $healthItems[] = ['icon' => 'bi-shop-window', 'text' => $storesNotOpenToday . ' store(s) not opened today'];
         }
         if ($outOfStockProducts > 0) {
             $healthMessages[] = $outOfStockProducts . ' out-of-stock product(s)';
+            $healthItems[] = ['icon' => 'bi-box-seam', 'text' => $outOfStockProducts . ' out-of-stock product(s)'];
         }
         if ($lowStockProducts > 0) {
             $healthMessages[] = $lowStockProducts . ' low-stock product(s)';
+            $healthItems[] = ['icon' => 'bi-box2', 'text' => $lowStockProducts . ' low-stock product(s)'];
         }
         if ($overCreditAccounts > 0) {
             $healthMessages[] = $overCreditAccounts . ' over-credit account(s)';
+            $healthItems[] = ['icon' => 'bi-credit-card-2-front', 'text' => $overCreditAccounts . ' over-credit account(s)'];
         }
         if ($unresolvedReviews > 0) {
             $healthMessages[] = $unresolvedReviews . ' unresolved store-day review(s)';
+            $healthItems[] = ['icon' => 'bi-clipboard2-pulse', 'text' => $unresolvedReviews . ' unresolved store-day review(s)'];
         }
         $healthText = $openAlerts > 0
-            ? 'Attention needed: ' . implode(' | ', $healthMessages) . '.'
+            ? 'Attention needed: ' . implode(', ', $healthMessages) . '.'
             : 'All core modules are online. No alerts detected.';
+
+        $storesNotOpenRows = [];
+        $unresolvedReviewRows = [];
+        if ($db->tableExists('store_day_sessions')) {
+            $storesNotOpenRows = $db->table('stores s')
+                ->select('s.id, s.store_name, u.name AS officer_name')
+                ->join('store_day_sessions sds', 'sds.store_id = s.id AND sds.business_date = ' . $db->escape($todayDate), 'left', false)
+                ->join('users u', 'u.id = s.officer_id', 'left')
+                ->where('s.is_active', true)
+                ->where('sds.id IS NULL', null, false)
+                ->orderBy('s.store_name', 'ASC')
+                ->get()
+                ->getResultArray();
+
+            $reviewSelect = 'sds.id, sds.store_id, sds.business_date, sds.variance_cash, sds.variance_ecash, sds.variance_status, sds.review_status, s.store_name, closer.name AS closed_by_name';
+            if ($hasVarianceCases) {
+                $reviewSelect .= ', c.case_ref, c.owner_user_id, owner.name AS owner_name';
+            } else {
+                $reviewSelect .= ', NULL AS case_ref, NULL AS owner_user_id, NULL AS owner_name';
+            }
+            if ($hasVarianceHandoffs) {
+                $reviewSelect .= ', h.status AS handoff_status, h.due_at AS handoff_due_at';
+            } else {
+                $reviewSelect .= ', NULL AS handoff_status, NULL AS handoff_due_at';
+            }
+            $unresolvedReviewQuery = $db->table('store_day_sessions sds')
+                ->select($reviewSelect, false)
+                ->join('stores s', 's.id = sds.store_id', 'inner')
+                ->join('users closer', 'closer.id = sds.closed_by', 'left');
+            if ($hasVarianceCases) {
+                $unresolvedReviewQuery->join('store_day_variance_cases c', 'c.store_day_session_id = sds.id', 'left')
+                    ->join('users owner', 'owner.id = c.owner_user_id', 'left');
+            }
+            if ($hasVarianceHandoffs) {
+                $unresolvedReviewQuery->join('store_day_variance_case_handoffs h', 'h.id = (SELECT MAX(h2.id) FROM store_day_variance_case_handoffs h2 WHERE h2.case_id = c.id)', 'left', false);
+            }
+            $unresolvedReviewRows = $unresolvedReviewQuery
+                ->where('sds.status', 'closed')
+                ->whereIn('sds.review_status', ['pending', 'needs_investigation'])
+                ->orderBy('sds.business_date', 'ASC')
+                ->orderBy('sds.id', 'ASC')
+                ->get()
+                ->getResultArray();
+        }
 
         $lowStockRows = $db->table('products p')
             ->select('p.id, p.name, p.sku, p.stock_qty, COALESCE(p.low_stock_threshold, 10) AS threshold_qty, s.store_name')
@@ -282,7 +294,6 @@ class AdminController extends Controller
             ->where('p.stock_qty <= COALESCE(p.low_stock_threshold, 10)', null, false)
             ->orderBy('p.stock_qty', 'ASC')
             ->orderBy('p.name', 'ASC')
-            ->limit(5)
             ->get()
             ->getResultArray();
 
@@ -292,7 +303,14 @@ class AdminController extends Controller
             ->where('u.is_active', true)
             ->where('b.current_debt > b.credit_limit', null, false)
             ->orderBy('(b.current_debt - b.credit_limit)', 'DESC', false)
-            ->limit(5)
+            ->get()
+            ->getResultArray();
+
+        $inactiveStoreRows = $db->table('stores s')
+            ->select('s.id, s.store_name, u.name AS officer_name')
+            ->join('users u', 'u.id = s.officer_id', 'left')
+            ->where('s.is_active', false)
+            ->orderBy('s.store_name', 'ASC')
             ->get()
             ->getResultArray();
 
@@ -307,6 +325,13 @@ class AdminController extends Controller
                 'label' => $isOverdue ? 'Overdue Case' : 'Store-Day Review',
                 'title' => (string) ($row['store_name'] ?? 'Store') . ' has an unresolved ' . str_replace('_', ' ', (string) ($row['review_status'] ?? 'review')),
                 'detail' => trim(((string) ($row['case_ref'] ?? '') !== '' ? (string) $row['case_ref'] . ' | ' : '') . (string) ($row['business_date'] ?? '-') . ' | Variance PHP ' . number_format($variance, 2) . ' | Owner: ' . ((string) ($row['owner_name'] ?? '') !== '' ? (string) $row['owner_name'] : 'Unassigned') . ($isOverdue ? ' | Acknowledgment overdue' : '')),
+                'detail_items' => array_values(array_filter([
+                    (string) ($row['case_ref'] ?? '') !== '' ? ['icon' => 'bi-folder2-open', 'text' => (string) $row['case_ref']] : null,
+                    ['icon' => 'bi-calendar3', 'text' => (string) ($row['business_date'] ?? '-')],
+                    ['icon' => 'bi-cash-stack', 'text' => 'Variance PHP ' . number_format($variance, 2)],
+                    ['icon' => 'bi-person', 'text' => 'Owner: ' . ((string) ($row['owner_name'] ?? '') !== '' ? (string) $row['owner_name'] : 'Unassigned')],
+                    $isOverdue ? ['icon' => 'bi-clock-history', 'text' => 'Acknowledgment overdue'] : null,
+                ])),
                 'href' => site_url('admin/stores/' . (int) ($row['store_id'] ?? 0)),
             ];
         }
@@ -316,6 +341,9 @@ class AdminController extends Controller
                 'label' => 'Store Day',
                 'title' => (string) ($row['store_name'] ?? 'Store') . ' has not opened today',
                 'detail' => 'Officer: ' . ((string) ($row['officer_name'] ?? '') !== '' ? (string) $row['officer_name'] : 'Unassigned'),
+                'detail_items' => [
+                    ['icon' => 'bi-person-badge', 'text' => 'Officer: ' . ((string) ($row['officer_name'] ?? '') !== '' ? (string) $row['officer_name'] : 'Unassigned')],
+                ],
                 'href' => site_url('admin/stores/' . (int) ($row['id'] ?? 0)),
             ];
         }
@@ -326,6 +354,11 @@ class AdminController extends Controller
                 'label' => $stockQty <= 0 ? 'Out of Stock' : 'Low Stock',
                 'title' => (string) ($row['name'] ?? 'Product'),
                 'detail' => (string) ($row['store_name'] ?? 'Store') . ' | SKU ' . (string) ($row['sku'] ?? '-') . ' | Stock ' . $stockQty . ' / Threshold ' . (int) ($row['threshold_qty'] ?? 10),
+                'detail_items' => [
+                    ['icon' => 'bi-shop', 'text' => (string) ($row['store_name'] ?? 'Store')],
+                    ['icon' => 'bi-upc-scan', 'text' => 'SKU ' . (string) ($row['sku'] ?? '-')],
+                    ['icon' => 'bi-box-seam', 'text' => 'Stock ' . $stockQty . ' / Threshold ' . (int) ($row['threshold_qty'] ?? 10)],
+                ],
                 'href' => site_url('admin/products'),
             ];
         }
@@ -336,9 +369,28 @@ class AdminController extends Controller
                 'label' => 'Over Credit',
                 'title' => (string) ($row['name'] ?? 'User'),
                 'detail' => 'Employee ' . (string) ($row['employee_id'] ?? '-') . ' | Over by PHP ' . number_format($overAmount, 2),
+                'detail_items' => [
+                    ['icon' => 'bi-person-vcard', 'text' => 'Employee ' . (string) ($row['employee_id'] ?? '-')],
+                    ['icon' => 'bi-exclamation-triangle', 'text' => 'Over by PHP ' . number_format($overAmount, 2)],
+                ],
                 'href' => site_url('admin/accounting-debts'),
             ];
         }
+        foreach ($inactiveStoreRows as $row) {
+            $alerts[] = [
+                'tone' => 'warning',
+                'label' => 'Inactive Store',
+                'title' => (string) ($row['store_name'] ?? 'Store') . ' is inactive',
+                'detail' => 'Officer: ' . ((string) ($row['officer_name'] ?? '') !== '' ? (string) $row['officer_name'] : 'Unassigned') . ' | New store operations are unavailable',
+                'detail_items' => [
+                    ['icon' => 'bi-person-badge', 'text' => 'Officer: ' . ((string) ($row['officer_name'] ?? '') !== '' ? (string) $row['officer_name'] : 'Unassigned')],
+                    ['icon' => 'bi-slash-circle', 'text' => 'New store operations are unavailable'],
+                ],
+                'href' => site_url('admin/stores/' . (int) ($row['id'] ?? 0)),
+            ];
+        }
+
+        $alertPage = DashboardAlertPagination::paginate($alerts, $requestedAlertsPage, 5);
 
         return $this->response->setJSON([
             'status' => 'success',
@@ -362,6 +414,7 @@ class AdminController extends Controller
             'health' => [
                 'ok' => $openAlerts === 0,
                 'message' => $healthText,
+                'items' => $healthItems,
             ],
             'analytics' => [
                 'range' => [
@@ -373,7 +426,8 @@ class AdminController extends Controller
                 'top_stores' => $topStores,
                 'top_selling_items' => $topSellingItems,
             ],
-            'alerts' => array_slice($alerts, 0, 12),
+            'alerts' => $alertPage['items'],
+            'alerts_pagination' => $alertPage['pagination'],
         ]);
     }
 
@@ -440,7 +494,7 @@ class AdminController extends Controller
 
         $db = Database::connect();
         $query = $db->table('audit_logs al')
-            ->select('al.id, al.actor_id, al.action, al.entity, al.entity_id, al.payload_json, al.created_at, u.name AS actor_name, u.email AS actor_email')
+            ->select('al.id, al.actor_id, al.action, al.entity, al.entity_id, al.payload_json, al.created_at, u.name AS actor_name, u.email AS actor_email, u.profile_image_url AS actor_profile_image_url')
             ->join('users u', 'u.id = al.actor_id', 'left');
 
         if ($action !== '') {
@@ -525,6 +579,7 @@ class AdminController extends Controller
                     'actor_id' => isset($row['actor_id']) ? (int) $row['actor_id'] : null,
                     'actor_name' => (string) ($row['actor_name'] ?? 'System'),
                     'actor_email' => (string) ($row['actor_email'] ?? ''),
+                    'actor_profile_image_url' => $row['actor_profile_image_url'] ?? null,
                     'action' => (string) ($row['action'] ?? ''),
                     'action_label' => $this->formatAuditAction((string) ($row['action'] ?? '')),
                     'entity' => (string) ($row['entity'] ?? ''),
@@ -1024,7 +1079,7 @@ class AdminController extends Controller
             ->getRowArray();
 
         $topDebts = $db->table('balances b')
-            ->select('u.employee_id, u.name, u.email, b.current_debt, b.credit_limit')
+            ->select('u.id AS user_id, u.employee_id, u.name, u.email, u.profile_image_url, b.current_debt, b.credit_limit')
             ->join('users u', 'u.id = b.user_id', 'inner')
             ->where('u.is_active', true)
             ->where('b.current_debt >', 0)
@@ -1067,13 +1122,230 @@ class AdminController extends Controller
             ],
             'top_debts' => array_map(static function (array $row): array {
                 return [
+                    'user_id' => (int) $row['user_id'],
                     'employee_id' => $row['employee_id'],
                     'name' => $row['name'],
                     'email' => $row['email'],
+                    'profile_image_url' => $row['profile_image_url'] ?? null,
                     'current_debt' => (float) $row['current_debt'],
                     'credit_limit' => (float) $row['credit_limit'],
                 ];
             }, $topDebts),
+        ]);
+    }
+
+    public function accountingDebtUserDetail(int $userId)
+    {
+        if ($userId <= 0) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Invalid user account.',
+            ]);
+        }
+
+        $historyPage = max(1, (int) ($this->request->getGet('page') ?? 1));
+        $historyPageSize = max(5, min(50, (int) ($this->request->getGet('page_size') ?? 10)));
+        $historyStoreId = max(0, (int) ($this->request->getGet('store_id') ?? 0));
+        $historyDateFrom = trim((string) ($this->request->getGet('date_from') ?? ''));
+        $historyDateTo = trim((string) ($this->request->getGet('date_to') ?? ''));
+        $historyDateFrom = preg_match('/^\d{4}-\d{2}-\d{2}$/', $historyDateFrom) ? $historyDateFrom : '';
+        $historyDateTo = preg_match('/^\d{4}-\d{2}-\d{2}$/', $historyDateTo) ? $historyDateTo : '';
+        if ($historyDateFrom !== '' && $historyDateTo !== '' && $historyDateFrom > $historyDateTo) {
+            return $this->response->setStatusCode(422)->setJSON([
+                'status' => 'error',
+                'message' => 'The start date must be on or before the end date.',
+            ]);
+        }
+
+        $db = Database::connect();
+        $optionalUserFields = [];
+        foreach (['profile_image_url', 'base_salary', 'employment_type', 'salary_grade', 'salary_step', 'salary_effective_date'] as $field) {
+            $optionalUserFields[] = $db->fieldExists($field, 'users') ? 'u.' . $field : 'NULL AS ' . $field;
+        }
+        $creditRateSelect = $db->fieldExists('credit_rate', 'balances')
+            ? 'b.credit_rate'
+            : (string) SalaryCreditPolicy::DEFAULT_CREDIT_RATE . ' AS credit_rate';
+
+        $user = $db->table('users u')
+            ->select('u.id, u.employee_id, u.name, u.email, u.user_type, u.is_active, ' . implode(', ', $optionalUserFields) . ', b.credit_limit, b.current_debt, b.updated_at AS balance_updated_at, ' . $creditRateSelect, false)
+            ->join('balances b', 'b.user_id = u.id', 'left')
+            ->where('u.id', $userId)
+            ->get()
+            ->getRowArray();
+
+        if (!$user) {
+            return $this->response->setStatusCode(404)->setJSON([
+                'status' => 'error',
+                'message' => 'User account not found.',
+            ]);
+        }
+
+        $creditLimit = (float) ($user['credit_limit'] ?? 0);
+        $currentDebt = (float) ($user['current_debt'] ?? 0);
+        $creditPercentage = SalaryCreditPolicy::percentageFromRate((float) ($user['credit_rate'] ?? SalaryCreditPolicy::DEFAULT_CREDIT_RATE));
+
+        $debtHistory = [];
+        $debtActivityTotals = ['total_added' => 0.0, 'total_reduced' => 0.0, 'activity_count' => 0];
+        $historyTotal = 0;
+        if ($db->tableExists('debt_cashbook_entries')) {
+            $totalsRow = $db->table('debt_cashbook_entries')
+                ->select("COUNT(*) AS activity_count, COALESCE(SUM(CASE WHEN direction = 'debit' THEN amount ELSE 0 END), 0) AS total_added, COALESCE(SUM(CASE WHEN direction = 'credit' THEN amount ELSE 0 END), 0) AS total_reduced", false)
+                ->where('user_id', $userId)
+                ->get()
+                ->getRowArray() ?? [];
+            $debtActivityTotals = [
+                'total_added' => (float) ($totalsRow['total_added'] ?? 0),
+                'total_reduced' => (float) ($totalsRow['total_reduced'] ?? 0),
+                'activity_count' => (int) ($totalsRow['activity_count'] ?? 0),
+            ];
+
+            $historyQuery = $db->table('debt_cashbook_entries dce')
+                ->join('users actor', 'actor.id = dce.actor_id', 'left')
+                ->join('transactions history_txn', "dce.reference_type = 'transaction' AND history_txn.id = dce.reference_id", 'left', false);
+            if ($db->tableExists('store_cash_movements')) {
+                $historyQuery->join('store_cash_movements history_movement', "dce.reference_type = 'store_cash_movement' AND history_movement.id = dce.reference_id", 'left', false);
+                $historyStoreExpression = 'COALESCE(history_txn.store_id, history_movement.store_id)';
+            } else {
+                $historyStoreExpression = 'history_txn.store_id';
+            }
+            $historyQuery->join('stores history_store', 'history_store.id = ' . $historyStoreExpression, 'left', false)
+                ->where('dce.user_id', $userId);
+            if ($historyStoreId > 0) {
+                $historyQuery->where($historyStoreExpression, $historyStoreId, false);
+            }
+            if ($historyDateFrom !== '') {
+                $historyQuery->where('dce.created_at >=', $historyDateFrom . ' 00:00:00');
+            }
+            if ($historyDateTo !== '') {
+                $historyQuery->where('dce.created_at <=', $historyDateTo . ' 23:59:59');
+            }
+
+            $historyTotal = (clone $historyQuery)->countAllResults();
+            $historyTotalPages = max(1, (int) ceil($historyTotal / $historyPageSize));
+            $historyPage = min($historyPage, $historyTotalPages);
+            $debtHistory = $historyQuery
+                ->select('dce.id, dce.entry_type, dce.direction, dce.amount, dce.debt_before, dce.debt_after, dce.reference_type, dce.reference_id, dce.remarks, dce.created_at, actor.name AS actor_name, history_store.id AS store_id, history_store.store_name')
+                ->orderBy('dce.id', 'DESC')
+                ->limit($historyPageSize, ($historyPage - 1) * $historyPageSize)
+                ->get()
+                ->getResultArray();
+        }
+
+        $storesById = [];
+        if ($db->tableExists('debt_cashbook_entries') && $db->tableExists('transactions') && $db->tableExists('stores')) {
+            $debtByStore = $db->table('debt_cashbook_entries dce')
+                ->select('s.id AS store_id, s.store_name, COUNT(dce.id) AS debt_transaction_count, COALESCE(SUM(dce.amount), 0) AS debt_added, MAX(dce.created_at) AS last_activity_at')
+                ->join('transactions t', "dce.reference_type = 'transaction' AND t.id = dce.reference_id", 'inner', false)
+                ->join('stores s', 's.id = t.store_id', 'inner')
+                ->where('dce.user_id', $userId)
+                ->where('dce.direction', 'debit')
+                ->groupBy('s.id, s.store_name')
+                ->get()
+                ->getResultArray();
+            foreach ($debtByStore as $row) {
+                $storeId = (int) ($row['store_id'] ?? 0);
+                $storesById[$storeId] = [
+                    'store_id' => $storeId,
+                    'store_name' => $row['store_name'] ?: 'Unknown store',
+                    'debt_transaction_count' => (int) ($row['debt_transaction_count'] ?? 0),
+                    'debt_added' => (float) ($row['debt_added'] ?? 0),
+                    'store_repayments' => 0.0,
+                    'last_activity_at' => $row['last_activity_at'] ?? null,
+                ];
+            }
+
+            if ($db->tableExists('store_cash_movements')) {
+                $repaymentsByStore = $db->table('debt_cashbook_entries dce')
+                    ->select('s.id AS store_id, s.store_name, COALESCE(SUM(dce.amount), 0) AS store_repayments, MAX(dce.created_at) AS last_activity_at')
+                    ->join('store_cash_movements scm', "dce.reference_type = 'store_cash_movement' AND scm.id = dce.reference_id", 'inner', false)
+                    ->join('stores s', 's.id = scm.store_id', 'inner')
+                    ->where('dce.user_id', $userId)
+                    ->where('dce.direction', 'credit')
+                    ->groupBy('s.id, s.store_name')
+                    ->get()
+                    ->getResultArray();
+                foreach ($repaymentsByStore as $row) {
+                    $storeId = (int) ($row['store_id'] ?? 0);
+                    $storesById[$storeId] ??= [
+                        'store_id' => $storeId,
+                        'store_name' => $row['store_name'] ?: 'Unknown store',
+                        'debt_transaction_count' => 0,
+                        'debt_added' => 0.0,
+                        'store_repayments' => 0.0,
+                        'last_activity_at' => null,
+                    ];
+                    $storesById[$storeId]['store_repayments'] = (float) ($row['store_repayments'] ?? 0);
+                    if ((string) ($row['last_activity_at'] ?? '') > (string) ($storesById[$storeId]['last_activity_at'] ?? '')) {
+                        $storesById[$storeId]['last_activity_at'] = $row['last_activity_at'];
+                    }
+                }
+            }
+        }
+        $stores = array_values($storesById);
+        usort($stores, static fn(array $left, array $right): int => strcmp((string) ($right['last_activity_at'] ?? ''), (string) ($left['last_activity_at'] ?? '')));
+
+        return $this->response->setJSON([
+            'status' => 'success',
+            'data' => [
+                'general' => [
+                    'user_id' => (int) $user['id'],
+                    'employee_id' => $user['employee_id'],
+                    'name' => $user['name'],
+                    'email' => $user['email'],
+                    'profile_image_url' => $user['profile_image_url'] ?? null,
+                    'user_type' => $user['user_type'],
+                    'is_active' => ibems_bool($user['is_active'] ?? false),
+                    'base_salary' => (float) ($user['base_salary'] ?? 0),
+                    'employment_type' => $user['employment_type'] ?? null,
+                    'salary_grade' => $user['salary_grade'] ?? null,
+                    'salary_step' => $user['salary_step'] ?? null,
+                    'salary_effective_date' => $user['salary_effective_date'] ?? null,
+                ],
+                'debt' => [
+                    'current_debt' => $currentDebt,
+                    'credit_limit' => $creditLimit,
+                    'available_credit' => max(0, $creditLimit - $currentDebt),
+                    'credit_percentage' => $creditPercentage,
+                    'usage_percentage' => $creditLimit > 0 ? min(100, ($currentDebt / $creditLimit) * 100) : 0,
+                    'total_added' => $debtActivityTotals['total_added'],
+                    'total_reduced' => $debtActivityTotals['total_reduced'],
+                    'activity_count' => $debtActivityTotals['activity_count'],
+                    'updated_at' => $user['balance_updated_at'] ?? null,
+                    'history' => array_map(static fn(array $row): array => [
+                        'id' => (int) $row['id'],
+                        'entry_type' => $row['entry_type'],
+                        'direction' => $row['direction'],
+                        'amount' => (float) $row['amount'],
+                        'debt_before' => (float) $row['debt_before'],
+                        'debt_after' => (float) $row['debt_after'],
+                        'reference_type' => $row['reference_type'],
+                        'reference_id' => isset($row['reference_id']) ? (int) $row['reference_id'] : null,
+                        'remarks' => $row['remarks'],
+                        'actor_name' => $row['actor_name'] ?: 'System',
+                        'store_id' => isset($row['store_id']) ? (int) $row['store_id'] : null,
+                        'store_name' => $row['store_name'] ?? null,
+                        'created_at' => $row['created_at'],
+                    ], $debtHistory),
+                    'pagination' => [
+                        'page' => $historyPage,
+                        'page_size' => $historyPageSize,
+                        'total' => $historyTotal,
+                        'total_pages' => max(1, (int) ceil($historyTotal / $historyPageSize)),
+                        'store_id' => $historyStoreId > 0 ? $historyStoreId : null,
+                        'date_from' => $historyDateFrom !== '' ? $historyDateFrom : null,
+                        'date_to' => $historyDateTo !== '' ? $historyDateTo : null,
+                    ],
+                ],
+                'stores' => array_map(static fn(array $row): array => [
+                    'store_id' => (int) ($row['store_id'] ?? 0),
+                    'store_name' => $row['store_name'] ?: 'Unknown store',
+                    'debt_transaction_count' => (int) ($row['debt_transaction_count'] ?? 0),
+                    'debt_added' => (float) ($row['debt_added'] ?? 0),
+                    'store_repayments' => (float) ($row['store_repayments'] ?? 0),
+                    'net_store_activity' => max(0, (float) ($row['debt_added'] ?? 0) - (float) ($row['store_repayments'] ?? 0)),
+                    'last_activity_at' => $row['last_activity_at'] ?? null,
+                ], $stores),
+            ],
         ]);
     }
 
@@ -1087,7 +1359,7 @@ class AdminController extends Controller
         }
         $creditRateSelect = $db->fieldExists('credit_rate', 'balances') ? 'b.credit_rate' : (string) SalaryCreditPolicy::DEFAULT_CREDIT_RATE . ' AS credit_rate';
         $query = $db->table('users u')
-            ->select('u.id, u.employee_id, u.name, u.email, u.role, u.user_type, u.is_active, ' . implode(', ', $salaryProfileSelect) . ', b.user_id AS balance_user_id, b.current_debt, b.credit_limit, ' . $creditRateSelect, false)
+            ->select('u.id, u.employee_id, u.name, u.email, u.profile_image_url, u.role, u.user_type, u.is_active, ' . implode(', ', $salaryProfileSelect) . ', b.user_id AS balance_user_id, b.current_debt, b.credit_limit, ' . $creditRateSelect, false)
             ->join('balances b', 'b.user_id = u.id', 'left');
 
         if ($q !== '') {
@@ -1109,6 +1381,7 @@ class AdminController extends Controller
                     'employee_id' => $row['employee_id'],
                     'name' => $row['name'],
                     'email' => $row['email'],
+                    'profile_image_url' => $row['profile_image_url'] ?? null,
                     'role' => $row['role'],
                     'roles' => $rolesMap[$userId] ?? [strtoupper((string) ($row['role'] ?? 'USER'))],
                     'user_type' => $row['user_type'],
@@ -1143,7 +1416,7 @@ class AdminController extends Controller
         }
         $creditRateSelect = $db->fieldExists('credit_rate', 'balances') ? 'b.credit_rate' : (string) SalaryCreditPolicy::DEFAULT_CREDIT_RATE . ' AS credit_rate';
         $row = $db->table('users u')
-            ->select('u.id, u.employee_id, u.name, u.email, u.role, u.user_type, u.base_salary, ' . implode(', ', $salaryProfileSelect) . ', u.is_active, u.created_at, b.user_id AS balance_user_id, b.current_debt, b.credit_limit, ' . $creditRateSelect, false)
+            ->select('u.id, u.employee_id, u.name, u.email, u.profile_image_url, u.role, u.user_type, u.base_salary, ' . implode(', ', $salaryProfileSelect) . ', u.is_active, u.created_at, b.user_id AS balance_user_id, b.current_debt, b.credit_limit, ' . $creditRateSelect, false)
             ->join('balances b', 'b.user_id = u.id', 'left')
             ->where('u.id', $userId)
             ->get()
@@ -1163,6 +1436,7 @@ class AdminController extends Controller
                 'employee_id' => $row['employee_id'],
                 'name' => $row['name'],
                 'email' => $row['email'],
+                'profile_image_url' => $row['profile_image_url'] ?? null,
                 'role' => $row['role'],
                 'roles' => $this->resolveUserRoles((int) $row['id'], (string) ($row['role'] ?? 'USER')),
                 'user_type' => $row['user_type'],
@@ -1265,6 +1539,12 @@ class AdminController extends Controller
         $passwordHash = $password !== '' ? password_hash($password, PASSWORD_BCRYPT) : password_hash('123456', PASSWORD_BCRYPT);
         $initialCreditLimit = (float) ($financialProfile['credit_limit'] ?? 0);
 
+        try {
+            $profileImageUrl = $this->storeUserProfileImage();
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => $exception->getMessage()]);
+        }
+
         $db->transStart();
 
         $userPayload = [
@@ -1272,6 +1552,7 @@ class AdminController extends Controller
             'name' => $name,
             'email' => $email,
             'password_hash' => $passwordHash,
+            'profile_image_url' => $profileImageUrl,
             'role' => $primaryRole,
             'user_type' => $userType,
             'qr_token' => bin2hex(random_bytes(16)),
@@ -1426,6 +1707,11 @@ class AdminController extends Controller
         }
 
         $primaryRole = $this->pickPrimaryRole($roles);
+        try {
+            $profileImageUrl = $this->storeUserProfileImage((string) ($user['profile_image_url'] ?? ''));
+        } catch (\Throwable $exception) {
+            return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => $exception->getMessage()]);
+        }
         $db->transStart();
 
         $userPayload = [
@@ -1436,6 +1722,9 @@ class AdminController extends Controller
             'user_type' => $userType,
             'is_active' => $isActive,
         ];
+        if ($profileImageUrl !== null) {
+            $userPayload['profile_image_url'] = $profileImageUrl;
+        }
         if ($financialProfile !== null) {
             $userPayload += [
                 'base_salary' => $financialProfile['monthly_salary'],
@@ -1492,6 +1781,14 @@ class AdminController extends Controller
             return $this->response->setStatusCode(500)->setJSON([
                 'status' => 'error',
                 'message' => 'Failed to update user.',
+            ]);
+        }
+
+        if ($userId === (int) session()->get('user_id')) {
+            session()->set([
+                'name' => $name,
+                'email' => $email,
+                'profile_image_url' => $profileImageUrl ?? ($user['profile_image_url'] ?? null),
             ]);
         }
 
@@ -1800,7 +2097,7 @@ class AdminController extends Controller
         $q = trim((string) $this->request->getGet('q'));
         $db = Database::connect();
         $query = $db->table('users u')
-            ->select('u.id, u.employee_id, u.name, u.email, u.role, u.user_type, s.id AS assigned_store_id, s.store_name AS assigned_store_name')
+            ->select('u.id, u.employee_id, u.name, u.email, u.profile_image_url, u.role, u.user_type, s.id AS assigned_store_id, s.store_name AS assigned_store_name')
             ->join('stores s', 's.officer_id = u.id', 'left')
             ->where('u.is_active', true)
             ->whereIn('u.user_type', ['faculty', 'staff']);
@@ -1823,6 +2120,7 @@ class AdminController extends Controller
                     'employee_id' => $row['employee_id'],
                     'name' => $row['name'],
                     'email' => $row['email'],
+                    'profile_image_url' => $row['profile_image_url'] ?? null,
                     'role' => $row['role'],
                     'user_type' => $row['user_type'],
                     'assigned_store_id' => isset($row['assigned_store_id']) ? (int) $row['assigned_store_id'] : null,
@@ -2135,6 +2433,16 @@ class AdminController extends Controller
         }
 
         return $currentUrl;
+    }
+
+    private function storeUserProfileImage(?string $currentUrl = null): ?string
+    {
+        $file = $this->request->getFile('profile_image');
+        if (!$file || $file->getError() === UPLOAD_ERR_NO_FILE) {
+            return null;
+        }
+
+        return (new AssetStorageService())->storeImage($file, 'profile-images', $currentUrl);
     }
 
     public function toggleStoreStatus()

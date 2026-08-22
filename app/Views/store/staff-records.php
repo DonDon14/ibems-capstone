@@ -22,7 +22,7 @@
             </div>
             <span id="staff-count-badge" class="staff-count-badge">0 employees</span>
         </div>
-        <div class="staff-filters staff-filter-panel">
+        <div class="staff-filters staff-filter-panel" data-compact-filters>
             <div class="staff-filter-main">
                 <div class="staff-search-field">
                     <label for="debt-search">Search employees</label>
@@ -179,5 +179,5 @@
 <?= $this->section('scripts') ?>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260821a"></script>
-<script src="<?= base_url('assets/js/store-staff-records.js') ?>?v=20260821c"></script>
+<script src="<?= base_url('assets/js/store-staff-records.js') ?>?v=20260822b"></script>
 <?= $this->endSection() ?>

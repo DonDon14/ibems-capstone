@@ -19,7 +19,7 @@
         <?= view('components/stat_card', ['title' => 'Total Sales', 'value' => 'PHP 0.00', 'valueId' => 'history-summary-total', 'icon' => 'bi bi-graph-up-arrow', 'tone' => 'sales', 'class' => 'history-summary-card']) ?>
     </div>
 
-    <div class="history-filters" aria-label="Transaction filters">
+    <div class="history-filters" aria-label="Transaction filters" data-compact-filters>
         <div class="history-filter-field">
             <label for="history-date-from">From</label>
             <input id="history-date-from" type="date">
@@ -112,6 +112,6 @@
 
 <?= $this->section('scripts') ?>
 <script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260821a"></script>
-<script src="<?= base_url('assets/js/store-history.js') ?>?v=20260821b"></script>
+<script src="<?= base_url('assets/js/store-history.js') ?>?v=20260822a"></script>
 <?= $this->endSection() ?>
 

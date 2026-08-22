@@ -262,15 +262,20 @@
     box-shadow: 0 7px 16px rgba(15, 23, 42, 0.06);
 }
 
+/* The modern table reset removes wrapper padding; record cards still need an inset. */
+.ibems-modern .acct-table-wrap {
+    padding: 14px;
+}
+
 .acct-count-text {
-    margin: 0 0 10px;
+    margin: 0 2px 12px;
     color: #64748b;
     font-size: 0.88rem;
 }
 
 .acct-record-list {
     display: grid;
-    gap: 8px;
+    gap: 10px;
 }
 
 .acct-tabs {
@@ -704,6 +709,253 @@
     color: #64748b;
 }
 
+.employee-profile-loading {
+    min-height: 150px;
+}
+
+.employee-profile-overview,
+.employee-financial-section,
+.employee-history-section {
+    border: 1px solid #dbe3ea;
+    border-radius: 16px;
+    background: #fff;
+}
+
+.employee-profile-overview {
+    overflow: hidden;
+}
+
+.employee-identity {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 18px;
+    border-bottom: 1px solid #e2e8f0;
+    background: linear-gradient(135deg, #f8fbff 0%, #eef5ff 100%);
+}
+
+.employee-identity-avatar {
+    display: grid;
+    flex: 0 0 52px;
+    width: 52px;
+    height: 52px;
+    place-items: center;
+    border: 1px solid #bfdbfe;
+    border-radius: 14px;
+    background: #dbeafe;
+    color: #1d4ed8;
+    font-size: 1rem;
+    font-weight: 800;
+    letter-spacing: .04em;
+}
+
+.employee-identity-copy {
+    min-width: 0;
+    flex: 1;
+}
+
+.employee-profile-kicker {
+    display: block;
+    margin-bottom: 3px;
+    color: #64748b;
+    font-size: .68rem;
+    font-weight: 700;
+    letter-spacing: .1em;
+    text-transform: uppercase;
+}
+
+.employee-identity-copy h5 {
+    margin: 0;
+    color: #0f172a;
+    font-size: 1.15rem;
+    font-weight: 800;
+}
+
+.employee-identity-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px 12px;
+    margin-top: 6px;
+    color: #52657a;
+    font-size: .8rem;
+}
+
+.employee-identity-meta span {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-width: 0;
+}
+
+.employee-identity-meta i {
+    color: #7890aa;
+}
+
+.employee-identity-status {
+    flex: 0 0 auto;
+    align-self: flex-start;
+}
+
+.employee-finance-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    padding: 14px 18px;
+}
+
+.employee-finance-metric {
+    min-width: 0;
+    padding: 12px;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+    background: #f8fafc;
+}
+
+.employee-finance-metric span {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    color: #64748b;
+    font-size: .72rem;
+    font-weight: 650;
+}
+
+.employee-finance-metric strong {
+    display: block;
+    margin-top: 6px;
+    color: #0f172a;
+    font-size: 1rem;
+    font-weight: 800;
+}
+
+.employee-finance-metric.is-debt {
+    border-color: #fecdd3;
+    background: #fff1f2;
+}
+
+.employee-finance-metric.is-debt strong,
+.employee-finance-metric.is-debt span {
+    color: #be123c;
+}
+
+.employee-finance-metric.is-clear,
+.employee-finance-metric.is-available {
+    border-color: #bbf7d0;
+    background: #f0fdf4;
+}
+
+.employee-finance-metric.is-clear strong,
+.employee-finance-metric.is-available strong {
+    color: #047857;
+}
+
+.employee-finance-metric.is-muted strong {
+    color: #64748b;
+}
+
+.employee-profile-updated {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 18px 14px;
+    color: #7890aa;
+    font-size: .75rem;
+}
+
+.employee-financial-section,
+.employee-history-section {
+    margin-top: 14px;
+    padding: 15px 16px;
+}
+
+.employee-section-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+}
+
+.employee-section-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+}
+
+.employee-section-icon {
+    display: grid;
+    flex: 0 0 38px;
+    width: 38px;
+    height: 38px;
+    place-items: center;
+    border: 1px solid #bfdbfe;
+    border-radius: 11px;
+    background: #eff6ff;
+    color: #2563eb;
+}
+
+.employee-section-icon.is-neutral {
+    border-color: #e2e8f0;
+    background: #f8fafc;
+    color: #64748b;
+}
+
+.employee-section-title h5 {
+    margin: 0;
+    color: #0f172a;
+    font-size: .9rem;
+    font-weight: 750;
+    text-transform: none;
+}
+
+.employee-section-title p {
+    margin: 3px 0 0;
+    color: #64748b;
+    font-size: .78rem;
+}
+
+.employee-history-list {
+    margin-top: 12px;
+}
+
+.employee-history-list > .data-state {
+    min-height: 108px;
+    border: 1px dashed #cbd5e1;
+    border-radius: 12px;
+    background: #f8fafc;
+}
+
+@media (max-width: 800px) {
+    .employee-finance-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .employee-identity {
+        align-items: flex-start;
+        flex-wrap: wrap;
+    }
+
+    .employee-identity-status {
+        width: 100%;
+        padding-left: 66px;
+    }
+
+    .employee-section-head {
+        align-items: flex-start;
+        flex-direction: column;
+    }
+}
+
+@media (max-width: 520px) {
+    .employee-finance-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+
+    .employee-identity-status {
+        padding-left: 0;
+    }
+}
+
 .mode-profile-card h5,
 .mode-actions h5,
 .mode-history h5 {
@@ -969,19 +1221,4 @@
     .mode-layout {
         grid-template-columns: 1fr;
     }
-}
-.acct-pager {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    min-height: 46px;
-    color: #475569;
-    font-size: 0.86rem;
-    font-weight: 700;
-}
-
-.acct-pager button:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
 }

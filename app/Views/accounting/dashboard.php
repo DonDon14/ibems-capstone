@@ -2,10 +2,12 @@
 
 <?= $this->section('content') ?>
 <section class="dashboard-shell">
-    <div class="dashboard-title">
-        <h3>Accounting Dashboard</h3>
-        <p>Employee debt, governed payroll deductions, and correction monitoring.</p>
-    </div>
+    <?= view('components/page_header', [
+        'eyebrow' => 'Financial oversight',
+        'title' => 'Accounting dashboard',
+        'description' => 'Employee debt, governed payroll deductions, and correction monitoring.',
+        'icon' => 'bi bi-calculator',
+    ]) ?>
 
     <div class="dashboard-grid">
         <?= view('components/stat_card', ['title' => 'Total Accounts', 'value' => '-', 'valueId' => 'acd-total-accounts', 'icon' => 'bi bi-people', 'tone' => 'users']) ?>
@@ -58,7 +60,9 @@
     <div class="dash-panels">
         <article class="dash-panel">
             <h4><i class="bi bi-clock-history"></i> Recent Accounting Activity</h4>
-            <div id="acd-activity" class="stack-list"></div>
+            <div id="acd-activity" class="stack-list">
+                <?= view('components/data_state', ['type' => 'loading', 'message' => 'Loading accounting activity...']) ?>
+            </div>
         </article>
         <article class="dash-panel">
             <h4><i class="bi bi-exclamation-circle"></i> Top Debt Accounts</h4>
@@ -73,7 +77,7 @@
                         </tr>
                     </thead>
                     <tbody id="acd-top-debt-body">
-                        <tr><td colspan="4">Loading...</td></tr>
+                        <?= view('components/data_state', ['tag' => 'tr', 'colspan' => 4, 'type' => 'loading', 'message' => 'Loading debt accounts...']) ?>
                     </tbody>
                 </table>
             </div>
@@ -83,7 +87,9 @@
     <div class="dash-panels">
         <article class="dash-panel">
             <h4><i class="bi bi-exclamation-triangle"></i> Accounting Alerts</h4>
-            <div id="acd-alerts" class="stack-list"></div>
+            <div id="acd-alerts" class="stack-list">
+                <?= view('components/data_state', ['type' => 'loading', 'message' => 'Loading accounting alerts...']) ?>
+            </div>
         </article>
     </div>
 </section>
@@ -91,5 +97,5 @@
 
 <?= $this->section('scripts') ?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="<?= base_url('assets/js/accounting-dashboard.js') ?>"></script>
+<script src="<?= base_url('assets/js/accounting-dashboard.js') ?>?v=20260822d"></script>
 <?= $this->endSection() ?>

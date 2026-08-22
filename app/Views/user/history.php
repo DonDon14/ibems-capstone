@@ -29,7 +29,7 @@
         </div>
     </article>
 
-    <div class="user-filters">
+    <div class="user-filters" data-compact-filters>
         <div class="field">
             <label for="uh-store">Store</label>
             <select id="uh-store">

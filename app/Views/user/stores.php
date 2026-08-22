@@ -19,7 +19,7 @@
         <?= view('components/stat_card', ['title' => 'Available on This Page', 'value' => '0', 'valueId' => 'us-available-count', 'icon' => 'bi bi-check-circle', 'tone' => 'users']) ?>
     </div>
 
-    <div class="user-filters user-product-filters">
+    <div class="user-filters user-product-filters" data-compact-filters>
         <div class="field user-search-field">
             <label for="us-search">Search</label>
             <input id="us-search" type="search" placeholder="Product, category, SKU, or store">

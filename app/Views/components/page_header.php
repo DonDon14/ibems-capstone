@@ -3,6 +3,9 @@ $title = trim((string) ($title ?? ''));
 $description = trim((string) ($description ?? ''));
 $eyebrow = trim((string) ($eyebrow ?? ''));
 $icon = trim((string) ($icon ?? ''));
+$imageUrl = trim((string) ($imageUrl ?? ''));
+$imageAlt = trim((string) ($imageAlt ?? ''));
+$imageSize = trim((string) ($imageSize ?? ''));
 $titleId = trim((string) ($titleId ?? ''));
 $descriptionId = trim((string) ($descriptionId ?? ''));
 $actions = $actions ?? null;
@@ -13,7 +16,11 @@ $actions = $actions ?? null;
             <span class="page-header-eyebrow"><?= esc($eyebrow) ?></span>
         <?php endif; ?>
         <div class="page-header-title-row">
-            <?php if ($icon !== ''): ?>
+            <?php if ($imageUrl !== ''): ?>
+                <span class="page-header-icon page-header-icon--avatar<?= $imageSize === 'large' ? ' page-header-icon--avatar-large' : '' ?>">
+                    <img src="<?= esc($imageUrl) ?>" alt="<?= esc($imageAlt) ?>" data-profile-avatar data-current-user-avatar>
+                </span>
+            <?php elseif ($icon !== ''): ?>
                 <span class="page-header-icon" aria-hidden="true"><i class="<?= esc($icon) ?>"></i></span>
             <?php endif; ?>
             <div>

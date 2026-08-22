@@ -55,5 +55,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/store-admin-dashboard.js') ?>"></script>
+<script src="<?= base_url('assets/js/store-admin-dashboard.js') ?>?v=20260822b"></script>
 <?= $this->endSection() ?>

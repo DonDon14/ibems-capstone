@@ -1,5 +1,7 @@
 let adSalesTrendChart = null;
 let adTopItemsChart = null;
+let adAlertPage = 1;
+let adAlertsLoading = false;
 
 function adMoney(value) {
     return window.IbemsFormat?.money(value) || `PHP ${Number(value || 0).toFixed(2)}`;
@@ -182,17 +184,49 @@ function adRenderAlerts(rows) {
         const href = String(row.href || "").trim();
         const tag = href ? "a" : "div";
         const hrefAttr = href ? ` href="${adEscape(href)}"` : "";
+        const detailItems = Array.isArray(row.detail_items) ? row.detail_items : [];
+        const detail = detailItems.length > 0
+            ? `<span class="dashboard-meta-line">${detailItems.map((item) => `
+                <span class="dashboard-meta-item">
+                    <i class="bi ${adEscape(item.icon || "bi-dot")}" aria-hidden="true"></i>
+                    <span>${adEscape(item.text || "-")}</span>
+                </span>
+            `).join("")}</span>`
+            : adEscape(row.detail || "");
         return `
             <${tag}${hrefAttr} class="admin-alert-item is-${adEscape(row.tone || "warning")}">
                 <span class="admin-alert-label">${adEscape(row.label || "Alert")}</span>
                 <span class="admin-alert-copy">
                     <strong>${adEscape(row.title || "Attention needed")}</strong>
-                    <small>${adEscape(row.detail || "")}</small>
+                    <small>${detail}</small>
                 </span>
                 ${href ? '<i class="bi bi-arrow-right"></i>' : ""}
             </${tag}>
         `;
     }).join("");
+}
+
+function adRenderAlertPagination(pagination = {}) {
+    const pager = document.getElementById("ad-alerts-pager");
+    const summary = document.getElementById("ad-alerts-summary");
+    if (!pager || !summary) return;
+
+    const page = Math.max(1, Number(pagination.page || 1));
+    const totalPages = Math.max(1, Number(pagination.total_pages || 1));
+    const total = Math.max(0, Number(pagination.total || 0));
+    adAlertPage = page;
+    summary.textContent = total === 1 ? "1 alert" : `${total} alerts`;
+
+    if (total === 0 || totalPages <= 1) {
+        pager.innerHTML = "";
+        return;
+    }
+
+    pager.innerHTML = `
+        <button class="secondary-btn btn-sm" type="button" data-alert-page="${page - 1}" aria-label="Previous alert page" ${pagination.has_previous ? "" : "disabled"}><i class="bi bi-chevron-left" aria-hidden="true"></i> Previous</button>
+        <span>Page ${page} of ${totalPages}</span>
+        <button class="secondary-btn btn-sm" type="button" data-alert-page="${page + 1}" aria-label="Next alert page" ${pagination.has_next ? "" : "disabled"}>Next <i class="bi bi-chevron-right" aria-hidden="true"></i></button>
+    `;
 }
 
 function adRenderPaymentBreakdown(rows) {
@@ -226,6 +260,36 @@ function adRenderPaymentBreakdown(rows) {
     }).join("");
 }
 
+async function adFetchDashboard(alertsPage = 1) {
+    const query = new URLSearchParams({ alerts_page: String(Math.max(1, Number(alertsPage || 1))) });
+    const response = await fetch(`/admin/dashboard/data?${query.toString()}`);
+    const data = await response.json();
+    if (!response.ok || !data || data.status !== "success") {
+        throw new Error(data?.message || "Failed to load dashboard summary.");
+    }
+    return data;
+}
+
+async function adLoadAlertPage(page) {
+    if (adAlertsLoading || page < 1 || page === adAlertPage) return;
+    const container = document.getElementById("ad-alerts-list");
+    const pager = document.getElementById("ad-alerts-pager");
+    adAlertsLoading = true;
+    pager?.querySelectorAll("button").forEach((button) => { button.disabled = true; });
+    container?.setAttribute("aria-busy", "true");
+
+    try {
+        const data = await adFetchDashboard(page);
+        adRenderAlerts(data.alerts || []);
+        adRenderAlertPagination(data.alerts_pagination || {});
+    } catch (error) {
+        if (container) container.innerHTML = adDataState("error", "Unable to load this alert page.");
+    } finally {
+        adAlertsLoading = false;
+        container?.removeAttribute("aria-busy");
+    }
+}
+
 async function adLoadDashboard() {
     const totalStoresEl = document.getElementById("ad-total-stores");
     const activeOfficersEl = document.getElementById("ad-active-store-officers");
@@ -235,11 +299,7 @@ async function adLoadDashboard() {
     const healthBreakdownEl = document.getElementById("ad-health-breakdown");
 
     try {
-        const response = await fetch("/admin/dashboard/data");
-        const data = await response.json();
-        if (!response.ok || !data || data.status !== "success") {
-            throw new Error(data?.message || "Failed to load dashboard summary.");
-        }
+        const data = await adFetchDashboard(1);
 
         const summary = data.summary || {};
         totalStoresEl.textContent = String(Number(summary.total_stores || 0));
@@ -247,14 +307,31 @@ async function adLoadDashboard() {
         debtAccountsEl.textContent = String(Number(summary.debt_accounts || 0));
         openAlertsEl.textContent = String(Number(summary.open_alerts || 0));
 
-        healthMessageEl.textContent = (data.health && data.health.message) ? data.health.message : "No health data available.";
-        healthBreakdownEl.textContent = [
-            `Today Transactions: ${Number(summary.today_transactions || 0)}`,
-            `Today Sales: ${adMoney(summary.today_sales || 0)}`,
-            `Total Debt: ${adMoney(summary.total_debt || 0)}`,
-        ].join(" | ");
+        const health = data.health || {};
+        const healthItems = Array.isArray(health.items) ? health.items : [];
+        healthMessageEl.innerHTML = healthItems.length > 0
+            ? `
+                <span class="dashboard-health-message-lead"><i class="bi bi-exclamation-circle" aria-hidden="true"></i> Attention needed</span>
+                <span class="dashboard-meta-line">
+                    ${healthItems.map((item) => `
+                        <span class="dashboard-meta-item">
+                            <i class="bi ${adEscape(item.icon || "bi-dot")}" aria-hidden="true"></i>
+                            <span>${adEscape(item.text || "-")}</span>
+                        </span>
+                    `).join("")}
+                </span>
+            `
+            : adEscape(health.message || "No health data available.");
+        healthBreakdownEl.innerHTML = `
+            <span class="dashboard-meta-line">
+                <span class="dashboard-meta-item"><i class="bi bi-receipt" aria-hidden="true"></i><span>Today Transactions: ${Number(summary.today_transactions || 0)}</span></span>
+                <span class="dashboard-meta-item"><i class="bi bi-cash-coin" aria-hidden="true"></i><span>Today Sales: ${adEscape(adMoney(summary.today_sales || 0))}</span></span>
+                <span class="dashboard-meta-item"><i class="bi bi-wallet2" aria-hidden="true"></i><span>Total Debt: ${adEscape(adMoney(summary.total_debt || 0))}</span></span>
+            </span>
+        `;
         adRenderStoreDayStatus(summary);
         adRenderAlerts(data.alerts || []);
+        adRenderAlertPagination(data.alerts_pagination || {});
 
         const analytics = data.analytics || {};
         adDestroyCharts();
@@ -271,10 +348,18 @@ async function adLoadDashboard() {
         healthBreakdownEl.textContent = "";
         adRenderStoreDayStatus({});
         document.getElementById("ad-alerts-list").innerHTML = adDataState("error", "Unable to load operational alerts.");
+        document.getElementById("ad-alerts-summary").textContent = "Unavailable";
+        document.getElementById("ad-alerts-pager").innerHTML = "";
         document.getElementById("ad-payment-breakdown").innerHTML = adDataState("error", "Unable to load payment breakdown.");
         adDestroyCharts();
         document.getElementById("ad-top-stores-body").innerHTML = adDataState("error", "Unable to load top stores.", 3);
     }
 }
+
+document.getElementById("ad-alerts-pager")?.addEventListener("click", (event) => {
+    const button = event.target.closest("button[data-alert-page]");
+    if (!button || button.disabled) return;
+    adLoadAlertPage(Number(button.dataset.alertPage || 1));
+});
 
 adLoadDashboard();

@@ -52,29 +52,8 @@ from schedule cross join rates
 on conflict (schedule_id, salary_grade, salary_step) do update
 set monthly_salary = excluded.monthly_salary;
 
-with assigned as (
-    update public.users
-    set base_salary = 31705.00,
-        employment_type = 'plantilla',
-        salary_grade = 'SG-11',
-        salary_step = 1,
-        salary_effective_date = date '2026-01-01',
-        salary_schedule_id = (select id from public.salary_schedules where code = 'PH-NG-2026-T3')
-    where lower(user_type) in ('faculty', 'staff')
-      and salary_schedule_id is null
-    returning id
-)
-update public.balances b
-set credit_limit = 7926.25,
-    credit_rate = 0.2500,
-    updated_at = current_timestamp
-from assigned
-where assigned.id = b.user_id;
-
-insert into public.balances (user_id, credit_limit, credit_rate, current_debt, updated_at)
-select u.id, round(greatest(coalesce(u.base_salary, 0), 0) * 0.2500, 2), 0.2500, 0, current_timestamp
-from public.users u
-left join public.balances b on b.user_id = u.id
-where lower(u.user_type) in ('faculty', 'staff') and b.user_id is null;
+-- Existing salaries and credit limits predate schedule metadata and may be
+-- approved financial records. Leave them unchanged until an administrator
+-- explicitly configures the employee's schedule, grade, and step.
 
 commit;

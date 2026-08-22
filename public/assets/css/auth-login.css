@@ -147,15 +147,89 @@ button:disabled {
     max-width: 380px;
     min-height: 20px;
     font-size: 0.92rem;
-    text-align: center;
+    text-align: left;
 }
 
+#status:empty {
+    display: none;
+}
+
+#status.ok,
 #status.error {
-    color: var(--auth-danger);
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+    padding: 12px;
+    border: 1px solid;
+    border-radius: 12px;
+    animation: auth-status-in 180ms ease-out;
 }
 
 #status.ok {
-    color: var(--auth-ok);
+    border-color: #a7f3d0;
+    color: #065f46;
+    background: linear-gradient(135deg, #ecfdf5 0%, #f0fdf4 100%);
+}
+
+#status.error {
+    border-color: #fecaca;
+    color: #991b1b;
+    background: #fef2f2;
+}
+
+.auth-status-icon {
+    display: grid;
+    flex: 0 0 32px;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    border-radius: 999px;
+    color: #fff;
+    background: #059669;
+    font-size: 1rem;
+}
+
+#status.error .auth-status-icon {
+    background: #dc2626;
+}
+
+.auth-status-copy {
+    display: grid;
+    min-width: 0;
+    gap: 2px;
+}
+
+.auth-status-copy strong {
+    color: inherit;
+    font-size: .82rem;
+    font-weight: 750;
+}
+
+.auth-status-copy small {
+    color: inherit;
+    font-size: .72rem;
+    line-height: 1.45;
+    opacity: .84;
+}
+
+.auth-button-loading {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.auth-button-loading:not(.is-complete) i {
+    animation: auth-button-spin 800ms linear infinite;
+}
+
+@keyframes auth-status-in {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes auth-button-spin {
+    to { transform: rotate(360deg); }
 }
 
 .demo-creds {
@@ -193,6 +267,15 @@ button:disabled {
     justify-content: space-between;
     gap: 10px;
     text-align: left;
+}
+
+.auth-role-form {
+    width: 100%;
+    margin: 0;
+}
+
+.auth-role-form .auth-role-btn {
+    width: 100%;
 }
 
 .auth-role-btn small {

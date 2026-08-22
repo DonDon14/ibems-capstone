@@ -55,6 +55,22 @@ function groupCatalogProducts(products) {
     return Array.from(groups, ([key, variants]) => ({key, variants}));
 }
 
+function getCatalogImageUrl(variants) {
+    return String((variants || []).find((variant) => String(variant?.image_url || "").trim() !== "")?.image_url || "").trim();
+}
+
+function replaceBrokenCatalogImage(image) {
+    if (!(image instanceof HTMLImageElement) || !image.matches("[data-product-image]")) return;
+
+    const placeholder = document.createElement(image.classList.contains("product-variant-option-image") ? "span" : "div");
+    placeholder.className = `${image.className} placeholder`;
+    placeholder.textContent = String(image.dataset.productInitials || "PR").trim() || "PR";
+    placeholder.setAttribute("aria-hidden", "true");
+    image.replaceWith(placeholder);
+}
+
+document.addEventListener("error", (event) => replaceBrokenCatalogImage(event.target), true);
+
 function closeProductVariantPicker() {
     activeVariantFamilyKey = null;
     document.getElementById("product-variant-modal").style.display = "none";
@@ -70,7 +86,7 @@ function openProductVariantPicker(familyKey) {
     if (!group || group.variants.length < 2) return;
     activeVariantFamilyKey = familyKey;
     const productName = String(group.variants[0]?.name || "Product");
-    const familyImage = String(group.variants.find((variant) => String(variant.image_url || "").trim() !== "")?.image_url || "").trim();
+    const familyImage = getCatalogImageUrl(group.variants);
     document.getElementById("product-variant-title").textContent = productName;
     document.getElementById("product-variant-guidance").textContent = `Choose one of ${group.variants.length} available variants. Selection adds it directly to the order.`;
     document.getElementById("product-variant-options").innerHTML = group.variants.map((variant) => {
@@ -81,7 +97,7 @@ function openProductVariantPicker(familyKey) {
         const variantImage = String(variant.image_url || familyImage).trim();
         const variantLabel = String(variant.variant_label || "Default");
         const imageHtml = variantImage
-            ? `<img class="product-variant-option-image" src="${escapeHtml(variantImage)}" alt="${escapeHtml(`${productName} ${variantLabel}`)}">`
+            ? `<img class="product-variant-option-image" src="${escapeHtml(variantImage)}" alt="${escapeHtml(`${productName} ${variantLabel}`)}" data-product-image data-product-initials="${escapeHtml(getInitials(variantLabel))}">`
             : `<span class="product-variant-option-image placeholder" aria-hidden="true">${escapeHtml(getInitials(variantLabel))}</span>`;
         return `<button class="product-variant-option stock-${stockState.key}" type="button" data-pick-variant="${Number(variant.id)}" ${canAdd ? "" : "disabled"}>
             ${imageHtml}
@@ -1864,12 +1880,12 @@ function renderProducts() {
             const familyStockLabel = variants.length > 1 ? `${availableVariants.length}/${variants.length} available` : stockState.label;
             const category = String(product.category || "General");
             const displayName = variants.length > 1 ? String(product.name || "Unnamed product") : getProductDisplayName(product);
-            const imageUrl = String(product.image_url || "").trim();
+            const imageUrl = getCatalogImageUrl(variants);
             const supplier = String(product.supplier || "").trim();
             const locationBin = String(product.location_bin || "").trim();
             const useImage = imageUrl !== "";
             const visualHtml = useImage
-                ? `<img class="product-visual" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(displayName)}">`
+                ? `<img class="product-visual" src="${escapeHtml(imageUrl)}" alt="${escapeHtml(displayName)}" data-product-image data-product-initials="${escapeHtml(getInitials(displayName))}">`
                 : `<div class="product-visual placeholder">${escapeHtml(getInitials(displayName))}</div>`;
             const inCartHtml = inCart > 0 ? `<span class="product-cart-chip"><i class="bi bi-cart-check"></i>${inCart} in cart</span>` : "";
             const operationsMeta = supplier || locationBin
@@ -1987,8 +2003,8 @@ function renderDebtSuggestions() {
         const categoryLabel = category ? category.charAt(0).toUpperCase() + category.slice(1).toLowerCase() : "N/A";
         return `
             <button type="button" class="debt-suggestion-item" data-customer-id="${customer.id}">
-                <span class="name">${escapeHtml(customer.name)}</span>
-                <span class="meta">${escapeHtml(customer.employee_id || customer.email)} • ${escapeHtml(categoryLabel)} • ${escapeHtml(formatCredit(customer))}</span>
+                ${window.IbemsAvatar.html(customer.name, customer.profile_image_url, "debt-suggestion-avatar")}
+                <span class="debt-suggestion-copy"><span class="name">${escapeHtml(customer.name)}</span><span class="meta">${escapeHtml(customer.employee_id || customer.email)} • ${escapeHtml(categoryLabel)} • ${escapeHtml(formatCredit(customer))}</span></span>
             </button>
         `;
     });
@@ -2044,8 +2060,8 @@ function renderDebtPaymentSuggestions() {
         const categoryLabel = category ? category.charAt(0).toUpperCase() + category.slice(1).toLowerCase() : "N/A";
         return `
             <button type="button" class="debt-suggestion-item" data-repayment-user-id="${customer.id}">
-                <span class="name">${escapeHtml(customer.name)}</span>
-                <span class="meta">${escapeHtml(customer.employee_id || customer.email)} | ${escapeHtml(categoryLabel)} | Debt ${escapeHtml(formatMoney(customer.current_debt || 0))}</span>
+                ${window.IbemsAvatar.html(customer.name, customer.profile_image_url, "debt-suggestion-avatar")}
+                <span class="debt-suggestion-copy"><span class="name">${escapeHtml(customer.name)}</span><span class="meta">${escapeHtml(customer.employee_id || customer.email)} • ${escapeHtml(categoryLabel)} • Debt ${escapeHtml(formatMoney(customer.current_debt || 0))}</span></span>
             </button>
         `;
     }).join("");
@@ -2082,9 +2098,12 @@ function renderDebtPaymentProfile() {
     const credit = Number(selectedRepaymentCustomer.credit_limit || 0);
     profile.classList.remove("is-hidden");
     profile.innerHTML = `
-        <div>
+        <div class="debt-payment-person">
+            ${window.IbemsAvatar.html(selectedRepaymentCustomer.name, selectedRepaymentCustomer.profile_image_url, "debt-payment-avatar")}
+            <div>
             <strong>${escapeHtml(selectedRepaymentCustomer.name || "Debtor")}</strong>
             <small>${escapeHtml(selectedRepaymentCustomer.employee_id || selectedRepaymentCustomer.email || "-")}</small>
+            </div>
         </div>
         <div>
             <span>Current Debt</span>

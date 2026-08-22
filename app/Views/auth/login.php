@@ -8,18 +8,18 @@
     <meta name="csrf-header-name" content="<?= esc(config('Security')->headerName) ?>">
     <meta name="csrf-cookie-name" content="<?= esc(config('Security')->cookieName) ?>">
     <title>IBEMS Login</title>
-    <link rel="icon" type="image/jpeg" href="<?= base_url('assets/images/ustp_claveria_logo.jpg') ?>">
+    <link rel="icon" type="image/png" href="<?= base_url('assets/images/ibems-logo.png') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.css') ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/css/auth-login.css') ?>">
+    <link rel="stylesheet" href="<?= base_url('assets/css/auth-login.css') ?>?v=20260822a">
     <link rel="stylesheet" href="<?= base_url('assets/css/password-visibility.css') ?>?v=20260813b">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 </head>
 <body class="auth-modern">
-<?php $ustpLogoUrl = base_url('assets/images/ustp_claveria_logo.jpg'); ?>
+<?php $ibemsLogoUrl = base_url('assets/images/ibems-logo.png'); ?>
     <main class="auth-shell">
         <section class="auth-panel auth-panel-form">
             <div class="auth-mark">
-                <img src="<?= esc($ustpLogoUrl) ?>" alt="USTP Logo" class="auth-mark-logo">
+                <img src="<?= esc($ibemsLogoUrl) ?>" alt="IBEMS logo" class="auth-mark-logo">
             </div>
             <h1>Welcome Back</h1>
             <p>Sign in to the Integrated Business Enterprise Management System.</p>
@@ -35,6 +35,8 @@
                 <button id="submit-btn" type="submit">Sign In to Dashboard</button>
             </form>
 
+            <div id="status" role="status" aria-live="polite"></div>
+
             <div class="demo-creds">
                 <strong>Demo Credentials</strong>
                 <span>Admin: admin@ibems.local / 123456</span>
@@ -43,8 +45,6 @@
                 <span>Accounting: accounting@ibems.local / 123456</span>
                 <span>User: maria.santos@ibems.local / 123456</span>
             </div>
-
-            <div id="status"></div>
         </section>
 
         <section class="auth-panel auth-panel-art" aria-hidden="true">
@@ -58,7 +58,7 @@
     </main>
 
     <script src="<?= base_url('assets/js/csrf.js') ?>"></script>
-    <script src="<?= base_url('assets/js/auth-login.js') ?>?v=20260821b"></script>
+    <script src="<?= base_url('assets/js/auth-login.js') ?>?v=20260822b"></script>
     <script src="<?= base_url('assets/js/password-visibility.js') ?>?v=20260813a"></script>
 </body>
 </html>

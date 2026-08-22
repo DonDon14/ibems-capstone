@@ -143,7 +143,7 @@ function renderOfficerSuggestions(query) {
             : "Available";
         return `
             <button id="store-officer-option-${index}" class="officer-suggestion-item ${isAssignedElsewhere ? "is-disabled" : ""}" type="button" role="option" aria-selected="false" data-officer-pick="${officer.id}" ${isAssignedElsewhere ? "disabled" : ""}>
-                <span>${employee}${sEscape(officer.name)} (${sEscape(officer.email)})</span>
+                <span class="table-person-cell">${window.IbemsAvatar.html(officer.name, officer.profile_image_url, "table-person-avatar")}<span><strong>${employee}${sEscape(officer.name)}</strong><small>${sEscape(officer.email)}</small></span></span>
                 <small>${sEscape(role)} / ${sEscape(type)} - ${sEscape(assignmentText)}</small>
             </button>
         `;
@@ -186,7 +186,7 @@ function renderSupervisorSuggestions(query) {
         const roles = Array.isArray(officer.roles) && officer.roles.length ? officer.roles : [officer.role];
         return `
             <button id="store-supervisor-option-${index}" class="officer-suggestion-item" type="button" role="option" aria-selected="false" data-supervisor-pick="${officer.id}">
-                <span>${sEscape(officer.employee_id ? `${officer.employee_id} - ` : "")}${sEscape(officer.name)} (${sEscape(officer.email)})</span>
+                <span class="table-person-cell">${window.IbemsAvatar.html(officer.name, officer.profile_image_url, "table-person-avatar")}<span><strong>${sEscape(officer.employee_id ? `${officer.employee_id} - ` : "")}${sEscape(officer.name)}</strong><small>${sEscape(officer.email)}</small></span></span>
                 <small>${sEscape(roles.map(formatRoleLabel).join(", "))} / ${sEscape(formatTypeLabel(officer.user_type))}</small>
             </button>
         `;

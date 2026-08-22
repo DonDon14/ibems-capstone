@@ -338,7 +338,7 @@ class AccountingController extends Controller
             ->getRowArray();
 
         $topDebtAccounts = $db->table('balances b')
-            ->select('u.id AS user_id, u.employee_id, u.name, u.email, b.current_debt, b.credit_limit')
+            ->select('u.id AS user_id, u.employee_id, u.name, u.email, u.profile_image_url, b.current_debt, b.credit_limit')
             ->join('users u', 'u.id = b.user_id', 'inner')
             ->where('u.is_active', true)
             ->whereIn('u.user_type', ['faculty', 'staff'])
@@ -349,7 +349,7 @@ class AccountingController extends Controller
             ->getResultArray();
 
         $overLimitAccounts = $db->table('balances b')
-            ->select('u.id AS user_id, u.employee_id, u.name, u.email, b.current_debt, b.credit_limit')
+            ->select('u.id AS user_id, u.employee_id, u.name, u.email, u.profile_image_url, b.current_debt, b.credit_limit')
             ->join('users u', 'u.id = b.user_id', 'inner')
             ->where('u.is_active', true)
             ->whereIn('u.user_type', ['faculty', 'staff'])
@@ -362,13 +362,13 @@ class AccountingController extends Controller
 
         $staleCutoff = date('Y-m-d H:i:s', strtotime('-30 day'));
         $staleDebtAccounts = $db->table('balances b')
-            ->select('u.id AS user_id, u.employee_id, u.name, u.email, b.current_debt, b.updated_at, MAX(dce.created_at) AS last_cashbook_at')
+            ->select('u.id AS user_id, u.employee_id, u.name, u.email, u.profile_image_url, b.current_debt, b.updated_at, MAX(dce.created_at) AS last_cashbook_at')
             ->join('users u', 'u.id = b.user_id', 'inner')
             ->join('debt_cashbook_entries dce', 'dce.user_id = u.id', 'left')
             ->where('u.is_active', true)
             ->whereIn('u.user_type', ['faculty', 'staff'])
             ->where('b.current_debt >', 0)
-            ->groupBy('u.id, u.employee_id, u.name, u.email, b.current_debt, b.updated_at')
+            ->groupBy('u.id, u.employee_id, u.name, u.email, u.profile_image_url, b.current_debt, b.updated_at')
             ->having('(MAX(dce.created_at) IS NULL OR MAX(dce.created_at) < ' . $db->escape($staleCutoff) . ')', null, false)
             ->orderBy('b.current_debt', 'DESC')
             ->limit(5)
@@ -515,6 +515,7 @@ class AccountingController extends Controller
                     'employee_id' => $row['employee_id'],
                     'name' => $row['name'],
                     'email' => $row['email'],
+                    'profile_image_url' => $row['profile_image_url'] ?? null,
                     'current_debt' => (float) ($row['current_debt'] ?? 0),
                     'credit_limit' => (float) ($row['credit_limit'] ?? 0),
                 ];
@@ -526,6 +527,7 @@ class AccountingController extends Controller
                         'employee_id' => $row['employee_id'],
                         'name' => $row['name'],
                         'email' => $row['email'],
+                        'profile_image_url' => $row['profile_image_url'] ?? null,
                         'current_debt' => (float) ($row['current_debt'] ?? 0),
                         'credit_limit' => (float) ($row['credit_limit'] ?? 0),
                         'over_amount' => max(0, (float) ($row['current_debt'] ?? 0) - (float) ($row['credit_limit'] ?? 0)),
@@ -537,6 +539,7 @@ class AccountingController extends Controller
                         'employee_id' => $row['employee_id'],
                         'name' => $row['name'],
                         'email' => $row['email'],
+                        'profile_image_url' => $row['profile_image_url'] ?? null,
                         'current_debt' => (float) ($row['current_debt'] ?? 0),
                         'last_cashbook_at' => $row['last_cashbook_at'] ?? null,
                     ];
@@ -573,9 +576,10 @@ class AccountingController extends Controller
         $db = Database::connect();
         $salaryProfileSelect = $this->salaryProfileSelect($db, 'u');
         $creditRateSelect = $db->fieldExists('credit_rate', 'balances') ? 'b.credit_rate' : (string) SalaryCreditPolicy::DEFAULT_CREDIT_RATE . ' AS credit_rate';
+        $profileImageSelect = $db->fieldExists('profile_image_url', 'users') ? 'u.profile_image_url' : 'NULL AS profile_image_url';
 
         $query = $db->table('users u')
-            ->select('u.id AS user_id, u.employee_id, u.name, u.email, u.user_type, u.is_active, u.base_salary, ' . $salaryProfileSelect . ', b.user_id AS balance_user_id, b.credit_limit, b.current_debt, b.updated_at, ' . $creditRateSelect, false)
+            ->select('u.id AS user_id, u.employee_id, u.name, u.email, ' . $profileImageSelect . ', u.user_type, u.is_active, u.base_salary, ' . $salaryProfileSelect . ', b.user_id AS balance_user_id, b.credit_limit, b.current_debt, b.updated_at, ' . $creditRateSelect, false)
             ->join('balances b', 'b.user_id = u.id', 'left')
             ->where('u.is_active', true)
             ->whereIn('u.user_type', ['faculty', 'staff']);
@@ -669,8 +673,9 @@ class AccountingController extends Controller
         $db = Database::connect();
         $salaryProfileSelect = $this->salaryProfileSelect($db, 'u');
         $creditRateSelect = $db->fieldExists('credit_rate', 'balances') ? 'b.credit_rate' : (string) SalaryCreditPolicy::DEFAULT_CREDIT_RATE . ' AS credit_rate';
+        $profileImageSelect = $db->fieldExists('profile_image_url', 'users') ? 'u.profile_image_url' : 'NULL AS profile_image_url';
         $row = $db->table('users u')
-            ->select('u.id AS user_id, u.employee_id, u.name, u.email, u.user_type, u.base_salary, ' . $salaryProfileSelect . ', b.user_id AS balance_user_id, b.credit_limit, b.current_debt, b.updated_at, ' . $creditRateSelect, false)
+            ->select('u.id AS user_id, u.employee_id, u.name, u.email, ' . $profileImageSelect . ', u.user_type, u.base_salary, ' . $salaryProfileSelect . ', b.user_id AS balance_user_id, b.credit_limit, b.current_debt, b.updated_at, ' . $creditRateSelect, false)
             ->join('balances b', 'b.user_id = u.id', 'left')
             ->where('u.is_active', true)
             ->where('u.id', $userId)
@@ -1996,7 +2001,7 @@ class AccountingController extends Controller
                     'updated_at' => $now,
                 ]);
             }
-            $db->table('audit_logs')->insert([
+            (new AuditLogModel())->insert([
                 'actor_id' => $actorId,
                 'action' => 'ACCOUNTING_UPDATE_FINANCIAL_PROFILE',
                 'entity' => 'balances',

@@ -35,6 +35,8 @@ class Filters extends BaseFilters
         'pagecache'     => PageCache::class,
         'performance'   => PerformanceMetrics::class,
         'access'        => \App\Filters\RoleFilter::class,
+        'authenticated' => \App\Filters\AuthenticatedFilter::class,
+        'notification_dispatch' => \App\Filters\NotificationDispatchFilter::class,
     ];
 
     /**
@@ -78,7 +80,7 @@ class Filters extends BaseFilters
             // 'invalidchars',
         ],
         'after' => [
-            // 'honeypot',
+            'notification_dispatch' => ['except' => ['healthz']],
             // 'secureheaders',
         ],
     ];

@@ -61,7 +61,7 @@ class AuthController extends Controller
 
         return $this->response->setJSON([
             'status' => 'success',
-            'message' => 'Login successful',
+            'message' => 'Sign-in successful.',
             'user' => [
                 'id'   => $user['id'],
                 'name' => $user['name'],
@@ -96,6 +96,7 @@ class AuthController extends Controller
             'user' => [
                 'user_id' => session()->get('user_id'),
                 'name'    => session()->get('name'),
+                'profile_image_url' => session()->get('profile_image_url'),
                 'role'    => session()->get('role'),
                 'roles'   => array_values((array) (session()->get('available_roles') ?? [])),
             ]
@@ -131,7 +132,11 @@ class AuthController extends Controller
             ]);
         }
 
-        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $contentType = strtolower($this->request->getHeaderLine('Content-Type'));
+        $jsonRequest = str_contains($contentType, 'application/json')
+            ? $this->request->getJSON(true)
+            : null;
+        $request = $jsonRequest ?? $this->request->getPost();
         $role = strtoupper(trim((string) ($request['role'] ?? '')));
         $available = ibems_available_roles();
 
@@ -143,6 +148,10 @@ class AuthController extends Controller
         }
 
         session()->set('role', $role);
+
+        if ($jsonRequest === null) {
+            return redirect()->to(ibems_role_landing_path($role));
+        }
 
         return $this->response->setJSON([
             'status' => 'success',

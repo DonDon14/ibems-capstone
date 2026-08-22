@@ -19,12 +19,17 @@ $routes->post('pos/transactions', 'PosController::createTransaction', ['filter' 
 
 $routes->get('login', 'PageController::login');
 $routes->get('dashboard', 'PageController::dashboard', ['filter' => 'access:portal.enter']);
+$routes->post('profile/image', 'ProfileController::uploadImage', ['filter' => 'access:account.self']);
+$routes->get('notifications', 'NotificationController::index', ['filter' => 'access:account.self']);
+$routes->post('notifications/(:num)/read', 'NotificationController::markRead/$1', ['filter' => 'access:account.self']);
+$routes->post('notifications/read-all', 'NotificationController::markAllRead', ['filter' => 'access:account.self']);
 
 $routes->get('admin/dashboard', 'AdminController::dashboard', ['filter' => 'access:system.manage']);
 $routes->get('admin/dashboard/data', 'AdminController::dashboardData', ['filter' => 'access:system.manage']);
 $routes->get('admin/store-ops', 'AdminController::storeOps', ['filter' => 'access:system.manage']);
 $routes->get('admin/accounting-debts', 'AdminController::accountingDebts', ['filter' => 'access:system.manage']);
 $routes->get('admin/accounting-debts/data', 'AdminController::accountingDebtsData', ['filter' => 'access:system.manage']);
+$routes->get('admin/accounting-debts/user/(:num)', 'AdminController::accountingDebtUserDetail/$1', ['filter' => 'access:system.manage']);
 $routes->get('admin/user-view', 'AdminController::userView', ['filter' => 'access:system.manage']);
 $routes->get('admin/user-view/data', 'AdminController::userViewData', ['filter' => 'access:system.manage']);
 $routes->get('admin/user-view/(:num)', 'AdminController::userViewDetail/$1', ['filter' => 'access:system.manage']);

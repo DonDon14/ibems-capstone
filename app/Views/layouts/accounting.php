@@ -6,6 +6,7 @@ $portalTitle = 'Accounting Portal';
 $portalSubtitle = 'Faculty/Staff Debt Monitoring';
 $footerText = 'USTP IBEMS Accounting';
 $initials = ibems_initials($name, 'AO');
+$profileImageUrl = (string) (session()->get('profile_image_url') ?? '');
 $availableRoles = ibems_available_roles();
 $navigation = [
     ['path' => 'accounting/dashboard', 'label' => 'Dashboard', 'icon' => 'bi bi-speedometer2'],

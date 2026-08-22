@@ -7,6 +7,7 @@
     const brand = document.querySelector(".app-brand");
     const navLinks = Array.from(document.querySelectorAll(".app-menu a"));
     const logoutLink = document.querySelector(".sidebar-logout a, .sidebar-logout button");
+    const logoutForms = Array.from(document.querySelectorAll("form[data-confirm-logout]"));
     if (!shell || !btn) return;
 
     const isDesktop = () => window.matchMedia("(min-width: 1201px)").matches;
@@ -65,6 +66,29 @@
             logoutLink.setAttribute("data-tooltip", label);
         }
     }
+
+    logoutForms.forEach((form) => {
+        form.addEventListener("submit", async (event) => {
+            if (form.dataset.logoutConfirmed === "true") return;
+            event.preventDefault();
+
+            const confirmed = window.IbemsDialog
+                ? await window.IbemsDialog.confirm("Your current session will end and you will need to sign in again.", {
+                    title: "Log out of IBEMS?",
+                    confirmLabel: "Log out",
+                    cancelLabel: "Stay signed in",
+                    icon: "bi-box-arrow-right",
+                    tone: "danger",
+                })
+                : window.confirm("Log out of IBEMS?");
+
+            if (!confirmed) return;
+            form.dataset.logoutConfirmed = "true";
+            const submitButton = form.querySelector('button[type="submit"]');
+            if (submitButton) submitButton.disabled = true;
+            HTMLFormElement.prototype.submit.call(form);
+        });
+    });
 
     const activeLink = navLinks.find((link) => link.classList.contains("is-active"));
     if (activeLink) {
@@ -129,4 +153,200 @@
             }
         }
     });
+
+    document.querySelectorAll("[data-inset-modal-scroll]").forEach((card) => {
+        if (card.dataset.insetModalScrollReady === "true") return;
+
+        const header = Array.from(card.children).find((child) =>
+            child.matches(".acct-modal-head, .admin-modal-head")
+        );
+        if (!header) return;
+
+        const scrollRegion = document.createElement("div");
+        scrollRegion.className = "app-inset-modal-scroll";
+        Array.from(card.children).forEach((child) => {
+            if (child !== header) scrollRegion.appendChild(child);
+        });
+
+        card.appendChild(scrollRegion);
+        card.classList.add("app-inset-modal-card");
+        card.dataset.insetModalScrollReady = "true";
+    });
+
+    const compactBars = Array.from(document.querySelectorAll("[data-compact-filters]"));
+
+    const controlWrapper = (control, bar) => {
+        const wrapper = control.closest("label, .field, .ui-field, .history-filter-field, .inventory-filter-field, .settings-input-field");
+        return wrapper && bar.contains(wrapper) ? wrapper : control;
+    };
+
+    const initCompactFilterBar = (bar, index) => {
+        if (bar.dataset.compactFiltersReady === "true") return;
+
+        const searchInput = bar.querySelector('input[type="search"]');
+        const searchWrapper = searchInput ? controlWrapper(searchInput, bar) : null;
+        const advancedControls = Array.from(bar.querySelectorAll('select, input[type="date"], input[type="checkbox"]'));
+        const sortControls = advancedControls.filter((control) => /sort/i.test(control.id || control.name || ""));
+        const filterControls = advancedControls.filter((control) => !sortControls.includes(control));
+        if (!sortControls.length && !filterControls.length) return;
+
+        advancedControls.forEach((control) => {
+            control.dataset.compactDefault = control.type === "checkbox" ? String(control.defaultChecked) : control.value;
+        });
+
+        const originalButtons = Array.from(bar.querySelectorAll("button")).filter((button) => !searchWrapper?.contains(button));
+        const primary = document.createElement("div");
+        primary.className = "compact-filter-primary";
+        const actionBox = document.createElement("div");
+        actionBox.className = "compact-filter-actions";
+        const panelId = `compact-filter-panel-${index + 1}`;
+
+        if (searchWrapper) primary.appendChild(searchWrapper);
+        primary.appendChild(actionBox);
+        bar.prepend(primary);
+
+        const makeToggle = (mode, label, icon) => {
+            const button = document.createElement("button");
+            button.type = "button";
+            button.className = "secondary-btn compact-filter-toggle";
+            button.dataset.compactFilterToggle = mode;
+            button.setAttribute("aria-controls", panelId);
+            button.setAttribute("aria-expanded", "false");
+            button.innerHTML = `<i class="bi ${icon}" aria-hidden="true"></i><span>${label}</span><span class="compact-filter-count" aria-hidden="true"></span>`;
+            actionBox.appendChild(button);
+            return button;
+        };
+
+        const sortToggle = sortControls.length ? makeToggle("sort", "Sort", "bi-arrow-down-up") : null;
+        const filterToggle = filterControls.length ? makeToggle("filter", "Filter", "bi-funnel") : null;
+        originalButtons.forEach((button) => actionBox.appendChild(button));
+
+        const panel = document.createElement("div");
+        panel.id = panelId;
+        panel.className = "compact-filter-panel";
+        panel.hidden = true;
+
+        const heading = document.createElement("div");
+        heading.className = "compact-filter-panel-head";
+        heading.innerHTML = '<div><span>List controls</span><strong data-compact-filter-title>Filters</strong></div><button type="button" class="compact-filter-close" aria-label="Close list controls"><i class="bi bi-x-lg" aria-hidden="true"></i></button>';
+        panel.appendChild(heading);
+
+        const appendSection = (mode, title, controls) => {
+            if (!controls.length) return;
+            const section = document.createElement("section");
+            section.className = "compact-filter-section";
+            section.dataset.compactFilterSection = mode;
+            const sectionTitle = document.createElement("h3");
+            sectionTitle.textContent = title;
+            const grid = document.createElement("div");
+            grid.className = "compact-filter-grid";
+            const wrappers = [];
+            controls.forEach((control) => {
+                const wrapper = controlWrapper(control, bar);
+                if (!wrappers.includes(wrapper) && wrapper !== searchWrapper) wrappers.push(wrapper);
+            });
+            wrappers.forEach((wrapper) => grid.appendChild(wrapper));
+            section.append(sectionTitle, grid);
+            panel.appendChild(section);
+        };
+
+        appendSection("sort", "Sort results", sortControls);
+        appendSection("filter", "Filter results", filterControls);
+
+        const footer = document.createElement("div");
+        footer.className = "compact-filter-panel-actions";
+        footer.innerHTML = '<button type="button" class="secondary-btn" data-compact-filter-reset><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Reset all</button><button type="button" class="primary-btn" data-compact-filter-apply>Apply filters</button>';
+        panel.appendChild(footer);
+        bar.appendChild(panel);
+        bar.classList.add("compact-filter-bar");
+        bar.dataset.compactFiltersReady = "true";
+        Array.from(bar.children).forEach((child) => {
+            if (child === primary || child === panel) return;
+            if (!child.matches("input, select, button, a") && !child.querySelector("input, select, button, a")) {
+                child.classList.add("compact-filter-vacated");
+            }
+        });
+
+        const setOpen = (mode = "filter", open = true) => {
+            panel.hidden = !open;
+            panel.dataset.mode = mode;
+            if (open && window.matchMedia("(min-width: 761px)").matches) {
+                window.requestAnimationFrame(() => {
+                    const top = panel.getBoundingClientRect().top;
+                    panel.style.maxHeight = `${Math.max(240, window.innerHeight - top - 16)}px`;
+                    panel.style.overflowY = "auto";
+                });
+            } else if (!open) {
+                panel.style.removeProperty("max-height");
+                panel.style.removeProperty("overflow-y");
+            }
+            panel.querySelector("[data-compact-filter-title]").textContent = mode === "sort" ? "Sort results" : "Filters";
+            [sortToggle, filterToggle].filter(Boolean).forEach((button) => {
+                const active = open && button.dataset.compactFilterToggle === mode;
+                button.classList.toggle("is-active", active);
+                button.setAttribute("aria-expanded", active ? "true" : "false");
+            });
+            bar.classList.toggle("has-open-filter-panel", open);
+        };
+
+        const activeFor = (control) => {
+            const baseline = control.dataset.compactDefault ?? "";
+            return control.type === "checkbox" ? String(control.checked) !== baseline : control.value !== baseline;
+        };
+
+        const updateCounts = () => {
+            const update = (button, controls) => {
+                if (!button) return;
+                const count = controls.filter(activeFor).length;
+                const badge = button.querySelector(".compact-filter-count");
+                badge.textContent = count ? String(count) : "";
+                button.classList.toggle("has-active-filters", count > 0);
+                button.setAttribute("aria-label", `${button.dataset.compactFilterToggle === "sort" ? "Sort" : "Filter"}${count ? `, ${count} active` : ""}`);
+            };
+            update(sortToggle, sortControls);
+            update(filterToggle, filterControls);
+        };
+
+        [sortToggle, filterToggle].filter(Boolean).forEach((button) => {
+            button.addEventListener("click", () => {
+                const mode = button.dataset.compactFilterToggle;
+                const shouldOpen = panel.hidden || panel.dataset.mode !== mode;
+                setOpen(mode, shouldOpen);
+            });
+        });
+        panel.querySelector(".compact-filter-close").addEventListener("click", () => setOpen(panel.dataset.mode, false));
+        panel.querySelector("[data-compact-filter-apply]").addEventListener("click", () => setOpen(panel.dataset.mode, false));
+        panel.querySelector("[data-compact-filter-reset]").addEventListener("click", () => {
+            const resetButton = originalButtons.find((button) => /refresh|reset|clear/i.test(`${button.id} ${button.textContent}`));
+            if (resetButton) {
+                resetButton.click();
+            } else {
+                advancedControls.forEach((control) => {
+                    if (control.type === "checkbox") control.checked = control.dataset.compactDefault === "true";
+                    else control.value = control.dataset.compactDefault || "";
+                    control.dispatchEvent(new Event("change", { bubbles: true }));
+                });
+                if (searchInput) {
+                    searchInput.value = "";
+                    searchInput.dispatchEvent(new Event("input", { bubbles: true }));
+                }
+            }
+            window.setTimeout(updateCounts, 0);
+        });
+
+        advancedControls.forEach((control) => control.addEventListener("change", updateCounts));
+        document.addEventListener("click", (event) => {
+            if (!panel.hidden && !bar.contains(event.target)) setOpen(panel.dataset.mode, false);
+        });
+        bar.addEventListener("keydown", (event) => {
+            if (event.key === "Escape" && !panel.hidden) {
+                const activeToggle = panel.dataset.mode === "sort" ? sortToggle : filterToggle;
+                setOpen(panel.dataset.mode, false);
+                activeToggle?.focus();
+            }
+        });
+        updateCounts();
+    };
+
+    compactBars.forEach(initCompactFilterBar);
 })();

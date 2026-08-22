@@ -8,21 +8,40 @@
     <meta name="csrf-header-name" content="<?= esc(config('Security')->headerName) ?>">
     <meta name="csrf-cookie-name" content="<?= esc(config('Security')->cookieName) ?>">
     <title>Select Role</title>
-    <link rel="icon" type="image/jpeg" href="<?= base_url('assets/images/ustp_claveria_logo.jpg') ?>">
+    <link rel="icon" type="image/png" href="<?= base_url('assets/images/ibems-logo.png') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.css') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/auth-login.css') ?>">
 </head>
 <body class="auth-modern">
-<?php $ustpLogoUrl = base_url('assets/images/ustp_claveria_logo.jpg'); ?>
+<?php $ibemsLogoUrl = base_url('assets/images/ibems-logo.png'); ?>
     <main class="auth-shell">
         <section class="auth-panel auth-panel-form">
             <div class="auth-mark">
-                <img src="<?= esc($ustpLogoUrl) ?>" alt="USTP Logo" class="auth-mark-logo">
+                <img src="<?= esc($ibemsLogoUrl) ?>" alt="IBEMS logo" class="auth-mark-logo">
             </div>
             <h1>Select Portal</h1>
             <p>Choose which role to use for this session.</p>
 
-            <div id="role-options" class="auth-role-list"></div>
+            <div id="role-options" class="auth-role-list">
+                <?php foreach (ibems_available_roles() as $availableRole): ?>
+                    <?php
+                    $roleKey = strtoupper((string) $availableRole);
+                    $roleLabels = [
+                        'ADMIN' => 'Admin',
+                        'STORE_SYSTEM' => 'Store Officer',
+                        'STORE_SUPERVISOR' => 'Store Supervisor',
+                        'ACCOUNTING_OFFICE' => 'Accounting Office',
+                        'USER' => 'User',
+                    ];
+                    ?>
+                    <form method="post" action="<?= site_url('auth/select-role') ?>" class="auth-role-form">
+                        <?= csrf_field() ?>
+                        <button type="submit" class="auth-role-btn" name="role" value="<?= esc($roleKey) ?>">
+                            <span><?= esc($roleLabels[$roleKey] ?? str_replace('_', ' ', $roleKey)) ?></span>
+                        </button>
+                    </form>
+                <?php endforeach; ?>
+            </div>
             <div id="status"></div>
         </section>
 
@@ -36,7 +55,5 @@
         </section>
     </main>
 
-    <script src="<?= base_url('assets/js/csrf.js') ?>"></script>
-    <script src="<?= base_url('assets/js/auth-select-role.js') ?>"></script>
 </body>
 </html>

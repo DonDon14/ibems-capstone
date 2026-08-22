@@ -300,17 +300,18 @@ function srRenderDebts(rows) {
         const creditLimit = Math.max(0, Number(row.credit_limit || 0));
         const debtUsage = creditLimit > 0 ? Math.min(100, (currentDebt / creditLimit) * 100) : 0;
         return `
-        <article class="staff-record-row sr-row-clickable flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:shadow-sm"
+        <article class="staff-record-row sr-row-clickable interactive-record-row flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4"
             data-debt-user-id="${Number(row.id || 0)}"
             data-debt-name="${srEscape(row.name)}"
             data-debt-employee="${srEscape(row.employee_id || "")}"
             data-debt-email="${srEscape(row.email || "")}"
+            data-debt-photo="${srEscape(row.profile_image_url || "")}"
             data-debt-category="${srEscape(row.user_type || "")}"
             data-current-debt="${currentDebt}"
             data-credit-limit="${creditLimit}"
             data-available-credit="${Math.max(0, Number(row.available_credit || 0))}">
             <div class="staff-person flex min-w-0 items-center gap-3">
-                <div class="staff-avatar inline-flex h-11 w-11 flex-none items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-sm font-bold text-blue-700">${srEscape(String(row.name || "U").split(" ").filter(Boolean).slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join("") || "U")}</div>
+                ${window.IbemsAvatar.html(row.name, row.profile_image_url, "staff-avatar h-11 w-11 flex-none rounded-full border border-slate-200 bg-slate-50")}
                 <div class="staff-person-meta min-w-0">
                     <div class="staff-name-line flex flex-wrap items-center gap-2">
                         <strong class="text-base font-bold text-slate-900">${srEscape(row.name)}</strong>
@@ -495,10 +496,9 @@ function srOpenEmployeeModal(employee) {
     srSelectedEmployee = employee;
     srTransactionPage = 1;
     srRenderTransactionStores();
-    const initials = String(employee.name || "U").split(" ").filter(Boolean).slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join("") || "U";
     document.getElementById("staff-employee-summary").innerHTML = `
         <div class="staff-summary-person">
-            <span class="staff-avatar">${srEscape(initials)}</span>
+            ${window.IbemsAvatar.html(employee.name, employee.profileImageUrl, "staff-avatar")}
             <div><strong>${srEscape(employee.name)}</strong><span>${srEscape(employee.employeeId || "-")} &middot; ${srEscape(employee.email || "-")}</span></div>
             <span class="table-chip">${srEscape(srCategory(employee.userType))}</span>
         </div>
@@ -734,6 +734,7 @@ document.getElementById("debt-body").addEventListener("click", async (event) => 
         name: row.getAttribute("data-debt-name") || "",
         employeeId: row.getAttribute("data-debt-employee") || "",
         email: row.getAttribute("data-debt-email") || "",
+        profileImageUrl: row.getAttribute("data-debt-photo") || "",
         userType: row.getAttribute("data-debt-category") || "",
         currentDebt: Number(row.getAttribute("data-current-debt") || 0),
         creditLimit: Number(row.getAttribute("data-credit-limit") || 0),

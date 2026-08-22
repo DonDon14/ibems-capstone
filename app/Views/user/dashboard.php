@@ -10,7 +10,9 @@
         'eyebrow' => 'Personal account',
         'title' => 'User dashboard',
         'description' => 'Welcome, ' . (string) (session()->get('name') ?? 'User') . '.',
-        'icon' => 'bi bi-person-circle',
+        'imageUrl' => ibems_profile_image_url(session()->get('profile_image_url')),
+        'imageAlt' => (string) (session()->get('name') ?? 'User') . ' profile picture',
+        'imageSize' => 'large',
     ]) ?>
 
     <div class="dashboard-grid dashboard-grid-single">

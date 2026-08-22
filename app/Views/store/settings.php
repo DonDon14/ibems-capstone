@@ -24,7 +24,7 @@
                 <button id="add-category-btn" class="primary-btn" type="button"><i class="bi bi-plus-circle" aria-hidden="true"></i> Add category</button>
             </div>
         </div>
-        <div id="category-tools" class="category-tools is-hidden">
+        <div id="category-tools" class="category-tools is-hidden" data-compact-filters>
             <label class="settings-input-field" for="category-search"><span>Search categories</span><input id="category-search" type="search" placeholder="Category name"></label>
             <label class="settings-input-field" for="category-sort"><span>Sort by</span><select id="category-sort"><option value="name-asc">Name (A–Z)</option><option value="name-desc">Name (Z–A)</option><option value="products-desc">Most products</option></select></label>
         </div>

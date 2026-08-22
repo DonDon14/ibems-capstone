@@ -146,6 +146,15 @@ if (! function_exists('ibems_initials')) {
     }
 }
 
+if (! function_exists('ibems_profile_image_url')) {
+    function ibems_profile_image_url(?string $url): string
+    {
+        $url = trim((string) $url);
+
+        return $url !== '' ? $url : base_url('assets/images/default-profile.svg');
+    }
+}
+
 if (! function_exists('ibems_money')) {
     function ibems_money(float|int|string|null $value, int $decimals = 2): string
     {

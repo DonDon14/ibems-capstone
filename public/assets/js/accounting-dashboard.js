@@ -11,12 +11,29 @@ function acdEscape(value) {
         .replace(/'/g, "&#39;");
 }
 
+function acdDataState(title, detail = "", icon = "bi-inbox") {
+    return `
+        <div class="data-state">
+            <i class="bi ${acdEscape(icon)}" aria-hidden="true"></i>
+            <div>
+                <strong>${acdEscape(title)}</strong>
+                ${detail ? `<small>${acdEscape(detail)}</small>` : ""}
+            </div>
+        </div>`;
+}
+
+function acdTableState(title, detail = "", icon = "bi-inbox") {
+    return `<tr class="data-state-row"><td colspan="4">${acdDataState(title, detail, icon)}</td></tr>`;
+}
+
 let acdTrendChart = null;
+let acdTrendRows = [];
 
 function acdRenderTrend(rows) {
     const canvas = document.getElementById("acd-trend-chart");
     if (!canvas || typeof window.Chart === "undefined") return;
     const wrap = canvas.parentElement;
+    acdTrendRows = Array.isArray(rows) ? rows : [];
     wrap?.querySelector(".acd-trend-empty")?.remove();
 
     if (acdTrendChart) {
@@ -34,12 +51,16 @@ function acdRenderTrend(rows) {
     if (!amounts.some((amount) => amount > 0)) {
         canvas.hidden = true;
         const empty = document.createElement("div");
-        empty.className = "acd-trend-empty mini-bar-empty";
-        empty.textContent = "No confirmed payroll deductions in the last 7 days.";
+        empty.className = "acd-trend-empty";
+        empty.innerHTML = acdDataState("No confirmed deductions", "No payroll deductions were confirmed in the last 7 days.", "bi-bar-chart");
         wrap?.appendChild(empty);
         return;
     }
     canvas.hidden = false;
+
+    const isDark = document.documentElement.dataset.theme === "dark";
+    const tickColor = isDark ? "#c6d2e1" : "#475569";
+    const gridColor = isDark ? "rgba(148, 163, 184, 0.18)" : "rgba(148, 163, 184, 0.24)";
 
     acdTrendChart = new window.Chart(canvas, {
         type: "bar",
@@ -69,10 +90,12 @@ function acdRenderTrend(rows) {
                 },
             },
             scales: {
-                x: { grid: { display: false } },
+                x: { grid: { display: false }, ticks: { color: tickColor } },
                 y: {
                     beginAtZero: true,
+                    grid: { color: gridColor },
                     ticks: {
+                        color: tickColor,
                         callback(value) {
                             return window.IbemsFormat?.money(value, { decimals: 0 }) || `PHP ${Number(value).toFixed(0)}`;
                         },
@@ -83,12 +106,14 @@ function acdRenderTrend(rows) {
     });
 }
 
+window.addEventListener("ibems:themechange", () => acdRenderTrend(acdTrendRows));
+
 function acdRenderActivity(rows) {
     const container = document.getElementById("acd-activity");
     if (!container) return;
 
     if (!Array.isArray(rows) || rows.length === 0) {
-        container.innerHTML = '<div class="mini-bar-empty">No recent accounting activity.</div>';
+        container.innerHTML = acdDataState("No recent accounting activity", "Completed Accounting actions will appear here.", "bi-clock-history");
         return;
     }
 
@@ -115,13 +140,13 @@ function acdRenderTopDebt(rows) {
     if (!tbody) return;
 
     if (!Array.isArray(rows) || rows.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4">No debt accounts found.</td></tr>';
+        tbody.innerHTML = acdTableState("No debt accounts found", "Accounts with outstanding debt will appear here.", "bi-cash-stack");
         return;
     }
 
     tbody.innerHTML = rows.map((row) => `
         <tr>
-            <td>${acdEscape(row.name || "-")}<br><small>${acdEscape(row.employee_id || "-")}</small></td>
+            <td><span class="table-person-cell">${window.IbemsAvatar.html(row.name, row.profile_image_url, "table-person-avatar")}<span><strong>${acdEscape(row.name || "-")}</strong><small>${acdEscape(row.employee_id || "-")}</small></span></span></td>
             <td>${acdEscape(row.email || "-")}</td>
             <td>${acdEscape(acdMoney(row.current_debt || 0))}</td>
             <td>${acdEscape(acdMoney(row.credit_limit || 0))}</td>
@@ -129,13 +154,26 @@ function acdRenderTopDebt(rows) {
     `).join("");
 }
 
-function acdAlertItem(title, detail, tone = "warning") {
+function acdDashboardMeta(items) {
+    return `
+        <div class="dashboard-meta-line">
+            ${items.map((item) => `
+                <span class="dashboard-meta-item">
+                    <i class="bi ${acdEscape(item.icon || "bi-dot")}" aria-hidden="true"></i>
+                    <span>${acdEscape(item.text || "-")}</span>
+                </span>
+            `).join("")}
+        </div>
+    `;
+}
+
+function acdAlertItem(title, detailItems, tone = "warning") {
     return `
         <div class="stack-item acd-alert-item is-${acdEscape(tone)}">
             <div class="stack-item-head">
                 <strong>${acdEscape(title)}</strong>
             </div>
-            <div class="stack-meta">${acdEscape(detail)}</div>
+            <div class="stack-meta">${acdDashboardMeta(detailItems)}</div>
         </div>
     `;
 }
@@ -153,7 +191,11 @@ function acdRenderAlerts(alerts) {
     overLimit.forEach((row) => {
         html.push(acdAlertItem(
             `Over limit: ${row.name || "Employee"}`,
-            `${row.employee_id || "-"} | Debt ${acdMoney(row.current_debt || 0)} / Limit ${acdMoney(row.credit_limit || 0)} | Over ${acdMoney(row.over_amount || 0)}`,
+            [
+                { icon: "bi-person-vcard", text: row.employee_id || "-" },
+                { icon: "bi-wallet2", text: `Debt ${acdMoney(row.current_debt || 0)} / Limit ${acdMoney(row.credit_limit || 0)}` },
+                { icon: "bi-exclamation-triangle", text: `Over ${acdMoney(row.over_amount || 0)}` },
+            ],
             "danger"
         ));
     });
@@ -162,7 +204,11 @@ function acdRenderAlerts(alerts) {
         const lastActivity = row.last_cashbook_at ? String(row.last_cashbook_at) : "No cashbook activity";
         html.push(acdAlertItem(
             `Stale debt: ${row.name || "Employee"}`,
-            `${row.employee_id || "-"} | Debt ${acdMoney(row.current_debt || 0)} | Last activity: ${lastActivity}`,
+            [
+                { icon: "bi-person-vcard", text: row.employee_id || "-" },
+                { icon: "bi-wallet2", text: `Debt ${acdMoney(row.current_debt || 0)}` },
+                { icon: "bi-clock-history", text: `Last activity: ${lastActivity}` },
+            ],
             "warning"
         ));
     });
@@ -170,13 +216,17 @@ function acdRenderAlerts(alerts) {
     failedImports.forEach((row) => {
         html.push(acdAlertItem(
             `Import needs review: ${row.filename || "CSV import"}`,
-            `${row.invalid_rows || 0} invalid of ${row.total_rows || 0} rows | Imported by ${row.imported_by_name || "Unknown"} | ${row.imported_at || "-"}`,
+            [
+                { icon: "bi-table", text: `${row.invalid_rows || 0} invalid of ${row.total_rows || 0} rows` },
+                { icon: "bi-person", text: `Imported by ${row.imported_by_name || "Unknown"}` },
+                { icon: "bi-calendar3", text: row.imported_at || "-" },
+            ],
             "info"
         ));
     });
 
     if (html.length === 0) {
-        container.innerHTML = '<div class="mini-bar-empty">No accounting alerts detected.</div>';
+        container.innerHTML = acdDataState("No accounting alerts", "No over-limit, stale-debt, or failed-import alerts were detected.", "bi-shield-check");
         return;
     }
 

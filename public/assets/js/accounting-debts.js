@@ -30,6 +30,17 @@ function aEscape(value) {
         .replace(/'/g, "&#39;");
 }
 
+function aDataState(title, detail = "Try adjusting the search or filters.", icon = "bi-inbox") {
+    return `
+        <div class="data-state">
+            <i class="bi ${aEscape(icon)}" aria-hidden="true"></i>
+            <div>
+                <strong>${aEscape(title)}</strong>
+                ${detail ? `<small>${aEscape(detail)}</small>` : ""}
+            </div>
+        </div>`;
+}
+
 function aMoney(value) {
     return window.IbemsFormat?.money(value) || `PHP ${Number(value || 0).toFixed(2)}`;
 }
@@ -449,7 +460,7 @@ function renderRows(rows) {
     const body = document.getElementById("acct-body");
     const countText = document.getElementById("acct-count-text");
     if (!Array.isArray(rows) || rows.length === 0) {
-        body.innerHTML = '<div class="acct-empty rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">No records found.</div>';
+        body.innerHTML = aDataState("No accounting records found");
         document.getElementById("acct-pager").innerHTML = "";
         if (countText) countText.textContent = "Showing 0 records";
         renderSummary([]);
@@ -474,7 +485,7 @@ function renderRows(rows) {
         }
         return (typeof a === "number" ? a - b : a.localeCompare(b)) * direction;
     });
-    const pageSize = Math.max(10, Number(document.getElementById("acct-page-size").value || 25));
+    const pageSize = Math.max(10, Number(document.getElementById("acct-page-size").value || 10));
     const totalPages = Math.max(1, Math.ceil(allRows.length / pageSize));
     acctPage = Math.min(acctPage, totalPages);
     const pageRows = allRows.slice((acctPage - 1) * pageSize, acctPage * pageSize);
@@ -484,9 +495,9 @@ function renderRows(rows) {
     }
 
     body.innerHTML = pageRows.map((row) => `
-        <article data-row-user="${row.user_id}" class="acct-record-row acct-row-clickable flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4 transition hover:-translate-y-0.5 hover:bg-slate-50">
+        <article data-row-user="${row.user_id}" class="acct-record-row acct-row-clickable interactive-record-row flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
             <div class="acct-person flex min-w-0 items-center gap-3">
-                <div class="acct-avatar inline-flex h-11 w-11 flex-none items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-sm font-bold text-blue-700">${aEscape(String(row.name || "U").split(" ").filter(Boolean).slice(0, 2).map((part) => part.charAt(0).toUpperCase()).join("") || "U")}</div>
+                ${window.IbemsAvatar.html(row.name, row.profile_image_url, "acct-avatar h-11 w-11 flex-none rounded-full border border-slate-200 bg-slate-50")}
                 <div class="acct-person-meta min-w-0">
                     <div class="acct-name-line flex flex-wrap items-center gap-2">
                         <strong class="text-base font-bold text-slate-900">${aEscape(row.name)}</strong>
@@ -539,7 +550,7 @@ function renderCashbookRows(rows, type) {
         : "No approved store operator shortages recorded yet.";
 
     if (list.length === 0) {
-        body.innerHTML = `<div class="acct-empty rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">${emptyText}</div>`;
+        body.innerHTML = aDataState(emptyText, "This queue will update when qualifying activity is recorded.");
         document.getElementById("acct-pager").innerHTML = "";
         if (countText) countText.textContent = "Showing 0 records";
         renderSummary(acctRows);
@@ -553,7 +564,7 @@ function renderCashbookRows(rows, type) {
         if (sortBy === "date") return String(left.created_at || "").localeCompare(String(right.created_at || "")) * direction;
         return (Number(left.amount || 0) - Number(right.amount || 0)) * direction;
     });
-    const pageSize = Math.max(10, Number(document.getElementById("acct-page-size").value || 25));
+    const pageSize = Math.max(10, Number(document.getElementById("acct-page-size").value || 10));
     const totalPages = Math.max(1, Math.ceil(list.length / pageSize));
     acctPage = Math.min(acctPage, totalPages);
     const pageRows = list.slice((acctPage - 1) * pageSize, acctPage * pageSize);
@@ -831,8 +842,53 @@ function buildProfileHtml(p) {
     `;
 }
 
+function buildEmployeeProfileHtml(p) {
+    const debt = Number(p.current_debt || 0);
+    const available = Number(p.available_credit || 0);
+    const creditPercentage = Number(p.credit_percentage ?? acctDefaultCreditPercentage);
+
+    return `
+        <section class="employee-profile-overview">
+            <header class="employee-identity">
+                ${window.IbemsAvatar.html(p.name, p.profile_image_url, "employee-identity-avatar")}
+                <div class="employee-identity-copy">
+                    <span class="employee-profile-kicker">Employee financial profile</span>
+                    <h5>${aEscape(p.name || "Employee")}</h5>
+                    <div class="employee-identity-meta">
+                        <span><i class="bi bi-person-vcard" aria-hidden="true"></i>${aEscape(p.employee_id || "No employee ID")}</span>
+                        <span><i class="bi bi-envelope" aria-hidden="true"></i>${aEscape(p.email || "No email")}</span>
+                        <span><i class="bi bi-briefcase" aria-hidden="true"></i>${aEscape(aCategory(p.user_type))}</span>
+                    </div>
+                </div>
+                <div class="employee-identity-status">${debtStatusPill(p)}</div>
+            </header>
+            <div class="employee-finance-grid">
+                <article class="employee-finance-metric is-salary">
+                    <span><i class="bi bi-wallet2" aria-hidden="true"></i>Monthly salary</span>
+                    <strong>${aEscape(aMoney(p.base_salary))}</strong>
+                </article>
+                <article class="employee-finance-metric ${debt > 0 ? "is-debt" : "is-clear"}">
+                    <span><i class="bi bi-cash-stack" aria-hidden="true"></i>Current debt</span>
+                    <strong>${aEscape(aMoney(debt))}</strong>
+                </article>
+                <article class="employee-finance-metric is-credit">
+                    <span><i class="bi bi-credit-card" aria-hidden="true"></i>Credit limit · ${aEscape(creditPercentage)}%</span>
+                    <strong>${aEscape(aMoney(p.credit_limit))}</strong>
+                </article>
+                <article class="employee-finance-metric ${available > 0 ? "is-available" : "is-muted"}">
+                    <span><i class="bi bi-check2-circle" aria-hidden="true"></i>Available credit</span>
+                    <strong>${aEscape(aMoney(available))}</strong>
+                </article>
+            </div>
+            <footer class="employee-profile-updated"><i class="bi bi-clock" aria-hidden="true"></i> Last updated ${aEscape(aDateTime(p.updated_at))}</footer>
+        </section>
+    `;
+}
+
 function buildHistoryHtml(rows) {
-    if (!Array.isArray(rows) || rows.length === 0) return "No history available.";
+    if (!Array.isArray(rows) || rows.length === 0) {
+        return aDataState("No financial history yet", "Salary, credit, repayment, and deduction changes will appear here.", "bi-clock-history");
+    }
 
     return rows.map((row) => {
         const payload = row.payload || {};
@@ -956,29 +1012,32 @@ async function openEmployeeModal(userId) {
     const historyEl = document.getElementById("employee-modal-history");
 
     modal.style.display = "grid";
-    profileEl.innerHTML = "Loading profile...";
-    historyEl.innerHTML = "Loading history...";
+    profileEl.innerHTML = aDataState("Loading employee profile", "Fetching current salary and credit information.", "bi-person-vcard");
+    historyEl.innerHTML = aDataState("Loading financial history", "Fetching the latest account changes.", "bi-clock-history");
     document.getElementById("employee-modal-actions").classList.add("hidden");
     document.getElementById("employee-limit-box").classList.add("hidden");
 
     try {
         await loadAcctSalarySchedules();
     } catch (error) {
-        profileEl.innerHTML = `<div class="mode-profile-empty">${aEscape(error.message || "Salary schedules are unavailable.")}</div>`;
-        historyEl.innerHTML = "No history available.";
+        profileEl.innerHTML = aDataState("Unable to load employee profile", error.message || "Salary schedules are unavailable.", "bi-exclamation-triangle");
+        historyEl.innerHTML = aDataState("Financial history unavailable", "Try reopening this employee after the profile service is available.", "bi-exclamation-triangle");
         return;
     }
     employeeModalProfile = await loadProfile(employeeModalUserId);
     if (!employeeModalProfile) {
-        profileEl.innerHTML = '<div class="mode-profile-empty">Unable to load profile.</div>';
-        historyEl.innerHTML = "No history available.";
+        profileEl.innerHTML = aDataState("Unable to load employee profile", "The selected employee record could not be retrieved.", "bi-exclamation-triangle");
+        historyEl.innerHTML = aDataState("Financial history unavailable", "No employee profile was returned.", "bi-exclamation-triangle");
         return;
     }
 
-    profileEl.innerHTML = buildProfileHtml(employeeModalProfile);
+    profileEl.innerHTML = buildEmployeeProfileHtml(employeeModalProfile);
     document.getElementById("employee-limit-current").textContent = aBool(employeeModalProfile.financial_profile_configured)
         ? `${aCategory(employeeModalProfile.employment_type)} | ${employeeModalProfile.salary_grade || "-"}${employeeModalProfile.salary_step ? ` Step ${employeeModalProfile.salary_step}` : ""} | Salary ${aMoney(employeeModalProfile.base_salary || 0)} | ${Number(employeeModalProfile.credit_percentage ?? acctDefaultCreditPercentage)}% Credit ${aMoney(employeeModalProfile.credit_limit || 0)}`
-        : "Salary-grade profile not configured";
+        : "No salary-grade schedule is configured. Add one to calculate the employee’s credit limit.";
+    document.getElementById("employee-open-limit-edit").innerHTML = aBool(employeeModalProfile.financial_profile_configured)
+        ? '<i class="bi bi-pencil-square"></i> Edit profile'
+        : '<i class="bi bi-plus-lg"></i> Configure profile';
     populateAcctSalaryProfile(employeeModalProfile);
     document.getElementById("employee-modal-actions").classList.remove("hidden");
 

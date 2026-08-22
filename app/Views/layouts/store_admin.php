@@ -6,6 +6,7 @@ $portalTitle = 'Store Admin Portal';
 $portalSubtitle = 'Assigned Store Oversight';
 $footerText = 'USTP IBEMS Store Administration';
 $initials = ibems_initials($name, 'SA');
+$profileImageUrl = (string) (session()->get('profile_image_url') ?? '');
 $availableRoles = ibems_available_roles();
 $navigation = [
     ['path' => 'store-admin/dashboard', 'label' => 'Dashboard', 'icon' => 'bi bi-speedometer2'],

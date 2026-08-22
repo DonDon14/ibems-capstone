@@ -239,7 +239,7 @@ class StoreController extends BaseController
                 ->getResultArray();
 
             $recentTransactions = $db->table('transactions t')
-                ->select('t.id, t.client_txn_id, t.amount, t.payment_method, t.customer_type, t.created_at, u.name AS customer_name')
+                ->select('t.id, t.client_txn_id, t.amount, t.payment_method, t.customer_type, t.created_at, u.name AS customer_name, u.profile_image_url AS customer_profile_image_url')
                 ->join('users u', 'u.id = t.user_id', 'left')
                 ->where('t.store_id', $storeId)
                 ->orderBy('t.created_at', 'DESC')
@@ -2235,7 +2235,7 @@ class StoreController extends BaseController
         $db = Database::connect();
 
         $builder = $db->table('users u')
-            ->select('u.id, u.employee_id, u.name, u.email, u.user_type, u.is_active, u.debt_pin_hash, b.credit_limit, b.current_debt')
+            ->select('u.id, u.employee_id, u.name, u.email, u.profile_image_url, u.user_type, u.is_active, u.debt_pin_hash, b.credit_limit, b.current_debt')
             ->join('balances b', 'b.user_id = u.id', 'inner')
             ->where('u.is_active', true)
             ->whereIn('u.user_type', ['faculty', 'staff']);
@@ -2328,7 +2328,7 @@ class StoreController extends BaseController
         $allowedPaymentMethods[] = 'split';
         $hasPaymentLines = in_array('transaction_payments', $db->listTables(), true);
         $query = $db->table('transactions t')
-            ->select('t.id, t.client_txn_id, t.created_at, t.payment_method, t.amount, t.customer_type, t.user_id, u.name AS customer_name')
+            ->select('t.id, t.client_txn_id, t.created_at, t.payment_method, t.amount, t.customer_type, t.user_id, u.name AS customer_name, u.profile_image_url AS customer_profile_image_url')
             ->join('users u', 'u.id = t.user_id', 'left')
             ->where('t.store_id', $storeId);
 
@@ -2423,6 +2423,7 @@ class StoreController extends BaseController
                 'amount' => (float) $row['amount'],
                 'customer_type' => $row['customer_type'],
                 'customer_name' => $customerName,
+                'customer_profile_image_url' => $row['customer_profile_image_url'] ?? null,
                 'payments' => $paymentRowsByTransaction[(int) $row['id']] ?? [],
             ];
         }, $rows);
@@ -3245,7 +3246,7 @@ class StoreController extends BaseController
                 $productId = (int) $db->insertID(); $productIds[] = $productId;
                 if ((int)$variant['stock'] > 0) $db->table('inventory_movements')->insert(['product_id'=>$productId,'store_id'=>$storeId,'type'=>'restock','qty'=>(int)$variant['stock'],'unit_cost'=>(float)$variant['cost'],'total_cost'=>(float)$variant['cost']*(int)$variant['stock'],'expected_profit'=>((float)$variant['price']-(float)$variant['cost'])*(int)$variant['stock'],'reason'=>$reason,'created_at'=>$now]);
             }
-            $db->table('audit_logs')->insert(['actor_id'=>$actorId,'action'=>'CREATE_PRODUCT_FAMILY','entity'=>'product_families','entity_id'=>$familyId,'payload_json'=>json_encode(['store_id'=>$storeId,'name'=>$name,'variant_count'=>count($variants),'product_ids'=>$productIds]),'created_at'=>$now]);
+            (new AuditLogModel())->insert(['actor_id'=>$actorId,'action'=>'CREATE_PRODUCT_FAMILY','entity'=>'product_families','entity_id'=>$familyId,'payload_json'=>json_encode(['store_id'=>$storeId,'name'=>$name,'variant_count'=>count($variants),'product_ids'=>$productIds]),'created_at'=>$now]);
             if (!$db->transStatus()) throw new \RuntimeException('Failed to create product family.');
             $db->transCommit();
             return $this->response->setJSON(['status'=>'success','family_id'=>$familyId,'product_ids'=>$productIds,'variant_count'=>count($variants)]);

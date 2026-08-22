@@ -20,7 +20,7 @@
         <?= view('components/stat_card', ['title' => 'Action Types', 'value' => '0', 'valueId' => 'audit-action-count', 'icon' => 'bi bi-diagram-3', 'tone' => 'alerts']) ?>
     </div>
 
-    <div class="overview-filter audit-filter-panel rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div class="overview-filter audit-filter-panel rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" data-compact-filters>
         <div class="audit-filter-main">
             <?= view('components/form_field', [
                 'id' => 'audit-search',
@@ -122,5 +122,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/admin-audit.js') ?>"></script>
+<script src="<?= base_url('assets/js/admin-audit.js') ?>?v=20260822a"></script>
 <?= $this->endSection() ?>

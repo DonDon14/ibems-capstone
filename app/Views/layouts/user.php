@@ -6,6 +6,7 @@ $portalTitle = 'User Portal';
 $portalSubtitle = 'Account and Purchase Overview';
 $footerText = 'USTP IBEMS User Portal';
 $initials = ibems_initials($name, 'US');
+$profileImageUrl = (string) (session()->get('profile_image_url') ?? '');
 $availableRoles = ibems_available_roles();
 $navigation = [
     ['path' => 'user/dashboard', 'label' => 'Dashboard', 'icon' => 'bi bi-speedometer2'],

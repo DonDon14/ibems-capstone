@@ -317,7 +317,14 @@ body.ibems-modern {
 .ibems-modern .app-container {
     min-width: 0;
     padding: clamp(20px, 3vw, 40px);
-    background: #f8fafc;
+    background-color: #f8fafc;
+    background-image:
+        linear-gradient(rgba(248, 250, 252, 0.18), rgba(248, 250, 252, 0.32)),
+        url('../images/ibems-app-background.jpg');
+    background-position: center;
+    background-repeat: no-repeat;
+    background-size: cover;
+    background-attachment: scroll, fixed;
 }
 
 .ibems-modern .app-container > * {
@@ -391,6 +398,30 @@ body.ibems-modern {
     border-radius: 13px;
     background: #eff6ff;
     font-size: 1.05rem;
+}
+
+.ibems-modern .page-header-icon--avatar {
+    overflow: hidden;
+    padding: 2px;
+    background: #fff;
+}
+
+.ibems-modern .page-header-icon--avatar img {
+    width: 100%;
+    height: 100%;
+    border-radius: 10px;
+    object-fit: cover;
+}
+
+.ibems-modern .page-header-icon--avatar-large {
+    width: 64px;
+    height: 64px;
+    flex-basis: 64px;
+    border-radius: 18px;
+}
+
+.ibems-modern .page-header-icon--avatar-large img {
+    border-radius: 14px;
 }
 
 .ibems-modern .page-header h1 {
@@ -1263,9 +1294,9 @@ body.has-app-dialog {
     place-items: center;
     padding: 0;
     color: transparent;
-    border: 1px solid #e2e8f0;
+    border: 1px solid transparent;
     border-radius: 9px;
-    background: #fff;
+    background: transparent;
     box-shadow: none;
     font-size: 0;
 }
@@ -1275,6 +1306,8 @@ body.ibems-modern :is(.admin-modal-close, .acct-modal-close, .inv-modal-close, .
     place-items: center;
     padding: 0;
     color: transparent;
+    border-color: transparent;
+    background: transparent;
     font-size: 0;
     line-height: 1;
 }
@@ -1287,10 +1320,17 @@ body.ibems-modern :is(.admin-modal-close, .acct-modal-close, .inv-modal-close, .
     line-height: 1;
 }
 
-.ibems-modern :is(.admin-modal-close, .acct-modal-close, .inv-modal-close, .app-modal-close, .receipt-close):hover {
+body.ibems-modern :is(.admin-modal-close, .acct-modal-close, .inv-modal-close, .app-modal-close, .receipt-close):hover {
     color: transparent;
-    border-color: #cbd5e1;
-    background: #f8fafc;
+    border-color: transparent;
+    background: #f1f5f9;
+    transform: none;
+}
+
+body.ibems-modern :is(.admin-modal-close, .acct-modal-close, .inv-modal-close, .app-modal-close, .receipt-close):focus-visible {
+    border-color: #93c5fd;
+    outline: 3px solid rgba(37, 99, 235, 0.18);
+    outline-offset: 1px;
 }
 
 .ibems-modern :is(.admin-modal-close, .acct-modal-close, .inv-modal-close, .app-modal-close, .receipt-close):hover::before {
@@ -1469,6 +1509,12 @@ body.ibems-modern :is(.admin-modal-close, .acct-modal-close, .inv-modal-close, .
         flex-basis: 40px;
     }
 
+    .ibems-modern .page-header-icon--avatar-large {
+        width: 54px;
+        height: 54px;
+        flex-basis: 54px;
+    }
+
     .ibems-modern .page-header-actions > * {
         flex: 1 1 auto;
     }
@@ -1510,4 +1556,1123 @@ body.ibems-modern :is(.admin-modal-close, .acct-modal-close, .inv-modal-close, .
         animation-iteration-count: 1 !important;
         transition-duration: 0.01ms !important;
     }
+}
+
+/* Shared notification center and appearance controls */
+.ibems-modern .topbar-icon-button {
+    position: relative;
+    display: inline-grid;
+    width: 38px;
+    height: 38px;
+    flex: 0 0 38px;
+    place-items: center;
+    border: 1px solid #e2e8f0;
+    border-radius: 10px;
+    background: #fff;
+    color: #475569;
+    cursor: pointer;
+    font: inherit;
+    transition: background-color .15s ease, border-color .15s ease, color .15s ease, transform .15s ease;
+}
+
+.ibems-modern .topbar-icon-button:hover,
+.ibems-modern .topbar-icon-button:focus-visible,
+.ibems-modern .topbar-icon-button[aria-expanded="true"] {
+    color: #0b5bd3;
+    border-color: #bfdbfe;
+    background: #eff6ff;
+}
+
+.ibems-modern .notification-center { position: relative; }
+
+.ibems-modern .notification-badge {
+    position: absolute;
+    top: -7px;
+    right: -7px;
+    min-width: 19px;
+    height: 19px;
+    padding: 0 5px;
+    border: 2px solid #fff;
+    border-radius: 999px;
+    background: #e11d48;
+    color: #fff;
+    font-size: 10px;
+    font-weight: 800;
+    line-height: 15px;
+    text-align: center;
+}
+
+.ibems-modern .notification-panel {
+    position: absolute;
+    top: calc(100% + 12px);
+    right: 0;
+    z-index: 120;
+    width: min(410px, calc(100vw - 32px));
+    overflow: hidden;
+    border: 1px solid #dbe4ee;
+    border-radius: 15px;
+    background: #fff;
+    box-shadow: 0 24px 60px rgba(15, 23, 42, .18);
+}
+
+.ibems-modern .notification-panel-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 15px 16px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.ibems-modern .notification-panel-head > div { display: grid; gap: 2px; }
+.ibems-modern .notification-panel-head strong { color: #0f172a; font-size: .96rem; }
+.ibems-modern .notification-panel-head span { color: #64748b; font-size: .72rem; }
+.ibems-modern .notification-panel-head button {
+    padding: 5px 7px;
+    border: 0;
+    background: transparent;
+    color: #0b5bd3;
+    cursor: pointer;
+    font: inherit;
+    font-size: .74rem;
+    font-weight: 700;
+}
+
+.ibems-modern .notification-list { max-height: min(520px, calc(100vh - 120px)); overflow-y: auto; }
+.ibems-modern .notification-item {
+    display: grid;
+    grid-template-columns: 38px minmax(0, 1fr) 8px;
+    gap: 11px;
+    align-items: start;
+    padding: 13px 15px;
+    border-bottom: 1px solid #edf2f7;
+    color: inherit;
+    text-decoration: none;
+}
+.ibems-modern .notification-item:last-child { border-bottom: 0; }
+.ibems-modern .notification-item:hover,
+.ibems-modern .notification-item:focus-visible { background: #f8fafc; }
+.ibems-modern .notification-item.is-unread { background: #eff6ff; }
+.ibems-modern .notification-item.is-unread:hover { background: #e4efff; }
+.ibems-modern .notification-item-icon {
+    display: grid;
+    width: 38px;
+    height: 38px;
+    place-items: center;
+    border-radius: 11px;
+    background: #eaf2ff;
+    color: #2563eb;
+}
+.ibems-modern .notification-item-icon.notification-success { background: #dcfce7; color: #15803d; }
+.ibems-modern .notification-item-icon.notification-danger { background: #ffe4e6; color: #be123c; }
+.ibems-modern .notification-item-copy { display: grid; gap: 3px; min-width: 0; }
+.ibems-modern .notification-item-copy strong { color: #0f172a; font-size: .82rem; }
+.ibems-modern .notification-item-copy > span { color: #475569; font-size: .76rem; line-height: 1.4; }
+.ibems-modern .notification-item-copy time { color: #94a3b8; font-size: .68rem; }
+.ibems-modern .notification-unread-dot { width: 7px; height: 7px; margin-top: 6px; border-radius: 50%; background: #2563eb; }
+.ibems-modern .notification-empty { display: grid; min-height: 170px; place-items: center; align-content: center; gap: 9px; color: #64748b; font-size: .8rem; }
+.ibems-modern .notification-empty i { font-size: 1.35rem; color: #94a3b8; }
+.ibems-modern .notification-empty.is-error { color: #b91c1c; }
+
+/* Dark theme is shared by every portal because they all render portal_shell.php. */
+html[data-theme="dark"] { color-scheme: dark; }
+html[data-theme="dark"] body.ibems-modern {
+    --text-main: #e5edf7;
+    --text-soft: #9fb0c4;
+    --border: #334155;
+    --surface: #111c2e;
+    --surface-soft: #162338;
+    --surface-muted: #1b2a42;
+    --line-soft: #334155;
+    background: linear-gradient(rgba(5, 11, 23, .90), rgba(5, 11, 23, .94)), var(--app-bg-image), #070d18;
+    color: #dbe7f5;
+}
+html[data-theme="dark"] .ibems-modern :is(.app-main, .app-container) { background-color: transparent; color: #dbe7f5; }
+html[data-theme="dark"] .ibems-modern .app-topbar { background: rgba(10, 18, 32, .94); border-color: #26364d; }
+html[data-theme="dark"] .ibems-modern .app-sidebar { background: rgba(8, 15, 28, .96); border-color: #26364d; }
+html[data-theme="dark"] .ibems-modern .app-footer { background: #0a1220; border-color: #26364d; color: #8da0b9; }
+html[data-theme="dark"] .ibems-modern :is(.topbar-left h2, h1, h2, h3, h4, .profile-name) { color: #f1f5f9; }
+html[data-theme="dark"] .ibems-modern :is(.topbar-action, .topbar-profile, .topbar-icon-button) { background: #111c2e; border-color: #334155; color: #cbd5e1; }
+html[data-theme="dark"] .ibems-modern :is(.topbar-action, .topbar-icon-button):hover { background: #17263c; border-color: #46617f; color: #fff; }
+html[data-theme="dark"] .ibems-modern .notification-badge { border-color: #111c2e; }
+html[data-theme="dark"] .ibems-modern :is(.notification-panel, .notification-item) { background: #111c2e; border-color: #26364d; }
+html[data-theme="dark"] .ibems-modern .notification-panel-head { border-color: #26364d; }
+html[data-theme="dark"] .ibems-modern :is(.notification-panel-head strong, .notification-item-copy strong) { color: #f1f5f9; }
+html[data-theme="dark"] .ibems-modern :is(.notification-panel-head span, .notification-item-copy > span) { color: #a9b8cb; }
+html[data-theme="dark"] .ibems-modern .notification-item:hover { background: #17263c; }
+html[data-theme="dark"] .ibems-modern .notification-item.is-unread { background: #102748; }
+html[data-theme="dark"] .ibems-modern .notification-item.is-unread:hover { background: #153158; }
+html[data-theme="dark"] .ibems-modern :is(.dash-card, .metric-card, .data-panel, .content-card, .section-card, .filter-card, .table-card, .operations-card, .quick-access-card, .app-modal-card, .admin-modal-card, .acct-modal-card, .inv-modal-card, .profile-image-card) {
+    background: #111c2e !important;
+    border-color: #334155 !important;
+    color: #dbe7f5;
+}
+html[data-theme="dark"] .ibems-modern :is(input, select, textarea, .form-control) { background: #0c1627 !important; border-color: #3a4a61 !important; color: #e5edf7 !important; }
+html[data-theme="dark"] .ibems-modern :is(table, thead, tbody, tr, td, th) { border-color: #2c3b50 !important; }
+html[data-theme="dark"] .ibems-modern :is(thead, th) { background: #162338 !important; color: #aebdd0 !important; }
+html[data-theme="dark"] .ibems-modern :is(td, .record-row, .list-row) { background-color: #111c2e; color: #dbe7f5; }
+html[data-theme="dark"] .ibems-modern :is(.muted, .text-muted, .profile-role, p) { color: #9fb0c4; }
+
+/* Complete portal dark theme: shared surfaces, data, controls, and overlays. */
+html[data-theme="dark"] body.ibems-modern {
+    --dark-canvas: #07111f;
+    --dark-shell: #091425;
+    --dark-surface: #101d30;
+    --dark-surface-raised: #14243a;
+    --dark-surface-soft: #182940;
+    --dark-border: #31435b;
+    --dark-border-strong: #405672;
+    --dark-text: #f4f7fb;
+    --dark-text-secondary: #c6d2e1;
+    --dark-text-muted: #9eb0c5;
+    --dark-link: #7db5ff;
+    --dark-blue-soft: #102c52;
+    --dark-shadow: 0 12px 32px rgba(0, 0, 0, .24);
+}
+
+html[data-theme="dark"] .ibems-modern .app-main {
+    background: var(--dark-canvas);
+}
+
+html[data-theme="dark"] .ibems-modern .app-container {
+    background-color: var(--dark-canvas);
+    background-image:
+        linear-gradient(rgba(7, 17, 31, .91), rgba(7, 17, 31, .96)),
+        url('../images/ibems-app-background.jpg');
+}
+
+html[data-theme="dark"] .ibems-modern .app-sidebar {
+    color: var(--dark-text-secondary);
+    background: rgba(7, 16, 30, .98);
+    border-color: #25364d;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.app-brand h1, .app-brand p) {
+    color: var(--dark-text);
+}
+
+html[data-theme="dark"] .ibems-modern .app-brand-logo {
+    background: #f8fafc;
+    border-color: #46617f;
+}
+
+html[data-theme="dark"] .ibems-modern .app-menu::before,
+html[data-theme="dark"] .ibems-modern .topbar-left p {
+    color: #8fa2b9;
+}
+
+html[data-theme="dark"] .ibems-modern .app-menu a {
+    color: #afbdd0;
+}
+
+html[data-theme="dark"] .ibems-modern .app-menu a i {
+    color: #8296b0;
+}
+
+html[data-theme="dark"] .ibems-modern .app-menu a:is(:hover, :focus-visible) {
+    color: #f8fafc;
+    border-color: #3a4d67;
+    background: #14243a;
+}
+
+html[data-theme="dark"] .ibems-modern .app-menu a.is-active {
+    color: #dbeafe;
+    border-color: #315f9b;
+    background: #12325a;
+}
+
+html[data-theme="dark"] .ibems-modern .app-menu a.is-active i {
+    color: #7db5ff;
+}
+
+html[data-theme="dark"] .ibems-modern .sidebar-logout {
+    border-color: #2a3b52;
+}
+
+html[data-theme="dark"] .ibems-modern .sidebar-logout button {
+    color: #aebdd0;
+}
+
+html[data-theme="dark"] .ibems-modern .sidebar-logout button:hover {
+    color: #fecaca;
+    border-color: #7f3542;
+    background: #351b27;
+}
+
+html[data-theme="dark"] .ibems-modern .page-header {
+    border-color: var(--dark-border);
+}
+
+html[data-theme="dark"] .ibems-modern :is(.page-header h1, .page-header h2, .page-header h3, .dashboard-title h3) {
+    color: var(--dark-text);
+}
+
+html[data-theme="dark"] .ibems-modern :is(.page-header p, .dashboard-title p) {
+    color: var(--dark-text-secondary);
+}
+
+html[data-theme="dark"] .ibems-modern .page-header-icon {
+    color: #8fbdff;
+    border-color: #315f9b;
+    background: #102c52;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .dash-card, .metric-card, .dash-panel, .data-panel, .record-panel,
+    .overview-filter, .overview-table-wrap, .summary-card, .content-card,
+    .section-card, .filter-card, .table-card, .operations-card,
+    .quick-access-card, .admin-quick-panel, .action-quick-panel,
+    .acct-flow-panel, .acct-summary, .acct-table-wrap, .mode-profile-card,
+    .store-card, .ad-store-card, .ad-account-panel, .ad-debt-summary,
+    .inventory-card, .inventory-table-wrap, .reports-card, .table-wrap,
+    .history-table-wrap, .history-summary-card, .staff-card,
+    .staff-employee-card, .settings-card, .category-settings-card,
+    .user-security-panel, .user-status-card, .user-store-total-card,
+    .user-product-card, .panel, .order-summary, .confirm-card,
+    .opening-balance-card, .scanner-card, .receipt-card
+) {
+    color: var(--dark-text-secondary);
+    border-color: var(--dark-border) !important;
+    background: var(--dark-surface) !important;
+    box-shadow: var(--dark-shadow);
+}
+
+html[data-theme="dark"] .ibems-modern .app-container :is(h1, h2, h3, h4, h5, h6, strong),
+html[data-theme="dark"] .ibems-modern :is(.metric-card strong, .dash-card strong, .stack-item strong, td strong) {
+    color: var(--dark-text);
+}
+
+html[data-theme="dark"] .ibems-modern .app-container :is(p, small, label),
+html[data-theme="dark"] .ibems-modern :is(
+    .metric-card-label, .stack-meta, .table-cell-note, .inventory-card-subtitle,
+    .reports-card-note, .staff-filter-result, .profile-role, .field-help,
+    .ui-field-help, .quick-link-copy small, .dashboard-panel-meta
+) {
+    color: var(--dark-text-muted);
+}
+
+html[data-theme="dark"] .ibems-modern .app-container a:not(.primary-btn):not(.btn-primary) {
+    color: var(--dark-link);
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .stack-item, .admin-alert-item, .admin-payment-item, .record-list-item,
+    .interactive-record-row, .uv-record-row, .acct-record-row,
+    .acct-cashbook-row, .ad-account-row, .store-admin-review-item,
+    .store-admin-store-item, .product-row, .inventory-movement-item,
+    .inventory-variant-row, .staff-record-row, .staff-employee-summary,
+    .history-item, .cart-item, .scan-suggestion-item, .debt-suggestion-item,
+    .officer-suggestion-item, .ap-detail-item, .audit-detail-item,
+    .ad-detail-item, .detail-item, .readiness-item
+) {
+    color: var(--dark-text-secondary);
+    border-color: var(--dark-border) !important;
+    background: var(--dark-surface-raised) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .stack-item, .interactive-record-row, .uv-record-row, .acct-record-row,
+    .ad-account-row, .product-row, .staff-record-row, .history-row-clickable,
+    .sr-row-clickable, .uh-row-clickable
+):is(:hover, :focus-within) {
+    color: var(--dark-text);
+    border-color: #52719a !important;
+    background: #1a304c !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.readiness-grid > div, .mini-ledger > span, .dashboard-meta-item, .uv-meta-item, .confirm-meta-item, .receipt-meta-item) {
+    color: var(--dark-text-secondary);
+    border-color: var(--dark-border);
+    background: var(--dark-surface-raised);
+}
+
+html[data-theme="dark"] .ibems-modern :is(.quick-links, .admin-quick-links, .action-quick-links) a {
+    color: var(--dark-text);
+    border-color: var(--dark-border);
+    background: var(--dark-surface-raised);
+}
+
+html[data-theme="dark"] .ibems-modern :is(.quick-links, .admin-quick-links, .action-quick-links) a:hover {
+    border-color: #52719a;
+    background: #1a304c;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.quick-link-copy strong, .stack-item-head strong, .readiness-grid strong, .mini-ledger strong) {
+    color: var(--dark-text);
+}
+
+html[data-theme="dark"] .ibems-modern :is(.stack-item-head span, .readiness-grid span, .readiness-grid small, .mini-ledger span) {
+    color: var(--dark-text-muted);
+}
+
+html[data-theme="dark"] .ibems-modern :is(table, .table-standard, .ap-table, .audit-table, .confirm-table, .receipt-table) {
+    color: var(--dark-text-secondary);
+    background: var(--dark-surface);
+}
+
+html[data-theme="dark"] .ibems-modern :is(thead, thead tr, th) {
+    color: #c8d5e5 !important;
+    border-color: var(--dark-border) !important;
+    background: #172740 !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(tbody, tbody tr, td) {
+    color: var(--dark-text-secondary) !important;
+    border-color: var(--dark-border) !important;
+    background: var(--dark-surface) !important;
+}
+
+html[data-theme="dark"] .ibems-modern tbody tr:is(:hover, :focus-within) td {
+    background: #182c47 !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(input, select, textarea, option, .form-control),
+html[data-theme="dark"] .ibems-modern :is(.ui-select-trigger, .ui-date-trigger) {
+    color: var(--dark-text) !important;
+    border-color: var(--dark-border-strong) !important;
+    background-color: #0b1728 !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(input, textarea)::placeholder,
+html[data-theme="dark"] .ibems-modern .ui-date-value.is-placeholder {
+    color: #8295ac !important;
+}
+
+html[data-theme="dark"] .ibems-modern input[type="date"] {
+    color-scheme: dark;
+}
+
+html[data-theme="dark"] .ibems-modern :is(input, select, textarea):disabled,
+html[data-theme="dark"] .ibems-modern :is(.ui-select-trigger, .ui-date-trigger):disabled {
+    color: #7f91a8 !important;
+    border-color: #293a50 !important;
+    background: #121d2c !important;
+}
+
+html[data-theme="dark"] .ibems-modern .ui-control-icon {
+    color: #a9b8cb;
+    border-color: var(--dark-border);
+    background: #142238;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.ui-select-menu, .ui-date-popup) {
+    color: var(--dark-text-secondary);
+    border-color: var(--dark-border-strong);
+    background: var(--dark-surface-raised);
+    box-shadow: 0 22px 48px rgba(0, 0, 0, .42);
+}
+
+html[data-theme="dark"] .ibems-modern :is(.ui-select-option, .ui-date-day, .ui-date-head strong) {
+    color: var(--dark-text-secondary);
+}
+
+html[data-theme="dark"] .ibems-modern :is(.ui-select-option, .ui-date-day):is(:hover, .is-active) {
+    color: var(--dark-text);
+    background: #203654;
+}
+
+html[data-theme="dark"] .ibems-modern .ui-select-option[aria-selected="true"],
+html[data-theme="dark"] .ibems-modern .ui-date-day.is-today {
+    color: #bfdbfe;
+    background: var(--dark-blue-soft);
+}
+
+html[data-theme="dark"] .ibems-modern :is(.secondary-btn, .btn-secondary, .ghost-btn, .btn-ghost, .icon-btn, .card-action-btn) {
+    color: #d4deeb;
+    border-color: var(--dark-border-strong);
+    background: #142238;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.secondary-btn, .btn-secondary, .ghost-btn, .btn-ghost, .icon-btn, .card-action-btn):hover:not(:disabled) {
+    color: #fff;
+    border-color: #59779e;
+    background: #1b304c;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .app-modal-card, .admin-modal-card, .acct-modal-card, .inv-modal-card,
+    .settings-modal-card, .uv-modal-card, .ad-account-modal-card,
+    .debt-payment-modal-card, .debt-pin-modal-card, .product-variant-modal-card,
+    .customer-qr-card, .profile-image-card, .app-dialog-card
+) {
+    color: var(--dark-text-secondary);
+    border-color: var(--dark-border-strong) !important;
+    background: var(--dark-surface) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.app-modal-head, .admin-modal-head, .acct-modal-head, .inv-modal-head, .settings-modal-head, .profile-image-head),
+html[data-theme="dark"] .ibems-modern :is(.app-modal-actions, .admin-modal-actions, .acct-modal-actions, .inv-modal-actions, .settings-modal-actions, .profile-image-actions) {
+    border-color: var(--dark-border) !important;
+    background: var(--dark-surface-raised) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.app-modal-close, .admin-modal-close, .acct-modal-close, .inv-modal-close, .settings-modal-head .icon-btn, .profile-image-close) {
+    color: #b8c7d9;
+    border-color: var(--dark-border-strong);
+    background: #17263c;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.compact-filter-bar, .compact-filter-panel, .staff-filter-panel, .acct-filters-redesign, .uv-filter-panel, .ap-filter-panel, .audit-filter-panel, .admin-stores-filters, .history-filters, .user-filters, .user-product-filters) {
+    color: var(--dark-text-secondary);
+    border-color: var(--dark-border) !important;
+    background: var(--dark-surface) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.status-pill.is-ready, .status-badge.active, .uv-status.active, .acct-status.active, .user-status-badge.is-success) {
+    color: #86efac !important;
+    border-color: #25764b !important;
+    background: #123825 !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.status-pill.is-warning, .status-warning, .inventory-summary-low, .opening-status-pill) {
+    color: #fcd38d !important;
+    border-color: #8a5a18 !important;
+    background: #3a2912 !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.notification-item-icon, .metric-card-icon, .quick-link-icon, .page-header-icon) {
+    box-shadow: none;
+}
+
+html[data-theme="dark"] .ibems-modern .notification-item-icon.notification-success {
+    color: #86efac;
+    background: #123825;
+}
+
+html[data-theme="dark"] .ibems-modern .notification-item-icon.notification-danger {
+    color: #fda4af;
+    background: #451c2a;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.profile-image-file-name, .notification-item-copy time, .notification-empty) {
+    color: var(--dark-text-muted);
+}
+
+html[data-theme="dark"] .ibems-modern :is(.credit-meter-track, .debt-credit-track, .table-debt-bar, .progress-track) {
+    border-color: #344860;
+    background: #26364a;
+}
+
+html[data-theme="dark"] .ibems-modern .inventory-summary-pill {
+    color: var(--dark-text-secondary);
+    border-color: var(--dark-border);
+    background: #14243a;
+}
+
+html[data-theme="dark"] .ibems-modern .inventory-summary-pill:is(:hover, .is-active) {
+    border-color: #5c83b5;
+    background: #1a304c;
+}
+
+html[data-theme="dark"] .ibems-modern .inventory-summary-in {
+    border-color: #2e6949;
+    background: #123322;
+}
+
+html[data-theme="dark"] .ibems-modern .inventory-summary-low {
+    border-color: #8a5a18;
+    background: #3a2912;
+}
+
+html[data-theme="dark"] .ibems-modern .inventory-summary-out {
+    border-color: #7f3542;
+    background: #3b1d29;
+}
+
+html[data-theme="dark"] .ibems-modern .inventory-summary-pill :is(span, small) {
+    color: #b5c4d6;
+}
+
+html[data-theme="dark"] .ibems-modern .inventory-summary-pill strong {
+    color: #fff;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .product-card, .cart-list, .scan-quick-wrap, .opening-balance-banner,
+    .debt-payment-card, .split-payment-editor, .payment-state,
+    .pos-payment-account, .store-day-account-count, .cash-denomination-item,
+    .store-day-reopen-preview, .pos-context-bar, .pos-checkout-footer,
+    .product-variant-option
+) {
+    color: var(--dark-text-secondary);
+    border-color: var(--dark-border) !important;
+    background: var(--dark-surface-raised) !important;
+    box-shadow: none;
+}
+
+html[data-theme="dark"] .ibems-modern .product-card:is(.stock-low, .stock-maxed) {
+    border-color: #725526 !important;
+    background: #1e2a39 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .product-card :is(.product-name, .product-price, h5, strong),
+html[data-theme="dark"] .ibems-modern :is(.opening-balance-info strong, .payment-method-group-head strong, .summary-row strong, .total-row strong) {
+    color: var(--dark-text) !important;
+}
+
+html[data-theme="dark"] .ibems-modern .product-card :is(p, small, .product-meta, .product-stock),
+html[data-theme="dark"] .ibems-modern :is(.opening-balance-info small, .pos-context-bar, .payment-method-help) {
+    color: var(--dark-text-muted) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.opening-balance-banner.is-blocked, .opening-balance-banner.is-error, .pos-transaction-note.is-locked) {
+    color: #f8d59a;
+    border-color: #7b571e !important;
+    background: #342713 !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.category-tab, .cart-btn, .scan-btn, .debt-scan-btn, .scan-inline-btn) {
+    color: #d4deeb;
+    border-color: var(--dark-border-strong);
+    background: #172740;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.category-tab, .cart-btn, .scan-btn, .debt-scan-btn, .scan-inline-btn):hover:not(:disabled) {
+    color: #fff;
+    border-color: #5d7da6;
+    background: #203754;
+}
+
+html[data-theme="dark"] .ibems-modern .category-tab.active {
+    color: #fff;
+    border-color: #2d73c8;
+    background: #155294;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.debt-suggestions, .scan-suggestions) {
+    border-color: var(--dark-border-strong);
+    background: var(--dark-surface-raised);
+}
+
+html[data-theme="dark"] .ibems-modern .admin-status-pill {
+    color: var(--dark-text-secondary);
+    border-color: var(--dark-border);
+    background: var(--dark-surface-raised);
+}
+
+html[data-theme="dark"] .ibems-modern .admin-status-pill.is-ready {
+    border-color: #2e6949;
+    background: #123322;
+}
+
+html[data-theme="dark"] .ibems-modern .admin-status-pill.is-warning {
+    border-color: #8a5a18;
+    background: #3a2912;
+}
+
+html[data-theme="dark"] .ibems-modern .admin-status-pill span {
+    color: #b5c4d6;
+}
+
+html[data-theme="dark"] .ibems-modern .admin-status-pill strong {
+    color: #fff;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.dash-chart-wrap, .admin-empty-state, .data-state, .acct-flow-item) {
+    color: var(--dark-text-secondary);
+    border-color: var(--dark-border) !important;
+    background: var(--dark-surface-raised) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.data-state strong, .acct-flow-item strong) {
+    color: var(--dark-text);
+}
+
+html[data-theme="dark"] .ibems-modern :is(.data-state small, .acct-flow-item p) {
+    color: var(--dark-text-muted);
+}
+
+html[data-theme="dark"] .ibems-modern :is(.user-product-image-wrap, .user-product-image-fallback) {
+    color: #7db5ff;
+    border-color: var(--dark-border);
+    background: #172b45;
+}
+
+html[data-theme="dark"] .ibems-modern .user-product-card-body {
+    color: var(--dark-text-secondary);
+    background: var(--dark-surface);
+}
+
+html[data-theme="dark"] .ibems-modern .user-product-card h3 {
+    color: var(--dark-text);
+}
+
+/* Page-specific dark-mode completion. Keep legacy page styles from restoring
+   light surfaces or low-contrast copy after the shared portal shell loads. */
+html[data-theme="dark"] .ibems-modern .page-header-eyebrow {
+    color: #78a9ff;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.history-shell, .staff-scope-note, .debt-credit-meter) {
+    color: var(--dark-text-secondary);
+    border-color: var(--dark-border) !important;
+    background: var(--dark-surface) !important;
+}
+
+html[data-theme="dark"] .ibems-modern .history-date,
+html[data-theme="dark"] .ibems-modern .staff-scope-note strong,
+html[data-theme="dark"] .ibems-modern .debt-credit-head strong {
+    color: var(--dark-text) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .staff-scope-note, .staff-count-text, .reports-count,
+    .pos-context-label, .opening-balance-info .label,
+    .debt-credit-head span, .debt-credit-values, .debt-credit-meter p,
+    .text-slate-500, .text-slate-600, .history-pager,
+    .product-ops-meta span, .product-ops-meta i,
+    .scan-qty-field > span, .cart-empty-state > span
+) {
+    color: var(--dark-text-muted) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.period-chip, .settings-section-count) {
+    color: var(--dark-text-secondary);
+    border-color: var(--dark-border-strong);
+    background: var(--dark-surface-raised);
+}
+
+html[data-theme="dark"] .ibems-modern .period-chip:hover {
+    color: var(--dark-text);
+    border-color: #5d7da6;
+    background: #203754;
+}
+
+html[data-theme="dark"] .ibems-modern .period-chip.is-active {
+    color: #fff;
+    border-color: #2d73c8;
+    background: #155294;
+}
+
+html[data-theme="dark"] .ibems-modern .debt-credit-meter:is(.is-near, .is-maxed) {
+    border-color: #8a5a18 !important;
+    background: #302713 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .debt-credit-meter.is-over {
+    border-color: #7f3542 !important;
+    background: #351c27 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .debt-credit-meter.is-over :is(#debt-credit-status, #debt-credit-message) {
+    color: #fda4af !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.inventory-product-meta, .inventory-product-meta-secondary) {
+    color: var(--dark-text-muted);
+}
+
+html[data-theme="dark"] .ibems-modern .inventory-product-meta span {
+    color: var(--dark-text-secondary);
+    border-color: var(--dark-border);
+    background: #172740;
+}
+
+html[data-theme="dark"] .ibems-modern .inventory-product-meta-secondary span {
+    color: var(--dark-text-muted);
+    border: 0;
+    background: transparent;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.table-standard-wrap, .store-pagination, .dashboard-panel-meta) {
+    color: var(--dark-text-muted) !important;
+    border-color: var(--dark-border) !important;
+    background: var(--dark-surface-raised) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.store-card-action, .uv-chip) {
+    color: var(--dark-text-secondary) !important;
+    border-color: var(--dark-border-strong) !important;
+    background: #172740 !important;
+    box-shadow: none !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.store-card-action, .uv-chip):is(:hover, :focus-visible) {
+    color: #fff !important;
+    border-color: #5d7da6 !important;
+    background: #203754 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .uv-chip.is-active {
+    color: #fff !important;
+    border-color: #2d73c8 !important;
+    background: #155294 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .uv-role-chip {
+    color: #c6d2e1 !important;
+    border-color: #405672 !important;
+    background: #172740 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .uv-status.is-active {
+    color: #86efac !important;
+    border: 1px solid #25764b !important;
+    background: #123825 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .uv-status.is-inactive {
+    color: #fcd38d !important;
+    border: 1px solid #8a5a18 !important;
+    background: #3a2912 !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.overview-pager, .ap-product-cell span, .audit-date) {
+    color: var(--dark-text-muted) !important;
+}
+
+html[data-theme="dark"] .ibems-modern .dashboard-health-message-lead {
+    color: #fbbf6a !important;
+}
+
+html[data-theme="dark"] .ibems-modern .admin-alert-label {
+    color: #fda4af !important;
+    border-color: #7f3542 !important;
+    background: #3b1d29 !important;
+}
+
+/* Tailwind utility compatibility for pages that mix utility markup with the
+   portal design system. These utilities otherwise reintroduce white cards. */
+html[data-theme="dark"] .ibems-modern :is(.bg-white, .bg-slate-50, .bg-slate-100) {
+    background-color: var(--dark-surface-raised) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.text-slate-950, .text-slate-900, .text-slate-800) {
+    color: var(--dark-text) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.text-slate-700, .text-slate-600) {
+    color: var(--dark-text-secondary) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.text-slate-500, .text-slate-400) {
+    color: var(--dark-text-muted) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.border-slate-100, .border-slate-200, .border-slate-300) {
+    border-color: var(--dark-border) !important;
+}
+
+html[data-theme="dark"] .ibems-modern .acct-tab {
+    color: var(--dark-text-secondary) !important;
+    border-color: var(--dark-border-strong) !important;
+    background: #172740 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .acct-tab:is(:hover, :focus-visible) {
+    color: #fff !important;
+    border-color: #5d7da6 !important;
+    background: #203754 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .acct-tab.is-active {
+    color: #fff !important;
+    border-color: #2d73c8 !important;
+    background: #155294 !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.user-pager, .user-deduction-filter) {
+    color: var(--dark-text-muted) !important;
+    border-color: var(--dark-border) !important;
+    background: var(--dark-surface-raised) !important;
+}
+
+html[data-theme="dark"] .ibems-modern .user-inline-link {
+    color: var(--dark-link) !important;
+}
+
+html[data-theme="dark"] .ibems-modern .user-product-variant {
+    color: #c7d8ee !important;
+    border-color: #405672 !important;
+    background: #172740 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .user-status-badge {
+    color: #9bc4ff !important;
+    border-color: #315d91 !important;
+    background: #102c52 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .user-availability.is-out {
+    color: #fda4af !important;
+    border-color: #7f3542 !important;
+    background: #3b1d29 !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .dashboard-meta-line, .variance-grid span,
+    .table-person-cell > span, .store-admin-store-metrics > span
+) {
+    color: var(--dark-text-muted) !important;
+}
+
+html[data-theme="dark"] .ibems-modern .store-admin-store-metrics > span:last-child {
+    color: var(--dark-text) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.variance-case, .variance-pill.is-muted) {
+    color: var(--dark-text-secondary) !important;
+    border-color: var(--dark-border) !important;
+    background: var(--dark-surface-raised) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.variance-pill.is-danger, .store-admin-exposure) {
+    color: #fda4af !important;
+    border-color: #7f3542 !important;
+    background: #3b1d29 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .table-chip {
+    color: #c7d8ee !important;
+    border-color: #405672 !important;
+    background: #172740 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .acct-debt-status.is-warning {
+    color: #fcd38d !important;
+    border-color: #8a5a18 !important;
+    background: #3a2912 !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.dashboard-meta-item > span, .table-person-cell span) {
+    color: var(--dark-text-muted) !important;
+}
+
+html[data-theme="dark"] .ibems-modern .payment-method-card {
+    color: var(--dark-text-secondary) !important;
+    border-color: var(--dark-border) !important;
+    background: var(--dark-surface-raised) !important;
+}
+
+html[data-theme="dark"] .ibems-modern .payment-method-card.needs-setup {
+    border-color: #8a5a18 !important;
+    background: #302713 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .payment-method-copy strong {
+    color: var(--dark-text) !important;
+}
+
+html[data-theme="dark"] .ibems-modern .payment-method-copy :is(span, code, small) {
+    color: var(--dark-text-muted) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.payment-method-icon, .method-image-preview span) {
+    color: #7db5ff !important;
+    border-color: #315d91 !important;
+    background: #102c52 !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.category-default-badge, .payment-status-badge.is-built-in, .category-product-count) {
+    color: #c7d8ee !important;
+    border-color: #405672 !important;
+    background: #172740 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .payment-status-badge.is-setup {
+    color: #fcd38d !important;
+    border-color: #8a5a18 !important;
+    background: #3a2912 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .payment-status-badge.is-ready {
+    color: #86efac !important;
+    border-color: #25764b !important;
+    background: #123825 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .category-delete-btn {
+    color: #fda4af !important;
+    border-color: #7f3542 !important;
+    background: #351c27 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .category-delete-btn:hover {
+    color: #fff !important;
+    border-color: #a94758 !important;
+    background: #4a2431 !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.receipt-head, .receipt-actions, .confirm-actions) {
+    color: var(--dark-text-secondary) !important;
+    border-color: var(--dark-border) !important;
+    background: var(--dark-surface-raised) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.receipt-head h3, .receipt-head h4) {
+    color: var(--dark-text) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .product-action-info, .product-detail-view, .modal-action-tabs,
+    .adjust-preview, .variant-builder-row, .create-readiness,
+    .staff-summary-person, .staff-summary-finance, .staff-transaction-scope,
+    .staff-modal-filters, .store-logo-preview-box, .people-picker,
+    .ap-detail-hero, .ad-account-tabs, .uv-user-photo-field,
+    .audit-payload-block, .employee-profile-overview,
+    .employee-financial-section, .employee-history-section,
+    .method-editor-section, .modal-account-form, .payment-account-card,
+    .stale-day-expected, .stale-day-payment-breakdown
+) {
+    color: var(--dark-text-secondary) !important;
+    border-color: var(--dark-border) !important;
+    background: var(--dark-surface-raised) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .product-action-meta span, .product-action-stats div,
+    .adjust-preview div, .employee-finance-metric
+) {
+    color: var(--dark-text-secondary) !important;
+    border-color: var(--dark-border) !important;
+    background: #172740 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .variant-builder-head {
+    color: var(--dark-text-secondary) !important;
+    border-color: var(--dark-border) !important;
+    background: var(--dark-surface) !important;
+}
+
+html[data-theme="dark"] .ibems-modern .panel-tab {
+    color: var(--dark-text-secondary) !important;
+    border-color: var(--dark-border-strong) !important;
+    background: #172740 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .panel-tab:is(:hover, :focus-visible) {
+    color: #fff !important;
+    border-color: #5d7da6 !important;
+    background: #203754 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .panel-tab.is-active {
+    color: #fff !important;
+    border-color: #2d73c8 !important;
+    background: #155294 !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .product-action-label, .product-action-stats span,
+    .adjust-preview span, .staff-transaction-scope,
+    .employee-finance-metric span, .employee-history-section p,
+    .method-editor-section p, .audit-payload-block code
+) {
+    color: var(--dark-text-muted) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .product-action-main strong, .product-action-stats strong,
+    .adjust-preview strong, .employee-finance-metric strong,
+    .employee-profile-overview strong, .employee-financial-section strong,
+    .employee-history-section strong
+) {
+    color: var(--dark-text) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.employee-section-icon, .ap-product-fallback) {
+    color: #7db5ff !important;
+    border-color: #315d91 !important;
+    background: #102c52 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .acct-debt-status.is-success {
+    color: #86efac !important;
+    border-color: #25764b !important;
+    background: #123825 !important;
+}
+
+/* Remaining compact controls and semantic badges use the same dark palette.
+   Accent icon tiles remain intentionally colored; these selectors prevent
+   light page CSS from turning text-bearing controls into white islands. */
+html[data-theme="dark"] .ibems-modern :is(.staff-count-badge, .search-scan-btn) {
+    color: #9bc4ff !important;
+    border-color: #315d91 !important;
+    background: #102c52 !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.search-scan-btn:hover, .search-scan-btn:focus-visible) {
+    color: #fff !important;
+    border-color: #5d7da6 !important;
+    background: #203754 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .checkbox-field label {
+    color: var(--dark-text-secondary) !important;
+    border-color: var(--dark-border) !important;
+    background: var(--dark-surface) !important;
+}
+
+html[data-theme="dark"] .ibems-modern .pos-context-separator {
+    background: var(--dark-border-strong) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .acct-status.is-active, .user-availability.is-available,
+    .user-deduction-status, .variance-pill.is-success,
+    .ap-stock-badge.is-healthy, .history-payment-pill.payment-cash
+) {
+    color: #86efac !important;
+    border-color: #25764b !important;
+    background: #123825 !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .acct-status.is-inactive, .variance-pill.is-warning,
+    .ap-stock-badge.is-warning, .history-payment-pill.payment-debt
+) {
+    color: #fcd38d !important;
+    border-color: #8a5a18 !important;
+    background: #3a2912 !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .ap-stock-badge.is-danger, .ap-stock-badge.is-inactive
+) {
+    color: #fda4af !important;
+    border-color: #7f3542 !important;
+    background: #3b1d29 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .history-payment-pill:not(.payment-cash):not(.payment-debt) {
+    color: #9bc4ff !important;
+    border-color: #315d91 !important;
+    background: #102c52 !important;
+}
+
+/* Inventory create/edit modal: page CSS defines these nested form cards after
+   the shared modal shell, so every content panel needs an explicit dark skin. */
+html[data-theme="dark"] .ibems-modern .create-product-section {
+    color: var(--dark-text-secondary) !important;
+    border-color: var(--dark-border) !important;
+    background: var(--dark-surface-raised) !important;
+}
+
+html[data-theme="dark"] .ibems-modern .create-product-section h5 {
+    color: var(--dark-text) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .image-grid .image-preview-box, .modal-image-preview-grid .image-preview-box,
+    .readonly-value, .readiness-item
+) {
+    color: var(--dark-text-secondary) !important;
+    border-color: var(--dark-border) !important;
+    background: var(--dark-surface) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .modal-image-preview-grid .image-preview-box span, .readiness-item strong
+) {
+    color: var(--dark-text) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .modal-image-preview-grid small, .readonly-field label, .field-help
+) {
+    color: var(--dark-text-muted) !important;
+}
+
+@media (max-width: 640px) {
+    .ibems-modern .notification-panel { position: fixed; top: 66px; right: 12px; left: 12px; width: auto; }
 }

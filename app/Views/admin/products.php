@@ -20,7 +20,7 @@
         <?= view('components/stat_card', ['title' => 'Inactive Products', 'value' => '0', 'valueId' => 'ap-inactive-products', 'icon' => 'bi bi-pause-circle', 'tone' => 'users']) ?>
     </div>
 
-    <div class="overview-filter ap-filter-panel rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div class="overview-filter ap-filter-panel rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" data-compact-filters>
         <div class="ap-filter-main grid gap-3 lg:grid-cols-[minmax(240px,1fr)_180px_180px_180px_180px_auto]">
             <label class="ap-filter-field" for="ap-search">
                 <span>Search</span>

@@ -62,8 +62,10 @@ function auditRenderRows(rows, pagination = {}) {
                 <strong>${auditEscape(row.action_label || row.action || "-")}</strong>
             </td>
             <td>
-                <strong>${auditEscape(row.actor_name || "System")}</strong>
-                <small>${auditEscape(row.actor_email || "")}</small>
+                <span class="table-person-cell">
+                    ${window.IbemsAvatar.html(row.actor_name || "System", row.actor_profile_image_url, "table-person-avatar")}
+                    <span><strong>${auditEscape(row.actor_name || "System")}</strong><small>${auditEscape(row.actor_email || "")}</small></span>
+                </span>
             </td>
             <td>
                 <strong>${auditEscape(auditLabel(row.entity) || "-")}</strong>
@@ -160,7 +162,7 @@ function auditOpenDetail(auditId) {
             ${auditDetailItem("Date", auditDateTime(row.created_at))}
             ${auditDetailItem("Action", row.action_label || row.action)}
             ${auditDetailItem("Raw Action", row.action)}
-            ${auditDetailItem("Actor", `${row.actor_name || "System"}${row.actor_email ? ` (${row.actor_email})` : ""}`)}
+            <div class="audit-detail-item"><span>Actor</span><div class="table-person-cell">${window.IbemsAvatar.html(row.actor_name || "System", row.actor_profile_image_url, "table-person-avatar")}<strong>${auditEscape(`${row.actor_name || "System"}${row.actor_email ? ` (${row.actor_email})` : ""}`)}</strong></div></div>
             ${auditDetailItem("Entity", `${auditLabel(row.entity) || "-"}${row.entity_id ? ` #${row.entity_id}` : ""}`)}
             ${auditDetailItem("Event ID", String(row.id))}
         </div>

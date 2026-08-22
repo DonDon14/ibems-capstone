@@ -13,6 +13,16 @@ class App extends BaseConfig
         $runtimeBaseUrl = getenv('IBEMS_BASE_URL');
         if (is_string($runtimeBaseUrl) && $runtimeBaseUrl !== '') {
             $this->baseURL = rtrim($runtimeBaseUrl, '/') . '/';
+        } else {
+            $localDevelopmentBaseUrl = LocalDevelopmentBaseUrl::resolve(
+                defined('ENVIRONMENT') ? ENVIRONMENT : '',
+                $_SERVER['HTTP_HOST'] ?? null,
+                $_SERVER['HTTPS'] ?? null,
+            );
+
+            if ($localDevelopmentBaseUrl !== null) {
+                $this->baseURL = $localDevelopmentBaseUrl;
+            }
         }
 
         $runtimeIndexPage = getenv('IBEMS_INDEX_PAGE');

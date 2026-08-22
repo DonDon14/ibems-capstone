@@ -19,7 +19,7 @@
             : null,
     ]) ?>
 
-    <div class="admin-stores-filters">
+    <div class="admin-stores-filters" data-compact-filters>
         <div class="field">
             <label for="store-search">Search</label>
             <input id="store-search" type="search" placeholder="Store name or officer">
@@ -156,5 +156,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/admin-stores.js') ?>?v=20260821g"></script>
+<script src="<?= base_url('assets/js/admin-stores.js') ?>?v=20260822a"></script>
 <?= $this->endSection() ?>

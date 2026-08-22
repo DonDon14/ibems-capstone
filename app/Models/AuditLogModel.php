@@ -21,4 +21,26 @@ class AuditLogModel extends Model
     ];
 
     protected $useTimestamps = false;
+
+    protected $afterInsert = ['publishNotification'];
+
+    protected function publishNotification(array $event): array
+    {
+        $auditId = (int) ($event['id'] ?? 0);
+        $data = is_array($event['data'] ?? null) ? $event['data'] : [];
+        if ($auditId <= 0 || $data === []) {
+            return $event;
+        }
+
+        try {
+            (new \App\Services\NotificationService())->publishFromAudit($auditId, $data);
+        } catch (\Throwable $exception) {
+            log_message('error', 'Notification publication failed for audit event {id}: {message}', [
+                'id' => $auditId,
+                'message' => $exception->getMessage(),
+            ]);
+        }
+
+        return $event;
+    }
 }

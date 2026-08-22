@@ -93,6 +93,12 @@ final class AdminAccessRouteConfigTest extends CIUnitTestCase
 
         $authorization = config(Authorization::class);
         $mixedRoutes = [];
+        $allowedMixedPosts = [
+            'accounting/debts/preview-csv',
+            'profile/image',
+            'notifications/(:num)/read',
+            'notifications/read-all',
+        ];
         foreach ($matches as $match) {
             $roles = $authorization->rolesFor($match[3]);
             $this->assertNotNull($roles, "Unknown access policy {$match[3]} on route {$match[2]}.");
@@ -104,7 +110,7 @@ final class AdminAccessRouteConfigTest extends CIUnitTestCase
             $route = $match[2];
             $mixedRoutes[$route] = $method;
             if ($method !== 'get') {
-                $this->assertSame('accounting/debts/preview-csv', $route);
+                $this->assertContains($route, $allowedMixedPosts);
             }
         }
 
@@ -112,6 +118,9 @@ final class AdminAccessRouteConfigTest extends CIUnitTestCase
         $this->assertArrayHasKey('store/dashboard', $mixedRoutes);
         $this->assertArrayHasKey('accounting/dashboard', $mixedRoutes);
         $this->assertSame('post', $mixedRoutes['accounting/debts/preview-csv'] ?? null);
+        $this->assertSame('post', $mixedRoutes['profile/image'] ?? null);
+        $this->assertSame('post', $mixedRoutes['notifications/(:num)/read'] ?? null);
+        $this->assertSame('post', $mixedRoutes['notifications/read-all'] ?? null);
     }
 
     public function testAdminRoleDoesNotEnterThePersonalUserPortal(): void

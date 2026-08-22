@@ -75,40 +75,10 @@ class CreateDynamicSalarySchedules extends Migration
             $this->db->table('salary_schedule_rates')->insertBatch($this->salaryRates($scheduleId));
         }
 
-        $standardSalary = 31705.00;
-        $standardLimit = SalaryCreditPolicy::creditLimit($standardSalary);
-        $employees = $this->db->table('users')
-            ->select('id')
-            ->whereIn('user_type', ['faculty', 'staff'])
-            ->get()->getResultArray();
-        foreach ($employees as $employee) {
-            $userId = (int) $employee['id'];
-            $this->db->table('users')->where('id', $userId)->update([
-                'base_salary' => $standardSalary,
-                'employment_type' => 'plantilla',
-                'salary_grade' => 'SG-11',
-                'salary_step' => 1,
-                'salary_effective_date' => '2026-01-01',
-                'salary_schedule_id' => $scheduleId,
-            ]);
-
-            $balance = $this->db->table('balances')->where('user_id', $userId)->get()->getRowArray();
-            if ($balance) {
-                $this->db->table('balances')->where('user_id', $userId)->update([
-                    'credit_limit' => $standardLimit,
-                    'credit_rate' => SalaryCreditPolicy::DEFAULT_CREDIT_RATE,
-                    'updated_at' => date('Y-m-d H:i:s'),
-                ]);
-            } else {
-                $this->db->table('balances')->insert([
-                    'user_id' => $userId,
-                    'credit_limit' => $standardLimit,
-                    'credit_rate' => SalaryCreditPolicy::DEFAULT_CREDIT_RATE,
-                    'current_debt' => 0,
-                    'updated_at' => date('Y-m-d H:i:s'),
-                ]);
-            }
-        }
+        // Existing salaries and credit limits predate schedule metadata and may
+        // represent approved financial records. Do not guess a grade/step or
+        // replace those values during a schema migration. Administrators can
+        // explicitly configure each profile through User Management.
     }
 
     public function down()

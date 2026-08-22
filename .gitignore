@@ -70,6 +70,7 @@ Vagrantfile
 # Runtime-uploaded assets are stored externally in hosted environments.
 /public/uploads/product-images/*
 /public/uploads/store-logos/*
+/public/uploads/profile-images/*
 
 php_errors.log
 

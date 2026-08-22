@@ -23,7 +23,7 @@
         <button class="uv-chip rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:bg-slate-50" data-uv-quick="store_system" type="button">Store System</button>
     </div>
 
-    <div class="overview-filter uv-filter-panel rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+    <div class="overview-filter uv-filter-panel rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" data-compact-filters>
         <div class="uv-filter-main flex flex-wrap items-end gap-3">
             <label class="uv-search-field min-w-[260px] grow">
                 <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Search users</span>
@@ -95,12 +95,17 @@
 </section>
 
 <div id="uv-edit-modal" class="admin-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="uv-edit-title">
-    <div class="admin-modal-card max-h-[92vh] w-[min(980px,95vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+    <div class="admin-modal-card uv-modal-card max-h-[92vh] w-[min(980px,95vw)] rounded-2xl border border-slate-200 bg-white shadow-xl">
         <div class="admin-modal-head">
             <h4 id="uv-edit-title" class="text-lg font-bold text-slate-900">Edit User</h4>
             <button id="uv-edit-close" type="button" class="admin-modal-close" aria-label="Close edit user dialog">x</button>
         </div>
+        <div class="uv-modal-scroll">
         <div class="form-grid grid gap-3 md:grid-cols-2">
+            <div class="uv-user-photo-field md:col-span-2">
+                <img id="uv-e-photo-preview" src="<?= esc(ibems_profile_image_url(null)) ?>" alt="Profile picture preview" data-profile-avatar>
+                <div><strong>Profile picture</strong><p>Optional JPG, PNG, WebP, or GIF up to 2 MB.</p><label class="secondary-btn btn-sm" for="uv-e-photo"><i class="bi bi-image"></i> Choose image</label><input id="uv-e-photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden></div>
+            </div>
             <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-e-employee-id">Employee ID</label><input id="uv-e-employee-id" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="text"></div>
             <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-e-name">Name</label><input id="uv-e-name" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="text"></div>
             <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-e-email">Email</label><input id="uv-e-email" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="email"></div>
@@ -142,16 +147,22 @@
         <div class="admin-modal-actions">
             <button id="uv-edit-save" class="primary-btn" type="button">Save Changes</button>
         </div>
+        </div>
     </div>
 </div>
 
 <div id="uv-view-modal" class="admin-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="uv-view-title">
-    <div class="admin-modal-card max-h-[92vh] w-[min(980px,95vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+    <div class="admin-modal-card uv-modal-card max-h-[92vh] w-[min(980px,95vw)] rounded-2xl border border-slate-200 bg-white shadow-xl">
         <div class="admin-modal-head">
             <h4 id="uv-view-title" class="text-lg font-bold text-slate-900">Employee Details</h4>
             <button id="uv-view-close" type="button" class="admin-modal-close" aria-label="Close employee details dialog">x</button>
         </div>
+        <div class="uv-modal-scroll">
         <div class="form-grid grid gap-3 md:grid-cols-2">
+            <div class="uv-user-photo-field md:col-span-2">
+                <img id="uv-v-photo" src="<?= esc(ibems_profile_image_url(null)) ?>" alt="Employee profile picture" data-profile-avatar>
+                <div><strong>Profile picture</strong><p>The same image is shown in portal headers and employee records.</p></div>
+            </div>
             <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-v-employee-id">Employee ID</label><input id="uv-v-employee-id" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
             <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-v-name">Name</label><input id="uv-v-name" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
             <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-v-email">Email</label><input id="uv-v-email" class="h-11 w-full rounded-xl border border-slate-200 bg-slate-100 px-3 text-sm" type="text" readonly></div>
@@ -169,16 +180,22 @@
         <div class="admin-modal-actions">
             <button id="uv-view-edit" class="primary-btn" type="button">Edit User</button>
         </div>
+        </div>
     </div>
 </div>
 
 <div id="uv-add-modal" class="admin-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="uv-add-title">
-    <div class="admin-modal-card max-h-[92vh] w-[min(980px,95vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+    <div class="admin-modal-card uv-modal-card max-h-[92vh] w-[min(980px,95vw)] rounded-2xl border border-slate-200 bg-white shadow-xl">
         <div class="admin-modal-head">
             <h4 id="uv-add-title" class="text-lg font-bold text-slate-900">Add User</h4>
             <button id="uv-add-close" type="button" class="admin-modal-close" aria-label="Close add user dialog">x</button>
         </div>
+        <div class="uv-modal-scroll">
         <div class="form-grid grid gap-3 md:grid-cols-2">
+            <div class="uv-user-photo-field md:col-span-2">
+                <img id="uv-a-photo-preview" src="<?= esc(ibems_profile_image_url(null)) ?>" alt="Profile picture preview" data-profile-avatar>
+                <div><strong>Profile picture</strong><p>Optional JPG, PNG, WebP, or GIF up to 2 MB.</p><label class="secondary-btn btn-sm" for="uv-a-photo"><i class="bi bi-image"></i> Choose image</label><input id="uv-a-photo" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden></div>
+            </div>
             <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-a-employee-id">Employee ID</label><input id="uv-a-employee-id" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="text"></div>
             <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-a-name">Name</label><input id="uv-a-name" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="text"></div>
             <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-a-email">Email</label><input id="uv-a-email" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="email"></div>
@@ -215,15 +232,17 @@
         <div class="admin-modal-actions">
             <button id="uv-add-save" class="primary-btn" type="button">Create User</button>
         </div>
+        </div>
     </div>
 </div>
 
 <div id="uv-import-modal" class="admin-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="uv-import-title">
-    <div class="admin-modal-card max-h-[92vh] w-[min(720px,95vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+    <div class="admin-modal-card uv-modal-card max-h-[92vh] w-[min(720px,95vw)] rounded-2xl border border-slate-200 bg-white shadow-xl">
         <div class="admin-modal-head">
             <h4 id="uv-import-title" class="text-lg font-bold text-slate-900">Import Users CSV</h4>
             <button id="uv-import-close" type="button" class="admin-modal-close" aria-label="Close import users dialog">x</button>
         </div>
+        <div class="uv-modal-scroll">
         <div class="field space-y-1">
             <label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-import-file">CSV File</label>
             <input id="uv-import-file" class="block w-full rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-blue-50 file:px-3 file:py-1.5 file:text-sm file:font-semibold file:text-blue-700" type="file" accept=".csv,text/csv">
@@ -233,10 +252,11 @@
         <div class="admin-modal-actions">
             <button id="uv-import-submit" class="primary-btn" type="button">Import</button>
         </div>
+        </div>
     </div>
 </div>
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/admin-user-view.js') ?>"></script>
+<script src="<?= base_url('assets/js/admin-user-view.js') ?>?v=20260822c"></script>
 <?= $this->endSection() ?>

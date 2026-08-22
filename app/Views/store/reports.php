@@ -229,5 +229,5 @@
 <?= $this->section('scripts') ?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
 <script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260821a"></script>
-<script src="<?= base_url('assets/js/store-reports.js') ?>?v=20260821b"></script>
+<script src="<?= base_url('assets/js/store-reports.js') ?>?v=20260822a"></script>
 <?= $this->endSection() ?>

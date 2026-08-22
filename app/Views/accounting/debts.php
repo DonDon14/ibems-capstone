@@ -1,13 +1,17 @@
 <?= $this->extend('layouts/accounting') ?>
 
+<?= $this->section('styles') ?>
+<link rel="stylesheet" href="<?= base_url('assets/css/accounting-debts.css') ?>?v=20260822c">
+<?= $this->endSection() ?>
+
 <?= $this->section('content') ?>
 <section class="acct-shell space-y-5"<?= !empty($deductionsPage) ? ' style="display:none" aria-hidden="true"' : '' ?>>
-    <div class="dashboard-title acct-head">
-        <div>
-            <h3 class="text-3xl font-bold tracking-tight text-slate-900">Accounting Debt Center</h3>
-            <p class="mt-1 text-base text-slate-600">Track payroll-deductible debts, direct store payments, and store operator shortages in separate work queues.</p>
-        </div>
-    </div>
+    <?= view('components/page_header', [
+        'eyebrow' => 'Financial controls',
+        'title' => 'Accounting debt center',
+        'description' => 'Track payroll-deductible debts, direct store payments, and store operator shortages in separate work queues.',
+        'icon' => 'bi bi-cash-stack',
+    ]) ?>
 
     <div class="dashboard-grid acct-summary">
         <?= view('components/stat_card', ['title' => 'Employee Records', 'value' => '0', 'valueId' => 'acct-count', 'icon' => 'bi bi-people', 'tone' => 'users']) ?>
@@ -48,7 +52,7 @@
     </article>
 
     <article class="dash-panel rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-    <div class="acct-filters acct-filters-redesign space-y-3">
+    <div class="acct-filters acct-filters-redesign space-y-3" data-compact-filters>
         <div class="acct-filters-main flex flex-wrap items-end gap-3">
             <label class="field min-w-[260px] grow" for="acct-search">
                 <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Search employees</span>
@@ -74,8 +78,8 @@
             <label class="field min-w-[110px]" for="acct-page-size">
                 <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Rows</span>
                 <select id="acct-page-size" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm">
-                    <option value="10">10</option>
-                    <option value="25" selected>25</option>
+                    <option value="10" selected>10</option>
+                    <option value="25">25</option>
                     <option value="50">50</option>
                 </select>
             </label>
@@ -106,16 +110,17 @@
     <div class="acct-table-wrap table-standard-wrap">
         <p id="acct-count-text" class="acct-count-text text-sm text-slate-500">Showing 0 records</p>
         <div id="acct-body" class="acct-record-list grid gap-2">
-            <div class="acct-empty rounded-xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm text-slate-500">Loading records...</div>
+            <?= view('components/data_state', ['type' => 'loading', 'message' => 'Loading accounting records...']) ?>
         </div>
     </div>
     </article>
 
     <p id="acct-result" class="acct-result text-sm font-semibold"></p>
+    <div id="acct-pager" class="overview-pager" aria-label="Accounting record pages"></div>
 </section>
 
 <div id="deduction-mode-modal" class="acct-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="deduction-mode-title">
-    <div class="acct-modal-card max-h-[92vh] w-[min(1200px,96vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+    <div class="acct-modal-card max-h-[92vh] w-[min(1200px,96vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl" data-inset-modal-scroll>
         <div class="acct-modal-head">
             <h4 id="deduction-mode-title" class="text-lg font-bold text-slate-900">Manual Payroll Deduction</h4>
             <button id="close-deduction-mode" type="button" class="acct-modal-close" aria-label="Close manual payroll deduction">x</button>
@@ -157,18 +162,26 @@
 </div>
 
 <div id="employee-modal" class="acct-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="employee-modal-title">
-    <div class="acct-modal-card max-h-[92vh] w-[min(980px,95vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+    <div class="acct-modal-card max-h-[92vh] w-[min(980px,95vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl" data-inset-modal-scroll>
         <div class="acct-modal-head">
-            <h4 id="employee-modal-title" class="text-lg font-bold text-slate-900">Employee Details</h4>
+            <div>
+                <h4 id="employee-modal-title" class="text-lg font-bold text-slate-900">Employee Details</h4>
+                <p class="mt-1 text-sm text-slate-500">Review identity, salary reference, credit capacity, and financial activity.</p>
+            </div>
             <button id="close-employee-modal" type="button" class="acct-modal-close" aria-label="Close employee details">x</button>
         </div>
-        <div id="employee-modal-profile" class="mode-profile-empty rounded-xl border border-dashed border-slate-300 bg-slate-50 p-4 text-sm text-slate-500">Loading profile...</div>
+        <div id="employee-modal-profile" class="employee-profile-loading"><?= view('components/data_state', ['type' => 'loading', 'message' => 'Loading employee profile...']) ?></div>
 
-        <div id="employee-modal-actions" class="mode-actions hidden">
-            <h5 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Salary Grade and Dynamic Credit</h5>
-            <div class="inline-actions">
-                <span id="employee-limit-current" class="limit-label">Salary PHP 0.00 | Credit PHP 0.00</span>
-                <button id="employee-open-limit-edit" type="button" class="secondary-btn btn-sm">Edit</button>
+        <section id="employee-modal-actions" class="employee-financial-section hidden">
+            <div class="employee-section-head">
+                <div class="employee-section-title">
+                    <span class="employee-section-icon" aria-hidden="true"><i class="bi bi-cash-coin"></i></span>
+                    <div>
+                        <h5>Salary grade and dynamic credit</h5>
+                        <p id="employee-limit-current">Salary PHP 0.00 · Credit PHP 0.00</p>
+                    </div>
+                </div>
+                <button id="employee-open-limit-edit" type="button" class="secondary-btn btn-sm"><i class="bi bi-pencil-square"></i> Edit profile</button>
             </div>
             <div id="employee-limit-box" class="inline-box mt-2 flex flex-col gap-2 hidden">
                 <label class="field" for="employee-employment-type"><span class="text-xs font-semibold text-slate-500">Employment type</span><select id="employee-employment-type" class="h-11 rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700"><option value="plantilla">Plantilla</option><option value="cos">COS</option><option value="part_time">Part-time</option></select></label>
@@ -186,17 +199,22 @@
                     <button id="employee-limit-cancel" type="button" class="secondary-btn btn-sm">Cancel</button>
                 </div>
             </div>
-        </div>
+        </section>
 
-        <div class="mode-history">
-            <h5 class="text-sm font-semibold uppercase tracking-wide text-slate-500">Recent History</h5>
-            <div id="employee-modal-history" class="mode-history-list flex max-h-64 flex-col gap-2 overflow-auto">Loading history...</div>
-        </div>
+        <section class="employee-history-section">
+            <div class="employee-section-head">
+                <div class="employee-section-title">
+                    <span class="employee-section-icon is-neutral" aria-hidden="true"><i class="bi bi-clock-history"></i></span>
+                    <div><h5>Recent financial history</h5><p>Latest salary, credit-limit, repayment, and deduction changes.</p></div>
+                </div>
+            </div>
+            <div id="employee-modal-history" class="mode-history-list employee-history-list flex max-h-64 flex-col gap-2 overflow-auto"><?= view('components/data_state', ['type' => 'loading', 'message' => 'Loading financial history...']) ?></div>
+        </section>
     </div>
 </div>
 
 <div id="settlement-run-modal" class="acct-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="settlement-run-title">
-    <div class="acct-modal-card max-h-[92vh] w-[min(1320px,96vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+    <div class="acct-modal-card max-h-[92vh] w-[min(1320px,96vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl" data-inset-modal-scroll>
         <div class="acct-modal-head">
             <h4 id="settlement-run-title" class="text-lg font-bold text-slate-900">Legacy Monthly Deduction History</h4>
             <button id="close-settlement-run" type="button" class="acct-modal-close" aria-label="Close legacy deduction history"></button>
@@ -266,7 +284,7 @@
 </div>
 
 <div id="settlement-confirm-modal" class="acct-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="settlement-confirm-title">
-    <div class="acct-modal-card max-h-[92vh] w-[min(1040px,95vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+    <div class="acct-modal-card max-h-[92vh] w-[min(1040px,95vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl" data-inset-modal-scroll>
         <div class="acct-modal-head">
             <h4 id="settlement-confirm-title" class="text-lg font-bold text-slate-900">Confirm Salary Deduction</h4>
             <button id="close-settlement-confirm" type="button" class="acct-modal-close" aria-label="Close salary deduction confirmation">x</button>
@@ -302,12 +320,11 @@
             <button id="cancel-settlement-confirm" type="button" class="secondary-btn">Cancel</button>
             <button id="confirm-settlement-apply" type="button" class="primary-btn"><i class="bi bi-check2-circle"></i> Confirm Deduction</button>
         </div>
-        <div id="acct-pager" class="acct-pager" aria-label="Accounting record pages"></div>
     </div>
 </div>
 
 <div id="settlement-run-details-modal" class="acct-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="settlement-run-details-title">
-    <div class="acct-modal-card max-h-[92vh] w-[min(1320px,96vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+    <div class="acct-modal-card max-h-[92vh] w-[min(1320px,96vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl" data-inset-modal-scroll>
         <div class="acct-modal-head">
             <h4 id="settlement-run-details-title" class="text-lg font-bold text-slate-900">Salary Deduction Batch Details</h4>
             <div class="flex flex-wrap items-center gap-2">
@@ -347,18 +364,23 @@
 
 <div id="deduction-workflow-modal" class="acct-modal is-hidden<?= !empty($deductionsPage) ? ' deductions-page-shell' : '' ?>" role="dialog" aria-modal="true" aria-labelledby="deduction-workflow-title" data-current-role="<?= esc((string) session()->get('role')) ?>" data-current-user="<?= (int) session()->get('user_id') ?>">
     <div class="acct-modal-card max-h-[94vh] w-[min(1380px,97vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl<?= !empty($deductionsPage) ? ' deductions-page-card' : '' ?>">
-        <div class="acct-modal-head">
-            <div>
-                <?php if (!empty($deductionsPage)): ?>
-                        <h3 id="deduction-workflow-title">Payroll Deductions</h3>
-                        <p>Choose employee deductions by pay period, apply them in IBEMS, and preserve a reconciled history.</p>
-                <?php else: ?>
+        <?php if (!empty($deductionsPage)): ?>
+            <?= view('components/page_header', [
+                'eyebrow' => 'Payroll controls',
+                'title' => 'Payroll deductions',
+                'titleId' => 'deduction-workflow-title',
+                'description' => 'Choose employee deductions by pay period, apply them in IBEMS, and preserve a reconciled history.',
+                'icon' => 'bi bi-calculator',
+            ]) ?>
+        <?php else: ?>
+            <div class="acct-modal-head">
+                <div>
                     <h4 id="deduction-workflow-title" class="text-lg font-bold text-slate-900">Payroll Deduction Workflow</h4>
                     <p class="mt-1 text-sm text-slate-500">Prepare requests first. Employee debt changes only after Accounting confirms the deduction in IBEMS.</p>
-                <?php endif; ?>
+                </div>
+                <button id="close-deduction-workflow" type="button" class="acct-modal-close" aria-label="Close deduction workflow"></button>
             </div>
-            <button id="close-deduction-workflow" type="button" class="acct-modal-close"<?= !empty($deductionsPage) ? ' style="display:none" aria-hidden="true" tabindex="-1"' : '' ?> aria-label="Close deduction workflow"></button>
-        </div>
+        <?php endif; ?>
 
         <div class="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
             <div class="space-y-4">
@@ -473,7 +495,7 @@
 </div>
 
 <div id="debt-investigations-modal" class="acct-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="debt-investigations-title" data-current-role="<?= esc((string) session()->get('role')) ?>" data-current-user="<?= (int) session()->get('user_id') ?>">
-    <div class="acct-modal-card max-h-[94vh] w-[min(1180px,97vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+    <div class="acct-modal-card max-h-[94vh] w-[min(1180px,97vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl" data-inset-modal-scroll>
         <div class="acct-modal-head">
             <div>
                 <h4 id="debt-investigations-title" class="text-lg font-bold text-slate-900">Debt Investigations and Corrections</h4>
@@ -530,7 +552,7 @@
 </div>
 
 <div id="import-csv-modal" class="acct-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="import-csv-title">
-    <div class="acct-modal-card max-h-[92vh] w-[min(880px,95vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+    <div class="acct-modal-card max-h-[92vh] w-[min(880px,95vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl" data-inset-modal-scroll>
         <div class="acct-modal-head">
             <h4 id="import-csv-title" class="text-lg font-bold text-slate-900">Import Employee CSV</h4>
             <button id="close-import-csv" type="button" class="acct-modal-close" aria-label="Close employee CSV import">x</button>
@@ -589,23 +611,8 @@
         box-shadow: none !important;
         box-sizing: border-box;
     }
-    .deductions-page-card > .acct-modal-head {
-        display: block;
+    .deductions-page-card > .page-header {
         margin-bottom: 1.25rem;
-        padding: 0 0 1rem;
-        border-bottom: 1px solid #dbe3ee;
-    }
-    .deductions-page-card > .acct-modal-head h3 {
-        margin: 0;
-        color: #0f172a;
-        font-size: 1.875rem;
-        font-weight: 800;
-        letter-spacing: -0.025em;
-    }
-    .deductions-page-card > .acct-modal-head p {
-        margin: .35rem 0 0;
-        color: #64748b;
-        font-size: 1rem;
     }
     .deductions-page-card > .grid {
         min-width: 0;
@@ -668,5 +675,5 @@
 </style>
 <?php endif; ?>
 <script>window.IBEMS_DEDUCTIONS_PAGE = <?= !empty($deductionsPage) ? 'true' : 'false' ?>;</script>
-<script src="<?= base_url('assets/js/accounting-debts.js') ?>"></script>
+<script src="<?= base_url('assets/js/accounting-debts.js') ?>?v=20260822e"></script>
 <?= $this->endSection() ?>

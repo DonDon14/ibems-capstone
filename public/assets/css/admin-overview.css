@@ -621,6 +621,344 @@
     justify-content: flex-end;
 }
 
+.ad-account-row {
+    cursor: pointer;
+    transition: background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.ad-account-row:hover,
+.ad-account-row:focus-visible {
+    background: #f5f9ff;
+    box-shadow: inset 3px 0 #2563eb;
+    outline: none;
+}
+
+.ad-person-copy strong {
+    color: #0f172a;
+    line-height: 1.25;
+}
+
+.ad-person-copy small {
+    color: #64748b;
+    font-size: 0.72rem;
+}
+
+body .admin-modal .ad-account-modal-card {
+    width: min(980px, 100%);
+}
+
+.ad-account-modal-card > .admin-modal-head p {
+    margin: 3px 0 0;
+    color: #64748b;
+    font-size: 0.78rem;
+}
+
+.ad-account-modal-scroll {
+    display: grid;
+    gap: 16px;
+}
+
+.ad-account-identity {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px;
+    border: 1px solid #dbe4f0;
+    border-radius: 14px;
+    background: linear-gradient(135deg, #f8fbff, #fff);
+}
+
+.ad-account-identity .table-person-avatar {
+    width: 58px;
+    height: 58px;
+    border-radius: 16px;
+}
+
+.ad-account-identity h5,
+.ad-account-identity p {
+    margin: 0;
+}
+
+.ad-account-identity h5 {
+    color: #0f172a;
+    font-size: 1.08rem;
+}
+
+.ad-account-identity p {
+    margin-top: 3px;
+    color: #64748b;
+    font-size: 0.8rem;
+}
+
+.ad-account-tabs {
+    display: flex;
+    gap: 6px;
+    padding: 4px;
+    border: 1px solid #dbe4f0;
+    border-radius: 12px;
+    background: #f8fafc;
+}
+
+.ad-account-tab {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 7px;
+    min-height: 38px;
+    border: 0;
+    border-radius: 9px;
+    padding: 0 14px;
+    background: transparent;
+    color: #475569;
+    cursor: pointer;
+    font-weight: 700;
+}
+
+.ad-account-tab:hover {
+    background: #eaf2ff;
+    color: #1d4ed8;
+}
+
+.ad-account-tab[aria-selected="true"] {
+    background: #0f4c81;
+    color: #fff;
+    box-shadow: 0 5px 12px rgb(15 76 129 / 0.2);
+}
+
+.ad-account-panel[hidden] {
+    display: none;
+}
+
+.ad-detail-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.ad-detail-item {
+    min-width: 0;
+    padding: 11px 12px;
+    border: 1px solid #dbe4f0;
+    border-radius: 11px;
+    background: #fff;
+}
+
+.ad-detail-item span,
+.ad-detail-item strong {
+    display: block;
+}
+
+.ad-detail-item span {
+    color: #64748b;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+}
+
+.ad-detail-item strong {
+    margin-top: 4px;
+    overflow-wrap: anywhere;
+    color: #0f172a;
+    font-size: 0.9rem;
+}
+
+.ad-debt-summary {
+    margin-bottom: 14px;
+}
+
+.ad-detail-section-title {
+    margin: 0 0 9px;
+    color: #0f172a;
+    font-size: 0.88rem;
+}
+
+.ad-detail-section-head {
+    display: grid;
+    gap: 3px;
+    margin: 0 0 10px;
+}
+
+.ad-detail-section-head h6,
+.ad-detail-section-head p {
+    margin: 0;
+}
+
+.ad-detail-section-head h6 {
+    color: #0f172a;
+    font-size: 0.9rem;
+}
+
+.ad-detail-section-head p {
+    color: #64748b;
+    font-size: 0.76rem;
+    line-height: 1.45;
+}
+
+.ad-account-panel td .table-cell-note {
+    display: block;
+    margin-top: 3px;
+    line-height: 1.35;
+}
+
+.ad-store-list {
+    display: grid;
+    gap: 9px;
+}
+
+.ad-store-card {
+    display: grid;
+    grid-template-columns: minmax(170px, 1fr) repeat(4, minmax(105px, auto)) auto;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 12px;
+    border: 1px solid #dbe4f0;
+    border-radius: 12px;
+    background: #fff;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease, background-color 0.15s ease;
+}
+
+.ad-store-card:hover,
+.ad-store-card.is-expanded {
+    border-color: #b8d2fb;
+    background: #fbfdff;
+    box-shadow: 0 6px 18px rgba(15, 55, 105, 0.06);
+}
+
+.ad-store-card-main {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+}
+
+.ad-store-card-main strong,
+.ad-store-card-main small,
+.ad-store-card-main span {
+    display: block;
+}
+
+.ad-store-card-main strong {
+    color: #0f172a;
+    overflow-wrap: anywhere;
+}
+
+.ad-store-card-main small,
+.ad-store-card-main span {
+    color: #64748b;
+    font-size: 0.72rem;
+    line-height: 1.35;
+}
+
+.ad-store-card > span {
+    color: #64748b;
+    font-size: 0.76rem;
+}
+
+.ad-store-card > span strong {
+    display: block;
+    margin-top: 2px;
+    color: #0f172a;
+    font-size: 0.84rem;
+}
+
+.ad-store-toggle {
+    white-space: nowrap;
+}
+
+.ad-store-accordion {
+    grid-column: 1 / -1;
+    margin-top: 3px;
+    padding-top: 14px;
+    border-top: 1px solid #dbe4f0;
+}
+
+.ad-store-accordion[hidden] {
+    display: none;
+}
+
+.ad-store-date-filter {
+    display: flex;
+    align-items: end;
+    gap: 8px;
+    margin-bottom: 12px;
+    padding: 10px;
+    border: 1px solid #dbe4f0;
+    border-radius: 10px;
+    background: #f8fbff;
+}
+
+.ad-store-date-filter label {
+    display: grid;
+    gap: 5px;
+    min-width: 150px;
+    color: #475569;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    text-transform: uppercase;
+}
+
+.ad-store-date-filter input {
+    width: 100%;
+    min-height: 36px;
+    padding: 7px 10px;
+    border: 1px solid #cbd8e8;
+    border-radius: 8px;
+    background: #fff;
+    color: #0f172a;
+    font: inherit;
+    text-transform: none;
+}
+
+.ad-store-date-filter input:focus-visible {
+    border-color: #2563eb;
+    outline: 3px solid rgba(37, 99, 235, 0.16);
+}
+
+.ad-history-pager {
+    justify-content: space-between;
+    padding: 8px 2px 0;
+}
+
+.ad-history-pager > div {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+}
+
+@media (max-width: 720px) {
+    .ad-detail-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .ad-store-card {
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .ad-store-date-filter {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+    }
+
+    .ad-store-date-filter label {
+        min-width: 0;
+    }
+
+    .ad-account-tabs {
+        overflow-x: auto;
+    }
+}
+
+@media (min-width: 721px) and (max-width: 980px) {
+    .ad-store-card {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .ad-store-card-main {
+        grid-column: span 2;
+    }
+}
+
 .ap-table tbody tr {
     cursor: pointer;
 }
@@ -1638,22 +1976,6 @@ body.ibems-modern .sd-stale-day-modal .admin-modal-card {
         text-align: left;
     }
 }
-.overview-pager {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 12px;
-    min-height: 46px;
-    color: #475569;
-    font-size: 0.86rem;
-    font-weight: 700;
-}
-
-.overview-pager button:disabled {
-    cursor: not-allowed;
-    opacity: 0.5;
-}
-
 .store-detail-pager {
     justify-content: space-between;
     padding: 10px 16px;

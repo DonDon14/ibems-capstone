@@ -412,7 +412,7 @@ function rRenderTransactions(rows) {
     if (!safeRows.length) { body.innerHTML = rDataState("empty", "No transactions in this report period.", 6); return; }
     body.innerHTML = safeRows.map((row) => `<tr>
         <td>${rEscape(rDateTime(row.created_at))}</td><td><code>${rEscape(row.client_txn_id || `#${row.id}`)}</code></td>
-        <td>${rEscape(row.customer_name || "Walk-in")}</td><td>${rEscape(rPaymentLabel(row))}</td><td>${rEscape(rMoney(row.amount))}</td>
+        <td><span class="table-person-cell">${window.IbemsAvatar.html(row.customer_name, row.customer_profile_image_url, "table-person-avatar")}<span>${rEscape(row.customer_name || "Walk-in")}</span></span></td><td>${rEscape(rPaymentLabel(row))}</td><td>${rEscape(rMoney(row.amount))}</td>
         <td><button class="secondary-btn btn-sm" type="button" data-report-receipt="${Number(row.id)}"><i class="bi bi-receipt"></i> View receipt</button></td></tr>`).join("");
 }
 

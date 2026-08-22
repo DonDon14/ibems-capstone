@@ -39,7 +39,7 @@ class StoreAdminController extends Controller
         }
 
         $stores = $db->table('stores s')
-            ->select('s.id, s.store_name, s.logo_url, s.is_active, u.name AS officer_name, u.email AS officer_email')
+            ->select('s.id, s.store_name, s.logo_url, s.is_active, u.name AS officer_name, u.email AS officer_email, u.profile_image_url AS officer_profile_image_url')
             ->join('users u', 'u.id = s.officer_id', 'left')
             ->whereIn('s.id', $storeIds)
             ->orderBy('s.store_name', 'ASC')
@@ -135,6 +135,7 @@ class StoreAdminController extends Controller
                 'is_active' => $isActive,
                 'officer_name' => $store['officer_name'] ?: 'No assigned officer',
                 'officer_email' => $store['officer_email'] ?? null,
+                'officer_profile_image_url' => $store['officer_profile_image_url'] ?? null,
                 'today_txn_count' => (int) $today['txn_count'],
                 'today_sales_total' => (float) $today['sales_total'],
                 'day_status' => $dayStatus,

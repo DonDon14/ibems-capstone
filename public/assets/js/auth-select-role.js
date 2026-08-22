@@ -1,5 +1,7 @@
 const statusEl = document.getElementById("status");
 const optionsEl = document.getElementById("role-options");
+const frontControllerPrefix = window.location.pathname.includes("/index.php/") ? "/index.php" : "";
+const appPath = (path) => `${frontControllerPrefix}${path}`;
 
 function setStatus(message, type) {
     statusEl.textContent = message || "";
@@ -28,7 +30,7 @@ function targetPathByRole(role) {
 
 async function chooseRole(role) {
     try {
-        const response = await fetch("/auth/select-role", {
+        const response = await fetch(appPath("/auth/select-role"), {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ role }),
@@ -38,7 +40,7 @@ async function chooseRole(role) {
             setStatus(data?.message || "Unable to set role.", "error");
             return;
         }
-        window.location.href = data.redirect_to || targetPathByRole(role);
+        window.location.href = data.redirect_to || appPath(targetPathByRole(role));
     } catch (error) {
         setStatus("Unable to set role. Please try again.", "error");
     }
@@ -75,10 +77,10 @@ optionsEl.addEventListener("click", async (event) => {
 
 async function init() {
     try {
-        const meResp = await fetch("/auth/me");
+        const meResp = await fetch(appPath("/auth/me"));
         const meData = await meResp.json();
         if (!meData || meData.status !== "success") {
-            window.location.href = "/login";
+            window.location.href = appPath("/login");
             return;
         }
 
@@ -86,7 +88,7 @@ async function init() {
         const roles = meData.user?.roles || [];
         renderRoles(roles, role);
     } catch (error) {
-        window.location.href = "/login";
+        window.location.href = appPath("/login");
     }
 }
 

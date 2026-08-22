@@ -20,6 +20,25 @@ function aEscape(value) {
         .replace(/'/g, "&#39;");
 }
 
+function uvUserFormData(payload, profileImage) {
+    const body = new FormData();
+    Object.entries(payload).forEach(([key, value]) => {
+        body.append(key, Array.isArray(value) ? value.join(",") : String(value ?? ""));
+    });
+    if (profileImage) body.append("profile_image", profileImage);
+    return body;
+}
+
+function uvBindPhotoPreview(prefix) {
+    const input = document.getElementById(`${prefix}-photo`);
+    const preview = document.getElementById(`${prefix}-photo-preview`);
+    input?.addEventListener("change", () => {
+        const file = input.files?.[0];
+        if (!file || !preview) return;
+        preview.src = URL.createObjectURL(file);
+    });
+}
+
 function formatRoleLabel(role) {
     return String(role || "")
         .toLowerCase()
@@ -233,22 +252,20 @@ function renderUserTable(rows) {
         const debt = Number(row.current_debt || 0);
         const creditLimit = Number(row.credit_limit || 0);
         const profileConfigured = Boolean(row.financial_profile_configured);
-        const initials = String(row.name || "U")
-            .split(" ")
-            .filter(Boolean)
-            .slice(0, 2)
-            .map((part) => part.charAt(0).toUpperCase())
-            .join("") || "U";
         return `
-        <article class="record-list-item uv-record-row flex flex-wrap items-center justify-between gap-3" data-user-id="${row.id}">
+        <article class="record-list-item uv-record-row interactive-record-row flex flex-wrap items-center justify-between gap-3" data-user-id="${row.id}">
             <button class="uv-row-view flex min-w-0 grow items-center gap-3 text-left" type="button" data-view-user="${row.id}" title="View employee details">
-                <div class="uv-avatar inline-flex h-11 w-11 flex-none items-center justify-center rounded-full border border-slate-200 bg-slate-50 text-sm font-bold text-blue-700">${aEscape(initials)}</div>
+                ${window.IbemsAvatar.html(row.name, row.profile_image_url, "uv-avatar h-11 w-11 flex-none rounded-full border border-slate-200 bg-slate-50")}
                 <div class="uv-person-meta min-w-0">
                     <div class="uv-name-line flex flex-wrap items-center gap-2">
                         <strong class="text-base font-bold text-slate-900">${aEscape(row.name || "-")}</strong>
                         <span class="uv-status inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${row.is_active ? "is-active bg-emerald-100 text-emerald-700" : "is-inactive bg-amber-100 text-amber-700"}">${statusText}</span>
                     </div>
-                    <div class="uv-subline truncate text-sm text-slate-500">${aEscape(row.employee_id || "-")} | ${aEscape(formatTypeLabel(row.user_type))} | ${aEscape(row.email || "-")}</div>
+                    <div class="uv-subline uv-meta-line text-sm text-slate-500">
+                        <span class="uv-meta-item" title="Employee ID"><i class="bi bi-person-vcard" aria-hidden="true"></i><span>${aEscape(row.employee_id || "-")}</span></span>
+                        <span class="uv-meta-item" title="Employee category"><i class="bi bi-person-badge" aria-hidden="true"></i><span>${aEscape(formatTypeLabel(row.user_type))}</span></span>
+                        <span class="uv-meta-item" title="Email address"><i class="bi bi-envelope" aria-hidden="true"></i><span>${aEscape(row.email || "-")}</span></span>
+                    </div>
                     <div class="uv-role-list mt-2 flex flex-wrap gap-1.5">${renderRoleChips(roles)}</div>
                 </div>
             </button>
@@ -349,6 +366,8 @@ async function openEditUser(userId) {
     document.getElementById("uv-e-employee-id").value = row.employee_id || "";
     document.getElementById("uv-e-name").value = row.name || "";
     document.getElementById("uv-e-email").value = row.email || "";
+    document.getElementById("uv-e-photo").value = "";
+    document.getElementById("uv-e-photo-preview").src = window.IbemsAvatar.imageUrl(row.profile_image_url);
     setRoleChecks("uv-e", row.roles, row.role);
     document.getElementById("uv-e-type").value = row.user_type || "staff";
     document.getElementById("uv-e-active").value = row.is_active ? "1" : "0";
@@ -372,6 +391,7 @@ async function openViewUser(userId) {
     document.getElementById("uv-v-employee-id").value = row.employee_id || "-";
     document.getElementById("uv-v-name").value = row.name || "-";
     document.getElementById("uv-v-email").value = row.email || "-";
+    document.getElementById("uv-v-photo").src = window.IbemsAvatar.imageUrl(row.profile_image_url);
     document.getElementById("uv-v-roles").value = normalizeRoles(row.roles, row.role).map(formatRoleLabel).join(", ");
     document.getElementById("uv-v-type").value = formatTypeLabel(row.user_type);
     document.getElementById("uv-v-status").value = row.is_active ? "Active" : "Inactive";
@@ -407,10 +427,10 @@ async function saveEditedUser() {
     };
     if (["faculty", "staff"].includes(payload.user_type)) Object.assign(payload, uvFinancialPayload("uv-e"));
 
+    const body = uvUserFormData(payload, document.getElementById("uv-e-photo").files?.[0]);
     const response = await fetch("/admin/user-view/update", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body,
     });
     const data = await response.json();
     if (!data || data.status !== "success") {
@@ -441,10 +461,10 @@ async function createUser() {
     };
     if (["faculty", "staff"].includes(payload.user_type)) Object.assign(payload, uvFinancialPayload("uv-a"));
 
+    const body = uvUserFormData(payload, document.getElementById("uv-a-photo").files?.[0]);
     const response = await fetch("/admin/user-view/create", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
+        body,
     });
     const data = await response.json();
     if (!data || data.status !== "success") {
@@ -582,6 +602,8 @@ document.getElementById("uv-add-btn").addEventListener("click", async () => {
         return;
     }
     setRoleChecks("uv-a", ["USER"]);
+    document.getElementById("uv-a-photo").value = "";
+    document.getElementById("uv-a-photo-preview").src = window.IbemsAvatar.defaultUrl;
     document.getElementById("uv-a-type").value = "faculty";
     populateUvSalaryProfile("uv-a", {});
     toggleUvFinancialFields("uv-a");
@@ -645,5 +667,8 @@ document.getElementById("uv-pager").addEventListener("click", (event) => {
     document.getElementById(`${prefix}-step`).addEventListener("change", () => refreshUvSalaryPreview(prefix));
     document.getElementById(`${prefix}-credit-percent`).addEventListener("input", () => refreshUvSalaryPreview(prefix));
 });
+
+uvBindPhotoPreview("uv-a");
+uvBindPhotoPreview("uv-e");
 
 loadUserView();

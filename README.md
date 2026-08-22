@@ -82,37 +82,53 @@ php spark db:seed AccountingSupervisorDemoSeeder
 php spark serve --port 8080
 ```
 
+The local MySQL database must be running before the PHP server. To install this
+checkout's XAMPP MariaDB as an automatic Windows service, run this one time from
+an Administrator PowerShell:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\Install-IbemsLocalDatabaseService.ps1
+```
+
+The installer refuses to replace a `mysql` service owned by another installation.
+After installation, Windows starts the database automatically, so the normal
+`php spark serve` command does not depend on manually opening the XAMPP Control Panel.
+
 7. Open:
 
 ```text
 http://localhost:8080
 ```
 
-Important: CodeIgniter generates CSS, JS, image, and debugbar URLs from `.env` `app.baseURL`. The browser host and port must match `app.baseURL`. This project is currently configured for `http://localhost:8080`, so use exactly that URL.
+## Gmail Activity Notifications
+
+In-app notifications work after `php spark migrate`. To enable Gmail delivery,
+copy the keys from `.env.gmail.example` into the ignored local `.env` and replace
+the placeholders with a dedicated Google account and app password. Never commit
+the app password or paste it into logs.
+
+IBEMS attempts a small queued batch after write requests. For reliable retries
+in hosted or always-on environments, schedule this command every minute:
+
+```powershell
+php spark notifications:dispatch 25
+```
+
+The command safely does nothing when SMTP is not configured. Failed deliveries
+remain queued with bounded retry backoff; demo `.local` and `.test` addresses are
+marked as non-deliverable.
+
+In development, CodeIgniter automatically uses the actual local request host and port for CSS, JS, image, and debugbar URLs. An explicit `IBEMS_BASE_URL` still takes precedence when a launcher supplies one.
 
 ## If Port 8080 Is Busy
 
-Using another port requires two changes. First update `.env`:
-
-```ini
-app.baseURL = 'http://localhost:8082/'
-```
-
-Then restart the app on the same port:
+Start the app on the available port:
 
 ```powershell
 php spark serve --port 8082
 ```
 
-Do not browse to `8082` while `.env` still says `8080`. The HTML may load, but the CSS, JS, images, and debugbar will still point to `8080`, causing failed asset requests in the console.
-
-To return to the default port, change `.env` back to:
-
-```ini
-app.baseURL = 'http://localhost:8080/'
-```
-
-Then restart:
+To return to the default port, restart on `8080`:
 
 ```powershell
 php spark serve --port 8080
@@ -230,10 +246,7 @@ php spark migrate:status
 ## Common Startup Mistakes
 
 - Opening `http://127.0.0.1:8080` when `php spark serve` announced `http://localhost:8080`.
-- Opening `http://localhost:8082` while `.env` `app.baseURL` is still `http://localhost:8080/`.
-- Starting `php spark serve --port 8082` without changing `.env` to the same `8082` base URL.
 - Starting the PHP server before MySQL is running.
-- Changing `.env` `app.baseURL` without restarting `php spark serve`.
 - Running commands from `D:\BEMS` instead of `D:\xampp\htdocs\ibems-tailwind-test`.
 - Using the old `D:\xampp\htdocs\ibems` project folder instead of the current advanced version.
 

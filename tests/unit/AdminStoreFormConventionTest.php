@@ -75,7 +75,7 @@ final class AdminStoreFormConventionTest extends CIUnitTestCase
 
         $this->assertStringNotContainsString('id="store-sort"', $storeAdminView);
         $this->assertStringContainsString('document.getElementById("store-sort")?.addEventListener', $script);
-        $this->assertStringContainsString('admin-stores.js\') ?>?v=20260821g', $storeAdminView);
+        $this->assertStringContainsString('admin-stores.js\') ?>?v=20260822a', $storeAdminView);
     }
 
     public function testStoreModalKeepsChromeFixedAndHidesConditionalTextarea(): void

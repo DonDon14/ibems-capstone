@@ -14,6 +14,7 @@ class Authorization extends BaseConfig
      */
     public array $policies = [
         'portal.enter'          => ['ADMIN', 'STORE_SYSTEM', 'STORE_SUPERVISOR', 'ACCOUNTING_OFFICE'],
+        'account.self'          => ['ADMIN', 'STORE_SYSTEM', 'STORE_SUPERVISOR', 'ACCOUNTING_OFFICE', 'USER'],
         'system.manage'         => ['ADMIN'],
         'store.review_assigned' => ['STORE_SUPERVISOR'],
         'store.inspect'         => ['STORE_SYSTEM', 'ADMIN'],

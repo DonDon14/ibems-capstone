@@ -19,7 +19,7 @@
     <div class="dash-panels">
         <article class="dash-panel">
             <h4><i class="bi bi-heart-pulse"></i> Operations Health</h4>
-            <p id="ad-health-message">Loading operations status...</p>
+            <p id="ad-health-message" class="dashboard-health-message">Loading operations status...</p>
             <p id="ad-health-breakdown" class="dash-health-breakdown"></p>
             <div id="ad-store-day-status" class="admin-status-grid"></div>
         </article>
@@ -54,15 +54,28 @@
         </article>
     </div>
 
-    <div class="dash-panels">
-        <article class="dash-panel">
-            <h4><i class="bi bi-exclamation-triangle"></i> Operational Alerts</h4>
+    <div class="dash-panels admin-insight-panels">
+        <article class="dash-panel dashboard-alert-panel">
+            <div class="dashboard-panel-heading">
+                <div>
+                    <h4><i class="bi bi-exclamation-triangle"></i> Operational Alerts</h4>
+                    <p>Prioritized exceptions requiring administrator review.</p>
+                </div>
+                <span id="ad-alerts-summary" class="dashboard-panel-meta" aria-live="polite">Loading...</span>
+            </div>
             <div id="ad-alerts-list" class="admin-alert-list">
                 <?= view('components/data_state', ['type' => 'loading', 'message' => 'Loading alerts...']) ?>
             </div>
+            <nav id="ad-alerts-pager" class="overview-pager dashboard-alert-pager" aria-label="Operational alert pages"></nav>
         </article>
-        <article class="dash-panel">
-            <h4><i class="bi bi-credit-card-2-front"></i> Payment Breakdown (Last 7 Days)</h4>
+        <article class="dash-panel dashboard-payment-panel">
+            <div class="dashboard-panel-heading">
+                <div>
+                    <h4><i class="bi bi-credit-card-2-front"></i> Payment Breakdown</h4>
+                    <p>Collected payment mix for the last seven days.</p>
+                </div>
+                <span class="dashboard-panel-meta">7 days</span>
+            </div>
             <div id="ad-payment-breakdown" class="admin-payment-list">
                 <?= view('components/data_state', ['type' => 'loading', 'message' => 'Loading payment breakdown...']) ?>
             </div>
@@ -111,5 +124,5 @@
 
 <?= $this->section('scripts') ?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="<?= base_url('assets/js/admin-dashboard.js') ?>"></script>
+<script src="<?= base_url('assets/js/admin-dashboard.js') ?>?v=20260822b"></script>
 <?= $this->endSection() ?>

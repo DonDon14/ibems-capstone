@@ -60,6 +60,14 @@ class AssetStorageService
         return $storedUrl;
     }
 
+    public function deleteImage(?string $url): void
+    {
+        $url = trim((string) $url);
+        if ($url !== '') {
+            $this->deleteManagedAsset($url);
+        }
+    }
+
     public function ensureBucket(): void
     {
         $this->ensureSupabaseBucket($this->bucket, true, self::MAX_FILE_SIZE, self::ALLOWED_MIME_TYPES);

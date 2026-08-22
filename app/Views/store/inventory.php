@@ -26,7 +26,7 @@
                 <h4>Products</h4>
                 <p class="inventory-card-subtitle">Families stay grouped; expand them to manage exact variants.</p>
             </div>
-            <div class="inventory-filter-controls">
+            <div class="inventory-filter-controls" data-compact-filters>
                 <label class="inventory-filter-field" for="inventory-search">
                     <span>Search</span>
                     <input id="inventory-search" type="search" placeholder="Product, SKU, barcode, supplier, or bin">

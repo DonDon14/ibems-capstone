@@ -153,8 +153,10 @@
                                 <span><?= esc($paymentLabel($txn['payment_method'] ?? '')) ?></span>
                             </div>
                             <div class="stack-meta">
-                                <?= esc((string) (($txn['customer_name'] ?? null) ?: $paymentLabel($txn['customer_type'] ?? 'Walk In'))) ?>
-                                · <?= esc(ibems_datetime((string) ($txn['created_at'] ?? 'now'))) ?>
+                                <span class="table-person-cell">
+                                    <img class="table-person-avatar" src="<?= esc(ibems_profile_image_url($txn['customer_profile_image_url'] ?? null)) ?>" alt="" onerror="this.onerror=null;this.src='<?= esc(ibems_profile_image_url(null)) ?>'">
+                                    <span><?= esc((string) (($txn['customer_name'] ?? null) ?: $paymentLabel($txn['customer_type'] ?? 'Walk In'))) ?> · <?= esc(ibems_datetime((string) ($txn['created_at'] ?? 'now'))) ?></span>
+                                </span>
                             </div>
                         </a>
                     <?php endforeach; ?>

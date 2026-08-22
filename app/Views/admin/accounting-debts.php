@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/admin') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/admin-overview.css') ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/admin-overview.css') ?>?v=20260822b">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -45,8 +45,28 @@
         </div>
     </section>
 </section>
+
+<div id="ad-account-modal" class="admin-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="ad-account-modal-title" aria-hidden="true">
+    <section class="admin-modal-card app-inset-modal-card ad-account-modal-card">
+        <header class="admin-modal-head">
+            <div>
+                <h4 id="ad-account-modal-title">Debt Account Details</h4>
+                <p>Read-only employee financial and store activity.</p>
+            </div>
+            <button id="ad-account-modal-close" class="admin-modal-close" type="button" aria-label="Close account details"></button>
+        </header>
+        <div class="app-inset-modal-scroll ad-account-modal-scroll">
+            <div id="ad-account-modal-content">
+                <?= view('components/data_state', [
+                    'type' => 'loading',
+                    'message' => 'Loading account details...',
+                ]) ?>
+            </div>
+        </div>
+    </section>
+</div>
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/admin-accounting-debts.js') ?>"></script>
+<script src="<?= base_url('assets/js/admin-accounting-debts.js') ?>?v=20260822c"></script>
 <?= $this->endSection() ?>

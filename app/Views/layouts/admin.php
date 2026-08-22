@@ -7,6 +7,7 @@ $portalTitle = $isSupervisorPortal ? 'Store Supervisor Portal' : 'Admin Portal';
 $portalSubtitle = $isSupervisorPortal ? 'Assigned Store Oversight' : 'School-wide Operations Oversight';
 $footerText = 'USTP IBEMS Administration';
 $initials = ibems_initials($name, 'AD');
+$profileImageUrl = (string) (session()->get('profile_image_url') ?? '');
 $availableRoles = ibems_available_roles();
 $navigation = [
     ['path' => 'admin/dashboard', 'label' => 'Dashboard', 'icon' => 'bi bi-speedometer2', 'visible' => !$isSupervisorPortal],

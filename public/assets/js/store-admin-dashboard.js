@@ -95,7 +95,7 @@ function sadRenderStores(stores) {
             <a class="store-admin-store-item" href="${sadEscape(detailPrefix)}/${Number(store.id || 0)}">
                 <div>
                     <strong>${sadEscape(store.store_name || "Store")}</strong>
-                    <span>${sadEscape(store.officer_name || "No assigned officer")}</span>
+                    <span class="table-person-cell">${window.IbemsAvatar.html(store.officer_name, store.officer_profile_image_url, "table-person-avatar")}<span>${sadEscape(store.officer_name || "No assigned officer")}</span></span>
                 </div>
                 <div class="store-admin-store-metrics">
                     <span>${sadEscape(sadMoney(store.today_sales_total || 0))}</span>
@@ -124,7 +124,10 @@ function sadRenderReviews(reviews) {
                 <div class="store-admin-review-head">
                     <div>
                         <strong>${sadEscape(row.store_name || "Store")}</strong>
-                        <span>${sadEscape(row.business_date || "-")} | Closed by ${sadEscape(row.closed_by_name || "Unknown")}</span>
+                        <span class="dashboard-meta-line">
+                            <span class="dashboard-meta-item"><i class="bi bi-calendar3" aria-hidden="true"></i><span>${sadEscape(row.business_date || "-")}</span></span>
+                            <span class="dashboard-meta-item"><i class="bi bi-person" aria-hidden="true"></i><span>Closed by ${sadEscape(row.closed_by_name || "Unknown")}</span></span>
+                        </span>
                     </div>
                     <div class="variance-status-row">
                         <span class="variance-pill ${sadPillClass(varianceStatus)}">${sadEscape(sadVarianceLabel(varianceStatus))}</span>
