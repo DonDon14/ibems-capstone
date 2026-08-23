@@ -26,6 +26,26 @@ final class ThemeConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('ibems:themechange', $script);
     }
 
+    public function testAuthenticationScreensExposeThePersistentThemeControl(): void
+    {
+        $login = (string) file_get_contents(APPPATH . 'Views/auth/login.php');
+        $roleSelection = (string) file_get_contents(APPPATH . 'Views/auth/select_role.php');
+        $styles = (string) file_get_contents(FCPATH . 'assets/css/auth-login.css');
+
+        foreach ([$login, $roleSelection] as $view) {
+            $this->assertStringContainsString('id="theme-toggle"', $view);
+            $this->assertStringContainsString('assets/js/theme.js', $view);
+            $this->assertStringContainsString("localStorage.getItem('ibems-theme')", $view);
+            $this->assertStringContainsString('name="theme-color"', $view);
+        }
+
+        $this->assertStringContainsString('.auth-modern .auth-theme-toggle', $styles);
+        $this->assertStringContainsString('html[data-theme="dark"] .auth-modern .auth-panel-form', $styles);
+        $this->assertStringContainsString('html[data-theme="dark"] .auth-modern .auth-panel-art', $styles);
+        $this->assertStringContainsString('html[data-theme="dark"] .auth-modern #status.ok', $styles);
+        $this->assertStringContainsString('html[data-theme="dark"] .auth-modern #status.error', $styles);
+    }
+
     public function testDarkThemeDefinesContrastingDataSurfacesAndControls(): void
     {
         $css = file_get_contents(FCPATH . 'assets/css/modern-ui.css');
@@ -49,6 +69,36 @@ final class ThemeConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('.create-product-section', $css);
         $this->assertStringContainsString('.image-grid .image-preview-box, .modal-image-preview-grid .image-preview-box', $css);
         $this->assertStringContainsString('.readonly-value, .readiness-item', $css);
+        $this->assertStringContainsString('.border-blue-200, .border-blue-300', $css);
+        $this->assertStringContainsString('.ad-account-identity, .ad-account-tabs', $css);
+        $this->assertStringContainsString('.data-panel-head, .dashboard-alert-pager, .store-card-footer', $css);
+        $this->assertStringContainsString('.store-form-section, .compact-filter-panel-head, .compact-filter-panel-actions', $css);
+        $this->assertStringContainsString('.ibems-receipt-brand, .ibems-receipt-details', $css);
+        $this->assertStringContainsString('.supervisor-chip button:is(:hover, :focus-visible)', $css);
+        $this->assertStringContainsString('.officer-suggestion-item:is(:hover, .is-active)', $css);
+        $this->assertStringContainsString('.ui-select-trigger, .ui-date-trigger).is-open .ui-control-icon', $css);
+        $this->assertStringContainsString('.ui-date-actions button:last-child', $css);
+        $this->assertStringContainsString('.settings-table-wrap', $css);
+        $this->assertStringContainsString('.ibems-receipt-brand, .ibems-receipt-section-head', $css);
+        $this->assertStringContainsString('.ibems-receipt-status, .ibems-receipt-payment-pill', $css);
+        $this->assertStringContainsString('.receipt-close, .compact-filter-close, .profile-image-close', $css);
+        $this->assertStringContainsString('.inventory-movement-meta span', $css);
+        $this->assertStringContainsString('.inventory-movement-type.movement-sale', $css);
+        $this->assertStringContainsString('.app-modal-close, .receipt-close, .compact-filter-close, .profile-image-close', $css);
+        $this->assertStringContainsString('.settings-modal-head .icon-btn', $css);
+        $this->assertStringContainsString('.ui-date-popup::-webkit-scrollbar-button', $css);
+        $this->assertStringContainsString('.audit-payload-block :is(pre, code)', $css);
+        $this->assertStringContainsString('.metric-card-icon--sales', $css);
+        $this->assertStringContainsString('.category-edit-summary', $css);
+        $this->assertStringContainsString('.employee-identity-copy h5', $css);
+        $this->assertStringContainsString('.staff-summary-finance span', $css);
+        $this->assertStringContainsString('.metric-card-icon--alerts', $css);
+        $this->assertStringContainsString('.product-visual.placeholder, .prod-thumb-fallback', $css);
+        $this->assertStringContainsString('.app-dialog[data-tone="danger"] .app-dialog-icon', $css);
+        $this->assertStringContainsString('.product-grid, .pos-right, .app-inset-modal-scroll', $css);
+        $this->assertStringContainsString('color: #dc2626 !important;', $css);
+        $this->assertStringContainsString('color: #f87171 !important;', $css);
+        $this->assertStringContainsString('outline: none !important;', $css);
     }
 
     public function testAccountingChartRespondsToThemeChanges(): void

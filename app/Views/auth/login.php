@@ -3,19 +3,30 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#ffffff">
     <meta name="csrf-token-name" content="<?= esc(config('Security')->tokenName) ?>">
     <meta name="csrf-token-value" content="<?= esc(service('security')->getHash()) ?>">
     <meta name="csrf-header-name" content="<?= esc(config('Security')->headerName) ?>">
     <meta name="csrf-cookie-name" content="<?= esc(config('Security')->cookieName) ?>">
     <title>IBEMS Login</title>
+    <script>
+    (function () {
+        var saved = localStorage.getItem('ibems-theme');
+        var theme = saved === 'dark' || saved === 'light' ? saved : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+        document.documentElement.dataset.theme = theme;
+    }());
+    </script>
     <link rel="icon" type="image/png" href="<?= base_url('assets/images/ibems-logo.png') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.css') ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/css/auth-login.css') ?>?v=20260822a">
+    <link rel="stylesheet" href="<?= base_url('assets/css/auth-login.css') ?>?v=20260823c">
     <link rel="stylesheet" href="<?= base_url('assets/css/password-visibility.css') ?>?v=20260813b">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 </head>
 <body class="auth-modern">
 <?php $ibemsLogoUrl = base_url('assets/images/ibems-logo.png'); ?>
+    <button id="theme-toggle" class="auth-theme-toggle" type="button" aria-label="Use dark mode" title="Use dark mode" aria-pressed="false">
+        <i class="bi bi-moon-stars" aria-hidden="true"></i>
+    </button>
     <main class="auth-shell">
         <section class="auth-panel auth-panel-form">
             <div class="auth-mark">
@@ -60,5 +71,6 @@
     <script src="<?= base_url('assets/js/csrf.js') ?>"></script>
     <script src="<?= base_url('assets/js/auth-login.js') ?>?v=20260822b"></script>
     <script src="<?= base_url('assets/js/password-visibility.js') ?>?v=20260813a"></script>
+    <script src="<?= base_url('assets/js/theme.js') ?>?v=20260822b"></script>
 </body>
 </html>
