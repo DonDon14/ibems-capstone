@@ -37,5 +37,8 @@ final class SearchControlConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('.ibems-modern .ui-native-control', $modernUi);
         $this->assertStringContainsString('position: absolute !important;', $modernUi);
         $this->assertStringContainsString('width: 1px !important;', $modernUi);
+        $this->assertStringContainsString('.ui-select-menu::-webkit-scrollbar-button', $modernUi);
+        $this->assertStringContainsString("display: none;\n    width: 0;\n    height: 0;", $modernUi);
+        $this->assertStringContainsString("overscroll-behavior: contain;\n    scrollbar-color: #94a3b8 transparent;\n    scrollbar-width: thin;", $modernUi);
     }
 }

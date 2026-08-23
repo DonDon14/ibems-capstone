@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/store') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/store-pos.css') ?>?v=20260822a">
+<link rel="stylesheet" href="<?= base_url('assets/css/store-pos.css') ?>?v=20260823d">
 <link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20260821b">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <?= $this->endSection() ?>
@@ -115,15 +115,35 @@
         </div>
 
         <div id="debt-customer-wrap" class="payment-wrap is-hidden">
-            <label id="checkout-customer-label" for="debt-customer-search">Customer (optional)</label>
-            <div class="debt-search-wrap">
-                <input id="debt-customer-search" type="search" placeholder="Walk-in or search employee name / ID">
-                <button id="open-debt-scanner-btn" type="button" class="debt-scan-btn search-scan-btn" aria-label="Scan employee QR or ID" title="Scan employee QR/ID">
-                    <i class="bi bi-qr-code-scan"></i>
-                </button>
-                <div id="debt-customer-suggestions" class="debt-suggestions is-hidden"></div>
+            <div id="debt-account-type-wrap" class="payment-wrap is-hidden" hidden>
+                <label for="debt-account-type">Charge debt to</label>
+                <select id="debt-account-type">
+                    <option value="employee">Employee account</option>
+                    <option value="department">Department account</option>
+                </select>
+                <small>Department charges use the department&apos;s monthly allocation and never affect an employee balance or payroll deduction.</small>
             </div>
-            <small id="checkout-customer-help">Leave blank for a walk-in sale, or select an employee to record this transaction in their history.</small>
+            <div id="employee-debt-customer-fields">
+                <label id="checkout-customer-label" for="debt-customer-search">Customer (optional)</label>
+                <div class="debt-search-wrap">
+                    <input id="debt-customer-search" type="search" placeholder="Walk-in or search employee name / ID">
+                    <button id="open-debt-scanner-btn" type="button" class="debt-scan-btn search-scan-btn" aria-label="Scan employee QR or ID" title="Scan employee QR/ID">
+                        <i class="bi bi-qr-code-scan"></i>
+                    </button>
+                    <div id="debt-customer-suggestions" class="debt-suggestions is-hidden"></div>
+                </div>
+                <small id="checkout-customer-help">Leave blank for a walk-in sale, or select an employee to record this transaction in their history.</small>
+            </div>
+            <section id="department-debt-fields" class="department-debt-fields is-hidden" aria-label="Department debt authorization" hidden>
+                <label for="department-debt-account">Department</label>
+                <select id="department-debt-account"><option value="">Select a department</option></select>
+                <small id="department-debt-help">Only departments with an open allocation for this month are available.</small>
+                <label for="department-requester-name">Requested by</label>
+                <input id="department-requester-name" type="text" maxlength="160" autocomplete="name" placeholder="Name of person receiving the items">
+                <label for="department-approver">Department head</label>
+                <select id="department-approver"><option value="">Select an approver</option></select>
+                <small id="department-approver-help">The department head must enter their separate department approval PIN.</small>
+            </section>
             <section id="debt-credit-meter" class="debt-credit-meter is-hidden" aria-live="polite">
                 <div class="debt-credit-head"><div><span>Employee credit</span><strong id="debt-credit-status">Select an employee</strong></div><strong id="debt-credit-available">PHP 0.00 available</strong></div>
                 <div class="debt-credit-track" role="progressbar" aria-label="Employee credit used" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="debt-credit-fill"></span></div>
@@ -131,7 +151,7 @@
                 <p id="debt-credit-message">The Debt portion of this checkout will appear here.</p>
             </section>
             <div id="debt-pin-wrap" class="debt-pin-wrap is-hidden">
-                <label><i class="bi bi-shield-lock"></i> Debt Authorization PIN</label>
+                <label id="debt-pin-label"><i class="bi bi-shield-lock"></i> Debt Authorization PIN</label>
                 <small id="debt-pin-help">PIN is verified securely when the transaction is submitted.</small>
                 <button id="open-debt-pin-modal" type="button" class="secondary-btn debt-pin-open-btn">
                     <i class="bi bi-key"></i> Enter PIN
@@ -391,6 +411,6 @@
 <?= $this->section('scripts') ?>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
 <script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260821a"></script>
-<script src="<?= base_url('assets/js/store-pos.js') ?>?v=20260822b"></script>
+<script src="<?= base_url('assets/js/store-pos.js') ?>?v=20260823e"></script>
 <?= $this->endSection() ?>
 

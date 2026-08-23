@@ -373,6 +373,10 @@
     window.addEventListener("resize", () => openControl?.reposition());
     window.addEventListener("scroll", () => openControl?.reposition(), true);
     document.addEventListener("ibems:modal-open", () => closeOpenControl(false));
+    window.addEventListener("ibems:portal-page-unload", () => {
+        closeOpenControl(false);
+        document.querySelectorAll(".ui-select-menu, .ui-date-popup").forEach((popup) => popup.remove());
+    });
 
     enhance(document);
     new MutationObserver((records) => records.forEach((record) => record.addedNodes.forEach((node) => {

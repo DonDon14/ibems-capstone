@@ -2161,7 +2161,7 @@ class StoreController extends BaseController
         if (!$method || (int) $method['store_id'] !== (int) $store['id'] || in_array((string) $method['code'], ['cash', 'debt'], true)) {
             return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => 'Select a non-cash receiving method.']);
         }
-        if ($imageUrl !== '' && !filter_var($imageUrl, FILTER_VALIDATE_URL) && !str_starts_with($imageUrl, '/')) {
+        if ($imageUrl !== '' && !$this->isAllowedImageUrl($imageUrl)) {
             return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => 'QR image must be a valid HTTPS or application URL.']);
         }
         $model = new PaymentDestinationAccountModel();
@@ -2217,6 +2217,17 @@ class StoreController extends BaseController
     {
         $visible = mb_substr($number, -4);
         return mb_strlen($number) <= 4 ? $number : str_repeat('•', max(4, mb_strlen($number) - 4)) . $visible;
+    }
+
+    private function isAllowedImageUrl(string $url): bool
+    {
+        if (str_starts_with($url, '/uploads/')) {
+            return !str_contains($url, '..') && !str_contains($url, "\\");
+        }
+        if (filter_var($url, FILTER_VALIDATE_URL) === false) {
+            return false;
+        }
+        return strtolower((string) parse_url($url, PHP_URL_SCHEME)) === 'https';
     }
 
     public function debtCustomers()
@@ -2327,10 +2338,19 @@ class StoreController extends BaseController
         $allowedPaymentMethods = array_column($db->table('store_payment_methods')->select('code')->where('store_id', $storeId)->get()->getResultArray(), 'code');
         $allowedPaymentMethods[] = 'split';
         $hasPaymentLines = in_array('transaction_payments', $db->listTables(), true);
+        $hasDepartmentDebt = $db->tableExists('department_debt_transactions') && $db->tableExists('departments');
+        $transactionSelect = 't.id, t.client_txn_id, t.created_at, t.payment_method, t.amount, t.customer_type, t.user_id, u.name AS customer_name, u.profile_image_url AS customer_profile_image_url';
+        if ($hasDepartmentDebt) {
+            $transactionSelect .= ', ddt.department_id, d.name AS department_name, d.code AS department_code, ddt.requester_name AS department_requester_name';
+        }
         $query = $db->table('transactions t')
-            ->select('t.id, t.client_txn_id, t.created_at, t.payment_method, t.amount, t.customer_type, t.user_id, u.name AS customer_name, u.profile_image_url AS customer_profile_image_url')
-            ->join('users u', 'u.id = t.user_id', 'left')
-            ->where('t.store_id', $storeId);
+            ->select($transactionSelect)
+            ->join('users u', 'u.id = t.user_id', 'left');
+        if ($hasDepartmentDebt) {
+            $query->join('department_debt_transactions ddt', 'ddt.transaction_id = t.id', 'left')
+                ->join('departments d', 'd.id = ddt.department_id', 'left');
+        }
+        $query->where('t.store_id', $storeId);
 
         if ($dateFrom !== '') {
             $query->where('t.created_at >=', $dateFrom . ' 00:00:00');
@@ -2410,7 +2430,7 @@ class StoreController extends BaseController
         }
 
         $transactions = array_map(static function (array $row) use ($paymentRowsByTransaction): array {
-            $customerName = $row['customer_name'] ?: 'Walk-in';
+            $customerName = ($row['department_name'] ?? '') ?: ($row['customer_name'] ?: 'Walk-in');
             if (($row['customer_type'] ?? '') !== 'walk_in' && !$row['customer_name']) {
                 $customerName = ucfirst((string) $row['customer_type']);
             }
@@ -2423,6 +2443,10 @@ class StoreController extends BaseController
                 'amount' => (float) $row['amount'],
                 'customer_type' => $row['customer_type'],
                 'customer_name' => $customerName,
+                'debt_account_type' => !empty($row['department_id']) ? 'department' : 'employee',
+                'department_id' => isset($row['department_id']) ? (int) $row['department_id'] : null,
+                'department_code' => (string) ($row['department_code'] ?? ''),
+                'department_requester_name' => (string) ($row['department_requester_name'] ?? ''),
                 'customer_profile_image_url' => $row['customer_profile_image_url'] ?? null,
                 'payments' => $paymentRowsByTransaction[(int) $row['id']] ?? [],
             ];
@@ -2452,13 +2476,21 @@ class StoreController extends BaseController
         $storeModel = new StoreModel();
         $db = Database::connect();
 
-        $txn = $db->table('transactions t')
-            ->select('t.id, t.client_txn_id, t.created_at, t.payment_method, t.amount, t.customer_type, t.store_id, t.user_id, u.name AS customer_name, s.store_name')
+        $hasDepartmentDebt = $db->tableExists('department_debt_transactions') && $db->tableExists('departments');
+        $detailSelect = 't.id, t.client_txn_id, t.created_at, t.payment_method, t.amount, t.customer_type, t.store_id, t.user_id, u.name AS customer_name, s.store_name';
+        if ($hasDepartmentDebt) {
+            $detailSelect .= ', ddt.department_id, ddt.debt_amount AS department_debt_amount, ddt.requester_name AS department_requester_name, d.name AS department_name, d.code AS department_code, ap.name AS department_approver_name';
+        }
+        $txnQuery = $db->table('transactions t')
+            ->select($detailSelect)
             ->join('users u', 'u.id = t.user_id', 'left')
-            ->join('stores s', 's.id = t.store_id', 'inner')
-            ->where('t.id', $transactionId)
-            ->get()
-            ->getRowArray();
+            ->join('stores s', 's.id = t.store_id', 'inner');
+        if ($hasDepartmentDebt) {
+            $txnQuery->join('department_debt_transactions ddt', 'ddt.transaction_id = t.id', 'left')
+                ->join('departments d', 'd.id = ddt.department_id', 'left')
+                ->join('users ap', 'ap.id = ddt.approved_by_user_id', 'left');
+        }
+        $txn = $txnQuery->where('t.id', $transactionId)->get()->getRowArray();
 
         if (!$txn) {
             return $this->response->setStatusCode(404)->setJSON([
@@ -2522,7 +2554,7 @@ class StoreController extends BaseController
             ];
         }
 
-        $customerName = $txn['customer_name'] ?: 'Walk-in';
+        $customerName = ($txn['department_name'] ?? '') ?: ($txn['customer_name'] ?: 'Walk-in');
         if (($txn['customer_type'] ?? '') !== 'walk_in' && !$txn['customer_name']) {
             $customerName = ucfirst((string) $txn['customer_type']);
         }
@@ -2536,6 +2568,12 @@ class StoreController extends BaseController
                 'payment_method' => $txn['payment_method'],
                 'amount' => (float) $txn['amount'],
                 'customer_name' => $customerName,
+                'debt_account_type' => !empty($txn['department_id']) ? 'department' : 'employee',
+                'department_id' => isset($txn['department_id']) ? (int) $txn['department_id'] : null,
+                'department_code' => (string) ($txn['department_code'] ?? ''),
+                'department_requester_name' => (string) ($txn['department_requester_name'] ?? ''),
+                'department_approver_name' => (string) ($txn['department_approver_name'] ?? ''),
+                'department_debt_amount' => isset($txn['department_debt_amount']) ? (float) $txn['department_debt_amount'] : null,
                 'store_name' => $txn['store_name'],
                 'items' => $items,
                 'payments' => $payments,

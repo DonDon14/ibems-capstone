@@ -123,15 +123,86 @@ class IbemsDataAudit extends BaseCommand
             CLI::write('[OK] transaction amount matches summed line totals', 'green');
         }
 
-        $debtWithoutUser = (int) $db->table('transactions')
-            ->where('LOWER(payment_method)', 'debt')
-            ->where('user_id IS NULL', null, false)
-            ->countAllResults();
-        if ($debtWithoutUser > 0) {
-            CLI::write("[FAIL] debt transactions with null user_id: {$debtWithoutUser}", 'red');
+        $debtWithoutAccount = $db->tableExists('department_debt_transactions')
+            ? (int) $db->query(
+                "SELECT COUNT(*) AS c
+                 FROM transactions t
+                 LEFT JOIN department_debt_transactions ddt ON ddt.transaction_id = t.id
+                 WHERE LOWER(t.payment_method) = 'debt'
+                   AND t.user_id IS NULL
+                   AND ddt.transaction_id IS NULL"
+            )->getRow('c')
+            : (int) $db->table('transactions')
+                ->where('LOWER(payment_method)', 'debt')
+                ->where('user_id IS NULL', null, false)
+                ->countAllResults();
+        if ($debtWithoutAccount > 0) {
+            CLI::write("[FAIL] debt transactions without an employee or department account: {$debtWithoutAccount}", 'red');
             $errors++;
         } else {
-            CLI::write('[OK] debt transactions always have user_id', 'green');
+            CLI::write('[OK] every debt transaction has an employee or department account', 'green');
+        }
+
+        if ($db->tableExists('department_debt_periods')) {
+            $invalidDepartmentPeriods = (int) $db->query(
+                'SELECT COUNT(*) AS c
+                 FROM department_debt_periods
+                 WHERE allocation_amount < 0
+                    OR used_amount < 0
+                    OR outstanding_amount < 0
+                    OR used_amount > allocation_amount'
+            )->getRow('c');
+            if ($invalidDepartmentPeriods > 0) {
+                CLI::write("[FAIL] invalid department debt period balances: {$invalidDepartmentPeriods}", 'red');
+                $errors++;
+            } else {
+                CLI::write('[OK] department debt period balances stay within allocation boundaries', 'green');
+            }
+
+            $departmentLedgerMismatch = (int) $db->query(
+                'SELECT COUNT(*) AS c
+                 FROM department_debt_periods p
+                 LEFT JOIN department_debt_entries e
+                   ON e.id = (SELECT MAX(e2.id) FROM department_debt_entries e2 WHERE e2.period_id = p.id)
+                 WHERE e.id IS NULL
+                    OR ABS(p.allocation_amount - e.allocation_after) > 0.01
+                    OR ABS(p.used_amount - e.used_after) > 0.01
+                    OR ABS(p.outstanding_amount - e.outstanding_after) > 0.01'
+            )->getRow('c');
+            if ($departmentLedgerMismatch > 0) {
+                CLI::write("[FAIL] department periods not reconciled to their latest ledger entry: {$departmentLedgerMismatch}", 'red');
+                $errors++;
+            } else {
+                CLI::write('[OK] department period balances reconcile to the append-only ledger', 'green');
+            }
+
+            $departmentPaymentMismatch = $db->tableExists('transaction_payments')
+                ? (int) $db->query(
+                    "SELECT COUNT(*) AS c
+                     FROM department_debt_transactions ddt
+                     LEFT JOIN (
+                         SELECT transaction_id, SUM(amount) AS debt_amount
+                         FROM transaction_payments
+                         WHERE LOWER(payment_method) = 'debt'
+                         GROUP BY transaction_id
+                     ) payments ON payments.transaction_id = ddt.transaction_id
+                     WHERE payments.transaction_id IS NULL
+                        OR ABS(ddt.debt_amount - payments.debt_amount) > 0.01"
+                )->getRow('c')
+                : (int) $db->query(
+                    "SELECT COUNT(*) AS c
+                     FROM department_debt_transactions ddt
+                     LEFT JOIN transactions t ON t.id = ddt.transaction_id
+                     WHERE t.id IS NULL
+                        OR LOWER(t.payment_method) <> 'debt'
+                        OR ABS(ddt.debt_amount - t.amount) > 0.01"
+                )->getRow('c');
+            if ($departmentPaymentMismatch > 0) {
+                CLI::write("[FAIL] department charges not reconciled to debt payment lines: {$departmentPaymentMismatch}", 'red');
+                $errors++;
+            } else {
+                CLI::write('[OK] department charges reconcile to transaction debt payment lines', 'green');
+            }
         }
 
         // 4) Store mapping integrity

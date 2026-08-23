@@ -1742,7 +1742,7 @@ document.getElementById("open-debt-investigations").addEventListener("click", op
 document.getElementById("open-settlement-run").addEventListener("click", openSettlementModal);
 document.getElementById("open-import-csv").addEventListener("click", openImportModal);
 document.getElementById("close-deduction-mode").addEventListener("click", closeMode);
-document.getElementById("close-deduction-workflow").addEventListener("click", closeDeductionWorkflow);
+document.getElementById("close-deduction-workflow")?.addEventListener("click", closeDeductionWorkflow);
 document.getElementById("close-debt-investigations").addEventListener("click", closeInvestigationsModal);
 document.getElementById("close-settlement-run").addEventListener("click", closeSettlementModal);
 document.getElementById("close-import-csv").addEventListener("click", closeImportModal);
@@ -1815,8 +1815,8 @@ document.getElementById("workflow-candidates").addEventListener("change", (event
 document.getElementById("workflow-candidate-search").addEventListener("input", filterWorkflowCandidates);
 document.getElementById("workflow-toggle-filters").addEventListener("click", (event) => {
     const panel = document.getElementById("workflow-filter-options");
-    const opening = panel.style.display === "none";
-    panel.style.display = opening ? "flex" : "none";
+    const opening = panel.hidden;
+    panel.hidden = !opening;
     event.currentTarget.setAttribute("aria-expanded", opening ? "true" : "false");
 });
 document.getElementById("workflow-candidate-type").addEventListener("change", filterWorkflowCandidates);
@@ -1895,8 +1895,8 @@ document.getElementById("settlement-confirm-modal").addEventListener("click", (e
 document.getElementById("close-settlement-run-details").addEventListener("click", closeSettlementRunDetails);
 document.getElementById("settlement-details-export").addEventListener("click", exportSettlementDetailsCsv);
 
-if (window.IBEMS_DEDUCTIONS_PAGE) {
-    const workflow = document.getElementById("deduction-workflow-modal");
+const workflow = document.getElementById("deduction-workflow-modal");
+if (workflow?.classList.contains("deductions-page-shell")) {
     workflow.style.display = "block";
     openDeductionWorkflow();
 }

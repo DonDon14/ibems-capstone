@@ -22,11 +22,13 @@ Do not paste either value into Git, application logs, issue comments, or chat.
 
 ## Automatic hosted bootstrap
 
-Before Apache starts, `ibems:hosted-bootstrap` applies two idempotent PostgreSQL
+Before Apache starts, `ibems:hosted-bootstrap` applies the required idempotent PostgreSQL
 scripts:
 
 - `010_salary_grade_profiles.sql`
 - `011_render_hosted_sessions.sql`
+- `012_dynamic_salary_schedules.sql`
+- `014_department_debt_accounts.sql`
 
 The command stops if the verified IBEMS baseline tables are absent. It never
 seeds, truncates, drops, or imports application data. Database sessions prevent

@@ -591,14 +591,8 @@
     min-height: 20px;
 }
 
-.acct-modal {
-    position: fixed;
-    inset: 0;
-    background: rgba(15, 23, 42, 0.45);
-    display: grid;
-    place-items: center;
-    padding: 18px;
-    z-index: 1300;
+.accounting-debt-overview.is-hidden {
+    display: none !important;
 }
 
 .acct-modal-card {
@@ -707,6 +701,107 @@
 
 .mode-profile-empty {
     color: #64748b;
+}
+
+.deductions-page-shell {
+    display: block !important;
+    position: static !important;
+    inset: auto !important;
+    width: 100% !important;
+    min-height: 0 !important;
+    padding: 1.5rem !important;
+    overflow: visible !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    transform: none !important;
+    filter: none !important;
+    box-sizing: border-box;
+}
+
+.deductions-page-card {
+    width: 100% !important;
+    max-width: 1380px !important;
+    max-height: none !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    box-sizing: border-box;
+}
+
+.deductions-page-card > .page-header {
+    margin-bottom: 1.25rem;
+}
+
+.deductions-page-card > .grid {
+    min-width: 0;
+}
+
+body #workflow-employees-modal {
+    position: fixed !important;
+    inset: 0 !important;
+    width: 100vw !important;
+    height: 100dvh !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 14px !important;
+    /* Keep this below the body-portalled select menu (z-index 1400). */
+    z-index: 1350 !important;
+    background: rgba(15, 23, 42, .62) !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+}
+
+body #workflow-employees-modal > .acct-modal-card {
+    width: min(1720px, calc(100vw - 28px)) !important;
+    height: min(94vh, 920px) !important;
+    max-height: calc(100dvh - 28px) !important;
+    display: flex;
+    flex-direction: column;
+}
+
+body #workflow-employees-modal #workflow-candidates {
+    flex: 1 1 auto;
+    max-height: none !important;
+    min-height: 0;
+}
+
+body #workflow-employees-modal .workflow-candidate {
+    display: grid !important;
+    grid-template-columns: 18px minmax(320px, 1fr) 180px 240px !important;
+    align-items: center !important;
+    column-gap: 10px !important;
+}
+
+body #workflow-employees-modal .workflow-candidate > .workflow-deduction-choice,
+body #workflow-employees-modal .workflow-candidate > span:last-child,
+body #workflow-employees-modal .workflow-candidate .workflow-request-amount,
+body #workflow-employees-modal .workflow-candidate .workflow-preparation-reason {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+}
+
+@media (max-width: 900px) {
+    body #workflow-employees-modal .workflow-candidate {
+        grid-template-columns: 18px minmax(0, 1fr) !important;
+    }
+
+    body #workflow-employees-modal .workflow-candidate > .workflow-deduction-choice,
+    body #workflow-employees-modal .workflow-candidate > span:last-child {
+        grid-column: 2;
+    }
+}
+
+@media (max-width: 1279px) {
+    .deductions-page-card > .grid {
+        grid-template-columns: minmax(0, 1fr) !important;
+    }
 }
 
 .employee-profile-loading {

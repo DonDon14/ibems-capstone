@@ -13,7 +13,10 @@ final class VerifyLiveOneDayOperations extends BaseCommand
 {
     protected $group = 'IBEMS';
     protected $name = 'ibems:verify-live-one-day-operations';
-    protected $description = 'Run and clean up an isolated one-day POS transaction matrix against PostgreSQL staging.';
+    protected $description = 'Run and clean up an isolated one-day POS transaction matrix against PostgreSQL staging or an explicitly approved local development database.';
+    protected $options = [
+        '--allow-local' => 'Explicitly allow the isolated, self-cleaning trial on a non-production local database.',
+    ];
 
     private $db;
     private string $marker;
@@ -22,9 +25,14 @@ final class VerifyLiveOneDayOperations extends BaseCommand
     public function run(array $params)
     {
         $this->db = Database::connect();
-        if (stripos((string) ($this->db->DBDriver ?? ''), 'Postgre') === false) {
-            CLI::error('This command is only available for PostgreSQL staging.');
+        $isPostgreSql = stripos((string) ($this->db->DBDriver ?? ''), 'Postgre') !== false;
+        $allowLocal = array_key_exists('allow-local', $params) || CLI::getOption('allow-local') !== null;
+        if (!$isPostgreSql && (!$allowLocal || ENVIRONMENT === 'production')) {
+            CLI::error('Non-PostgreSQL execution requires --allow-local and a non-production environment.');
             return EXIT_ERROR;
+        }
+        if (!$isPostgreSql) {
+            CLI::write('[LOCAL] Running an isolated development trial; synthetic records will be removed.', 'yellow');
         }
 
         $this->marker = 'QA-DAY-' . gmdate('YmdHis');

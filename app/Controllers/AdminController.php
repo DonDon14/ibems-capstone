@@ -1790,6 +1790,7 @@ class AdminController extends Controller
                 'email' => $email,
                 'profile_image_url' => $profileImageUrl ?? ($user['profile_image_url'] ?? null),
             ]);
+            ibems_refresh_session_roles(true);
         }
 
         return $this->response->setJSON([

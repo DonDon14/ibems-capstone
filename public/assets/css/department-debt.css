@@ -1,0 +1,110 @@
+.department-page { display: grid; gap: 1.25rem; }
+.department-summary-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0.9rem; }
+.department-financial-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.department-summary-grid article,
+.department-ledger-panel,
+.department-assignment-panel,
+.department-pin-panel { border: 1px solid var(--border); border-radius: 1rem; background: var(--surface); box-shadow: 0 8px 24px rgb(15 23 42 / 0.05); }
+.department-summary-grid article { display: grid; gap: 0.45rem; min-height: 7rem; padding: 1.1rem; }
+.department-summary-grid span,
+.department-ledger-panel header span,
+.department-assignment-panel header span,
+.department-pin-panel header span { color: var(--text-soft); font-size: 0.75rem; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; }
+.department-summary-grid strong { align-self: end; color: var(--text-main); font-size: clamp(1.35rem, 2vw, 2rem); }
+.department-toolbar { display: flex; align-items: end; gap: 0.75rem; padding: 0.85rem; border: 1px solid var(--border); border-radius: 1rem; background: var(--surface); }
+.department-toolbar label { display: grid; flex: 1 1 14rem; gap: 0.35rem; min-width: 0; }
+.department-toolbar label span,
+.department-form-grid label > span,
+.department-field-label,
+.department-pin-panel label > span { color: var(--text-soft); font-size: 0.75rem; font-weight: 750; }
+.department-toolbar input,
+.department-toolbar select,
+.department-form-grid input,
+.department-form-grid select,
+.department-pin-panel input { width: 100%; min-height: 2.75rem; border: 1px solid var(--border); border-radius: 0.7rem; background: var(--surface-soft); color: var(--text-main); padding: 0.6rem 0.75rem; }
+.department-table-wrap { overflow: auto; border: 1px solid var(--border); border-radius: 1rem; background: var(--surface); }
+.department-table-wrap .table { margin: 0; min-width: 780px; }
+.department-identity { display: grid; gap: 0.15rem; }
+.department-identity strong { color: var(--text-main); }
+.department-identity small { color: var(--text-soft); }
+.department-status-pill { display: inline-flex; align-items: center; gap: 0.3rem; width: fit-content; border: 1px solid var(--border); border-radius: 999px; padding: 0.25rem 0.55rem; background: var(--surface-soft); color: var(--text-main); font-size: 0.75rem; font-weight: 700; }
+.department-status-pill.is-active { border-color: color-mix(in srgb, #16a34a 42%, var(--border)); background: color-mix(in srgb, #16a34a 13%, var(--surface)); color: color-mix(in srgb, #16a34a 78%, var(--text-main)); }
+.department-status-pill.is-inactive,
+.department-status-pill.is-suspended { border-color: color-mix(in srgb, #f59e0b 45%, var(--border)); background: color-mix(in srgb, #f59e0b 14%, var(--surface)); color: color-mix(in srgb, #d97706 78%, var(--text-main)); }
+.department-status-pill.is-closed { opacity: 0.72; }
+.department-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.department-actions button { white-space: nowrap; }
+.department-result { min-height: 1.25rem; margin: 0; color: var(--text-soft); font-size: 0.88rem; }
+.department-result.is-error { color: #dc2626; }
+.department-result.is-success { color: #16a34a; }
+.department-modal { position: fixed; inset: 0; z-index: 1900; display: grid; place-items: center; padding: 1rem; background: rgb(2 6 23 / 0.62); backdrop-filter: blur(5px); }
+.department-modal.is-hidden { display: none; }
+body.department-modal-open { overflow: hidden; }
+.department-modal-card { width: min(46rem, 100%); max-height: min(90vh, 50rem); overflow: auto; border: 1px solid var(--border); border-radius: 1.15rem; background: var(--surface); color: var(--text-main); box-shadow: 0 24px 70px rgb(2 6 23 / 0.3); }
+.department-modal-card > header,
+.department-modal-card > footer,
+.department-ledger-panel > header,
+.department-assignment-panel > header,
+.department-pin-panel > header { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem 1.15rem; border-bottom: 1px solid var(--border); }
+.department-modal-card > header h3,
+.department-ledger-panel h3,
+.department-assignment-panel h3,
+.department-pin-panel h3 { margin: 0.15rem 0 0; font-size: 1.05rem; }
+.department-modal-card > header button { display: grid; place-items: center; width: 2.4rem; height: 2.4rem; border: 0; border-radius: 0.65rem; background: var(--surface-muted); color: var(--text-main); font-size: 1.5rem; }
+.department-modal-card > footer { justify-content: flex-end; border-top: 1px solid var(--border); border-bottom: 0; }
+.department-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.9rem; padding: 1.15rem; }
+.department-form-grid label { display: grid; gap: 0.35rem; min-width: 0; }
+.department-head-field { display: grid; gap: 0.35rem; min-width: 0; }
+.department-head-editor { position: relative; }
+.department-head-picker { display: grid; grid-template-columns: minmax(0, 1fr); align-items: center; min-height: 3rem; overflow: hidden; border: 1px solid var(--border); border-radius: 0.8rem; background: var(--surface-soft); transition: border-color 0.15s ease, box-shadow 0.15s ease; }
+.department-head-picker:focus-within { border-color: #2563eb; box-shadow: 0 0 0 3px rgb(37 99 235 / 0.14); }
+.department-form-grid .department-head-picker input[type="search"],
+.department-form-grid .department-head-picker input[type="search"]:hover,
+.department-form-grid .department-head-picker input[type="search"]:focus { min-height: 2.9rem; border: 0; border-radius: 0; padding: 0.6rem 0.75rem 0.6rem 2.4rem; outline: 0; background-color: transparent; box-shadow: none; }
+.department-head-suggestions { position: absolute; z-index: 25; top: calc(100% + 0.35rem); right: 0; left: 0; display: grid; gap: 0.25rem; max-height: min(20rem, 42vh); overflow: auto; padding: 0.4rem; border: 1px solid var(--border); border-radius: 0.8rem; background: var(--surface); box-shadow: 0 18px 45px rgb(2 6 23 / 0.24); scrollbar-color: color-mix(in srgb, var(--text-soft) 58%, transparent) transparent; scrollbar-width: thin; }
+.department-head-suggestions.is-hidden { display: none; }
+.department-head-option { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: center; gap: 0.7rem; width: 100%; border: 0; border-radius: 0.65rem; padding: 0.6rem 0.7rem; background: transparent; color: var(--text-main); text-align: left; cursor: pointer; }
+.department-head-option > span { display: grid; gap: 0.1rem; min-width: 0; }
+.department-head-option strong,
+.department-head-option small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.department-head-option small,
+.department-head-search-hint { color: var(--text-soft); font-size: 0.78rem; }
+.department-head-option:is(:hover, :focus-visible, .is-active) { outline: 0; background: color-mix(in srgb, #2563eb 14%, var(--surface)); }
+.department-head-search-hint { margin: 0; padding: 0.8rem; text-align: center; }
+.department-form-grid label small { color: var(--text-soft); font-size: 0.75rem; }
+.department-wide { grid-column: 1 / -1; }
+.department-modal-card > .department-result { padding: 0 1.15rem; }
+.department-progress { display: grid; gap: 0.35rem; min-width: 10rem; }
+.department-progress-track { height: 0.38rem; overflow: hidden; border-radius: 99px; background: var(--surface-muted); }
+.department-progress-track span { display: block; height: 100%; border-radius: inherit; background: #2563eb; }
+.department-progress small { color: var(--text-soft); }
+.department-ledger-panel { overflow: hidden; }
+.department-user-grid { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(18rem, 0.85fr); gap: 1rem; }
+.department-assignment-panel,
+.department-pin-panel { overflow: hidden; }
+#department-user-assignments { display: grid; gap: 0.7rem; padding: 1rem; }
+.department-assignment-card { display: grid; gap: 0.3rem; padding: 0.85rem; border: 1px solid var(--border); border-radius: 0.8rem; background: var(--surface-soft); }
+.department-assignment-card small { color: var(--text-soft); }
+.department-pin-panel { display: grid; align-content: start; gap: 0.85rem; padding-bottom: 1rem; }
+.department-pin-panel > p,
+.department-pin-panel > label,
+.department-pin-panel > button,
+.department-pin-panel > small { margin-inline: 1rem; }
+.department-pin-panel > label { display: grid; gap: 0.35rem; }
+.department-pin-panel > small { color: var(--text-soft); }
+.department-finance-card { width: min(38rem, 100%); }
+
+@media (max-width: 900px) {
+    .department-summary-grid,
+    .department-financial-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .department-user-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 620px) {
+    .department-summary-grid,
+    .department-financial-summary,
+    .department-form-grid { grid-template-columns: 1fr; }
+    .department-wide { grid-column: auto; }
+    .department-toolbar { align-items: stretch; flex-direction: column; }
+    .department-toolbar button { width: 100%; }
+}

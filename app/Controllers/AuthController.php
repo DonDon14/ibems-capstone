@@ -3,6 +3,7 @@
 namespace App\Controllers;
 
 use App\Models\UserModel;
+use App\Services\StoreAccessService;
 use CodeIgniter\Controller;
 
 class AuthController extends Controller
@@ -15,13 +16,35 @@ class AuthController extends Controller
             : $this->request->getPost();
 
         $email    = strtolower(trim((string) ($request['email'] ?? '')));
-        $password = $request['password'] ?? null;
+        $password = is_string($request['password'] ?? null) ? $request['password'] : '';
 
-        if (!$email || !$password) {
+        if ($email === '' || $password === '') {
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
                 'message' => 'Email and password required'
             ]);
+        }
+
+        if (strlen($email) > 254 || filter_var($email, FILTER_VALIDATE_EMAIL) === false || strlen($password) > 4096) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Enter a valid email and password'
+            ]);
+        }
+
+        $throttler = service('throttler');
+        $identityThrottleKey = 'login-identity-' . hash('sha256', $email);
+        $ipThrottleKey = 'login-ip-' . hash('sha256', $this->request->getIPAddress());
+        if (!$throttler->check($ipThrottleKey, 30, 300)
+            || !$throttler->check($identityThrottleKey, 8, 900)) {
+            $retryAfter = max(1, $throttler->getTokenTime());
+            return $this->response
+                ->setStatusCode(429)
+                ->setHeader('Retry-After', (string) $retryAfter)
+                ->setJSON([
+                    'status' => 'error',
+                    'message' => 'Too many sign-in attempts. Please wait before trying again.',
+                ]);
         }
 
         $userModel = new UserModel();
@@ -40,6 +63,12 @@ class AuthController extends Controller
                 'status' => 'error',
                 'message' => 'Invalid email or password'
             ]);
+        }
+
+        // A successful authentication clears the account-specific bucket while
+        // retaining the broader IP bucket to slow distributed credential abuse.
+        if (method_exists($throttler, 'remove')) {
+            $throttler->remove($identityThrottleKey);
         }
 
         session()->regenerate(true);
@@ -89,7 +118,7 @@ class AuthController extends Controller
             ]);
         }
 
-        ibems_refresh_session_roles();
+        ibems_refresh_session_roles(true);
 
         return $this->response->setJSON([
             'status' => 'success',
@@ -109,8 +138,7 @@ class AuthController extends Controller
             return redirect()->to('/login');
         }
 
-        ibems_refresh_session_roles();
-        $availableRoles = ibems_available_roles();
+        $availableRoles = ibems_refresh_session_roles(true);
         if ($availableRoles === []) {
             session()->destroy();
             return redirect()->to('/login');
@@ -120,7 +148,23 @@ class AuthController extends Controller
             return redirect()->to(ibems_role_landing_path($availableRoles[0]));
         }
 
-        return view('auth/select_role');
+        $storeRoles = array_values(array_intersect($availableRoles, ['STORE_SYSTEM', 'STORE_SUPERVISOR']));
+        $roleStores = [];
+        if ($storeRoles !== []) {
+            $storeAccess = new StoreAccessService();
+            $userId = (int) session()->get('user_id');
+            foreach ($storeRoles as $storeRole) {
+                $roleStores[$storeRole] = array_map(static fn (array $store): array => [
+                    'id' => (int) ($store['id'] ?? 0),
+                    'store_name' => (string) ($store['store_name'] ?? 'Store'),
+                ], $storeAccess->accessibleStores($userId, $storeRole));
+            }
+        }
+
+        return view('auth/select_role', [
+            'availableRoles' => $availableRoles,
+            'roleStores' => $roleStores,
+        ]);
     }
 
     public function selectRole()
@@ -138,7 +182,7 @@ class AuthController extends Controller
             : null;
         $request = $jsonRequest ?? $this->request->getPost();
         $role = strtoupper(trim((string) ($request['role'] ?? '')));
-        $available = ibems_available_roles();
+        $available = ibems_refresh_session_roles(true);
 
         if ($role === '' || !in_array($role, $available, true)) {
             return $this->response->setStatusCode(400)->setJSON([

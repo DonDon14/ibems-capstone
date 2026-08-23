@@ -210,6 +210,15 @@
     font: inherit;
     font-weight: 800;
     cursor: pointer;
+    transition: border-color 150ms ease, background-color 150ms ease, color 150ms ease, box-shadow 150ms ease;
+}
+
+.account-menu-logout button:is(:hover, :focus-visible) {
+    border-color: #dc2626;
+    outline: 0;
+    background: #dc2626;
+    color: #fff;
+    box-shadow: 0 8px 20px rgb(220 38 38 / 0.22);
 }
 
 @keyframes account-menu-in {
@@ -277,6 +286,13 @@ html[data-theme="dark"] .account-menu-logout button {
     border-color: #7f1d1d;
     background: #2a1720;
     color: #fda4af;
+}
+
+html[data-theme="dark"] .account-menu-logout button:is(:hover, :focus-visible) {
+    border-color: #ef4444;
+    background: #7f1d1d;
+    color: #fff1f2;
+    box-shadow: 0 8px 20px rgb(239 68 68 / 0.2);
 }
 
 @media (max-width: 760px) {

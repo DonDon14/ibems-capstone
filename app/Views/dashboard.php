@@ -14,7 +14,10 @@
 <nav class="app-nav">
     <a href="/store/pos">Store</a>
     <a href="/user/dashboard">User</a>
-    <a href="/auth/logout">Logout</a>
+    <form method="post" action="<?= site_url('auth/logout') ?>">
+        <?= csrf_field() ?>
+        <button type="submit">Logout</button>
+    </form>
 </nav>
 
 <main class="app-container">

@@ -124,46 +124,40 @@
         ".app-modal",
     ].join(",");
 
-    document.querySelectorAll(modalSelectors).forEach((modal) => {
-        modal.setAttribute("role", modal.getAttribute("role") || "dialog");
-        modal.setAttribute("aria-modal", "true");
+    const enhanceModalAccessibility = (root = document) => {
+        root.querySelectorAll?.(modalSelectors).forEach((modal) => {
+            modal.setAttribute("role", modal.getAttribute("role") || "dialog");
+            modal.setAttribute("aria-modal", "true");
 
-        const closeButton = modal.querySelector(
-            ".admin-modal-close, .acct-modal-close, .inv-modal-close, .app-modal-close, .receipt-close, [data-modal-close]"
-        );
-        if (closeButton && !closeButton.getAttribute("aria-label")) {
-            closeButton.setAttribute("aria-label", "Close dialog");
-        }
+            const closeButton = modal.querySelector(
+                ".admin-modal-close, .acct-modal-close, .inv-modal-close, .app-modal-close, .receipt-close, [data-modal-close]"
+            );
+            if (closeButton && !closeButton.getAttribute("aria-label")) closeButton.setAttribute("aria-label", "Close dialog");
 
-        const heading = modal.querySelector("h1, h2, h3, h4");
-        if (heading) {
-            if (!heading.id) {
-                heading.id = `${modal.id || "dialog"}-title`;
+            const heading = modal.querySelector("h1, h2, h3, h4");
+            if (heading) {
+                if (!heading.id) heading.id = `${modal.id || "dialog"}-title`;
+                if (!modal.getAttribute("aria-labelledby")) modal.setAttribute("aria-labelledby", heading.id);
             }
-            if (!modal.getAttribute("aria-labelledby")) {
-                modal.setAttribute("aria-labelledby", heading.id);
-            }
-        }
-    });
-
-    document.querySelectorAll("[data-inset-modal-scroll]").forEach((card) => {
-        if (card.dataset.insetModalScrollReady === "true") return;
-
-        const header = Array.from(card.children).find((child) =>
-            child.matches(".acct-modal-head, .admin-modal-head")
-        );
-        if (!header) return;
-
-        const scrollRegion = document.createElement("div");
-        scrollRegion.className = "app-inset-modal-scroll";
-        Array.from(card.children).forEach((child) => {
-            if (child !== header) scrollRegion.appendChild(child);
         });
 
-        card.appendChild(scrollRegion);
-        card.classList.add("app-inset-modal-card");
-        card.dataset.insetModalScrollReady = "true";
-    });
+        root.querySelectorAll?.("[data-inset-modal-scroll]").forEach((card) => {
+            if (card.dataset.insetModalScrollReady === "true") return;
+            const header = Array.from(card.children).find((child) => child.matches(".acct-modal-head, .admin-modal-head"));
+            if (!header) return;
+
+            const scrollRegion = document.createElement("div");
+            scrollRegion.className = "app-inset-modal-scroll";
+            Array.from(card.children).forEach((child) => {
+                if (child !== header) scrollRegion.appendChild(child);
+            });
+            card.appendChild(scrollRegion);
+            card.classList.add("app-inset-modal-card");
+            card.dataset.insetModalScrollReady = "true";
+        });
+    };
+
+    enhanceModalAccessibility();
 
     let compactPanelSequence = 0;
 
@@ -266,9 +260,17 @@
             panel.dataset.mode = mode;
             if (open && window.matchMedia("(min-width: 761px)").matches) {
                 window.requestAnimationFrame(() => {
-                    const top = panel.getBoundingClientRect().top;
-                    panel.style.maxHeight = `${Math.max(240, window.innerHeight - top - 16)}px`;
-                    panel.style.overflowY = "auto";
+                    panel.style.removeProperty("max-height");
+                    panel.style.removeProperty("overflow-y");
+                    window.requestAnimationFrame(() => {
+                        if (!panel.isConnected || panel.hidden) return;
+                        const panelRect = panel.getBoundingClientRect();
+                        const availableHeight = Math.max(0, window.innerHeight - panelRect.top - 16);
+                        if (panelRect.height > availableHeight) {
+                            panel.style.maxHeight = `${availableHeight}px`;
+                            panel.style.overflowY = "auto";
+                        }
+                    });
                 });
             } else if (!open) {
                 panel.style.removeProperty("max-height");
@@ -334,7 +336,7 @@
                 setOpen("sort", false);
             }
         }));
-        const pageSignal = window.IbemsUserNavigation?.currentSignal;
+        const pageSignal = window.IbemsPortalNavigation?.currentSignal || window.IbemsUserNavigation?.currentSignal;
         document.addEventListener("click", (event) => {
             if (panel.hidden || bar.contains(event.target)) return;
             const isMobileFilterPopup = window.matchMedia("(max-width: 760px)").matches
@@ -360,7 +362,9 @@
     };
 
     enhanceCompactFilters();
-    document.addEventListener("ibems:user-page-loaded", (event) => {
-        enhanceCompactFilters(event.detail?.main || document);
+    document.addEventListener("ibems:portal-page-loaded", (event) => {
+        const root = event.detail?.main || document;
+        enhanceModalAccessibility(root);
+        enhanceCompactFilters(root);
     });
 })();

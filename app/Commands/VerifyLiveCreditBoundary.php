@@ -11,14 +11,22 @@ class VerifyLiveCreditBoundary extends BaseCommand
 {
     protected $group = 'IBEMS';
     protected $name = 'ibems:verify-live-credit-boundary';
-    protected $description = 'Run and clean up an isolated exact-limit and over-limit debt purchase against PostgreSQL staging.';
+    protected $description = 'Run and clean up an isolated exact-limit and over-limit debt purchase against PostgreSQL staging or an explicitly approved local development database.';
+    protected $options = [
+        '--allow-local' => 'Explicitly allow the isolated, self-cleaning trial on a non-production local database.',
+    ];
 
     public function run(array $params)
     {
         $db = Database::connect();
-        if (stripos((string) ($db->DBDriver ?? ''), 'Postgre') === false) {
-            CLI::error('This command is only available for PostgreSQL staging.');
+        $isPostgreSql = stripos((string) ($db->DBDriver ?? ''), 'Postgre') !== false;
+        $allowLocal = array_key_exists('allow-local', $params) || CLI::getOption('allow-local') !== null;
+        if (!$isPostgreSql && (!$allowLocal || ENVIRONMENT === 'production')) {
+            CLI::error('Non-PostgreSQL execution requires --allow-local and a non-production environment.');
             return EXIT_ERROR;
+        }
+        if (!$isPostgreSql) {
+            CLI::write('[LOCAL] Running an isolated development trial; synthetic records will be removed.', 'yellow');
         }
 
         $marker = 'QA-CREDIT-' . gmdate('YmdHis');

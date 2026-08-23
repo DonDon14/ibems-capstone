@@ -30,6 +30,12 @@ class TransactionService
             'customer_user_id' => 'permit_empty|is_natural_no_zero',
             'customer_type' => 'permit_empty|in_list[walk_in,faculty,staff,student]',
             'debt_pin' => 'permit_empty|regex_match[/^[0-9]{4,6}$/]',
+            'debt_account_type' => 'permit_empty|in_list[employee,department]',
+            'department_id' => 'permit_empty|is_natural_no_zero',
+            'department_requester_user_id' => 'permit_empty|is_natural_no_zero',
+            'department_requester_name' => 'permit_empty|max_length[160]',
+            'department_approver_user_id' => 'permit_empty|is_natural_no_zero',
+            'department_pin' => 'permit_empty|regex_match[/^[0-9]{4,6}$/]',
             'items' => 'required',
         ]);
 
@@ -42,6 +48,12 @@ class TransactionService
         $customerUserId = isset($request['customer_user_id']) ? (int) $request['customer_user_id'] : null;
         $customerType = (string) ($request['customer_type'] ?? 'walk_in');
         $debtPin = trim((string) ($request['debt_pin'] ?? ''));
+        $debtAccountType = strtolower(trim((string) ($request['debt_account_type'] ?? 'employee')));
+        $departmentId = (int) ($request['department_id'] ?? 0);
+        $departmentRequesterUserId = (int) ($request['department_requester_user_id'] ?? 0);
+        $departmentRequesterName = trim((string) ($request['department_requester_name'] ?? ''));
+        $departmentApproverUserId = (int) ($request['department_approver_user_id'] ?? 0);
+        $departmentPin = trim((string) ($request['department_pin'] ?? ''));
         $cashReceived = isset($request['cash_received']) ? (float) $request['cash_received'] : null;
         $requestedPayments = $request['payments'] ?? [];
         $items = $request['items'] ?? [];
@@ -148,26 +160,59 @@ class TransactionService
         $debtCashbookModel = new DebtCashbookEntryModel();
         $debtBalanceBefore = null;
         if ($debtLine !== null) {
-            if (!$customerUserId) {
-                return $this->error('Please select a faculty/staff customer for debt transactions.');
+            if ($debtAccountType === 'department') {
+                $db = Database::connect();
+                if (!$db->tableExists('department_debt_periods')) {
+                    return $this->error('Department debt is unavailable until the latest database migration is applied.', 503);
+                }
+                if ($departmentId <= 0 || $departmentApproverUserId <= 0 || $departmentRequesterName === '') {
+                    return $this->error('Select a department and approver, then identify the person requesting the purchase.');
+                }
+                if ($departmentPin === '') {
+                    return $this->error('Enter the department approver PIN to authorize this charge.');
+                }
+                if ($departmentRequesterUserId > 0) {
+                    $requester = $userModel->getActiveUserById($departmentRequesterUserId);
+                    if (!$requester) {
+                        return $this->error('Selected department requester was not found.');
+                    }
+                    // When a requester account is selected, its canonical name
+                    // wins over client-supplied display text in the audit trail.
+                    $departmentRequesterName = trim((string) ($requester['name'] ?? ''));
+                }
+                $customerUserId = null;
+                $customer = null;
+                $customerType = 'walk_in';
+                $pinAuthorization = (new DepartmentAuthorizationService())->authorize(
+                    $departmentId,
+                    $departmentApproverUserId,
+                    $departmentPin,
+                    $actorId,
+                    $storeId,
+                    $debtAmount
+                );
+            } else {
+                if (!$customerUserId) {
+                    return $this->error('Please select a faculty/staff customer for employee debt transactions.');
+                }
+                if (!in_array($customerType, ['faculty', 'staff'], true)) {
+                    return $this->error('Only faculty/staff can use debt payment.');
+                }
+                if ($debtPin === '') {
+                    return $this->error('Enter the customer debt PIN to authorize this debt transaction.');
+                }
+                if (!$customer || trim((string) ($customer['debt_pin_hash'] ?? '')) === '') {
+                    return $this->error('Selected customer has no debt PIN set. Ask them to set it in their user portal first.');
+                }
+                $pinAuthorization = (new DebtPinAuthorizationService())->authorize(
+                    $customerUserId,
+                    (string) $customer['debt_pin_hash'],
+                    $debtPin,
+                    $actorId,
+                    $storeId,
+                    $debtAmount
+                );
             }
-            if (!in_array($customerType, ['faculty', 'staff'], true)) {
-                return $this->error('Only faculty/staff can use debt payment.');
-            }
-            if ($debtPin === '') {
-                return $this->error('Enter the customer debt PIN to authorize this debt transaction.');
-            }
-            if (!$customer || trim((string) ($customer['debt_pin_hash'] ?? '')) === '') {
-                return $this->error('Selected customer has no debt PIN set. Ask them to set it in their user portal first.');
-            }
-            $pinAuthorization = (new DebtPinAuthorizationService())->authorize(
-                $customerUserId,
-                (string) $customer['debt_pin_hash'],
-                $debtPin,
-                $actorId,
-                $storeId,
-                $debtAmount
-            );
             if (($pinAuthorization['status'] ?? 'error') !== 'success') {
                 return $pinAuthorization;
             }
@@ -186,7 +231,7 @@ class TransactionService
         $createdAt = date('Y-m-d H:i:s');
 
         try {
-            if ($debtLine !== null) {
+            if ($debtLine !== null && $debtAccountType === 'employee') {
                 $debtBalanceBefore = $balanceModel->getBalanceForUpdate((int) $customerUserId);
                 if (!$debtBalanceBefore) {
                     throw new \RuntimeException('Balance record not found.');
@@ -274,6 +319,11 @@ class TransactionService
                 'payload_json' => json_encode([
                     'customer_user_id' => $customerUserId,
                     'customer_type' => $customerType,
+                    'debt_account_type' => $debtLine !== null ? $debtAccountType : null,
+                    'department_id' => $debtAccountType === 'department' ? $departmentId : null,
+                    'department_requester_user_id' => $debtAccountType === 'department' && $departmentRequesterUserId > 0 ? $departmentRequesterUserId : null,
+                    'department_requester_name' => $debtAccountType === 'department' ? $departmentRequesterName : null,
+                    'department_approver_user_id' => $debtAccountType === 'department' ? $departmentApproverUserId : null,
                     'store_id' => $storeId,
                     'payment_method' => $paymentMethod,
                     'amount' => $totalAmount,
@@ -289,7 +339,7 @@ class TransactionService
                 throw new \RuntimeException('Failed to write audit log.');
             }
 
-            if ($debtLine !== null) {
+            if ($debtLine !== null && $debtAccountType === 'employee') {
                 if (!$balanceModel->addDebt((int) $customerUserId, $debtAmount)) {
                     throw new \RuntimeException('Failed to update debt balance.');
                 }
@@ -322,6 +372,20 @@ class TransactionService
                     'created_at' => $createdAt,
                     'updated_at' => $createdAt,
                 ]);
+            }
+
+            if ($debtLine !== null && $debtAccountType === 'department') {
+                (new DepartmentDebtService($db))->recordPurchase(
+                    $departmentId,
+                    (int) $txnId,
+                    $debtAmount,
+                    $departmentRequesterUserId > 0 ? $departmentRequesterUserId : null,
+                    $departmentRequesterName,
+                    $departmentApproverUserId,
+                    $actorId,
+                    $storeId,
+                    $createdAt
+                );
             }
 
             if (!$db->transStatus()) {

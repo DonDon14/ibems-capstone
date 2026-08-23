@@ -20,7 +20,7 @@ public function storesData(RequestInterface $request, ResponseInterface $respons
         $status = trim((string) $request->getGet('status'));
         $db = Database::connect();
         $query = $db->table('stores s')
-            ->select('s.id, s.store_name, s.logo_url, s.is_active, s.created_at, s.officer_id, u.name AS officer_name, u.email AS officer_email')
+            ->select('s.id, s.store_name, s.logo_url, s.is_active, s.created_at, s.officer_id, u.name AS officer_name, u.email AS officer_email, u.profile_image_url AS officer_profile_image_url')
             ->join('users u', 'u.id = s.officer_id', 'left');
         $role = ibems_current_role();
         $actorId = (int) session()->get('user_id');
@@ -85,7 +85,7 @@ public function storeDetailsData(RequestInterface $request, ResponseInterface $r
 
         $db = Database::connect();
         $store = $db->table('stores s')
-            ->select('s.id, s.store_name, s.logo_url, s.is_active, s.created_at, u.name AS officer_name, u.email AS officer_email')
+            ->select('s.id, s.store_name, s.logo_url, s.is_active, s.created_at, u.name AS officer_name, u.email AS officer_email, u.profile_image_url AS officer_profile_image_url')
             ->join('users u', 'u.id = s.officer_id', 'left')
             ->where('s.id', $storeId)
             ->get()
@@ -163,6 +163,7 @@ public function storeDetailsData(RequestInterface $request, ResponseInterface $r
             [
                 'name' => $store['officer_name'] ?: 'No assigned officer',
                 'email' => $store['officer_email'] ?: null,
+                'profile_image_url' => $store['officer_profile_image_url'] ?? null,
                 'role' => 'Primary Store Officer',
             ],
         ];
@@ -170,6 +171,7 @@ public function storeDetailsData(RequestInterface $request, ResponseInterface $r
             $assignedOfficers[] = [
                 'name' => $supervisor['name'] ?? 'Store Supervisor',
                 'email' => $supervisor['email'] ?? null,
+                'profile_image_url' => $supervisor['profile_image_url'] ?? null,
                 'role' => 'Store Supervisor',
             ];
         }
@@ -810,7 +812,7 @@ private function getStoreSupervisors(int $storeId): array
         }
 
         return $db->table('store_supervisors ss')
-            ->select('u.id, u.name, u.email, u.employee_id')
+            ->select('u.id, u.name, u.email, u.employee_id, u.profile_image_url')
             ->join('users u', 'u.id = ss.user_id', 'inner')
             ->where('ss.store_id', $storeId)
             ->where('u.is_active', true)
@@ -832,7 +834,7 @@ private function buildStoreSupervisorsMap(array $storeIds): array
         }
 
         $rows = $db->table('store_supervisors ss')
-            ->select('ss.store_id, u.id, u.name, u.email, u.employee_id')
+            ->select('ss.store_id, u.id, u.name, u.email, u.employee_id, u.profile_image_url')
             ->join('users u', 'u.id = ss.user_id', 'inner')
             ->whereIn('ss.store_id', $storeIds)
             ->where('u.is_active', true)
@@ -854,6 +856,7 @@ private function buildStoreSupervisorsMap(array $storeIds): array
                 'name' => (string) ($row['name'] ?? ''),
                 'email' => (string) ($row['email'] ?? ''),
                 'employee_id' => $row['employee_id'] ?? null,
+                'profile_image_url' => $row['profile_image_url'] ?? null,
             ];
         }
 

@@ -32,6 +32,11 @@ $readableRole = $roleLabels[strtoupper($role)] ?? ucwords(strtolower(str_replace
 $profileDetail = trim((string) ($profileDetail ?? $readableRole));
 $portalContext = is_array($portalContext ?? null) ? $portalContext : [];
 $userMobileExperience = ($userMobileExperience ?? false) === true && strtoupper($role) === 'USER';
+$notificationsEnabled = in_array(strtoupper($role), ['ADMIN', 'USER'], true);
+$pageStyles = (string) $this->renderSection('styles');
+$pageStyles = (string) preg_replace('/<link\b(?![^>]*\bdata-portal-page-style\b)/i', '<link data-portal-page-style', $pageStyles);
+$pageScripts = (string) $this->renderSection('scripts');
+$pageScripts = (string) preg_replace('/<script\b(?![^>]*\bdata-portal-page-script\b)/i', '<script {csp-script-nonce} data-portal-page-script', $pageScripts);
 if ($role !== '' && str_starts_with($profileDetail, $role)) {
     $profileDetail = $readableRole . substr($profileDetail, strlen($role));
 }
@@ -47,6 +52,7 @@ $ibemsLogoUrl = base_url('assets/images/ibems-logo.png');
     <meta name="csrf-token-value" content="<?= esc(service('security')->getHash()) ?>">
     <meta name="csrf-header-name" content="<?= esc(config('Security')->headerName) ?>">
     <meta name="csrf-cookie-name" content="<?= esc(config('Security')->cookieName) ?>">
+    <meta name="csp-script-nonce" content="<?= esc(service('csp')->getScriptNonce()) ?>">
     <meta name="default-profile-image" content="<?= esc(base_url('assets/images/default-profile.svg')) ?>">
     <?php if ($userMobileExperience): ?>
         <meta name="mobile-web-app-capable" content="yes">
@@ -57,7 +63,7 @@ $ibemsLogoUrl = base_url('assets/images/ibems-logo.png');
         <link rel="apple-touch-icon" href="<?= base_url('assets/images/ibems-user-icon-192.png') ?>">
     <?php endif; ?>
     <title><?= esc($pageTitle) ?></title>
-    <script>
+    <script {csp-script-nonce}>
     (function () {
         var saved = localStorage.getItem('ibems-theme');
         var theme = saved === 'dark' || saved === 'light' ? saved : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
@@ -66,18 +72,21 @@ $ibemsLogoUrl = base_url('assets/images/ibems-logo.png');
     </script>
     <link rel="icon" type="image/png" href="<?= esc($ibemsLogoUrl) ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.css') ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/css/app.css') ?>?v=20260822k">
-    <link rel="stylesheet" href="<?= base_url('assets/css/modern-ui.css') ?>?v=20260823g">
-    <link rel="stylesheet" href="<?= base_url('assets/css/account-menu.css') ?>?v=20260823a">
+    <link rel="stylesheet" href="<?= base_url('assets/css/app.css') ?>?v=20260823e">
+    <link rel="stylesheet" href="<?= base_url('assets/css/modern-ui.css') ?>?v=20260824d">
+    <link rel="stylesheet" href="<?= base_url('assets/css/account-menu.css') ?>?v=20260824a">
     <link rel="stylesheet" href="<?= base_url('assets/css/password-visibility.css') ?>?v=20260813b">
     <?php if ($userMobileExperience): ?>
         <link rel="stylesheet" href="<?= base_url('assets/css/user-mobile.css') ?>?v=20260823d">
     <?php endif; ?>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
-    <?= $this->renderSection('styles') ?>
+    <?= $pageStyles ?>
 </head>
-<body class="<?= esc($bodyClasses) ?>">
-<div class="app-shell"<?= $userMobileExperience ? ' data-user-navigation-shell' : '' ?>>
+<body class="<?= esc($bodyClasses) ?>" data-portal-page-classes="<?= esc($bodyClass) ?>">
+<div class="app-shell" data-portal-navigation-shell data-portal-navigation-key="<?= esc(strtoupper($role)) ?>"<?= $userMobileExperience ? ' data-user-navigation-shell' : '' ?>>
+    <div class="portal-navigation-progress user-navigation-progress" aria-hidden="true"></div>
+    <div id="user-navigation-status" class="sr-only" role="status" aria-live="polite" data-portal-navigation-status></div>
+
     <aside class="app-sidebar">
         <div class="app-sidebar-header">
             <div class="app-brand">
@@ -106,7 +115,7 @@ $ibemsLogoUrl = base_url('assets/images/ibems-logo.png');
                 $activePath = (string) ($item['activePath'] ?? $path);
                 $activeClass = ibems_is_active_path($activePath);
                 ?>
-                <a href="<?= site_url($path) ?>" class="<?= esc($activeClass) ?>" <?= $activeClass !== '' ? 'aria-current="page"' : '' ?>>
+                <a href="<?= site_url($path) ?>" class="<?= esc($activeClass) ?>" data-portal-navigation-link <?= $activeClass !== '' ? 'aria-current="page"' : '' ?>>
                     <i class="<?= esc($icon) ?>" aria-hidden="true"></i>
                     <span><?= esc($label) ?></span>
                 </a>
@@ -132,6 +141,7 @@ $ibemsLogoUrl = base_url('assets/images/ibems-logo.png');
                     <i class="bi bi-moon-stars" aria-hidden="true"></i>
                 </button>
 
+                <?php if ($notificationsEnabled): ?>
                 <div class="notification-center">
                     <button id="notification-toggle" type="button" class="topbar-icon-button" aria-label="Notifications" title="Notifications" aria-expanded="false" aria-controls="notification-panel">
                         <i class="bi bi-bell" aria-hidden="true"></i>
@@ -147,6 +157,7 @@ $ibemsLogoUrl = base_url('assets/images/ibems-logo.png');
                         </div>
                     </section>
                 </div>
+                <?php endif; ?>
 
                 <button id="account-menu-toggle" class="topbar-profile" type="button" aria-label="Open account and settings" title="Account and settings" aria-expanded="false" aria-controls="account-menu">
                     <span class="profile-avatar-wrap">
@@ -208,10 +219,7 @@ $ibemsLogoUrl = base_url('assets/images/ibems-logo.png');
             </section>
         </div>
 
-        <div class="user-navigation-progress" aria-hidden="true"></div>
-        <div id="user-navigation-status" class="sr-only" role="status" aria-live="polite"></div>
-
-        <main id="user-page-content" class="app-container" tabindex="-1">
+        <main id="user-page-content" class="app-container" tabindex="-1" data-portal-page-content>
             <?= $this->renderSection('content') ?>
         </main>
 
@@ -265,7 +273,7 @@ $ibemsLogoUrl = base_url('assets/images/ibems-logo.png');
             $activePath = (string) ($item['activePath'] ?? $path);
             $activeClass = ibems_is_active_path($activePath);
             ?>
-            <a href="<?= site_url($path) ?>" class="<?= esc($activeClass) ?>" aria-label="<?= esc($label) ?>" title="<?= esc($label) ?>" <?= $activeClass !== '' ? 'aria-current="page"' : '' ?>>
+            <a href="<?= site_url($path) ?>" class="<?= esc($activeClass) ?>" data-portal-navigation-link aria-label="<?= esc($label) ?>" title="<?= esc($label) ?>" <?= $activeClass !== '' ? 'aria-current="page"' : '' ?>>
                 <i class="<?= esc($icon) ?>" aria-hidden="true"></i>
                 <span><?= esc($label) ?></span>
             </a>
@@ -302,24 +310,25 @@ $ibemsLogoUrl = base_url('assets/images/ibems-logo.png');
 
 <script src="<?= base_url('assets/js/csrf.js') ?>"></script>
 <script src="<?= base_url('assets/js/theme.js') ?>?v=20260822b"></script>
-<script src="<?= base_url('assets/js/notifications.js') ?>?v=20260822c"></script>
+<?php if ($notificationsEnabled): ?>
+    <script src="<?= base_url('assets/js/notifications.js') ?>?v=20260823a"></script>
+<?php endif; ?>
 <script src="<?= base_url('assets/js/ibems-format.js') ?>"></script>
 <script src="<?= base_url('assets/js/profile-avatar.js') ?>?v=20260822a"></script>
 <script src="<?= base_url('assets/js/account-menu.js') ?>?v=20260823a"></script>
-<?php if ($userMobileExperience): ?>
-    <script src="<?= base_url('assets/js/user-navigation.js') ?>?v=20260823a"></script>
-<?php endif; ?>
-<script src="<?= base_url('assets/js/app-layout.js') ?>?v=20260823a"></script>
-<script src="<?= base_url('assets/js/modern-controls.js') ?>"></script>
+<script {csp-script-nonce} id="portal-context-data" type="application/json"><?= json_encode($portalContext, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
+<template id="portal-page-scripts"><?= $pageScripts ?></template>
+<script src="<?= base_url('assets/js/user-navigation.js') ?>?v=20260824c"></script>
+<script src="<?= base_url('assets/js/app-layout.js') ?>?v=20260823c"></script>
+<script src="<?= base_url('assets/js/modern-controls.js') ?>?v=20260823a"></script>
 <script src="<?= base_url('assets/js/app-dialog.js') ?>"></script>
 <script src="<?= base_url('assets/js/password-visibility.js') ?>?v=20260813a"></script>
 <?php if ($userMobileExperience): ?>
     <script src="<?= base_url('assets/js/user-account-settings.js') ?>?v=20260823a"></script>
     <script src="<?= base_url('assets/js/user-mobile.js') ?>?v=20260823a" data-service-worker-url="<?= esc(base_url('user/service-worker.js')) ?>"></script>
 <?php endif; ?>
-<script>
-window.IBEMS_PORTAL_CONTEXT = <?= json_encode($portalContext, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?>;
+<script {csp-script-nonce}>
+window.IBEMS_PORTAL_CONTEXT = JSON.parse(document.getElementById('portal-context-data')?.textContent || '{}');
 </script>
-<?= $this->renderSection('scripts') ?>
 </body>
 </html>

@@ -352,7 +352,7 @@
     color: #b91c1c;
 }
 
-.receipt-modal .receipt-card.staff-employee-card {
+#staff-employee-modal .receipt-card.staff-employee-card {
     width: min(1040px, 94vw);
     max-width: 1040px;
     max-height: 90vh;

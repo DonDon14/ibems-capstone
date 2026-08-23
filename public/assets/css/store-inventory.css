@@ -865,15 +865,6 @@ body.ibems-modern #inventory-product-modal :is(.inv-modal-head, .inv-modal-actio
     min-height: 20px;
     margin-top: 4px;
 }
-.inv-modal {
-    position: fixed;
-    inset: 0;
-    background: rgba(8, 14, 26, 0.54);
-    display: grid;
-    place-items: center;
-    padding: 18px;
-    z-index: 1200;
-}
 .inv-modal-card {
     width: min(900px, 100%);
     background: linear-gradient(180deg, #ffffff 0%, #f8fbff 100%);

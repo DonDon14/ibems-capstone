@@ -11,6 +11,7 @@ let debtCustomers = [];
 let selectedDebtCustomerId = null;
 let selectedDebtCustomer = null;
 let selectedDebtPin = "";
+let departmentDebtAccounts = [];
 let repaymentCustomers = [];
 let selectedRepaymentCustomer = null;
 let isSubmitting = false;
@@ -36,6 +37,73 @@ const splitTenderAmounts = new Map();
 const selectedPaymentAccounts = new Map();
 let debtPinLockoutTimer = null;
 const debtPinLockouts = new Map();
+
+function getDebtAccountType() {
+    return document.getElementById("debt-account-type")?.value === "department" ? "department" : "employee";
+}
+
+function getSelectedDepartmentDebtAccount() {
+    const id = Number(document.getElementById("department-debt-account")?.value || 0);
+    return departmentDebtAccounts.find((department) => Number(department.id) === id) || null;
+}
+
+function getSelectedDepartmentApprover() {
+    const department = getSelectedDepartmentDebtAccount();
+    const id = Number(document.getElementById("department-approver")?.value || 0);
+    return department?.approvers?.find((approver) => Number(approver.id) === id) || null;
+}
+
+async function loadDepartmentDebtAccounts() {
+    const data = await requestJson("/store/department-debt-accounts", {}, "Unable to load department debt accounts.");
+    departmentDebtAccounts = Array.isArray(data.departments) ? data.departments : [];
+    const select = document.getElementById("department-debt-account");
+    if (!select) return;
+    const selected = Number(select.value || 0);
+    select.innerHTML = '<option value="">Select a department</option>' + departmentDebtAccounts.map((department) =>
+        `<option value="${Number(department.id)}">${escapeHtml(department.code)} · ${escapeHtml(department.name)} — ${escapeHtml(formatMoney(department.remaining_allocation))} remaining</option>`
+    ).join("");
+    if (departmentDebtAccounts.some((department) => Number(department.id) === selected)) select.value = String(selected);
+    renderDepartmentApprovers();
+}
+
+function renderDepartmentApprovers() {
+    const select = document.getElementById("department-approver");
+    const help = document.getElementById("department-approver-help");
+    const department = getSelectedDepartmentDebtAccount();
+    if (!select) return;
+    const approvers = Array.isArray(department?.approvers) ? department.approvers : [];
+    select.innerHTML = '<option value="">Select an approver</option>' + approvers.map((approver) =>
+        `<option value="${Number(approver.id)}" ${approver.pin_set ? "" : "disabled"}>${escapeHtml(approver.name)}${approver.employee_id ? ` · ${escapeHtml(approver.employee_id)}` : ""}${approver.pin_set ? "" : " · PIN not set"}</option>`
+    ).join("");
+    if (help) {
+        help.textContent = !department
+            ? "Select a department first."
+            : approvers.some((approver) => approver.pin_set)
+                ? "The department head must enter their separate department approval PIN."
+                : "The active department head has not set a department approval PIN yet.";
+        help.classList.toggle("is-error", !!department && !approvers.some((approver) => approver.pin_set));
+    }
+}
+
+function updateDepartmentDebtFields() {
+    const isDepartment = getDebtAccountType() === "department";
+    const employeeFields = document.getElementById("employee-debt-customer-fields");
+    const departmentFields = document.getElementById("department-debt-fields");
+    employeeFields?.classList.toggle("is-hidden", isDepartment);
+    departmentFields?.classList.toggle("is-hidden", !isDepartment);
+    if (employeeFields) employeeFields.hidden = isDepartment;
+    if (departmentFields) departmentFields.hidden = !isDepartment;
+    if (employeeFields) employeeFields.style.display = isDepartment ? "none" : "block";
+    if (departmentFields) departmentFields.style.display = isDepartment ? "grid" : "none";
+    document.getElementById("open-debt-scanner-btn")?.classList.toggle("is-hidden", isDepartment);
+    const pinLabel = document.getElementById("debt-pin-label");
+    if (pinLabel) pinLabel.innerHTML = `<i class="bi bi-shield-lock"></i> ${isDepartment ? "Department Approval PIN" : "Debt Authorization PIN"}`;
+    if (isDepartment && departmentDebtAccounts.length === 0) {
+        loadDepartmentDebtAccounts().catch((error) => setResult(error.message || "Unable to load department debt accounts.", "error"));
+    }
+    updateDebtCreditMeter();
+    updateDebtPinUi();
+}
 
 function getProductFamilyKey(product) {
     const familyId = Number(product?.family_id || 0);
@@ -683,9 +751,9 @@ function renderStoreDayCloseReconciliation() {
                 ${collectionsMarkup}
             </div>
             <div class="close-reconcile-group is-credit-group">
-                <h5>Sold on employee credit</h5>
+                <h5>Sold on account credit</h5>
                 ${creditSalesMarkup}
-                <small>Recorded as employee debt; no cash or wallet balance was received today.</small>
+                <small>Recorded as employee or department debt; no cash or wallet balance was received today.</small>
             </div>
         </section>
         <section class="close-reconcile-section">
@@ -1096,13 +1164,13 @@ function requiresCheckoutCustomer(method) {
 
 function getPaymentOptionLabel(method) {
     const code = String(method?.code || "").toLowerCase();
-    if (code === "debt") return "Charge to employee account";
+    if (code === "debt") return "Charge to employee or department account";
     return String(method?.label || formatPaymentLabel(code));
 }
 
 function getPaymentMethodGuidance(method) {
     const code = String(method || "").toLowerCase();
-    if (code === "debt") return "Select an employee customer. This sale will increase their outstanding debt after PIN authorization.";
+    if (code === "debt") return "Choose an employee or department account. The matching balance is charged only after secure PIN authorization.";
     return "Customer selection is optional. Leave it blank for a walk-in sale.";
 }
 
@@ -1319,7 +1387,7 @@ function buildConfirmTransactionHtml(data) {
                 <i class="bi bi-exclamation-triangle"></i>
                 <div>
                     <strong>${paymentLines.length > 1 ? "Partial debt allocation" : "Debt transaction"}</strong>
-                    <span>${formatMoney(debtAmount)} will be charged to ${escapeHtml(data.debtCustomerLabel)}. Projected remaining credit: ${formatMoney(projectedRemainingCredit)}.</span>
+                    <span>${formatMoney(debtAmount)} will be charged to ${escapeHtml(data.debtCustomerLabel)}. Projected remaining ${data.departmentMode ? "monthly allocation" : "credit"}: ${formatMoney(projectedRemainingCredit)}.</span>
                 </div>
             </div>
         `
@@ -1346,14 +1414,15 @@ function buildConfirmTransactionHtml(data) {
     const customerBlock = debtPayment
         ? `
             <section class="confirm-section">
-                <h4><i class="bi bi-person-vcard"></i> Debt Customer</h4>
+                <h4><i class="bi ${data.departmentMode ? "bi-buildings" : "bi-person-vcard"}"></i> ${data.departmentMode ? "Department Account" : "Debt Customer"}</h4>
                 <div class="confirm-meta-grid">
                     <div class="confirm-meta-item"><span>Name</span><strong>${escapeHtml(debt?.name || data.debtCustomerLabel)}</strong></div>
                     <div class="confirm-meta-item"><span>Type</span><strong>${escapeHtml(String(debt?.user_type || "N/A").replace(/\b\w/g, (letter) => letter.toUpperCase()))}</strong></div>
-                    <div class="confirm-meta-item"><span>Current Debt</span><strong>${formatMoney(currentDebt)}</strong></div>
+                    <div class="confirm-meta-item"><span>${data.departmentMode ? "Used This Month" : "Current Debt"}</span><strong>${formatMoney(currentDebt)}</strong></div>
                     <div class="confirm-meta-item"><span>Debt Portion</span><strong>${formatMoney(debtAmount)}</strong></div>
-                    <div class="confirm-meta-item"><span>Projected Debt</span><strong>${formatMoney(projectedDebt)}</strong></div>
-                    <div class="confirm-meta-item"><span>Remaining Credit</span><strong>${formatMoney(projectedRemainingCredit)}</strong></div>
+                    <div class="confirm-meta-item"><span>${data.departmentMode ? "Projected Monthly Use" : "Projected Debt"}</span><strong>${formatMoney(projectedDebt)}</strong></div>
+                    <div class="confirm-meta-item"><span>Remaining ${data.departmentMode ? "Allocation" : "Credit"}</span><strong>${formatMoney(projectedRemainingCredit)}</strong></div>
+                    ${data.departmentMode ? `<div class="confirm-meta-item"><span>Requested By</span><strong>${escapeHtml(data.departmentRequesterName)}</strong></div><div class="confirm-meta-item"><span>Approved By</span><strong>${escapeHtml(data.departmentApprover?.name || "")}</strong></div>` : ""}
                 </div>
             </section>
         `
@@ -1494,14 +1563,16 @@ function updateDebtCreditMeter() {
     if (!meter) return;
     const paymentMethod = document.getElementById("payment-method")?.value || "";
     const usesDebt = paymentMethod === "debt" || splitIncludesDebt();
-    const customer = selectedDebtCustomer;
+    const departmentMode = getDebtAccountType() === "department";
+    const department = getSelectedDepartmentDebtAccount();
+    const customer = departmentMode ? department : selectedDebtCustomer;
     meter.classList.toggle("is-hidden", !usesDebt || !customer);
     if (!usesDebt || !customer) return;
 
-    const creditLimit = Math.max(0, Number(customer.credit_limit || 0));
-    const currentDebt = Math.max(0, Number(customer.current_debt || 0));
+    const creditLimit = Math.max(0, Number(departmentMode ? customer.allocation_amount : customer.credit_limit || 0));
+    const currentDebt = Math.max(0, Number(departmentMode ? customer.used_amount : customer.current_debt || 0));
     const debtAmount = getCheckoutDebtAmount();
-    const availableCredit = Math.max(0, Number(customer.available_credit ?? (creditLimit - currentDebt)));
+    const availableCredit = Math.max(0, Number(departmentMode ? customer.remaining_allocation : (customer.available_credit ?? (creditLimit - currentDebt))));
     const projectedDebt = currentDebt + debtAmount;
     const projectedAvailable = Math.max(0, creditLimit - projectedDebt);
     const overBy = Math.max(0, debtAmount - availableCredit);
@@ -1513,19 +1584,21 @@ function updateDebtCreditMeter() {
     meter.classList.toggle("is-over", isOver);
     meter.classList.toggle("is-maxed", isMaxed);
     meter.classList.toggle("is-near", isNear);
-    document.getElementById("debt-credit-status").textContent = isOver ? "Over credit limit" : isMaxed ? "Credit will be fully used" : isNear ? "Near credit limit" : "Credit available";
+    document.getElementById("debt-credit-status").textContent = isOver ? "Over monthly allocation" : isMaxed ? "Allocation will be fully used" : isNear ? "Near monthly allocation" : (departmentMode ? "Allocation available" : "Credit available");
     document.getElementById("debt-credit-available").textContent = `${formatMoney(projectedAvailable)} available after sale`;
-    document.getElementById("debt-credit-current").textContent = `Projected debt ${formatMoney(projectedDebt)}`;
-    document.getElementById("debt-credit-limit").textContent = `Limit ${formatMoney(creditLimit)}`;
+    document.getElementById("debt-credit-current").textContent = `${departmentMode ? "Projected monthly use" : "Projected debt"} ${formatMoney(projectedDebt)}`;
+    document.getElementById("debt-credit-limit").textContent = `${departmentMode ? "Allocation" : "Limit"} ${formatMoney(creditLimit)}`;
     document.getElementById("debt-credit-fill").style.width = `${usedPercent}%`;
     const track = meter.querySelector(".debt-credit-track");
     track?.setAttribute("aria-valuenow", String(Math.round(usedPercent)));
-    track?.setAttribute("aria-valuetext", `${formatMoney(projectedDebt)} projected debt of ${formatMoney(creditLimit)} limit`);
+    track?.setAttribute("aria-valuetext", `${formatMoney(projectedDebt)} projected ${departmentMode ? "monthly use" : "debt"} of ${formatMoney(creditLimit)} ${departmentMode ? "allocation" : "limit"}`);
     document.getElementById("debt-credit-message").textContent = isOver
-        ? `Debt allocation exceeds available credit by ${formatMoney(overBy)}. Reduce the Debt portion or use another payment method.`
+        ? (departmentMode
+            ? `Debt charge exceeds the available department allocation by ${formatMoney(overBy)}. Reduce the Debt portion or use another payment method.`
+            : `Debt allocation exceeds available credit by ${formatMoney(overBy)}. Reduce the Debt portion or use another payment method.`)
         : debtAmount > 0
             ? `${formatMoney(debtAmount)} will be charged to Debt in this transaction.`
-            : `Allocate an amount to Debt to preview the employee's remaining credit.`;
+            : `Allocate an amount to Debt to preview the ${departmentMode ? "department's remaining monthly allocation" : "employee's remaining credit"}.`;
 }
 
 function updateDebtPinUi() {
@@ -1536,7 +1609,10 @@ function updateDebtPinUi() {
     if (!wrap || !help || !input || !openButton) return;
 
     const paymentMethod = document.getElementById("payment-method")?.value || "";
-    const shouldShow = (paymentMethod === "debt" || splitIncludesDebt()) && !!selectedDebtCustomerId;
+    const departmentMode = getDebtAccountType() === "department";
+    const department = getSelectedDepartmentDebtAccount();
+    const approver = getSelectedDepartmentApprover();
+    const shouldShow = (paymentMethod === "debt" || splitIncludesDebt()) && (departmentMode ? !!department && !!approver : !!selectedDebtCustomerId);
     wrap.style.display = shouldShow ? "flex" : "none";
 
     if (!shouldShow) {
@@ -1551,14 +1627,16 @@ function updateDebtPinUi() {
         return;
     }
 
-    if (selectedDebtCustomer && selectedDebtCustomer.has_debt_pin === false) {
+    if ((!departmentMode && selectedDebtCustomer && selectedDebtCustomer.has_debt_pin === false) || (departmentMode && approver && approver.pin_set === false)) {
         input.disabled = true;
         input.value = "";
         selectedDebtPin = "";
         openButton.disabled = true;
         openButton.classList.remove("is-ready");
         openButton.innerHTML = '<i class="bi bi-shield-exclamation"></i> PIN Not Set';
-        help.textContent = "This customer must set a debt PIN in the User Portal before using debt payment.";
+        help.textContent = departmentMode
+            ? "This department head must set a department approval PIN in the User Portal before authorizing a charge."
+            : "This customer must set a debt PIN in the User Portal before using debt payment.";
         help.classList.add("is-error");
         help.classList.remove("is-ready");
         return;
@@ -1570,7 +1648,9 @@ function updateDebtPinUi() {
     openButton.innerHTML = selectedDebtPin
         ? '<i class="bi bi-check2-circle"></i> PIN Entered'
         : '<i class="bi bi-key"></i> Enter PIN';
-    help.textContent = selectedDebtPin ? "PIN ready for secure verification." : "Use the PIN modal before checkout.";
+    help.textContent = selectedDebtPin
+        ? `${departmentMode ? "Department approval" : "Debt"} PIN ready for secure verification.`
+        : `Use the ${departmentMode ? "department approval" : "debt"} PIN modal before checkout.`;
     help.classList.toggle("is-ready", !!selectedDebtPin);
     help.classList.remove("is-error");
 }
@@ -1582,19 +1662,26 @@ function openDebtPinModal() {
     const result = document.getElementById("debt-pin-modal-result");
     if (!modal || !input) return;
 
-    if (!selectedDebtCustomerId) {
-        setResult("Select a debt customer before entering a PIN.", "error");
+    const departmentMode = getDebtAccountType() === "department";
+    const department = getSelectedDepartmentDebtAccount();
+    const approver = getSelectedDepartmentApprover();
+    if (departmentMode ? (!department || !approver) : !selectedDebtCustomerId) {
+        setResult(departmentMode ? "Select a department and authorized approver before entering a PIN." : "Select a debt customer before entering a PIN.", "error");
         return;
     }
 
-    if (selectedDebtCustomer && selectedDebtCustomer.has_debt_pin === false) {
-        setResult("This customer must set a debt PIN in the User Portal before using debt payment.", "error");
+    if ((!departmentMode && selectedDebtCustomer && selectedDebtCustomer.has_debt_pin === false) || (departmentMode && approver?.pin_set === false)) {
+        setResult(departmentMode ? "This approver must set a department approval PIN in the User Portal first." : "This customer must set a debt PIN in the User Portal before using debt payment.", "error");
         return;
     }
 
     if (summary) {
-        summary.textContent = `Ask ${selectedDebtCustomer?.name || "the debtor"} to enter their debt authorization PIN.`;
+        summary.textContent = departmentMode
+            ? `Ask ${approver?.name || "the department head"} to approve the ${department?.name || "department"} charge using their department PIN.`
+            : `Ask ${selectedDebtCustomer?.name || "the debtor"} to enter their debt authorization PIN.`;
     }
+    const title = document.getElementById("debt-pin-modal-title");
+    if (title) title.innerHTML = `<i class="bi bi-shield-lock"></i> ${departmentMode ? "Department Approval PIN" : "Debt Authorization PIN"}`;
     if (result) {
         result.textContent = "";
         result.className = "result-msg";
@@ -1619,7 +1706,9 @@ function renderDebtPinAuthorizationState(message = "") {
     const result = document.getElementById("debt-pin-modal-result");
     if (!input || !saveButton || !result) return;
 
-    const lockoutKey = Number(selectedDebtCustomerId || 0);
+    const lockoutKey = getDebtAccountType() === "department"
+        ? `department-${Number(getSelectedDepartmentDebtAccount()?.id || 0)}-${Number(getSelectedDepartmentApprover()?.id || 0)}`
+        : `employee-${Number(selectedDebtCustomerId || 0)}`;
     const lockout = debtPinLockouts.get(lockoutKey) || null;
     const lockedUntilMs = Number(lockout?.epoch) > 0
         ? Number(lockout.epoch) * 1000
@@ -1628,12 +1717,15 @@ function renderDebtPinAuthorizationState(message = "") {
     if (remainingSeconds > 0) {
         const minutes = Math.floor(remainingSeconds / 60);
         const seconds = remainingSeconds % 60;
-        const employeeName = selectedDebtCustomer?.name || "This employee";
+        const employeeName = getDebtAccountType() === "department" ? (getSelectedDepartmentApprover()?.name || "This approver") : (selectedDebtCustomer?.name || "This employee");
         input.disabled = true;
         saveButton.disabled = true;
         saveButton.innerHTML = '<i class="bi bi-lock"></i> PIN Locked';
         result.className = "result-msg error";
-        result.textContent = `${employeeName}'s debt PIN is locked after too many incorrect attempts. Try again in ${minutes}:${String(seconds).padStart(2, "0")}. Other customers and payment methods remain available.`;
+        const alternatives = getDebtAccountType() === "department"
+            ? "Other accounts and payment methods remain available."
+            : "Other customers and payment methods remain available.";
+        result.textContent = `${employeeName}'s ${getDebtAccountType() === "department" ? "department approval" : "debt"} PIN is locked after too many incorrect attempts. Try again in ${minutes}:${String(seconds).padStart(2, "0")}. ${alternatives}`;
         return;
     }
 
@@ -1659,7 +1751,10 @@ function showDebtPinAuthorizationFailure(data = {}) {
     openDebtPinModal();
 
     if (data.locked_until) {
-        debtPinLockouts.set(Number(selectedDebtCustomerId), {
+        const lockoutKey = getDebtAccountType() === "department"
+            ? `department-${Number(getSelectedDepartmentDebtAccount()?.id || 0)}-${Number(getSelectedDepartmentApprover()?.id || 0)}`
+            : `employee-${Number(selectedDebtCustomerId || 0)}`;
+        debtPinLockouts.set(lockoutKey, {
             until: String(data.locked_until),
             epoch: Number(data.locked_until_epoch || 0) || null,
         });
@@ -1709,7 +1804,7 @@ function saveDebtPinFromModal() {
     updateDebtPinUi();
     updateCheckoutState();
     closeDebtPinModal();
-    setResult("Debt PIN captured for secure verification.", "ok");
+    setResult(`${getDebtAccountType() === "department" ? "Department approval" : "Debt"} PIN captured for secure verification.`, "ok");
     return true;
 }
 
@@ -1776,29 +1871,41 @@ function updateCheckoutState() {
         }
     }
 
-    if (((!splitTenderEnabled && requiresCheckoutCustomer(paymentMethod)) || splitIncludesDebt()) && !selectedDebtCustomerId) {
+    const usesDebt = paymentMethod === "debt" || splitIncludesDebt();
+    const departmentMode = usesDebt && getDebtAccountType() === "department";
+    const department = departmentMode ? getSelectedDepartmentDebtAccount() : null;
+    const departmentApprover = departmentMode ? getSelectedDepartmentApprover() : null;
+    const departmentRequesterName = String(document.getElementById("department-requester-name")?.value || "").trim();
+    if (((!splitTenderEnabled && requiresCheckoutCustomer(paymentMethod)) || splitIncludesDebt()) && !departmentMode && !selectedDebtCustomerId) {
         submitBtn.disabled = true;
         submitBtn.innerHTML = `<i class="bi bi-person-check"></i> Select ${paymentMethod === "debt" ? "Debt" : "Employee"} Customer`;
         return;
     }
+    if (departmentMode && (!department || !departmentApprover || !departmentRequesterName)) {
+        submitBtn.disabled = true;
+        submitBtn.innerHTML = '<i class="bi bi-buildings"></i> Complete Department Details';
+        return;
+    }
 
-    if (paymentMethod === "debt" || splitIncludesDebt()) {
-        const availableCredit = Math.max(0, Number(selectedDebtCustomer?.available_credit || 0));
-        if (selectedDebtCustomer && getCheckoutDebtAmount() - availableCredit > 0.004) {
+    if (usesDebt) {
+        const availableCredit = Math.max(0, Number(departmentMode ? department?.remaining_allocation : selectedDebtCustomer?.available_credit || 0));
+        if ((departmentMode ? department : selectedDebtCustomer) && getCheckoutDebtAmount() - availableCredit > 0.004) {
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="bi bi-exclamation-triangle"></i> Debt Exceeds Credit';
+            submitBtn.innerHTML = departmentMode
+                ? '<i class="bi bi-exclamation-triangle"></i> Debt Exceeds Allocation'
+                : '<i class="bi bi-exclamation-triangle"></i> Debt Exceeds Credit';
             return;
         }
 
-        if (selectedDebtCustomer && selectedDebtCustomer.has_debt_pin === false) {
+        if ((!departmentMode && selectedDebtCustomer && selectedDebtCustomer.has_debt_pin === false) || (departmentMode && departmentApprover?.pin_set === false)) {
             submitBtn.disabled = true;
-            submitBtn.innerHTML = '<i class="bi bi-shield-exclamation"></i> Customer PIN Not Set';
+            submitBtn.innerHTML = `<i class="bi bi-shield-exclamation"></i> ${departmentMode ? "Approver" : "Customer"} PIN Not Set`;
             return;
         }
 
         if (!selectedDebtPin) {
             submitBtn.disabled = false;
-            submitBtn.innerHTML = '<i class="bi bi-shield-lock"></i> Enter Debt PIN';
+            submitBtn.innerHTML = `<i class="bi bi-shield-lock"></i> Enter ${departmentMode ? "Approval" : "Debt"} PIN`;
             return;
         }
     }
@@ -2252,7 +2359,12 @@ function updateDebtCustomerVisibility() {
     const help = document.getElementById("checkout-customer-help");
 
     const customerRequired = requiresCheckoutCustomer(paymentMethod) || splitIncludesDebt();
+    const usesDebt = paymentMethod === "debt" || splitIncludesDebt();
     wrap.style.display = "flex";
+    const debtAccountTypeWrap = document.getElementById("debt-account-type-wrap");
+    debtAccountTypeWrap?.classList.toggle("is-hidden", !usesDebt);
+    if (debtAccountTypeWrap) debtAccountTypeWrap.hidden = !usesDebt;
+    if (debtAccountTypeWrap) debtAccountTypeWrap.style.display = usesDebt ? "grid" : "none";
     if (label) {
         label.textContent = customerRequired ? "Employee customer (required)" : "Customer (optional)";
     }
@@ -2263,11 +2375,14 @@ function updateDebtCustomerVisibility() {
                 : "Select the employee associated with this advance payment sale.")
             : "Leave blank for a walk-in sale, or select an employee to record this transaction in their history.";
     }
-    if (paymentMethod !== "debt" && !splitIncludesDebt()) {
+    if (!usesDebt) {
+        const accountType = document.getElementById("debt-account-type");
+        if (accountType) accountType.value = "employee";
         selectedDebtPin = "";
         const debtPinInput = document.getElementById("debt-pin-input");
         if (debtPinInput) debtPinInput.value = "";
     }
+    updateDepartmentDebtFields();
     updateDebtPinUi();
     if (debtCustomers.length === 0) {
         loadDebtCustomers().catch(() => setResult("Unable to load employee customers.", "error"));
@@ -2307,7 +2422,7 @@ function renderPaymentMethods() {
     const immediateMethods = methods.filter((method) => !isAccountPaymentMethod(method.code));
     const accountMethods = methods.filter((method) => isAccountPaymentMethod(method.code));
     chipsEl.innerHTML = renderGroup("Pay now", "Immediate sale tender", immediateMethods)
-        + renderGroup("Account transaction", "Requires an employee customer", accountMethods);
+        + renderGroup("Account transaction", "Requires an employee or department account", accountMethods);
 
     selectEl.innerHTML = methods
         .map((method, index) => `<option value="${escapeHtml(method.code)}" ${index === 0 ? "selected" : ""}>${escapeHtml(method.label)}</option>`)
@@ -2647,7 +2762,13 @@ function buildPendingTransaction() {
 
     if (cart.length === 0) return null;
 
-    if (((!splitTenderEnabled && requiresCheckoutCustomer(paymentMethod)) || splitIncludesDebt()) && !selectedDebtCustomerId) return null;
+    const usesDebt = paymentMethod === "debt" || splitIncludesDebt();
+    const departmentMode = usesDebt && getDebtAccountType() === "department";
+    const department = departmentMode ? getSelectedDepartmentDebtAccount() : null;
+    const departmentApprover = departmentMode ? getSelectedDepartmentApprover() : null;
+    const departmentRequesterName = String(document.getElementById("department-requester-name")?.value || "").trim();
+    if (((!splitTenderEnabled && requiresCheckoutCustomer(paymentMethod)) || splitIncludesDebt()) && !departmentMode && !selectedDebtCustomerId) return null;
+    if (departmentMode && (!department || !departmentApprover || !departmentRequesterName)) return null;
     if ((paymentMethod === "debt" || splitIncludesDebt()) && !selectedDebtPin) return null;
 
     const payload = {
@@ -2655,12 +2776,21 @@ function buildPendingTransaction() {
         customer_user_id: selectedDebtCustomerId || null,
         store_id: activeStoreId,
         payment_method: paymentMethod,
-        debt_pin: paymentMethod === "debt" || splitIncludesDebt() ? selectedDebtPin : "",
+        debt_account_type: departmentMode ? "department" : "employee",
+        debt_pin: usesDebt && !departmentMode ? selectedDebtPin : "",
+        department_id: departmentMode ? Number(department.id) : null,
+        department_requester_name: departmentMode ? departmentRequesterName : "",
+        department_approver_user_id: departmentMode ? Number(departmentApprover.id) : null,
+        department_pin: departmentMode ? selectedDebtPin : "",
         items: cart.map((item) => ({
             product_id: Number(item.product_id),
             qty: Number(item.qty),
         })),
     };
+    if (departmentMode) {
+        payload.customer_type = "walk_in";
+        payload.customer_user_id = null;
+    }
 
     const cartSnapshot = cart.map((item) => ({
         name: item.name,
@@ -2672,10 +2802,17 @@ function buildPendingTransaction() {
         ? getSplitPaymentLines()
         : [{payment_method: paymentMethod, amount: totalAmount, destination_account_id: selectedPaymentAccounts.get(paymentMethod) || null}];
     payload.payments = payments.map((line) => ({...line}));
-    const debtCustomer = (paymentMethod === "debt" || splitIncludesDebt()) && selectedDebtCustomerId
-        ? getDebtCustomerById(selectedDebtCustomerId)
-        : null;
-    const checkoutCustomer = selectedDebtCustomerId ? getDebtCustomerById(selectedDebtCustomerId) : null;
+    const debtCustomer = departmentMode
+        ? {
+            name: department.name,
+            employee_id: department.code,
+            user_type: "department",
+            available_credit: department.remaining_allocation,
+            current_debt: department.used_amount,
+            credit_limit: department.allocation_amount,
+        }
+        : (usesDebt && selectedDebtCustomerId ? getDebtCustomerById(selectedDebtCustomerId) : null);
+    const checkoutCustomer = departmentMode ? debtCustomer : (selectedDebtCustomerId ? getDebtCustomerById(selectedDebtCustomerId) : null);
 
     return {
         payload,
@@ -2685,12 +2822,18 @@ function buildPendingTransaction() {
         payments,
         storeName: getStoreNameById(activeStoreId),
         debtCustomerLabel:
-            (paymentMethod === "debt" || splitIncludesDebt()) && selectedDebtCustomerId
-                ? getDebtCustomerLabelById(selectedDebtCustomerId)
+            departmentMode
+                ? `${department.name} (Department)`
+                : usesDebt && selectedDebtCustomerId
+                    ? getDebtCustomerLabelById(selectedDebtCustomerId)
                 : "N/A",
         debtCustomer,
         checkoutCustomer,
-        customerLabel: checkoutCustomer?.name || "Walk-in",
+        customerLabel: departmentMode ? `${department.name} — requested by ${departmentRequesterName}` : (checkoutCustomer?.name || "Walk-in"),
+        departmentMode,
+        department,
+        departmentApprover,
+        departmentRequesterName,
     };
 }
 
@@ -2793,21 +2936,29 @@ async function submitTransaction() {
     }
 
     const checkoutUsesDebt = document.getElementById("payment-method").value === "debt" || splitIncludesDebt();
-    if (checkoutUsesDebt && !selectedDebtCustomerId) {
-        setResult("Select an employee (Faculty/Staff) for debt payment.", "error");
+    const departmentMode = checkoutUsesDebt && getDebtAccountType() === "department";
+    const department = departmentMode ? getSelectedDepartmentDebtAccount() : null;
+    const departmentApprover = departmentMode ? getSelectedDepartmentApprover() : null;
+    const departmentRequesterName = String(document.getElementById("department-requester-name")?.value || "").trim();
+    if (checkoutUsesDebt && !departmentMode && !selectedDebtCustomerId) {
+        setResult("Select an employee (Faculty/Staff) for employee debt payment.", "error");
+        return;
+    }
+    if (departmentMode && (!department || !departmentApprover || !departmentRequesterName)) {
+        setResult("Select a department and authorized approver, then enter the requester name.", "error");
         return;
     }
 
     if (checkoutUsesDebt) {
-        if (selectedDebtCustomer && selectedDebtCustomer.has_debt_pin === false) {
-            setResult("This customer must set a debt PIN in the User Portal before using debt payment.", "error");
+        if ((!departmentMode && selectedDebtCustomer && selectedDebtCustomer.has_debt_pin === false) || (departmentMode && departmentApprover?.pin_set === false)) {
+            setResult(departmentMode ? "This approver must set a department approval PIN in the User Portal first." : "This customer must set a debt PIN in the User Portal before using debt payment.", "error");
             updateCheckoutState();
             return;
         }
 
         if (!selectedDebtPin) {
             openDebtPinModal();
-            setResult("Enter the customer's debt PIN in the secure PIN modal.", "error");
+            setResult(departmentMode ? "Enter the department head's approval PIN in the secure PIN modal." : "Enter the customer's debt PIN in the secure PIN modal.", "error");
             updateCheckoutState();
             return;
         }
@@ -3248,6 +3399,38 @@ document.getElementById("store-day-account-counts").addEventListener("input", (e
 });
 document.getElementById("store-day-unassigned-counts").addEventListener("input", (event) => {
     if (event.target.matches("[data-closing-unassigned-key]")) updateStoreDayCloseVariance();
+});
+document.getElementById("debt-account-type")?.addEventListener("change", () => {
+    selectedDebtPin = "";
+    const input = document.getElementById("debt-pin-input");
+    if (input) input.value = "";
+    updateDepartmentDebtFields();
+    updateCheckoutState();
+});
+document.getElementById("department-debt-account")?.addEventListener("change", () => {
+    selectedDebtPin = "";
+    const input = document.getElementById("debt-pin-input");
+    if (input) input.value = "";
+    renderDepartmentApprovers();
+    updateDebtCreditMeter();
+    updateDebtPinUi();
+    updateCheckoutState();
+});
+document.getElementById("department-approver")?.addEventListener("change", () => {
+    selectedDebtPin = "";
+    const input = document.getElementById("debt-pin-input");
+    if (input) input.value = "";
+    updateDebtPinUi();
+    updateCheckoutState();
+});
+document.getElementById("department-requester-name")?.addEventListener("input", updateCheckoutState);
+
+window.IbemsPortalNavigation?.onCleanup(async () => {
+    if (debtPinLockoutTimer) {
+        clearInterval(debtPinLockoutTimer);
+        debtPinLockoutTimer = null;
+    }
+    await stopScanner();
 });
 
 (async () => {

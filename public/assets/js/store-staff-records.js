@@ -759,9 +759,9 @@ document.getElementById("staff-receipt-modal").addEventListener("click", (event)
     if (event.target.id === "staff-receipt-modal") srCloseReceipt();
 });
 
-window.addEventListener("beforeunload", () => {
-    srStopScanner();
-});
+const srCleanupScanner = () => srStopScanner();
+window.addEventListener("beforeunload", srCleanupScanner);
+window.IbemsPortalNavigation?.onCleanup(srCleanupScanner);
 
 document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;

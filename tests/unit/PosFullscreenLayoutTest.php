@@ -12,7 +12,7 @@ final class PosFullscreenLayoutTest extends TestCase
         $posCss = (string) file_get_contents(ROOTPATH . 'public/assets/css/store-pos.css');
 
         $this->assertStringContainsString("str_ends_with(\$requestPath, 'store/pos')", $storeLayout);
-        $this->assertStringContainsString('<body class="<?= esc($bodyClasses) ?>">', $portalShell);
+        $this->assertStringContainsString('<body class="<?= esc($bodyClasses) ?>" data-portal-page-classes="<?= esc($bodyClass) ?>">', $portalShell);
         $this->assertStringContainsString("site_url('store/dashboard')", $posView);
         $this->assertStringContainsString('Back to dashboard', $posView);
         $this->assertStringContainsString('.pos-fullscreen .app-sidebar', $posCss);

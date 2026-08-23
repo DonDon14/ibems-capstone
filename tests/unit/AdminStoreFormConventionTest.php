@@ -75,7 +75,7 @@ final class AdminStoreFormConventionTest extends CIUnitTestCase
 
         $this->assertStringNotContainsString('id="store-sort"', $storeAdminView);
         $this->assertStringContainsString('document.getElementById("store-sort")?.addEventListener', $script);
-        $this->assertStringContainsString('admin-stores.js\') ?>?v=20260822a', $storeAdminView);
+        $this->assertStringContainsString('admin-stores.js\') ?>?v=20260824b', $storeAdminView);
     }
 
     public function testStoreModalKeepsChromeFixedAndHidesConditionalTextarea(): void
@@ -94,6 +94,26 @@ final class AdminStoreFormConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('reasonField.hidden = !isDeactivating', $script);
     }
 
+    public function testAssignmentsUseAvatarCardsBeforeEnteringChangeMode(): void
+    {
+        $view = (string) file_get_contents(APPPATH . 'Views/admin/stores.php');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js');
+        $detailScript = (string) file_get_contents(FCPATH . 'assets/js/admin-store-details.js');
+        $service = (string) file_get_contents(APPPATH . 'Services/StoreOversightService.php');
+        $styles = (string) file_get_contents(FCPATH . 'assets/css/modern-ui.css');
+
+        foreach (['store-officer-summary', 'store-officer-editor', 'store-supervisor-summary', 'store-supervisor-editor'] as $id) {
+            $this->assertStringContainsString($id, $view);
+        }
+        foreach (['assignmentCard', 'renderOfficerSummary', 'renderSupervisorSummary', 'data-change-officer', 'data-change-supervisors'] as $content) {
+            $this->assertStringContainsString($content, $script);
+        }
+        $this->assertStringContainsString('window.IbemsAvatar.html(row.name, row.profile_image_url, "assigned-officer-avatar")', $detailScript);
+        $this->assertGreaterThanOrEqual(4, substr_count($service, 'profile_image_url'));
+        $this->assertStringContainsString('.assignment-person-card', $styles);
+        $this->assertStringContainsString('.assignment-person-avatar', $styles);
+    }
+
     public function testStoreLogoMatchesTheProductMediaInputPattern(): void
     {
         $view = (string) file_get_contents(APPPATH . 'Views/admin/stores.php');
@@ -105,6 +125,9 @@ final class AdminStoreFormConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('updateStoreLogoPreview', $script);
         $this->assertStringContainsString('URL.createObjectURL', $script);
         $this->assertStringContainsString('URL.revokeObjectURL', $script);
+        $this->assertSame(3, substr_count($view, 'class="store-logo-control'));
+        $this->assertStringContainsString('Logo source', $view);
+        $this->assertStringContainsString('Logo file', $view);
     }
 
     public function testPortalRoleTagsUseReadableLabels(): void

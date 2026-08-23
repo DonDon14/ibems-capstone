@@ -818,6 +818,40 @@
     background: linear-gradient(180deg, #f8fbff 0%, #ffffff 100%);
 }
 
+.department-debt-fields {
+    display: grid;
+    gap: 0.55rem;
+    padding: 0.9rem;
+    border: 1px solid var(--border-color, #dbe4ef);
+    border-radius: 0.9rem;
+    background: color-mix(in srgb, var(--surface-color, #fff) 92%, var(--primary-color, #14518a) 8%);
+}
+
+.department-debt-fields.is-hidden {
+    display: none;
+}
+
+#debt-account-type-wrap[hidden],
+#employee-debt-customer-fields[hidden],
+#department-debt-fields[hidden] {
+    display: none !important;
+}
+
+.department-debt-fields label {
+    margin-top: 0.15rem;
+    font-size: 0.78rem;
+    font-weight: 700;
+}
+
+.department-debt-fields select,
+.department-debt-fields input {
+    width: 100%;
+}
+
+.department-debt-fields small.is-error {
+    color: var(--danger-color, #b42318);
+}
+
 .debt-pin-wrap label {
     display: inline-flex;
     align-items: center;
@@ -1480,16 +1514,6 @@
     display: inline-flex;
     align-items: center;
     gap: 5px;
-}
-
-.receipt-modal {
-    position: fixed;
-    inset: 0;
-    background: rgba(15, 23, 42, 0.55);
-    display: grid;
-    place-items: center;
-    padding: 20px;
-    z-index: 1000;
 }
 
 .receipt-card {
