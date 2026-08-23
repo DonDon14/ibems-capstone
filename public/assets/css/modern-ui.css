@@ -782,7 +782,36 @@ body.ibems-modern {
 }
 
 .ui-date-popup {
-    padding: .875rem;
+    padding: .75rem;
+    overflow-x: hidden;
+    overscroll-behavior: contain;
+    scrollbar-color: #94a3b8 transparent;
+    scrollbar-width: thin;
+}
+
+.ui-date-popup::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.ui-date-popup::-webkit-scrollbar-track,
+.ui-date-popup::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+.ui-date-popup::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: #94a3b8;
+    background-clip: padding-box;
+}
+
+.ui-date-popup::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+    border: 0;
+    background: transparent;
 }
 
 .ui-date-head,
@@ -839,7 +868,7 @@ body.ibems-modern {
 .ui-date-grid {
     display: grid;
     grid-template-columns: repeat(7, minmax(0, 1fr));
-    gap: .25rem;
+    gap: .18rem;
 }
 
 .ui-date-weekdays {
@@ -856,7 +885,7 @@ body.ibems-modern {
 }
 
 .ui-date-day {
-    height: 2.125rem;
+    height: 1.95rem;
     color: #334155;
     font-size: .75rem;
     font-weight: 650;
@@ -889,8 +918,8 @@ body.ibems-modern {
 }
 
 .ui-date-actions {
-    margin-top: .7rem;
-    padding-top: .625rem;
+    margin-top: .55rem;
+    padding-top: .5rem;
     border-top: 1px solid #f1f5f9;
 }
 
@@ -1955,6 +1984,12 @@ html[data-theme="dark"] .ibems-modern .ui-control-icon {
     background: #142238;
 }
 
+html[data-theme="dark"] .ibems-modern :is(.ui-select-trigger, .ui-date-trigger).is-open .ui-control-icon {
+    color: #9bc4ff !important;
+    border-color: #315d91 !important;
+    background: #102c52 !important;
+}
+
 html[data-theme="dark"] .ibems-modern :is(.ui-select-menu, .ui-date-popup) {
     color: var(--dark-text-secondary);
     border-color: var(--dark-border-strong);
@@ -1975,6 +2010,20 @@ html[data-theme="dark"] .ibems-modern .ui-select-option[aria-selected="true"],
 html[data-theme="dark"] .ibems-modern .ui-date-day.is-today {
     color: #bfdbfe;
     background: var(--dark-blue-soft);
+}
+
+html[data-theme="dark"] .ibems-modern .ui-date-actions {
+    border-color: var(--dark-border) !important;
+}
+
+html[data-theme="dark"] .ibems-modern .ui-date-actions button:last-child {
+    color: #9bc4ff !important;
+    background: #102c52 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .ui-date-actions button:last-child:hover {
+    color: #fff !important;
+    background: #203754 !important;
 }
 
 html[data-theme="dark"] .ibems-modern :is(.secondary-btn, .btn-secondary, .ghost-btn, .btn-ghost, .icon-btn, .card-action-btn) {
@@ -2008,8 +2057,8 @@ html[data-theme="dark"] .ibems-modern :is(.app-modal-actions, .admin-modal-actio
 
 html[data-theme="dark"] .ibems-modern :is(.app-modal-close, .admin-modal-close, .acct-modal-close, .inv-modal-close, .settings-modal-head .icon-btn, .profile-image-close) {
     color: #b8c7d9;
-    border-color: var(--dark-border-strong);
-    background: #17263c;
+    border-color: transparent;
+    background: transparent;
 }
 
 html[data-theme="dark"] .ibems-modern :is(.compact-filter-bar, .compact-filter-panel, .staff-filter-panel, .acct-filters-redesign, .uv-filter-panel, .ap-filter-panel, .audit-filter-panel, .admin-stores-filters, .history-filters, .user-filters, .user-product-filters) {
@@ -2182,6 +2231,47 @@ html[data-theme="dark"] .ibems-modern :is(.data-state small, .acct-flow-item p) 
     color: var(--dark-text-muted);
 }
 
+/* Neutral and semantic icon tiles need dark surfaces as well as dark cards.
+   Keep their meaning through color instead of leaving light-mode islands. */
+html[data-theme="dark"] .ibems-modern .data-state > i {
+    color: #a9b8cb !important;
+    border: 1px solid var(--dark-border) !important;
+    background: #172740 !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .metric-card-icon--finance, .metric-card-icon--default,
+    .quick-link-icon, .category-modal-icon, .category-edit-summary > i
+) {
+    color: #9bc4ff !important;
+    border-color: #315d91 !important;
+    background: #102c52 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .metric-card-icon--sales {
+    color: #86efac !important;
+    border-color: #25764b !important;
+    background: #123825 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .metric-card-icon--users {
+    color: #d8b4fe !important;
+    border-color: #694091 !important;
+    background: #2e1b47 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .metric-card-icon--debt {
+    color: #fda4af !important;
+    border-color: #7f3542 !important;
+    background: #3b1d29 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .metric-card-icon--warning {
+    color: #fcd38d !important;
+    border-color: #8a5a18 !important;
+    background: #3a2912 !important;
+}
+
 html[data-theme="dark"] .ibems-modern :is(.user-product-image-wrap, .user-product-image-fallback) {
     color: #7db5ff;
     border-color: var(--dark-border);
@@ -2337,6 +2427,10 @@ html[data-theme="dark"] .ibems-modern :is(.bg-white, .bg-slate-50, .bg-slate-100
     background-color: var(--dark-surface-raised) !important;
 }
 
+html[data-theme="dark"] .ibems-modern .bg-blue-50 {
+    background-color: #102c52 !important;
+}
+
 html[data-theme="dark"] .ibems-modern :is(.text-slate-950, .text-slate-900, .text-slate-800) {
     color: var(--dark-text) !important;
 }
@@ -2349,8 +2443,15 @@ html[data-theme="dark"] .ibems-modern :is(.text-slate-500, .text-slate-400) {
     color: var(--dark-text-muted) !important;
 }
 
-html[data-theme="dark"] .ibems-modern :is(.border-slate-100, .border-slate-200, .border-slate-300) {
+html[data-theme="dark"] .ibems-modern :is(
+    .border-slate-100, .border-slate-200, .border-slate-300,
+    .border-blue-200, .border-blue-300
+) {
     border-color: var(--dark-border) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.text-blue-800, .text-blue-900) {
+    color: #9bc4ff !important;
 }
 
 html[data-theme="dark"] .ibems-modern .acct-tab {
@@ -2508,7 +2609,7 @@ html[data-theme="dark"] .ibems-modern :is(
     .adjust-preview, .variant-builder-row, .create-readiness,
     .staff-summary-person, .staff-summary-finance, .staff-transaction-scope,
     .staff-modal-filters, .store-logo-preview-box, .people-picker,
-    .ap-detail-hero, .ad-account-tabs, .uv-user-photo-field,
+    .ap-detail-hero, .ad-account-identity, .ad-account-tabs, .uv-user-photo-field,
     .audit-payload-block, .employee-profile-overview,
     .employee-financial-section, .employee-history-section,
     .method-editor-section, .modal-account-form, .payment-account-card,
@@ -2517,6 +2618,201 @@ html[data-theme="dark"] .ibems-modern :is(
     color: var(--dark-text-secondary) !important;
     border-color: var(--dark-border) !important;
     background: var(--dark-surface-raised) !important;
+}
+
+html[data-theme="dark"] .ibems-modern .audit-payload-block :is(pre, code) {
+    color: var(--dark-text-secondary) !important;
+}
+
+html[data-theme="dark"] .ibems-modern .category-edit-summary {
+    color: var(--dark-text-secondary) !important;
+    border-color: var(--dark-border) !important;
+    background: var(--dark-surface-raised) !important;
+}
+
+html[data-theme="dark"] .ibems-modern .category-edit-summary strong {
+    color: var(--dark-text) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.category-edit-summary span, .category-edit-head p) {
+    color: var(--dark-text-muted) !important;
+}
+
+html[data-theme="dark"] .ibems-modern .employee-identity {
+    color: var(--dark-text-secondary) !important;
+    border-color: var(--dark-border) !important;
+    background: linear-gradient(135deg, #14243a 0%, #102038 100%) !important;
+}
+
+html[data-theme="dark"] .ibems-modern .employee-identity-copy h5 {
+    color: var(--dark-text) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .employee-profile-kicker, .employee-identity-meta,
+    .employee-identity-meta i, .employee-profile-updated
+) {
+    color: var(--dark-text-muted) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .staff-modal-eyebrow, .staff-summary-finance span,
+    .staff-summary-person div > span,
+    .staff-modal-filters .checkbox-field > span
+) {
+    color: var(--dark-text-muted) !important;
+}
+
+html[data-theme="dark"] .ibems-modern .employee-identity-avatar {
+    color: #9bc4ff !important;
+    border-color: #315d91 !important;
+    background: #102c52 !important;
+}
+
+/* Shared separators must use the same muted rule across every portal. */
+html[data-theme="dark"] .ibems-modern :is(
+    hr, .data-panel-head, .dashboard-alert-pager, .store-card-footer,
+    .store-form-section, .compact-filter-panel-head, .compact-filter-panel-actions,
+    .ad-store-accordion, .variance-grid, .store-detail-pager, .employee-identity,
+    .debt-suggestion-item + .debt-suggestion-item,
+    .scan-suggestion-item + .scan-suggestion-item,
+    .cart-item, .total-row, .split-payment-summary,
+    .split-payment-methods, .receipt-total-box > div:last-child,
+    .close-reconcile-group + .close-reconcile-group,
+    .close-reconcile-row, .close-reconcile-row.is-total,
+    .staff-record-row, .staff-modal-head, .staff-summary-finance > div,
+    .ibems-receipt-brand, .ibems-receipt-details,
+    .ibems-receipt-lines th, .ibems-receipt-lines td,
+    .ibems-receipt-payment, .ibems-receipt-qr-wrap
+) {
+    border-color: var(--dark-border) !important;
+}
+
+html[data-theme="dark"] .ibems-modern .settings-table-wrap {
+    border-color: var(--dark-border) !important;
+    background: var(--dark-surface) !important;
+}
+
+/* Standard receipts remain readable in-place in dark mode. The printable
+   document produced in a new window intentionally retains its white paper. */
+html[data-theme="dark"] .ibems-modern .ibems-receipt {
+    color: var(--dark-text-secondary) !important;
+    border-color: var(--dark-border-strong) !important;
+    background: var(--dark-surface) !important;
+    box-shadow: none !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .ibems-receipt-brand, .ibems-receipt-section-head,
+    .ibems-receipt-payment, .ibems-receipt-qr-wrap
+) {
+    color: var(--dark-text-secondary) !important;
+    background: var(--dark-surface-raised) !important;
+}
+
+html[data-theme="dark"] .ibems-modern .ibems-receipt-details {
+    background: var(--dark-surface) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .ibems-receipt-title, .ibems-receipt-detail strong,
+    .ibems-receipt-lines td strong, .ibems-receipt-payment-row,
+    .ibems-receipt-payment-row strong, .ibems-receipt-payment-row b,
+    .ibems-receipt-thankyou strong, .ibems-receipt-qr-wrap strong
+) {
+    color: var(--dark-text) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .ibems-receipt-sub, .ibems-receipt-detail span,
+    .ibems-receipt-lines td small, .ibems-receipt-thankyou span,
+    .ibems-receipt-qr-wrap span
+) {
+    color: var(--dark-text-muted) !important;
+}
+
+html[data-theme="dark"] .ibems-modern .ibems-receipt-mark {
+    color: #9bc4ff !important;
+    border-color: #315d91 !important;
+    background: #102c52 !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.ibems-receipt-status, .ibems-receipt-payment-pill) {
+    color: #86efac !important;
+    border-color: #25764b !important;
+    background: #123825 !important;
+}
+
+/* Store editor: keep every nested picker and removable person token inside
+   the dark surface instead of allowing page-level light styles through. */
+html[data-theme="dark"] .ibems-modern .store-form-section-head > span {
+    color: #7db5ff !important;
+    border-color: #315d91 !important;
+    background: #102c52 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .supervisor-chip {
+    color: var(--dark-text-secondary) !important;
+    border-color: var(--dark-border-strong) !important;
+    background: #172740 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .supervisor-chip button {
+    color: #b8c7d9 !important;
+    background: #26364a !important;
+}
+
+html[data-theme="dark"] .ibems-modern .supervisor-chip button:is(:hover, :focus-visible) {
+    color: #f87171 !important;
+    background: #3b1d29 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .officer-suggestions {
+    color: var(--dark-text-secondary) !important;
+    border-color: var(--dark-border-strong) !important;
+    background: var(--dark-surface-raised) !important;
+    box-shadow: var(--dark-shadow);
+}
+
+html[data-theme="dark"] .ibems-modern .officer-suggestion-item {
+    color: var(--dark-text-secondary) !important;
+    background: transparent !important;
+}
+
+html[data-theme="dark"] .ibems-modern .officer-suggestion-item:is(:hover, .is-active) {
+    color: var(--dark-text) !important;
+    background: #203654 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .officer-suggestion-item:is(.is-disabled, :disabled) {
+    color: var(--dark-text-muted) !important;
+    background: #121d2c !important;
+}
+
+/* Inventory movement metadata and quantity tiles are semantic dark badges,
+   not light cards nested inside an otherwise dark activity list. */
+html[data-theme="dark"] .ibems-modern .inventory-movement-meta span {
+    color: var(--dark-text-secondary) !important;
+    border-color: var(--dark-border) !important;
+    background: #172740 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .inventory-movement-type.movement-restock {
+    color: #86efac !important;
+    border: 1px solid #25764b;
+    background: #123825 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .inventory-movement-type.movement-sale {
+    color: #7dd3fc !important;
+    border: 1px solid #25638a;
+    background: #12304a !important;
+}
+
+html[data-theme="dark"] .ibems-modern .inventory-movement-type.movement-adjustment {
+    color: #fcd38d !important;
+    border: 1px solid #8a5a18;
+    background: #3a2912 !important;
 }
 
 html[data-theme="dark"] .ibems-modern :is(
@@ -2671,6 +2967,155 @@ html[data-theme="dark"] .ibems-modern :is(
     .modal-image-preview-grid small, .readonly-field label, .field-help
 ) {
     color: var(--dark-text-muted) !important;
+}
+
+/* Close controls are intentionally quiet at rest and unmistakable on hover.
+   Keep this rule shared so every portal and modal type behaves identically. */
+body.ibems-modern :is(
+    .admin-modal-close, .acct-modal-close, .inv-modal-close,
+    .app-modal-close, .receipt-close, .compact-filter-close, .profile-image-close,
+    .settings-modal-head .icon-btn
+) {
+    color: #64748b !important;
+    border-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+body.ibems-modern :is(
+    .admin-modal-close, .acct-modal-close, .inv-modal-close,
+    .app-modal-close, .receipt-close, .compact-filter-close, .profile-image-close,
+    .settings-modal-head .icon-btn
+):hover {
+    color: #dc2626 !important;
+    border-color: transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+}
+
+body.ibems-modern :is(
+    .admin-modal-close, .acct-modal-close, .inv-modal-close,
+    .app-modal-close, .receipt-close, .compact-filter-close, .profile-image-close,
+    .settings-modal-head .icon-btn
+):focus-visible {
+    color: #b91c1c !important;
+    border-color: transparent !important;
+    background: transparent !important;
+    outline: none !important;
+    box-shadow: none !important;
+}
+
+body.ibems-modern :is(
+    .admin-modal-close, .acct-modal-close, .inv-modal-close,
+    .app-modal-close, .receipt-close
+):hover::before {
+    color: #dc2626 !important;
+}
+
+html[data-theme="dark"] body.ibems-modern :is(
+    .admin-modal-close, .acct-modal-close, .inv-modal-close,
+    .app-modal-close, .receipt-close, .compact-filter-close, .profile-image-close,
+    .settings-modal-head .icon-btn
+) {
+    color: #b8c7d9 !important;
+}
+
+html[data-theme="dark"] body.ibems-modern :is(
+    .admin-modal-close, .acct-modal-close, .inv-modal-close,
+    .app-modal-close, .receipt-close, .compact-filter-close, .profile-image-close,
+    .settings-modal-head .icon-btn
+):hover {
+    color: #f87171 !important;
+}
+
+html[data-theme="dark"] body.ibems-modern :is(
+    .admin-modal-close, .acct-modal-close, .inv-modal-close,
+    .app-modal-close, .receipt-close
+):hover::before {
+    color: #f87171 !important;
+}
+
+html[data-theme="dark"] body.ibems-modern :is(
+    .admin-modal-close, .acct-modal-close, .inv-modal-close,
+    .app-modal-close, .receipt-close, .compact-filter-close, .profile-image-close,
+    .settings-modal-head .icon-btn
+):focus-visible {
+    color: #fda4af !important;
+    background: transparent !important;
+}
+
+/* Final shared dark-mode coverage for semantic tiles and scroll regions used
+   by page-specific inventory, audit, POS, and confirmation components. */
+html[data-theme="dark"] .ibems-modern .metric-card-icon--alerts {
+    color: #9bc4ff !important;
+    border-color: #315d91 !important;
+    background: #102c52 !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .product-visual.placeholder, .prod-thumb-fallback,
+    .product-action-thumb-fallback, .inv-product-fallback
+) {
+    color: #9bc4ff !important;
+    border-color: #315d91 !important;
+    background: #102c52 !important;
+    background-image: none !important;
+}
+
+html[data-theme="dark"] .ibems-modern .app-dialog-icon {
+    color: #9bc4ff !important;
+    border: 1px solid #315d91 !important;
+    background: #102c52 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .app-dialog[data-tone="danger"] .app-dialog-icon {
+    color: #fda4af !important;
+    border-color: #7f3542 !important;
+    background: #3b1d29 !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .product-grid, .pos-right, .app-inset-modal-scroll,
+    .admin-stores-modal-body, .variant-builder-list,
+    .inventory-movement-list
+) {
+    scrollbar-color: #657b96 transparent;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .product-grid, .pos-right, .app-inset-modal-scroll,
+    .admin-stores-modal-body, .variant-builder-list,
+    .inventory-movement-list
+)::-webkit-scrollbar-track,
+html[data-theme="dark"] .ibems-modern :is(
+    .product-grid, .pos-right, .app-inset-modal-scroll,
+    .admin-stores-modal-body, .variant-builder-list,
+    .inventory-movement-list
+)::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .product-grid, .pos-right, .app-inset-modal-scroll,
+    .admin-stores-modal-body, .variant-builder-list,
+    .inventory-movement-list
+)::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: #657b96;
+    background-clip: padding-box;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .product-grid, .pos-right, .app-inset-modal-scroll,
+    .admin-stores-modal-body, .variant-builder-list,
+    .inventory-movement-list
+)::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+    background: transparent;
 }
 
 @media (max-width: 640px) {
