@@ -8,6 +8,8 @@ $footerText = 'USTP IBEMS User Portal';
 $initials = ibems_initials($name, 'US');
 $profileImageUrl = (string) (session()->get('profile_image_url') ?? '');
 $availableRoles = ibems_available_roles();
+$userMobileExperience = strtoupper($role) === 'USER';
+$bodyClass = trim(($bodyClass ?? '') . ($userMobileExperience ? ' user-mobile-enabled' : ''));
 $navigation = [
     ['path' => 'user/dashboard', 'label' => 'Dashboard', 'icon' => 'bi bi-speedometer2'],
     ['path' => 'user/stores', 'label' => 'Stores & Products', 'icon' => 'bi bi-shop-window'],

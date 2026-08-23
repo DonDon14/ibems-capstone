@@ -1,5 +1,10 @@
+(function () {
+"use strict";
+
+const udPageSignal = window.IbemsUserNavigation?.currentSignal || new AbortController().signal;
 const udPeriod = document.getElementById("ud-period");
 const udBody = document.getElementById("ud-body");
+if (!udPeriod || !udBody) return;
 
 function udEscape(value) {
     const node = document.createElement("div");
@@ -16,7 +21,7 @@ function udStatus(value) {
 }
 
 function udState(message, type = "empty") {
-    return `<tr><td colspan="7"><div class="data-state is-${udEscape(type)}">${udEscape(message)}</div></td></tr>`;
+    return `<tr class="data-state-row"><td colspan="7"><div class="data-state is-${udEscape(type)}">${udEscape(message)}</div></td></tr>`;
 }
 
 function udRender(data) {
@@ -41,13 +46,13 @@ function udRender(data) {
 
     udBody.innerHTML = rows.map((row) => `
         <tr>
-            <td><strong>${udEscape(row.period_label || row.period_code)}</strong><br><span class="meta">${udEscape(row.date_start)} to ${udEscape(row.date_end)}</span></td>
-            <td>${udEscape(window.IbemsFormat?.dateTime(row.applied_at) || row.applied_at || "-")}</td>
-            <td>${udEscape(udMoney(row.requested_amount))}</td>
-            <td><strong>${udEscape(udMoney(row.deducted_amount))}</strong></td>
-            <td>${udEscape(udMoney(row.debt_before))}</td>
-            <td>${udEscape(udMoney(row.debt_after))}</td>
-            <td><span class="user-deduction-status">${udEscape(udStatus(row.status))}</span></td>
+            <td data-label="Pay Period"><strong>${udEscape(row.period_label || row.period_code)}</strong><br><span class="meta">${udEscape(row.date_start)} to ${udEscape(row.date_end)}</span></td>
+            <td data-label="Applied Date">${udEscape(window.IbemsFormat?.dateTime(row.applied_at) || row.applied_at || "-")}</td>
+            <td data-label="Requested">${udEscape(udMoney(row.requested_amount))}</td>
+            <td data-label="Deducted"><strong>${udEscape(udMoney(row.deducted_amount))}</strong></td>
+            <td data-label="Debt Before">${udEscape(udMoney(row.debt_before))}</td>
+            <td data-label="Debt After">${udEscape(udMoney(row.debt_after))}</td>
+            <td data-label="Status"><span class="user-deduction-status">${udEscape(udStatus(row.status))}</span></td>
         </tr>
     `).join("");
 }
@@ -56,14 +61,16 @@ async function udLoad(periodId = "") {
     udBody.innerHTML = udState("Loading deductions...", "loading");
     const query = periodId ? `?period_id=${encodeURIComponent(periodId)}` : "";
     try {
-        const response = await fetch(`/user/deductions/data${query}`);
+        const response = await fetch(`/user/deductions/data${query}`, { signal: udPageSignal });
         const data = await response.json();
         if (!response.ok || data.status !== "success") throw new Error(data.message || "Unable to load deductions.");
         udRender(data);
     } catch (error) {
+        if (udPageSignal.aborted) return;
         udBody.innerHTML = udState(error.message || "Unable to load deductions.", "error");
     }
 }
 
 udPeriod?.addEventListener("change", () => udLoad(udPeriod.value));
 udLoad();
+}());

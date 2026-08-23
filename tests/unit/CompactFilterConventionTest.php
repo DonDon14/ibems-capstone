@@ -30,7 +30,7 @@ class CompactFilterConventionTest extends TestCase
         }
     }
 
-    public function testSharedBehaviorIncludesAccessibleSortFilterApplyAndResetControls(): void
+    public function testSharedBehaviorIncludesAccessibleSortFilterDoneAndResetControls(): void
     {
         $source = file_get_contents(ROOTPATH . 'public/assets/js/app-layout.js');
 
@@ -38,7 +38,11 @@ class CompactFilterConventionTest extends TestCase
         $this->assertStringContainsString('aria-controls', $source);
         $this->assertStringContainsString('aria-expanded', $source);
         $this->assertStringContainsString('data-compact-filter-reset', $source);
+        $this->assertStringContainsString('!button.closest(".ui-select, .ui-date")', $source);
         $this->assertStringContainsString('data-compact-filter-apply', $source);
+        $this->assertStringContainsString('>Done</button>', $source);
+        $this->assertStringContainsString('panel.dataset.mode === "sort"', $source);
+        $this->assertStringContainsString('.ui-select-menu, .ui-date-popup', $source);
         $this->assertStringContainsString('event.key === "Escape"', $source);
     }
 }

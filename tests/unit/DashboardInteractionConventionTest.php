@@ -29,7 +29,10 @@ final class DashboardInteractionConventionTest extends CIUnitTestCase
         $shell = (string) file_get_contents(APPPATH . 'Views/components/portal_shell.php');
         $layoutScript = (string) file_get_contents(FCPATH . 'assets/js/app-layout.js');
 
-        $this->assertSame(2, substr_count($shell, 'data-confirm-logout'));
+        $this->assertSame(1, substr_count($shell, 'data-confirm-logout'));
+        $this->assertStringContainsString('class="account-menu-logout" data-confirm-logout', $shell);
+        $this->assertStringNotContainsString('class="sidebar-logout"', $shell);
+        $this->assertStringNotContainsString('class="topbar-logout"', $shell);
         $this->assertStringContainsString('window.IbemsDialog.confirm', $layoutScript);
         $this->assertStringContainsString('Log out of IBEMS?', $layoutScript);
         $this->assertStringContainsString('Stay signed in', $layoutScript);

@@ -8,7 +8,7 @@ final class PasswordVisibilityTest extends TestCase
     {
         $views = [
             ROOTPATH . 'app/Views/auth/login.php',
-            ROOTPATH . 'app/Views/user/dashboard.php',
+            ROOTPATH . 'app/Views/components/portal_shell.php',
             ROOTPATH . 'app/Views/admin/user-view.php',
             ROOTPATH . 'app/Views/store/pos.php',
         ];

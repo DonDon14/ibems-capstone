@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/user') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/user-portal.css') ?>?v=20260821b">
+<link rel="stylesheet" href="<?= base_url('assets/css/user-portal.css') ?>?v=20260821b" data-user-page-style>
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -63,5 +63,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/user-stores.js') ?>?v=20260821b"></script>
+<script src="<?= base_url('assets/js/user-stores.js') ?>?v=20260823a" data-user-page-script></script>
 <?= $this->endSection() ?>
