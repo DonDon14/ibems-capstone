@@ -1,0 +1,26 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#ffffff">
+    <title>IBEMS User Portal Offline</title>
+    <style>
+        * { box-sizing: border-box; }
+        body { min-height: 100vh; min-height: 100dvh; margin: 0; display: grid; place-items: center; padding: 24px; background: #f4f7fb; color: #0f172a; font-family: Inter, system-ui, sans-serif; }
+        main { width: min(100%, 420px); padding: 28px; border: 1px solid #dbe5f0; border-radius: 22px; background: #fff; box-shadow: 0 20px 55px rgba(15, 23, 42, .12); text-align: center; }
+        img { width: 76px; height: 76px; object-fit: contain; }
+        h1 { margin: 18px 0 8px; font-size: 1.5rem; }
+        p { margin: 0; color: #64748b; line-height: 1.55; }
+        button { width: 100%; min-height: 48px; margin-top: 22px; border: 1px solid #1d4ed8; border-radius: 14px; background: #1d4ed8; color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
+    </style>
+</head>
+<body>
+    <main>
+        <img src="/assets/images/ibems-logo.png" alt="IBEMS logo">
+        <h1>You’re offline</h1>
+        <p>Reconnect to securely load your current purchases, balances, deductions, and store information. IBEMS does not save financial changes while offline.</p>
+        <button type="button" onclick="window.location.reload()">Try again</button>
+    </main>
+</body>
+</html>

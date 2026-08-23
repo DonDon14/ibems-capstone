@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/user') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/user-portal.css') ?>?v=20260821b">
+<link rel="stylesheet" href="<?= base_url('assets/css/user-portal.css') ?>?v=20260821b" data-user-page-style>
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -43,16 +43,6 @@
         </article>
     </div>
 
-    <article class="dash-panel user-security-panel">
-        <div class="user-security-copy">
-            <h4><i class="bi bi-shield-lock"></i> Debt Authorization PIN</h4>
-            <p id="u-debt-pin-status">Checking PIN status...</p>
-        </div>
-        <button id="u-open-pin-modal" type="button" class="primary-btn">
-            <i class="bi bi-key"></i> Set PIN
-        </button>
-    </article>
-
     <div class="dashboard-grid">
         <?= view('components/stat_card', ['title' => 'Credit Limit', 'value' => 'PHP 0.00', 'valueId' => 'u-credit-limit', 'icon' => 'bi bi-wallet2', 'tone' => 'finance']) ?>
         <?= view('components/stat_card', ['title' => 'Current Debt', 'value' => 'PHP 0.00', 'valueId' => 'u-current-debt', 'icon' => 'bi bi-credit-card-2-front', 'tone' => 'debt']) ?>
@@ -84,7 +74,7 @@
 
     <div class="dash-panel">
         <h4><i class="bi bi-receipt"></i> Recent Transactions</h4>
-        <div class="table-standard-wrap mt-10">
+        <div class="table-standard-wrap user-mobile-card-table mt-10">
             <table class="table table-standard">
                 <thead>
                     <tr>
@@ -103,37 +93,9 @@
     </div>
 </section>
 
-<div id="u-debt-pin-modal" class="app-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="u-debt-pin-title">
-    <div class="app-modal-card">
-        <div class="app-modal-head">
-            <h4 id="u-debt-pin-title"><i class="bi bi-shield-lock"></i> Debt Authorization PIN</h4>
-            <button id="u-pin-modal-close" type="button" class="app-modal-close" aria-label="Close debt authorization PIN form">x</button>
-        </div>
-        <form id="u-debt-pin-form" class="user-pin-form">
-            <p id="u-pin-form-help">Use a 4 to 6 digit PIN. Stores will ask for this only when charging purchases to debt.</p>
-            <label id="u-current-password-wrap" class="user-pin-field is-hidden">
-                <span>Current Password</span>
-                <input id="u-current-password" name="current_password" type="password" autocomplete="current-password">
-            </label>
-            <label class="user-pin-field">
-                <span>New Debt PIN</span>
-                <input id="u-debt-pin" name="pin" type="password" inputmode="numeric" maxlength="6" autocomplete="off" required>
-            </label>
-            <label class="user-pin-field">
-                <span>Confirm Debt PIN</span>
-                <input id="u-debt-pin-confirm" name="pin_confirm" type="password" inputmode="numeric" maxlength="6" autocomplete="off" required>
-            </label>
-            <p id="u-pin-form-result" class="user-pin-result"></p>
-            <div class="app-modal-actions">
-                <button id="u-pin-modal-cancel" type="button" class="secondary-btn">Cancel</button>
-                <button id="u-save-pin" type="submit" class="primary-btn"><i class="bi bi-check2-circle"></i> Save PIN</button>
-            </div>
-        </form>
-    </div>
-</div>
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="<?= base_url('assets/js/user-dashboard.js') ?>"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" data-user-page-script data-user-page-once></script>
+<script src="<?= base_url('assets/js/user-dashboard.js') ?>?v=20260823a" data-user-page-script></script>
 <?= $this->endSection() ?>

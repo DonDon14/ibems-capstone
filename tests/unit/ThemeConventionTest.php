@@ -110,6 +110,22 @@ final class ThemeConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('window.addEventListener("ibems:themechange"', $script);
     }
 
+    public function testAccountMenuUsesDarkAwareIdentityActionsAndLogoutColors(): void
+    {
+        $css = (string) file_get_contents(FCPATH . 'assets/css/account-menu.css');
+
+        $this->assertStringContainsString('html[data-theme="dark"] .account-menu-identity img', $css);
+        $this->assertStringContainsString('var(--dark-border-strong, #405672)', $css);
+        $this->assertStringContainsString('html[data-theme="dark"] .topbar-profile .profile-avatar-img', $css);
+        $this->assertStringContainsString('border-color: transparent !important', $css);
+        $this->assertStringContainsString('html[data-theme="dark"] .topbar-profile:not(:hover):not(:focus-visible)', $css);
+        $this->assertStringContainsString('html[data-theme="dark"] .account-menu-actions :is(button, a) > i', $css);
+        $this->assertStringContainsString('background: #17345a', $css);
+        $this->assertStringContainsString('html[data-theme="dark"] .account-menu-logout button', $css);
+        $this->assertStringContainsString('background: #2a1720', $css);
+        $this->assertStringContainsString('color: #fda4af', $css);
+    }
+
     public function testLoginUsesTheActiveFrontControllerPrefix(): void
     {
         $script = file_get_contents(FCPATH . 'assets/js/auth-login.js');

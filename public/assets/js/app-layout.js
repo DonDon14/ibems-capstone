@@ -6,7 +6,6 @@
     const sidebar = document.querySelector(".app-sidebar");
     const brand = document.querySelector(".app-brand");
     const navLinks = Array.from(document.querySelectorAll(".app-menu a"));
-    const logoutLink = document.querySelector(".sidebar-logout a, .sidebar-logout button");
     const logoutForms = Array.from(document.querySelectorAll("form[data-confirm-logout]"));
     if (!shell || !btn) return;
 
@@ -59,13 +58,6 @@
             link.setAttribute("data-tooltip", label);
         }
     });
-
-    if (logoutLink) {
-        const label = (logoutLink.querySelector("span")?.textContent || logoutLink.textContent || "").trim();
-        if (label !== "") {
-            logoutLink.setAttribute("data-tooltip", label);
-        }
-    }
 
     logoutForms.forEach((form) => {
         form.addEventListener("submit", async (event) => {
@@ -173,7 +165,7 @@
         card.dataset.insetModalScrollReady = "true";
     });
 
-    const compactBars = Array.from(document.querySelectorAll("[data-compact-filters]"));
+    let compactPanelSequence = 0;
 
     const controlWrapper = (control, bar) => {
         const wrapper = control.closest("label, .field, .ui-field, .history-filter-field, .inventory-filter-field, .settings-input-field");
@@ -194,7 +186,9 @@
             control.dataset.compactDefault = control.type === "checkbox" ? String(control.defaultChecked) : control.value;
         });
 
-        const originalButtons = Array.from(bar.querySelectorAll("button")).filter((button) => !searchWrapper?.contains(button));
+        const originalButtons = Array.from(bar.querySelectorAll("button")).filter((button) =>
+            !searchWrapper?.contains(button) && !button.closest(".ui-select, .ui-date")
+        );
         const primary = document.createElement("div");
         primary.className = "compact-filter-primary";
         const actionBox = document.createElement("div");
@@ -255,7 +249,7 @@
 
         const footer = document.createElement("div");
         footer.className = "compact-filter-panel-actions";
-        footer.innerHTML = '<button type="button" class="secondary-btn" data-compact-filter-reset><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Reset all</button><button type="button" class="primary-btn" data-compact-filter-apply>Apply filters</button>';
+        footer.innerHTML = '<button type="button" class="secondary-btn" data-compact-filter-reset><i class="bi bi-arrow-counterclockwise" aria-hidden="true"></i> Reset all</button><button type="button" class="primary-btn" data-compact-filter-apply>Done</button>';
         panel.appendChild(footer);
         bar.appendChild(panel);
         bar.classList.add("compact-filter-bar");
@@ -334,10 +328,20 @@
             window.setTimeout(updateCounts, 0);
         });
 
-        advancedControls.forEach((control) => control.addEventListener("change", updateCounts));
+        advancedControls.forEach((control) => control.addEventListener("change", () => {
+            updateCounts();
+            if (window.matchMedia("(max-width: 760px)").matches && panel.dataset.mode === "sort" && sortControls.includes(control)) {
+                setOpen("sort", false);
+            }
+        }));
+        const pageSignal = window.IbemsUserNavigation?.currentSignal;
         document.addEventListener("click", (event) => {
-            if (!panel.hidden && !bar.contains(event.target)) setOpen(panel.dataset.mode, false);
-        });
+            if (panel.hidden || bar.contains(event.target)) return;
+            const isMobileFilterPopup = window.matchMedia("(max-width: 760px)").matches
+                && panel.dataset.mode === "filter"
+                && event.target.closest?.(".ui-select-menu, .ui-date-popup");
+            if (!isMobileFilterPopup) setOpen(panel.dataset.mode, false);
+        }, pageSignal ? { signal: pageSignal } : undefined);
         bar.addEventListener("keydown", (event) => {
             if (event.key === "Escape" && !panel.hidden) {
                 const activeToggle = panel.dataset.mode === "sort" ? sortToggle : filterToggle;
@@ -348,5 +352,15 @@
         updateCounts();
     };
 
-    compactBars.forEach(initCompactFilterBar);
+    const enhanceCompactFilters = (root = document) => {
+        Array.from(root.querySelectorAll?.("[data-compact-filters]") || []).forEach((bar) => {
+            compactPanelSequence += 1;
+            initCompactFilterBar(bar, compactPanelSequence);
+        });
+    };
+
+    enhanceCompactFilters();
+    document.addEventListener("ibems:user-page-loaded", (event) => {
+        enhanceCompactFilters(event.detail?.main || document);
+    });
 })();

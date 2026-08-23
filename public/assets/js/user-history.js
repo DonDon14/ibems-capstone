@@ -1,3 +1,9 @@
+(function () {
+"use strict";
+
+const uhPageSignal = window.IbemsUserNavigation?.currentSignal || new AbortController().signal;
+if (!document.getElementById("uh-body")) return;
+
 let uhSelectedReceipt = null;
 let uhReceiptTrigger = null;
 let uhTransactionPage = 1;
@@ -109,9 +115,10 @@ function uhApplyDebtStatus(summary) {
 async function loadUserSummaryCards() {
     let data;
     try {
-        const response = await fetch("/user/summary");
+        const response = await fetch("/user/summary", { signal: uhPageSignal });
         data = await response.json();
     } catch (error) {
+        if (uhPageSignal.aborted) return;
         uhApplyDebtStatus({
             debt_status_tone: "danger",
             debt_status_label: "Unavailable",
@@ -156,9 +163,10 @@ async function loadUserTransactions() {
 
     let data;
     try {
-        const response = await fetch(`/user/transactions?${params.toString()}`);
+        const response = await fetch(`/user/transactions?${params.toString()}`, { signal: uhPageSignal });
         data = await response.json();
     } catch (error) {
+        if (uhPageSignal.aborted) return;
         body.innerHTML = uhDataState("error", error.message || "Unable to load transactions.", 6);
         document.getElementById("uh-transactions-pager").innerHTML = "";
         return;
@@ -181,12 +189,12 @@ async function loadUserTransactions() {
 
     body.innerHTML = data.data.map((row) => `
         <tr class="uh-row-clickable table-row-clickable" data-txn-id="${Number(row.id)}">
-            <td>${uhEscape(uhDateTime(row.created_at))}</td>
-            <td>${uhEscape(row.store_name)}</td>
-            <td>${uhEscape(String(row.payment_method || "").toUpperCase())}</td>
-            <td>${uhEscape(uhMoney(row.amount))}</td>
-            <td>${uhEscape(row.client_txn_id || `TXN-${row.id}`)}</td>
-            <td>
+            <td data-label="Date">${uhEscape(uhDateTime(row.created_at))}</td>
+            <td data-label="Store">${uhEscape(row.store_name)}</td>
+            <td data-label="Payment">${uhEscape(String(row.payment_method || "").toUpperCase())}</td>
+            <td data-label="Amount">${uhEscape(uhMoney(row.amount))}</td>
+            <td data-label="Reference">${uhEscape(row.client_txn_id || `TXN-${row.id}`)}</td>
+            <td data-label="Receipt">
                 <button class="secondary-btn btn-sm" type="button" data-receipt-id="${Number(row.id)}">
                     <i class="bi bi-receipt"></i> Receipt
                 </button>
@@ -213,9 +221,10 @@ async function loadUserCashbook() {
 
     let data;
     try {
-        const response = await fetch(`/user/cashbook?${params.toString()}`);
+        const response = await fetch(`/user/cashbook?${params.toString()}`, { signal: uhPageSignal });
         data = await response.json();
     } catch (error) {
+        if (uhPageSignal.aborted) return;
         body.innerHTML = uhDataState("error", error.message || "Unable to load cashbook.", 8);
         document.getElementById("uh-cashbook-pager").innerHTML = "";
         return;
@@ -244,14 +253,14 @@ async function loadUserCashbook() {
 
         return `
         <tr>
-            <td>${uhEscape(uhDateTime(row.created_at))}</td>
-            <td>${uhEscape(uhEntryLabel(row.entry_type))}</td>
-            <td>${uhEscape(String(row.direction || "").toUpperCase())}</td>
-            <td>${uhEscape(uhMoney(row.amount))}</td>
-            <td>${uhEscape(uhMoney(row.debt_before))}</td>
-            <td>${uhEscape(uhMoney(row.debt_after))}</td>
-            <td>${uhEscape(uhMoney(row.available_credit_snapshot))}</td>
-            <td>${remarksHtml}</td>
+            <td data-label="Date">${uhEscape(uhDateTime(row.created_at))}</td>
+            <td data-label="Entry">${uhEscape(uhEntryLabel(row.entry_type))}</td>
+            <td data-label="Direction">${uhEscape(String(row.direction || "").toUpperCase())}</td>
+            <td data-label="Amount">${uhEscape(uhMoney(row.amount))}</td>
+            <td data-label="Debt Before">${uhEscape(uhMoney(row.debt_before))}</td>
+            <td data-label="Debt After">${uhEscape(uhMoney(row.debt_after))}</td>
+            <td data-label="Available Credit">${uhEscape(uhMoney(row.available_credit_snapshot))}</td>
+            <td data-label="Remarks">${remarksHtml}</td>
         </tr>
     `;
     }).join("");
@@ -269,7 +278,7 @@ async function openReceipt(transactionId) {
     modal.querySelector(".receipt-card")?.focus();
 
     try {
-        const response = await fetch(`/user/transactions/${transactionId}`);
+        const response = await fetch(`/user/transactions/${transactionId}`, { signal: uhPageSignal });
         const data = await response.json();
 
         if (!response.ok || !data || data.status !== "success" || !data.transaction) {
@@ -295,6 +304,7 @@ async function openReceipt(transactionId) {
         window.IbemsReceipt.renderReceipt("uh-receipt-content", uhSelectedReceipt);
         printButton.disabled = false;
     } catch (error) {
+        if (uhPageSignal.aborted) return;
         content.innerHTML = `<div class="receipt-error">${uhEscape(error.message || "Unable to load this receipt.")}</div>`;
     }
 }
@@ -415,6 +425,7 @@ document.addEventListener("keydown", (event) => {
     if (event.key === "Escape" && !document.getElementById("uh-receipt-modal").classList.contains("is-hidden")) {
         closeReceipt();
     }
-});
+}, { signal: uhPageSignal });
 
 loadUserHistoryAll();
+}());

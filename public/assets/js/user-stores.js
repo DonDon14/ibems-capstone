@@ -1,3 +1,9 @@
+(function () {
+"use strict";
+
+const usPageSignal = window.IbemsUserNavigation?.currentSignal || new AbortController().signal;
+if (!document.getElementById("us-products")) return;
+
 let usPage = 1;
 let usSearchTimer = null;
 let usRequestSequence = 0;
@@ -104,7 +110,7 @@ async function usLoad() {
     const grid = document.getElementById("us-products");
     grid.innerHTML = usState("loading", "Loading store products...");
     try {
-        const response = await fetch(`/user/stores/data?${params.toString()}`);
+        const response = await fetch(`/user/stores/data?${params.toString()}`, { signal: usPageSignal });
         const data = await response.json();
         if (requestId !== usRequestSequence) return;
         if (!response.ok || data?.status !== "success") throw new Error(data?.message || "Unable to load store products.");
@@ -123,6 +129,7 @@ async function usLoad() {
         usRenderProducts(rows);
         usRenderPager(meta);
     } catch (error) {
+        if (usPageSignal.aborted) return;
         if (requestId !== usRequestSequence) return;
         grid.innerHTML = usState("error", error.message || "Unable to load store products.");
         document.getElementById("us-context").textContent = "Products unavailable";
@@ -162,6 +169,7 @@ document.addEventListener("error", (event) => {
     const image = event.target;
     if (!(image instanceof HTMLImageElement) || !image.closest(".user-product-image-wrap")) return;
     image.closest(".user-product-image-wrap").outerHTML = '<span class="user-product-image-fallback"><i class="bi bi-box-seam"></i></span>';
-}, true);
+}, { capture: true, signal: usPageSignal });
 
 usLoad();
+}());

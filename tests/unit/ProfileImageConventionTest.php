@@ -16,6 +16,8 @@ class ProfileImageConventionTest extends TestCase
         $this->assertStringContainsString('function ibems_profile_image_url', $common);
         $this->assertStringContainsString('data-current-user-avatar', $shell);
         $this->assertStringContainsString('data-profile-image-open', $shell);
+        $this->assertStringContainsString('id="account-menu-toggle"', $shell);
+        $this->assertStringContainsString('Change or upload your account photo', $shell);
         foreach (['admin', 'accounting', 'store', 'store_admin', 'user'] as $layout) {
             $source = (string) file_get_contents(APPPATH . 'Views/layouts/' . $layout . '.php');
             $this->assertStringContainsString("session()->get('profile_image_url')", $source);
