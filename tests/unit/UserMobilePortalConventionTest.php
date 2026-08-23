@@ -111,7 +111,9 @@ final class UserMobilePortalConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('userNavigationVisits', $navigation);
         $this->assertStringContainsString('window.addEventListener("popstate"', $navigation);
         $this->assertStringContainsString('window.location.assign', $navigation);
-        $this->assertStringContainsString('pageController.abort()', $navigation);
+        $this->assertStringContainsString('runtime.controller.abort()', $navigation);
+        $this->assertStringContainsString('window.IbemsUserNavigation = api', $navigation);
+        $this->assertStringContainsString('ibems:user-page-loaded', $navigation);
 
         foreach (['dashboard.php', 'stores.php', 'history.php', 'deductions.php'] as $view) {
             $contents = (string) file_get_contents(APPPATH . 'Views/user/' . $view);

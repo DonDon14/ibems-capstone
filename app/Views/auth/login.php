@@ -9,7 +9,7 @@
     <meta name="csrf-header-name" content="<?= esc(config('Security')->headerName) ?>">
     <meta name="csrf-cookie-name" content="<?= esc(config('Security')->cookieName) ?>">
     <title>IBEMS Login</title>
-    <script>
+    <script {csp-script-nonce}>
     (function () {
         var saved = localStorage.getItem('ibems-theme');
         var theme = saved === 'dark' || saved === 'light' ? saved : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
@@ -18,7 +18,7 @@
     </script>
     <link rel="icon" type="image/png" href="<?= base_url('assets/images/ibems-logo.png') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.css') ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/css/auth-login.css') ?>?v=20260823c">
+    <link rel="stylesheet" href="<?= base_url('assets/css/auth-login.css') ?>?v=20260823f">
     <link rel="stylesheet" href="<?= base_url('assets/css/password-visibility.css') ?>?v=20260813b">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 </head>

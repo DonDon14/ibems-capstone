@@ -1378,6 +1378,8 @@ document.getElementById("modal-save-product").addEventListener("click", async ()
     await invUpdateProduct(invModalProductId);
 });
 
+window.IbemsPortalNavigation?.onCleanup(invCloseBarcodeCamera);
+
 (async () => {
     try {
         await invLoadStores();

@@ -56,7 +56,7 @@ a {
     padding: 14px 10px;
     gap: 10px;
     border-right: 1px solid rgba(255, 255, 255, 0.08);
-    transition: width 0.18s ease, padding 0.18s ease;
+    transition: width 0.24s cubic-bezier(0.4, 0, 0.2, 1), padding 0.24s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .app-sidebar-header {
@@ -93,6 +93,21 @@ a {
 
 .app-brand-text {
     min-width: 0;
+}
+
+.app-brand-text,
+.app-menu a span,
+.sidebar-logout a span,
+.sidebar-logout button span {
+    max-width: 180px;
+    overflow: hidden;
+    opacity: 1;
+    transform: translateX(0);
+    white-space: nowrap;
+    transition:
+        max-width 0.24s cubic-bezier(0.4, 0, 0.2, 1),
+        opacity 0.1s ease 0.12s,
+        transform 0.24s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .app-brand h1 {
@@ -230,7 +245,11 @@ a {
 .app-shell.sidebar-collapsed .app-menu a span,
 .app-shell.sidebar-collapsed .sidebar-logout a span,
 .app-shell.sidebar-collapsed .sidebar-logout button span {
-    display: none;
+    max-width: 0;
+    opacity: 0;
+    transform: translateX(-6px);
+    pointer-events: none;
+    transition-delay: 0s;
 }
 
 .app-shell.sidebar-collapsed .app-menu a::after,
@@ -280,7 +299,7 @@ a {
     min-height: 100vh;
     height: 100vh;
     overflow: hidden;
-    transition: margin-left 0.18s ease;
+    transition: margin-left 0.24s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .app-topbar {
@@ -404,22 +423,40 @@ a {
 .sidebar-toggle-glyph {
     position: relative;
     display: block;
-    width: 20px;
+    width: 23px;
     height: 17px;
-    flex: 0 0 20px;
-    border: 1.8px solid currentColor;
-    border-radius: 5px;
+    flex: 0 0 23px;
+    border: 1.7px solid currentColor;
+    border-radius: 4px;
 }
 
 .sidebar-toggle-glyph::before {
     content: "";
     position: absolute;
-    top: -1px;
-    bottom: -1px;
-    left: 6px;
-    width: 1.8px;
-    border-radius: 999px;
+    top: -1.7px;
+    bottom: -1.7px;
+    left: 7px;
+    width: 1.7px;
+    border-radius: 0;
     background: currentColor;
+}
+
+.sidebar-toggle-glyph::after {
+    content: "";
+    position: absolute;
+    top: 50%;
+    right: 4px;
+    width: 4px;
+    height: 4px;
+    border-left: 1.4px solid currentColor;
+    border-bottom: 1.4px solid currentColor;
+    transform: translateY(-50%) rotate(45deg);
+    transform-origin: center;
+    transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.app-shell.sidebar-collapsed .sidebar-toggle-glyph::after {
+    transform: translateY(-50%) rotate(225deg);
 }
 
 .topbar-profile {
@@ -2589,6 +2626,37 @@ body .app-modal .app-modal-actions {
     border-radius: 16px;
     background: #fff;
     box-shadow: 0 22px 55px rgb(15 23 42 / 0.2);
+    overscroll-behavior: contain;
+    scrollbar-color: #94a3b8 transparent;
+    scrollbar-width: thin;
+}
+
+.compact-filter-panel::-webkit-scrollbar {
+    width: 9px;
+}
+
+.compact-filter-panel::-webkit-scrollbar-track {
+    margin-block: 5px;
+    background: transparent;
+}
+
+.compact-filter-panel::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: #94a3b8;
+    background-clip: padding-box;
+}
+
+.compact-filter-panel::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+    background-clip: padding-box;
+}
+
+.compact-filter-panel::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+    background: transparent;
 }
 
 .compact-filter-panel[hidden] {

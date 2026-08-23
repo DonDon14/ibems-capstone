@@ -491,12 +491,15 @@ function sdRenderOfficers(officers) {
     }
 
     wrap.innerHTML = rows.map((row) => `
-        <div class="stack-item">
-            <div class="stack-item-head">
-                <strong>${sdEscape(row.name || "No assigned officer")}</strong>
-                <span>${sdEscape(sdIdentifierLabel(row.role || "Officer"))}</span>
+        <div class="stack-item assigned-officer-card">
+            ${window.IbemsAvatar.html(row.name, row.profile_image_url, "assigned-officer-avatar")}
+            <div class="assigned-officer-copy">
+                <div class="stack-item-head">
+                    <strong>${sdEscape(row.name || "No assigned officer")}</strong>
+                    <span>${sdEscape(sdIdentifierLabel(row.role || "Officer"))}</span>
+                </div>
+                <div class="stack-meta">${sdEscape(row.email || "-")}</div>
             </div>
-            <div class="stack-meta">${sdEscape(row.email || "-")}</div>
         </div>
     `).join("");
 }

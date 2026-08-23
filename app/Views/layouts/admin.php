@@ -14,6 +14,7 @@ $navigation = [
     ['path' => 'admin/stores', 'label' => 'Stores & POS', 'icon' => 'bi bi-shop-window'],
     ['path' => 'admin/products', 'label' => 'Products', 'icon' => 'bi bi-box-seam', 'visible' => !$isSupervisorPortal],
     ['path' => 'admin/accounting-debts', 'label' => 'Accounting Debts', 'icon' => 'bi bi-cash-coin', 'visible' => !$isSupervisorPortal],
+    ['path' => 'admin/departments', 'label' => 'Departments', 'icon' => 'bi bi-diagram-3', 'visible' => !$isSupervisorPortal],
     ['path' => 'admin/user-view', 'label' => 'User Management', 'icon' => 'bi bi-people', 'visible' => !$isSupervisorPortal],
     ['path' => 'admin/audit', 'label' => 'Audit Log', 'icon' => 'bi bi-journal-text', 'visible' => !$isSupervisorPortal],
 ];

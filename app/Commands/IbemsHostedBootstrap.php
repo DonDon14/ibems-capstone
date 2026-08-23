@@ -25,7 +25,7 @@ class IbemsHostedBootstrap extends BaseCommand
         }
 
         try {
-            foreach (['010_salary_grade_profiles.sql', '011_render_hosted_sessions.sql', '012_dynamic_salary_schedules.sql'] as $file) {
+            foreach (['010_salary_grade_profiles.sql', '011_render_hosted_sessions.sql', '012_dynamic_salary_schedules.sql', '014_department_debt_accounts.sql'] as $file) {
                 $path = ROOTPATH . 'database/postgresql/' . $file;
                 $sql = file_get_contents($path);
                 if ($sql === false) {

@@ -33,8 +33,10 @@ class CompactFilterConventionTest extends TestCase
     public function testSharedBehaviorIncludesAccessibleSortFilterDoneAndResetControls(): void
     {
         $source = file_get_contents(ROOTPATH . 'public/assets/js/app-layout.js');
+        $styles = file_get_contents(ROOTPATH . 'public/assets/css/app.css');
 
         $this->assertIsString($source);
+        $this->assertIsString($styles);
         $this->assertStringContainsString('aria-controls', $source);
         $this->assertStringContainsString('aria-expanded', $source);
         $this->assertStringContainsString('data-compact-filter-reset', $source);
@@ -44,5 +46,10 @@ class CompactFilterConventionTest extends TestCase
         $this->assertStringContainsString('panel.dataset.mode === "sort"', $source);
         $this->assertStringContainsString('.ui-select-menu, .ui-date-popup', $source);
         $this->assertStringContainsString('event.key === "Escape"', $source);
+        $this->assertStringContainsString('panel.style.removeProperty("max-height")', $source);
+        $this->assertStringContainsString('panelRect.height > availableHeight', $source);
+        $this->assertStringNotContainsString('Math.max(240, window.innerHeight - top - 16)', $source);
+        $this->assertStringContainsString('.compact-filter-panel::-webkit-scrollbar-button', $styles);
+        $this->assertStringContainsString('scrollbar-width: thin;', $styles);
     }
 }

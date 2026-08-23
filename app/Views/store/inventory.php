@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/store') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/store-inventory.css') ?>?v=20260821b">
+<link rel="stylesheet" href="<?= base_url('assets/css/store-inventory.css') ?>?v=20260823c">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -446,5 +446,5 @@
 
 <?= $this->section('scripts') ?>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script src="<?= base_url('assets/js/store-inventory.js') ?>?v=20260821f"></script>
+<script src="<?= base_url('assets/js/store-inventory.js') ?>?v=20260823a"></script>
 <?= $this->endSection() ?>

@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 2560 1440" preserveAspectRatio="xMidYMid slice" role="img" aria-label="Abstract IBEMS portal background">
+  <defs>
+    <linearGradient id="ribbon" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#dbeafe" stop-opacity=".78"/>
+      <stop offset="1" stop-color="#bfdbfe" stop-opacity=".38"/>
+    </linearGradient>
+    <linearGradient id="ribbonSoft" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#eff6ff" stop-opacity=".22"/>
+      <stop offset="1" stop-color="#cbdff5" stop-opacity=".62"/>
+    </linearGradient>
+    <pattern id="dots" width="20" height="20" patternUnits="userSpaceOnUse">
+      <circle cx="4" cy="4" r="2.3" fill="#90b6df" opacity=".42"/>
+    </pattern>
+    <filter id="softShadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="#4776a8" flood-opacity=".12"/>
+    </filter>
+  </defs>
+  <g fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M2030-170 2680 420 2288 828 1780 358Z" fill="url(#ribbon)" stroke="#c9ddf2" stroke-opacity=".44" stroke-width="2"/>
+    <path d="M2280-130 2740 286 2390 652 1970 255Z" fill="url(#ribbonSoft)" stroke="#d3e4f5" stroke-opacity=".55" stroke-width="2"/>
+    <path d="M1635 1535 2410 740 2720 1055 2240 1535Z" fill="url(#ribbon)" stroke="#c9ddf2" stroke-opacity=".4" stroke-width="2"/>
+    <path d="M1870 1535 2525 860 2730 1074 2280 1535Z" fill="url(#ribbonSoft)" stroke="#d3e4f5" stroke-opacity=".48" stroke-width="2"/>
+    <path d="M-170 1240 160 1570 560 1570 92 1102Z" fill="url(#ribbonSoft)" stroke="#d7e5f3" stroke-opacity=".55" stroke-width="2"/>
+  </g>
+  <g opacity=".72" fill="none" stroke="#a9c7e6" stroke-width="3">
+    <path d="M2176 310v223M2176 533c0 92-84 107-84 204M2176 533c0 92 88 107 88 204M2092 737c0 87 72 103 72 196M2264 737c0 87-100 103-100 196M2164 933c0 112-82 127-82 237"/>
+    <g fill="#7ca9d6" stroke="none"><circle cx="2176" cy="533" r="10"/><circle cx="2092" cy="737" r="10"/><circle cx="2264" cy="737" r="10"/><circle cx="2164" cy="933" r="10"/></g>
+  </g>
+  <g filter="url(#softShadow)" fill="none" stroke="#5f92c4" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <g transform="translate(2078 205)"><circle cx="98" cy="98" r="86" fill="#fff" fill-opacity=".82" stroke="#bdd5ed" stroke-width="3"/><g transform="translate(55 48)"><rect width="65" height="82" rx="6"/><path d="M16 19h32M16 34h25M16 49h31M16 64h20"/><ellipse cx="69" cy="68" rx="22" ry="9" fill="#fff"/><path d="M47 68v25c0 5 10 9 22 9s22-4 22-9V68M47 80c0 5 10 9 22 9s22-4 22-9"/></g></g>
+    <g transform="translate(2172 660)"><circle cx="92" cy="92" r="80" fill="#fff" fill-opacity=".82" stroke="#bdd5ed" stroke-width="3"/><g transform="translate(50 48)"><path d="m42 0 42 21-42 21L0 21 42 0Z"/><path d="M0 21v49l42 22 42-22V21M42 42v50"/></g></g>
+    <g transform="translate(2072 895)"><circle cx="92" cy="92" r="80" fill="#fff" fill-opacity=".82" stroke="#bdd5ed" stroke-width="3"/><g transform="translate(44 48)"><circle cx="48" cy="23" r="17"/><circle cx="18" cy="32" r="13"/><circle cx="78" cy="32" r="13"/><path d="M20 84V72c0-18 13-31 28-31s28 13 28 31v12M0 78V68c0-13 8-23 20-25M96 78V68c0-13-8-23-20-25"/></g></g>
+    <g transform="translate(1990 1112)"><circle cx="92" cy="92" r="80" fill="#fff" fill-opacity=".82" stroke="#bdd5ed" stroke-width="3"/><g transform="translate(43 54)"><path d="M8 25h82L82 0H16L8 25Z"/><path d="M14 25v58h70V25M31 83V52h36v31"/><path d="M8 25c0 12 17 12 17 0 0 12 17 12 17 0 0 12 17 12 17 0 0 12 17 12 17 0 0 12 17 12 17 0"/></g></g>
+  </g>
+  <g opacity=".66" fill="url(#dots)"><rect x="1930" y="390" width="150" height="96"/><rect x="2322" y="542" width="150" height="96"/><rect x="1450" y="1190" width="150" height="96"/><rect x="2180" y="1300" width="150" height="96"/><rect x="260" y="1240" width="150" height="96"/></g>
+  <g fill="none" stroke="#b7cde4" stroke-width="3" opacity=".65"><rect x="126" y="1182" width="30" height="30"/><rect x="540" y="1320" width="45" height="45"/><rect x="1510" y="1258" width="42" height="42"/><rect x="2440" y="136" width="30" height="30"/></g>
+  <g fill="#f4c430" opacity=".78"><circle cx="150" cy="1325" r="7"/><circle cx="2358" cy="980" r="8"/><circle cx="2240" cy="185" r="6"/><circle cx="2460" cy="1270" r="7"/></g>
+</svg>

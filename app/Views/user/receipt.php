@@ -27,7 +27,7 @@
 
 <?= $this->section('scripts') ?>
 <script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260821a"></script>
-<script>
+<script {csp-script-nonce}>
     (async function () {
         const transactionId = <?= (int) ($transaction_id ?? 0) ?>;
         const resultEl = document.getElementById("user-receipt-page-result");

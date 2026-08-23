@@ -43,7 +43,8 @@
     position: relative;
 }
 
-.field label {
+.field label,
+.field > .field-label {
     font-size: 0.82rem;
     color: #64748b;
     font-weight: 600;
@@ -645,12 +646,23 @@ body.admin-stores-modal-open {
 
 .store-logo-input-grid {
     display: grid;
-    grid-template-columns: minmax(170px, 0.65fr) minmax(260px, 1.35fr);
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     gap: 10px;
+    align-items: end;
 }
 
-.store-logo-input-grid > :is(div, .ui-select) {
+.store-logo-input-grid > :is(div, .ui-select),
+.store-logo-control {
     min-width: 0;
+}
+
+.store-logo-control {
+    display: grid;
+    gap: 6px;
+}
+
+.store-logo-control > label {
+    min-height: 1.1rem;
 }
 
 .store-logo-input-grid input {

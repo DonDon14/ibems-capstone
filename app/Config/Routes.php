@@ -10,7 +10,6 @@ $routes->get('healthz', 'PageController::health');
 
 $routes->post('auth/login', 'AuthController::login');
 $routes->post('auth/logout', 'AuthController::logout');
-$routes->get('auth/logout', 'AuthController::logout');
 $routes->get('auth/me', 'AuthController::me');
 $routes->get('auth/select-role', 'AuthController::selectRolePage');
 $routes->post('auth/select-role', 'AuthController::selectRole');
@@ -55,6 +54,9 @@ $routes->get('admin/stores/officers', 'AdminController::officers', ['filter' => 
 $routes->post('admin/stores/create', 'AdminController::createStore', ['filter' => 'access:system.manage']);
 $routes->post('admin/stores/update', 'AdminController::updateStore', ['filter' => 'access:system.manage']);
 $routes->post('admin/stores/toggle-status', 'AdminController::toggleStoreStatus', ['filter' => 'access:system.manage']);
+$routes->get('admin/departments', 'DepartmentDebtController::adminPage', ['filter' => 'access:system.manage']);
+$routes->get('admin/departments/data', 'DepartmentDebtController::adminData', ['filter' => 'access:system.manage']);
+$routes->post('admin/departments/save', 'DepartmentDebtController::saveDepartment', ['filter' => 'access:system.manage']);
 
 $routes->get('store-admin', 'StoreAdminController::dashboard', ['filter' => 'access:store.review_assigned']);
 $routes->get('store-admin/dashboard', 'StoreAdminController::dashboard', ['filter' => 'access:store.review_assigned']);
@@ -103,6 +105,7 @@ $routes->post('store/cash-movements/create', 'StoreController::createCashMovemen
 $routes->post('store/debt-repayments/create', 'StoreController::createDebtRepayment', ['filter' => 'access:store.operate']);
 $routes->get('store/reports/summary', 'StoreController::reportSummary', ['filter' => 'access:store.inspect']);
 $routes->get('store/debt-customers', 'StoreController::debtCustomers', ['filter' => 'access:store.inspect']);
+$routes->get('store/department-debt-accounts', 'DepartmentDebtController::storeData', ['filter' => 'access:store.inspect']);
 $routes->get('store/transactions', 'StoreController::transactions', ['filter' => 'access:store.inspect']);
 $routes->get('store/staff-transactions', 'StoreController::staffTransactions', ['filter' => 'access:store.inspect']);
 $routes->get('store/transactions/(:num)', 'StoreController::transactionDetails/$1', ['filter' => 'access:store.inspect']);
@@ -128,6 +131,9 @@ $routes->get('user/transactions', 'UserController::transactions', ['filter' => '
 $routes->get('user/transactions/(:num)', 'UserController::transactionDetails/$1', ['filter' => 'access:user.self']);
 $routes->get('user/receipt/(:num)', 'UserController::receiptPage/$1', ['filter' => 'access:user.self']);
 $routes->get('user/cashbook', 'UserController::cashbook', ['filter' => 'access:user.self']);
+$routes->get('user/department-authorizations', 'DepartmentDebtController::userPage', ['filter' => 'access:user.self']);
+$routes->get('user/department-authorizations/data', 'DepartmentDebtController::userData', ['filter' => 'access:user.self']);
+$routes->post('user/department-authorizations/pin', 'DepartmentDebtController::setPin', ['filter' => 'access:user.self']);
 
 $routes->get('accounting/dashboard', 'AccountingController::dashboard', ['filter' => 'access:accounting.inspect']);
 $routes->get('accounting/dashboard/data', 'AccountingController::dashboardData', ['filter' => 'access:accounting.inspect']);
@@ -154,3 +160,7 @@ $routes->get('accounting/settlement/runs/(:num)', 'AccountingController::settlem
 $routes->post('accounting/debts/preview-csv', 'AccountingController::previewImportCsv', ['filter' => 'access:accounting.inspect']);
 $routes->post('accounting/debts/import-csv', 'AccountingController::importCsv', ['filter' => 'access:accounting.operate']);
 $routes->post('accounting/debts/financial-profile', 'AccountingController::updateFinancialProfile', ['filter' => 'access:accounting.operate']);
+$routes->get('accounting/department-debts', 'DepartmentDebtController::accountingPage', ['filter' => 'access:accounting.inspect']);
+$routes->get('accounting/department-debts/data', 'DepartmentDebtController::accountingData', ['filter' => 'access:accounting.inspect']);
+$routes->post('accounting/department-debts/allocation', 'DepartmentDebtController::setAllocation', ['filter' => 'access:accounting.operate']);
+$routes->post('accounting/department-debts/settlement', 'DepartmentDebtController::recordSettlement', ['filter' => 'access:accounting.operate']);

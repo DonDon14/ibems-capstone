@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/admin') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/admin-stores.css') ?>?v=20260821f">
+<link rel="stylesheet" href="<?= base_url('assets/css/admin-stores.css') ?>?v=20260824a">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -79,14 +79,20 @@
                         <input id="store-name" type="text" placeholder="Enter a clear store name">
                     </div>
                     <div class="field store-logo-field">
-                        <label for="store-logo-source">Store Logo <span class="optional-label">Optional</span></label>
+                        <span class="field-label">Store Logo <span class="optional-label">Optional</span></span>
                         <div class="store-logo-input-grid">
-                            <select id="store-logo-source" aria-label="Store logo source">
-                                <option value="upload">Upload File</option>
-                                <option value="url">Use Image URL</option>
-                            </select>
-                            <div id="store-logo-upload-wrap"><input id="store-logo-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></div>
-                            <div class="is-hidden" id="store-logo-url-wrap"><input id="store-logo-url" type="url" placeholder="https://..."></div>
+                            <div class="store-logo-control">
+                                <label for="store-logo-source">Logo source</label>
+                                <select id="store-logo-source" aria-label="Store logo source">
+                                    <option value="upload">Upload File</option>
+                                    <option value="url">Use Image URL</option>
+                                </select>
+                            </div>
+                            <div id="store-logo-upload-wrap" class="store-logo-control">
+                                <label for="store-logo-file">Logo file</label>
+                                <input id="store-logo-file" type="file" accept="image/png,image/jpeg,image/webp,image/gif">
+                            </div>
+                            <div class="store-logo-control is-hidden" id="store-logo-url-wrap"><label for="store-logo-url">Image URL</label><input id="store-logo-url" type="url" placeholder="https://..."></div>
                         </div>
                         <div class="store-logo-preview-box">
                             <img id="store-logo-preview" alt="Store logo preview" class="is-hidden">
@@ -104,9 +110,13 @@
                 <div class="form-grid">
                     <div class="field store-officer-field">
                         <label for="store-officer-search">Primary Store Officer</label>
-                        <div id="store-officer-picker" class="people-picker" data-selection-mode="single">
-                            <div id="store-officer-selected" class="people-picker-values"></div>
-                            <input id="store-officer-search" type="search" role="combobox" autocomplete="off" aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false" aria-controls="store-officer-suggestions" placeholder="Search name, email, or employee ID">
+                        <div id="store-officer-summary" class="assignment-summary"></div>
+                        <div id="store-officer-editor" class="assignment-editor is-hidden">
+                            <div id="store-officer-picker" class="people-picker" data-selection-mode="single">
+                                <div id="store-officer-selected" class="people-picker-values"></div>
+                                <input id="store-officer-search" type="search" role="combobox" autocomplete="off" aria-label="Search primary store officer" aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false" aria-controls="store-officer-suggestions" placeholder="Search name, email, or employee ID">
+                            </div>
+                            <button id="store-officer-change-done" class="secondary-btn assignment-done" type="button">Done</button>
                         </div>
                         <input id="store-officer-id" type="hidden">
                         <div id="store-officer-suggestions" class="officer-suggestions is-hidden" role="listbox" aria-label="Store officer suggestions"></div>
@@ -114,9 +124,13 @@
                     </div>
                     <div class="field store-supervisors-field">
                         <label for="store-supervisor-search">Store Supervisors</label>
-                        <div id="store-supervisor-picker" class="people-picker" data-selection-mode="multiple">
-                            <div id="store-supervisor-selected" class="people-picker-values"></div>
-                            <input id="store-supervisor-search" type="search" role="combobox" autocomplete="off" aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false" aria-controls="store-supervisor-suggestions" placeholder="Search and add one or more supervisors">
+                        <div id="store-supervisor-summary" class="assignment-summary assignment-summary-list"></div>
+                        <div id="store-supervisor-editor" class="assignment-editor is-hidden">
+                            <div id="store-supervisor-picker" class="people-picker" data-selection-mode="multiple">
+                                <div id="store-supervisor-selected" class="people-picker-values"></div>
+                                <input id="store-supervisor-search" type="search" role="combobox" autocomplete="off" aria-label="Search store supervisors" aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false" aria-controls="store-supervisor-suggestions" placeholder="Search and add one or more supervisors">
+                            </div>
+                            <button id="store-supervisor-change-done" class="secondary-btn assignment-done" type="button">Done</button>
                         </div>
                         <div id="store-supervisor-suggestions" class="officer-suggestions is-hidden" role="listbox" aria-multiselectable="true" aria-label="Store supervisor suggestions"></div>
                         <small class="field-help">At least one supervisor is required before activation.</small>
@@ -156,5 +170,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/admin-stores.js') ?>?v=20260822a"></script>
+<script src="<?= base_url('assets/js/admin-stores.js') ?>?v=20260824b"></script>
 <?= $this->endSection() ?>

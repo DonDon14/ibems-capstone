@@ -15,6 +15,7 @@ final class AccountingDebtEndpointTest extends CIUnitTestCase
     {
         $view = file_get_contents(APPPATH . 'Views/accounting/debts.php');
         $script = file_get_contents(FCPATH . 'assets/js/accounting-debts.js');
+        $styles = file_get_contents(FCPATH . 'assets/css/accounting-debts.css');
 
         $this->assertStringContainsString('workflow-candidate-search', $view);
         $this->assertStringContainsString('workflow-candidate-type', $view);
@@ -23,13 +24,14 @@ final class AccountingDebtEndpointTest extends CIUnitTestCase
         $this->assertStringContainsString('workflow-employees-modal', $view);
         $this->assertStringContainsString('workflow-summary-employees', $view);
         $this->assertStringContainsString('max-h-[65vh]', $view);
-        $this->assertStringContainsString('grid-template-columns: 18px minmax(320px, 1fr) 180px 240px', $view);
-        $this->assertStringContainsString('.workflow-preparation-reason', $view);
-        $this->assertStringContainsString('z-index: 1350', $view);
+        $this->assertStringContainsString('grid-template-columns: 18px minmax(320px, 1fr) 180px 240px', $styles);
+        $this->assertStringContainsString('.workflow-preparation-reason', $styles);
+        $this->assertStringContainsString('z-index: 1350', $styles);
         $this->assertStringContainsString('function filterWorkflowCandidates()', $script);
         $this->assertStringContainsString('amount.readOnly = choice.value === "full"', $script);
         $this->assertStringContainsString('No deduction requires a reason', $script);
         $this->assertStringContainsString('data-workflow-batch-action="apply"', $script);
+        $this->assertStringContainsString('getElementById("close-deduction-workflow")?.addEventListener', $script);
         $this->assertStringNotContainsString('workflow-confirmed-amount', $script);
     }
 

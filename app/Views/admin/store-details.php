@@ -117,5 +117,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/admin-store-details.js') ?>"></script>
+<script src="<?= base_url('assets/js/admin-store-details.js') ?>?v=20260824a"></script>
 <?= $this->endSection() ?>

@@ -12,7 +12,7 @@ final class PosPaymentSelectorTest extends TestCase
 
         $this->assertStringContainsString('class="payment-selector"', $view);
         $this->assertStringContainsString('function isAccountPaymentMethod', $js);
-        $this->assertStringContainsString('Charge to employee account', $js);
+        $this->assertStringContainsString('Charge to employee or department account', $js);
         $this->assertStringContainsString('requiresCheckoutCustomer(paymentMethod)', $js);
         $this->assertStringContainsString('secondary-btn payment-method-option', $js);
         $this->assertStringContainsString('aria-pressed=', $js);

@@ -9,7 +9,7 @@
     <meta name="csrf-header-name" content="<?= esc(config('Security')->headerName) ?>">
     <meta name="csrf-cookie-name" content="<?= esc(config('Security')->cookieName) ?>">
     <title>Select Role</title>
-    <script>
+    <script {csp-script-nonce}>
     (function () {
         var saved = localStorage.getItem('ibems-theme');
         var theme = saved === 'dark' || saved === 'light' ? saved : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
@@ -18,38 +18,91 @@
     </script>
     <link rel="icon" type="image/png" href="<?= base_url('assets/images/ibems-logo.png') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.css') ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/css/auth-login.css') ?>?v=20260823c">
+    <link rel="stylesheet" href="<?= base_url('assets/css/auth-login.css') ?>?v=20260823f">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 </head>
-<body class="auth-modern">
+<body class="auth-modern auth-role-selection">
 <?php $ibemsLogoUrl = base_url('assets/images/ibems-logo.png'); ?>
     <button id="theme-toggle" class="auth-theme-toggle" type="button" aria-label="Use dark mode" title="Use dark mode" aria-pressed="false">
         <i class="bi bi-moon-stars" aria-hidden="true"></i>
     </button>
     <main class="auth-shell">
-        <section class="auth-panel auth-panel-form">
+        <section class="auth-panel auth-panel-form auth-role-panel">
             <div class="auth-mark">
                 <img src="<?= esc($ibemsLogoUrl) ?>" alt="IBEMS logo" class="auth-mark-logo">
             </div>
             <h1>Select Portal</h1>
             <p>Choose which role to use for this session.</p>
 
-            <div id="role-options" class="auth-role-list">
-                <?php foreach (ibems_available_roles() as $availableRole): ?>
+            <?php
+            $rolePresentation = [
+                'ADMIN' => [
+                    'label' => 'Admin',
+                    'description' => 'Manage school-wide operations, users, stores, and audit activity.',
+                    'icon' => 'bi-shield-check',
+                ],
+                'STORE_SYSTEM' => [
+                    'label' => 'Store Officer',
+                    'description' => 'Run store operations, inventory, sales, and assigned staff.',
+                    'icon' => 'bi-shop-window',
+                ],
+                'STORE_SUPERVISOR' => [
+                    'label' => 'Store Supervisor',
+                    'description' => 'Oversee assigned stores, staff activity, and operational reports.',
+                    'icon' => 'bi-diagram-3',
+                ],
+                'ACCOUNTING_OFFICE' => [
+                    'label' => 'Accounting Office',
+                    'description' => 'Monitor employee debt, deductions, and payroll records.',
+                    'icon' => 'bi-calculator',
+                ],
+                'USER' => [
+                    'label' => 'User',
+                    'description' => 'Shop products, review purchases, and manage your account.',
+                    'icon' => 'bi-person',
+                ],
+            ];
+            ?>
+            <div id="role-options" class="auth-role-list" role="group" aria-label="Available portals">
+                <?php foreach (($availableRoles ?? ibems_available_roles()) as $availableRole): ?>
                     <?php
                     $roleKey = strtoupper((string) $availableRole);
-                    $roleLabels = [
-                        'ADMIN' => 'Admin',
-                        'STORE_SYSTEM' => 'Store Officer',
-                        'STORE_SUPERVISOR' => 'Store Supervisor',
-                        'ACCOUNTING_OFFICE' => 'Accounting Office',
-                        'USER' => 'User',
+                    $portal = $rolePresentation[$roleKey] ?? [
+                        'label' => ucwords(strtolower(str_replace('_', ' ', $roleKey))),
+                        'description' => 'Open this assigned IBEMS portal.',
+                        'icon' => 'bi-grid',
                     ];
+                    $assignedStores = array_values(array_filter(
+                        (array) (($roleStores ?? [])[$roleKey] ?? []),
+                        static fn ($store): bool => is_array($store) && trim((string) ($store['store_name'] ?? '')) !== ''
+                    ));
+                    $storeCount = count($assignedStores);
+                    $storeNames = array_map(static fn (array $store): string => trim((string) $store['store_name']), $assignedStores);
+                    $visibleStoreNames = array_slice($storeNames, 0, 2);
+                    $remainingStoreCount = max(0, $storeCount - count($visibleStoreNames));
+                    $storeContext = $storeCount === 1
+                        ? $storeNames[0]
+                        : ($storeCount > 1
+                            ? $storeCount . ' assigned stores: ' . implode(', ', $visibleStoreNames) . ($remainingStoreCount > 0 ? ' +' . $remainingStoreCount . ' more' : '')
+                            : '');
                     ?>
                     <form method="post" action="<?= site_url('auth/select-role') ?>" class="auth-role-form">
                         <?= csrf_field() ?>
                         <button type="submit" class="auth-role-btn" name="role" value="<?= esc($roleKey) ?>">
-                            <span><?= esc($roleLabels[$roleKey] ?? str_replace('_', ' ', $roleKey)) ?></span>
+                            <span class="auth-role-icon" aria-hidden="true">
+                                <i class="bi <?= esc($portal['icon']) ?>"></i>
+                            </span>
+                            <span class="auth-role-copy">
+                                <strong><?= esc($portal['label']) ?></strong>
+                                <small><?= esc($portal['description']) ?></small>
+                                <?php if ($storeContext !== ''): ?>
+                                    <span class="auth-role-meta">
+                                        <i class="bi bi-building" aria-hidden="true"></i>
+                                        <span><?= esc($storeContext) ?></span>
+                                    </span>
+                                <?php endif; ?>
+                            </span>
+                            <i class="bi bi-arrow-right auth-role-arrow" aria-hidden="true"></i>
                         </button>
                     </form>
                 <?php endforeach; ?>

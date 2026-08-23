@@ -1,11 +1,11 @@
 <?= $this->extend('layouts/accounting') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/accounting-debts.css') ?>?v=20260822c">
+<link rel="stylesheet" href="<?= base_url('assets/css/accounting-debts.css') ?>?v=20260823d">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
-<section class="acct-shell space-y-5"<?= !empty($deductionsPage) ? ' style="display:none" aria-hidden="true"' : '' ?>>
+<section class="accounting-debt-overview acct-shell space-y-5<?= !empty($deductionsPage) ? ' is-hidden' : '' ?>"<?= !empty($deductionsPage) ? ' aria-hidden="true"' : '' ?>>
     <?= view('components/page_header', [
         'eyebrow' => 'Financial controls',
         'title' => 'Accounting debt center',
@@ -456,22 +456,31 @@
                             <button id="workflow-close-employees" type="button" class="acct-modal-close" aria-label="Close employee deduction register"></button>
                         </div>
                         <div class="flex flex-wrap items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2">
-                        <input id="workflow-candidate-search" type="search" class="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm" placeholder="Search name or employee ID">
+                        <label class="flex min-w-56 flex-col gap-1 text-xs font-semibold text-slate-600" for="workflow-candidate-search">
+                            <span>Search employees</span>
+                            <input id="workflow-candidate-search" type="search" class="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm" placeholder="Name or employee ID">
+                        </label>
                         <button id="workflow-toggle-filters" type="button" class="secondary-btn" aria-expanded="false"><i class="bi bi-funnel"></i> Filters</button>
                         <button id="workflow-select-matching" type="button" class="secondary-btn">Select matching</button>
                         <button id="workflow-clear-selection" type="button" class="secondary-btn">Clear</button>
                     </div>
-                    <div id="workflow-filter-options" class="mt-2 flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-2" style="display:none">
-                            <select id="workflow-candidate-type" class="h-10 min-w-40 rounded-xl border border-slate-200 bg-white px-3 text-sm" aria-label="Filter employee type">
+                    <div id="workflow-filter-options" class="mt-2 flex flex-wrap gap-2 rounded-xl border border-slate-200 bg-white p-2" hidden>
+                        <label class="flex min-w-40 flex-col gap-1 text-xs font-semibold text-slate-600" for="workflow-candidate-type">
+                            <span>Employee type</span>
+                            <select id="workflow-candidate-type" class="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm">
                                 <option value="all">All employee types</option>
                                 <option value="faculty">Faculty</option>
                                 <option value="staff">Staff</option>
                             </select>
-                            <select id="workflow-candidate-salary" class="h-10 min-w-48 rounded-xl border border-slate-200 bg-white px-3 text-sm" aria-label="Filter salary reference">
+                        </label>
+                        <label class="flex min-w-48 flex-col gap-1 text-xs font-semibold text-slate-600" for="workflow-candidate-salary">
+                            <span>Salary reference</span>
+                            <select id="workflow-candidate-salary" class="h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm">
                                 <option value="all">Any salary reference</option>
                                 <option value="provided">Salary provided</option>
                                 <option value="missing">Salary not provided</option>
                             </select>
+                        </label>
                         </div>
                         <div class="mt-2 flex items-center justify-between gap-3"><div id="workflow-candidate-count" class="text-sm text-slate-500">No employees loaded.</div><button id="workflow-prepare-batch" type="button" class="primary-btn">Prepare selected batch</button></div>
                         <div id="workflow-candidates" class="mt-2 max-h-[65vh] space-y-2 overflow-auto pr-1"></div>
@@ -581,99 +590,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<?php if (!empty($deductionsPage)): ?>
-<style>
-    .deductions-page-shell {
-        display: block !important;
-        position: static !important;
-        inset: auto !important;
-        width: 100% !important;
-        min-height: 0 !important;
-        padding: 1.5rem !important;
-        overflow: visible !important;
-        background: transparent !important;
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
-        transform: none !important;
-        filter: none !important;
-        box-sizing: border-box;
-    }
-    .deductions-page-card {
-        width: 100% !important;
-        max-width: 1380px !important;
-        max-height: none !important;
-        margin: 0 auto !important;
-        padding: 0 !important;
-        overflow: visible !important;
-        border: 0 !important;
-        border-radius: 0 !important;
-        background: transparent !important;
-        box-shadow: none !important;
-        box-sizing: border-box;
-    }
-    .deductions-page-card > .page-header {
-        margin-bottom: 1.25rem;
-    }
-    .deductions-page-card > .grid {
-        min-width: 0;
-    }
-    body #workflow-employees-modal {
-        position: fixed !important;
-        inset: 0 !important;
-        width: 100vw !important;
-        height: 100dvh !important;
-        max-width: none !important;
-        margin: 0 !important;
-        padding: 14px !important;
-        /* Keep this below the body-portalled select menu (z-index 1400). */
-        z-index: 1350 !important;
-        background: rgba(15, 23, 42, .62) !important;
-        backdrop-filter: none !important;
-        -webkit-backdrop-filter: none !important;
-    }
-    body #workflow-employees-modal > .acct-modal-card {
-        width: min(1720px, calc(100vw - 28px)) !important;
-        height: min(94vh, 920px) !important;
-        max-height: calc(100dvh - 28px) !important;
-        display: flex;
-        flex-direction: column;
-    }
-    body #workflow-employees-modal #workflow-candidates {
-        flex: 1 1 auto;
-        max-height: none !important;
-        min-height: 0;
-    }
-    body #workflow-employees-modal .workflow-candidate {
-        display: grid !important;
-        grid-template-columns: 18px minmax(320px, 1fr) 180px 240px !important;
-        align-items: center !important;
-        column-gap: 10px !important;
-    }
-    body #workflow-employees-modal .workflow-candidate > .workflow-deduction-choice,
-    body #workflow-employees-modal .workflow-candidate > span:last-child,
-    body #workflow-employees-modal .workflow-candidate .workflow-request-amount,
-    body #workflow-employees-modal .workflow-candidate .workflow-preparation-reason {
-        width: 100% !important;
-        min-width: 0 !important;
-        max-width: 100% !important;
-        box-sizing: border-box !important;
-    }
-    @media (max-width: 900px) {
-        body #workflow-employees-modal .workflow-candidate {
-            grid-template-columns: 18px minmax(0, 1fr) !important;
-        }
-        body #workflow-employees-modal .workflow-candidate > .workflow-deduction-choice,
-        body #workflow-employees-modal .workflow-candidate > span:last-child {
-            grid-column: 2;
-        }
-    }
-    @media (max-width: 1279px) {
-        .deductions-page-card > .grid {
-            grid-template-columns: minmax(0, 1fr) !important;
-        }
-    }
-</style>
-<?php endif; ?>
-<script>window.IBEMS_DEDUCTIONS_PAGE = <?= !empty($deductionsPage) ? 'true' : 'false' ?>;</script>
-<script src="<?= base_url('assets/js/accounting-debts.js') ?>?v=20260822e"></script>
+<script src="<?= base_url('assets/js/accounting-debts.js') ?>?v=20260824g"></script>
 <?= $this->endSection() ?>

@@ -23,6 +23,8 @@ class IbemsScenario15Days extends BaseCommand
             CLI::write('Scenario already exists; running verification only.', 'yellow');
             $actors = $this->actors();
             $this->ensureSupervisorCoverage($this->storesWithOfficers($actors['admin']), $actors['admin']);
+            $customers = $this->customers();
+            $this->ensureScenarioEmployeeCompleteness($customers['employee'], $actors['admin']);
             $this->repairScenarioTimestamps();
             return $this->verify();
         }
@@ -33,6 +35,7 @@ class IbemsScenario15Days extends BaseCommand
             $stores = $this->storesWithOfficers($actors['admin']);
             $this->ensureSupervisorCoverage($stores, $actors['admin']);
             $customers = $this->customers();
+            $this->ensureScenarioEmployeeCompleteness($customers['employee'], $actors['admin']);
             $products = $this->products($stores);
             $this->simulateDays($stores, $products, $customers['employee']);
             $this->recordPinChanges($customers['employee']);
@@ -114,6 +117,34 @@ class IbemsScenario15Days extends BaseCommand
             $employee = $this->db->table('users')->where('id', $employeeId)->get()->getRowArray();
         }
         return ['employee' => (int) $employee['id']];
+    }
+
+    private function ensureScenarioEmployeeCompleteness(int $userId, int $adminId): void
+    {
+        if ($this->db->table('user_roles')->where(['user_id' => $userId, 'role' => 'USER'])->countAllResults() === 0) {
+            $this->db->table('user_roles')->insert([
+                'user_id' => $userId,
+                'role' => 'USER',
+                'created_at' => '2026-07-14 08:05:00',
+                'updated_at' => '2026-07-14 08:05:00',
+            ]);
+        }
+        if ($this->db->table('balances')->where('user_id', $userId)->countAllResults() === 0) {
+            $this->db->table('balances')->insert([
+                'user_id' => $userId,
+                'credit_limit' => 1000,
+                'current_debt' => 0,
+                'updated_at' => '2026-07-14 08:05:00',
+            ]);
+        }
+        if ($this->db->table('audit_logs')->where('action', 'ADMIN_CREATE_USER')->where('entity', 'users')->where('entity_id', $userId)->like('payload_json', self::PREFIX)->countAllResults() === 0) {
+            $this->audit($adminId, 'ADMIN_CREATE_USER', 'users', $userId, [
+                'scenario' => self::PREFIX,
+                'employee_id' => 'SCN15-EMP-001',
+                'roles' => ['USER'],
+                'initial_credit_limit' => 1000,
+            ], '2026-07-14 08:05:00');
+        }
     }
 
     private function ensureSupervisorCoverage(array $stores, int $adminId): void
@@ -411,6 +442,14 @@ class IbemsScenario15Days extends BaseCommand
         $rejections = $this->db->table('audit_logs')->where('action', 'REJECT_CREDIT_LIMIT_EXCEEDED')->like('payload_json', self::PREFIX)->countAllResults();
         $period = $this->db->table('deduction_periods')->where('period_code', self::PREFIX)->get()->getRowArray();
         $investigation = $this->db->table('debt_investigations')->like('summary', 'scenario')->get()->getRowArray();
+        $employee = $this->db->table('users')->where('employee_id', 'SCN15-EMP-001')->get()->getRowArray();
+        $employeeId = (int) ($employee['id'] ?? 0);
+        $employeeRole = $employeeId > 0 ? $this->db->table('user_roles')->where(['user_id' => $employeeId, 'role' => 'USER'])->countAllResults() : 0;
+        $employeeAudit = $employeeId > 0 ? $this->db->table('audit_logs')->where('action', 'ADMIN_CREATE_USER')->where('entity_id', $employeeId)->like('payload_json', self::PREFIX)->countAllResults() : 0;
+        $employeeBalance = $employeeId > 0 ? $this->db->table('balances')->where('user_id', $employeeId)->get()->getRowArray() : null;
+        $latestCashbook = $employeeId > 0 ? $this->db->table('debt_cashbook_entries')->where('user_id', $employeeId)->orderBy('created_at', 'DESC')->orderBy('id', 'DESC')->get(1)->getRowArray() : null;
+        $transactionItems = $this->db->table('transaction_items ti')->join('transactions t', 't.id = ti.transaction_id')->like('t.client_txn_id', self::PREFIX, 'after')->countAllResults();
+        $inventoryMovements = $this->db->table('inventory_movements im')->join('transactions t', 't.id = im.txn_id')->like('t.client_txn_id', self::PREFIX, 'after')->countAllResults();
         $timestampRows = $this->db->table('transactions t')
             ->select('t.created_at AS transaction_created_at, ti.created_at AS item_created_at, im.created_at AS movement_created_at')
             ->join('transaction_items ti', 'ti.transaction_id = t.id', 'inner')
@@ -428,6 +467,7 @@ class IbemsScenario15Days extends BaseCommand
         }
         $checks = [
             'all stores covered for 15 days' => $sessions === $stores * 15 && (int) ($coveredStores['total'] ?? 0) === $stores,
+            'scenario employee has user, role, balance, and creation audit' => $employeeId > 0 && $employeeRole === 1 && $employeeAudit === 1 && $employeeBalance !== null,
             'every store has a scenario product' => $scenarioProducts === $stores,
             'every store has supervisor coverage' => (int) ($coveredSupervisorStores['total'] ?? 0) === $stores,
             'cash and debt transactions recorded' => $transactions >= ($stores * 15) + 12,
@@ -436,6 +476,8 @@ class IbemsScenario15Days extends BaseCommand
             'salary period finalized' => ($period['status'] ?? '') === 'finalized',
             'investigation independently approved' => $investigation && (int) $investigation['recommended_by'] !== (int) $investigation['approved_by'],
             'transaction timestamps agree across inventory records' => $timestampsMatch,
+            'every scenario transaction has item and stock movement records' => $transactionItems === $transactions && $inventoryMovements === $transactions,
+            'employee balance matches latest append-only cashbook state' => $latestCashbook && abs((float) ($employeeBalance['current_debt'] ?? -1) - (float) ($latestCashbook['debt_after'] ?? -2)) < 0.001,
         ];
         foreach ($checks as $label => $ok) {
             CLI::write(($ok ? '[OK] ' : '[FAIL] ') . $label, $ok ? 'green' : 'red');

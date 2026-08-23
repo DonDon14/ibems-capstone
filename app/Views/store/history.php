@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/store') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/store-history.css') ?>?v=20260821c">
+<link rel="stylesheet" href="<?= base_url('assets/css/store-history.css') ?>?v=20260823d">
 <link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20260821b">
 <?= $this->endSection() ?>
 

@@ -26,13 +26,13 @@ class IbemsBrandIdentityTest extends TestCase
 
     public function testSharedPortalUsesOptimizedIbemsBackground(): void
     {
-        $backgroundPath = FCPATH . 'assets/images/ibems-app-background.jpg';
+        $backgroundPath = FCPATH . 'assets/images/ibems-app-background.svg';
         $modernUi = (string) file_get_contents(FCPATH . 'assets/css/modern-ui.css');
 
         $this->assertFileExists($backgroundPath);
-        $this->assertSame('image/jpeg', mime_content_type($backgroundPath));
-        $this->assertLessThan(150000, filesize($backgroundPath));
-        $this->assertStringContainsString("url('../images/ibems-app-background.jpg')", $modernUi);
+        $this->assertSame('image/svg+xml', mime_content_type($backgroundPath));
+        $this->assertLessThan(10000, filesize($backgroundPath));
+        $this->assertStringContainsString("url('../images/ibems-app-background.svg?v=20260823a')", $modernUi);
         $this->assertStringContainsString('background-attachment: scroll, fixed', $modernUi);
     }
 }

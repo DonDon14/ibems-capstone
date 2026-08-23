@@ -39,12 +39,12 @@ class NotificationService
         $event = $this->formatEvent($action, $payload, $storeId);
         $createdAt = (string) ($audit['created_at'] ?? date('Y-m-d H:i:s'));
         $transactionId = $entity === 'transactions' ? $entityId : (int) ($payload['transaction_id'] ?? 0);
-        $model = new NotificationModel();
+        $model = new NotificationModel($this->db);
         $inserted = 0;
 
         foreach ($recipients as $recipient) {
             $userId = (int) $recipient['id'];
-            $link = $this->recipientLink((array) $recipient['roles'], $event['category'], $transactionId);
+            $link = $this->recipientLink((array) $recipient['roles'], $event['category'], $transactionId, $payload, $userId);
             $ok = $model->insert([
                 'user_id' => $userId,
                 'txn_id' => $transactionId > 0 ? $transactionId : null,
@@ -78,7 +78,7 @@ class NotificationService
             return ['unread_count' => 0, 'notifications' => []];
         }
 
-        $model = new NotificationModel();
+        $model = new NotificationModel($this->db);
         $rows = $model->where('user_id', $userId)
             ->orderBy('created_at', 'DESC')->orderBy('id', 'DESC')
             ->findAll(max(1, min(30, $limit)));
@@ -207,24 +207,33 @@ class NotificationService
         foreach ($users as &$user) $user['roles'] = array_values(array_unique($user['roles']));
         unset($user);
 
+        // The notification center is deliberately a governance/personal feed:
+        // administrators receive oversight events, while users only receive
+        // events that affect their own account or a department they manage.
+        // Accounting and store roles already have authoritative work queues and
+        // dashboards; duplicating every audit event there creates alert noise.
         $wanted = [];
         foreach ($users as $id => $user) {
             if (in_array('ADMIN', $user['roles'], true)) $wanted[$id] = true;
-            if ($this->isFinancialEvent($entity, $action) && in_array('ACCOUNTING_OFFICE', $user['roles'], true)) $wanted[$id] = true;
         }
 
-        $affectedUserId = (int) ($payload['customer_user_id'] ?? $payload['user_id'] ?? $payload['target_user_id'] ?? 0);
-        if ($affectedUserId <= 0 && in_array($entity, ['users', 'balances', 'user_balances', 'debt_cashbook'], true)) $affectedUserId = $entityId;
-        if ($affectedUserId > 0) $wanted[$affectedUserId] = true;
+        $affectedUserIds = [];
+        foreach (['customer_user_id', 'user_id', 'target_user_id', 'department_requester_user_id', 'department_approver_user_id', 'approver_user_id'] as $key) {
+            $candidate = (int) ($payload[$key] ?? 0);
+            if ($candidate > 0) $affectedUserIds[$candidate] = true;
+        }
+        if ($affectedUserIds === [] && in_array($entity, ['users', 'balances', 'user_balances', 'debt_cashbook'], true) && $entityId > 0) {
+            $affectedUserIds[$entityId] = true;
+        }
 
-        if ($storeId > 0) {
-            $store = $this->db->table('stores')->select('officer_id')->where('id', $storeId)->get()->getRowArray();
-            if ((int) ($store['officer_id'] ?? 0) > 0) $wanted[(int) $store['officer_id']] = true;
-            if ($this->db->tableExists('store_supervisors')) {
-                foreach ($this->db->table('store_supervisors')->select('user_id')->where('store_id', $storeId)->get()->getResultArray() as $row) {
-                    $wanted[(int) $row['user_id']] = true;
-                }
-            }
+        $departmentId = (int) ($payload['department_id'] ?? ($entity === 'departments' ? $entityId : 0));
+        if ($departmentId > 0 && in_array($action, ['ACCOUNTING_SET_DEPARTMENT_ALLOCATION', 'ACCOUNTING_RECORD_DEPARTMENT_SETTLEMENT'], true)) {
+            $department = $this->db->table('departments')->select('head_user_id')->where('id', $departmentId)->get()->getRowArray();
+            if ((int) ($department['head_user_id'] ?? 0) > 0) $affectedUserIds[(int) $department['head_user_id']] = true;
+        }
+
+        foreach (array_keys($affectedUserIds) as $id) {
+            if (isset($users[$id]) && in_array('USER', $users[$id]['roles'], true)) $wanted[$id] = true;
         }
 
         unset($wanted[$actorId]);
@@ -262,9 +271,25 @@ class NotificationService
             $storeName = (string) ($storeRow['store_name'] ?? '');
         }
         if ($action === 'CREATE_TRANSACTION') {
-            return ['category' => 'transaction', 'title' => 'Transaction completed',
-                'message' => trim(($amount > 0 ? 'PHP ' . number_format($amount, 2) . ' transaction' : 'A transaction') . ($storeName !== '' ? ' at ' . $storeName : '') . ' was recorded.'),
+            $isDepartmentCharge = (string) ($payload['debt_account_type'] ?? '') === 'department';
+            return ['category' => 'transaction', 'title' => $isDepartmentCharge ? 'Department charge recorded' : 'Transaction completed',
+                'message' => trim(($amount > 0 ? 'PHP ' . number_format($amount, 2) : 'A') . ($isDepartmentCharge ? ' department charge' : ' transaction') . ($storeName !== '' ? ' at ' . $storeName : '') . ' was recorded.'),
                 'icon' => 'bi bi-receipt', 'severity' => 'success'];
+        }
+        if ($action === 'ACCOUNTING_SET_DEPARTMENT_ALLOCATION') {
+            return ['category' => 'department', 'title' => 'Department allocation updated',
+                'message' => 'Accounting updated a monthly department debt allocation.',
+                'icon' => 'bi bi-buildings', 'severity' => 'info'];
+        }
+        if ($action === 'ACCOUNTING_RECORD_DEPARTMENT_SETTLEMENT') {
+            return ['category' => 'department', 'title' => 'Department settlement recorded',
+                'message' => 'Accounting recorded a payment against a department debt balance.',
+                'icon' => 'bi bi-cash-coin', 'severity' => 'success'];
+        }
+        if (in_array($action, ['FAILED_DEPARTMENT_PIN', 'DEPARTMENT_PIN_LOCKED', 'BLOCKED_DEPARTMENT_PIN', 'BLOCKED_DEPARTMENT_APPROVAL'], true)) {
+            return ['category' => 'security', 'title' => 'Department approval attempt',
+                'message' => 'A department charge approval attempt needs your attention.',
+                'icon' => 'bi bi-shield-exclamation', 'severity' => 'danger'];
         }
         $title = ucwords(strtolower(str_replace('_', ' ', $action)));
         return ['category' => $this->isFinancialEvent('', $action) ? 'financial' : 'activity', 'title' => $title,
@@ -273,12 +298,14 @@ class NotificationService
             'severity' => str_contains($action, 'FAIL') || str_contains($action, 'REJECT') ? 'danger' : 'info'];
     }
 
-    private function recipientLink(array $roles, string $category, int $transactionId): string
+    private function recipientLink(array $roles, string $category, int $transactionId, array $payload, int $userId): string
     {
         if (in_array('ADMIN', $roles, true)) return site_url('admin/audit');
-        if (in_array('ACCOUNTING_OFFICE', $roles, true)) return site_url('accounting/debts');
-        if (in_array('STORE_SUPERVISOR', $roles, true)) return site_url('store-admin/dashboard');
-        if (in_array('STORE_SYSTEM', $roles, true)) return site_url($category === 'transaction' ? 'store/history' : 'store/dashboard');
+        $departmentId = (int) ($payload['department_id'] ?? 0);
+        $departmentApproverId = (int) ($payload['department_approver_user_id'] ?? $payload['approver_user_id'] ?? 0);
+        if ($departmentId > 0 && ($category === 'department' || $category === 'security' || $departmentApproverId === $userId)) {
+            return site_url('user/department-authorizations');
+        }
         if ($transactionId > 0) return site_url('user/transactions/' . $transactionId);
         return site_url('user/dashboard');
     }

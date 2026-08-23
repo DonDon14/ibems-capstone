@@ -62,12 +62,15 @@ body.ibems-modern {
 }
 
 .ibems-modern .app-brand {
-    padding: 4px;
+    width: 100%;
+    flex: 0 0 auto;
+    padding: 3px;
     gap: 11px;
     border: 0;
     border-radius: 12px;
     background: transparent;
     box-shadow: none;
+    transition: width .24s cubic-bezier(.4, 0, .2, 1), gap .24s cubic-bezier(.4, 0, .2, 1);
 }
 
 .ibems-modern .app-brand-logo {
@@ -103,19 +106,11 @@ body.ibems-modern {
     gap: 5px;
 }
 
-.ibems-modern .app-menu::before {
-    content: "Workspace";
-    padding: 0 10px 7px;
-    color: #94a3b8;
-    font-family: "JetBrains Mono", ui-monospace, monospace;
-    font-size: 0.62rem;
-    font-weight: 600;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-}
-
 .ibems-modern .app-menu a {
-    min-height: 42px;
+    width: 100%;
+    margin-inline: 0;
+    height: 44px;
+    min-height: 44px;
     gap: 11px;
     padding: 9px 11px;
     color: #64748b;
@@ -123,7 +118,15 @@ body.ibems-modern {
     border-radius: 10px;
     font-size: 0.83rem;
     font-weight: 600;
-    transition: background-color 150ms, border-color 150ms, color 150ms, box-shadow 150ms;
+    transition:
+        width .24s cubic-bezier(.4, 0, .2, 1),
+        margin .24s cubic-bezier(.4, 0, .2, 1),
+        padding .24s cubic-bezier(.4, 0, .2, 1),
+        gap .24s cubic-bezier(.4, 0, .2, 1),
+        background-color 150ms,
+        border-color 150ms,
+        color 150ms,
+        box-shadow 150ms;
 }
 
 .ibems-modern .app-menu a i {
@@ -185,13 +188,15 @@ body.ibems-modern {
 }
 
 .ibems-modern .secondary-btn.sidebar-toggle-in-sidebar {
-    color: #2563eb;
+    color: #1d4ed8;
     border-color: #bfdbfe;
+    border-radius: 11px;
     background: #eff6ff;
+    box-shadow: 0 1px 2px rgba(37, 99, 235, .12);
 }
 
 .ibems-modern .secondary-btn.sidebar-toggle-in-sidebar:hover:not(:disabled) {
-    color: #1d4ed8;
+    color: #1e40af;
     border-color: #93c5fd;
     background: #dbeafe;
 }
@@ -212,15 +217,25 @@ body.ibems-modern {
 }
 
 .ibems-modern .app-shell.sidebar-collapsed .app-sidebar {
-    padding-inline: 10px;
-}
-
-.ibems-modern .app-shell.sidebar-collapsed .app-menu::before {
-    display: none;
+    padding-inline: 14px;
 }
 
 .ibems-modern .app-shell.sidebar-collapsed .app-sidebar-header {
-    min-height: 42px;
+    min-height: 52px;
+    justify-content: flex-start;
+}
+
+.ibems-modern .app-shell.sidebar-collapsed .app-brand {
+    width: 48px;
+    padding: 3px;
+    gap: 0;
+}
+
+.ibems-modern .app-shell.sidebar-collapsed .app-menu a {
+    justify-content: flex-start;
+    gap: 0;
+    margin-inline: 6px;
+    padding-inline: 12px;
 }
 
 .ibems-modern .app-shell.sidebar-collapsed .sidebar-toggle-in-sidebar {
@@ -319,8 +334,8 @@ body.ibems-modern {
     padding: clamp(20px, 3vw, 40px);
     background-color: #f8fafc;
     background-image:
-        linear-gradient(rgba(248, 250, 252, 0.18), rgba(248, 250, 252, 0.32)),
-        url('../images/ibems-app-background.jpg');
+        linear-gradient(rgba(248, 250, 252, 0.1), rgba(248, 250, 252, 0.2)),
+        url('../images/ibems-app-background.svg?v=20260823a');
     background-position: center;
     background-repeat: no-repeat;
     background-size: cover;
@@ -607,6 +622,12 @@ body.ibems-modern {
     cursor: pointer;
 }
 
+html[data-theme="dark"] .ibems-modern input[type="search"] {
+    background-image:
+        radial-gradient(circle at center, transparent 42%, #bfdbfe 46%, #bfdbfe 58%, transparent 62%),
+        linear-gradient(45deg, transparent 44%, #bfdbfe 46%, #bfdbfe 58%, transparent 60%);
+}
+
 .ibems-modern input[type="date"] {
     min-width: 145px;
     color-scheme: light;
@@ -732,8 +753,8 @@ body.ibems-modern {
 
 .ui-select-menu,
 .ui-date-popup {
-    /* Popovers are portalled to <body>; keep them above app modals (1300). */
-    z-index: 1400;
+    /* Portalled controls must stay above every app dialog, including app-dialog (3000). */
+    z-index: 3100;
     overflow: auto;
     border: 1px solid #e2e8f0;
     border-radius: .9rem;
@@ -744,6 +765,9 @@ body.ibems-modern {
 .ui-select-menu {
     padding: .375rem;
     overflow-x: hidden;
+    overscroll-behavior: contain;
+    scrollbar-color: #94a3b8 transparent;
+    scrollbar-width: thin;
 }
 
 .ui-select-option {
@@ -789,16 +813,20 @@ body.ibems-modern {
     scrollbar-width: thin;
 }
 
+.ui-select-menu::-webkit-scrollbar,
 .ui-date-popup::-webkit-scrollbar {
     width: 8px;
     height: 8px;
 }
 
+.ui-select-menu::-webkit-scrollbar-track,
+.ui-select-menu::-webkit-scrollbar-corner,
 .ui-date-popup::-webkit-scrollbar-track,
 .ui-date-popup::-webkit-scrollbar-corner {
     background: transparent;
 }
 
+.ui-select-menu::-webkit-scrollbar-thumb,
 .ui-date-popup::-webkit-scrollbar-thumb {
     border: 2px solid transparent;
     border-radius: 999px;
@@ -806,6 +834,7 @@ body.ibems-modern {
     background-clip: padding-box;
 }
 
+.ui-select-menu::-webkit-scrollbar-button,
 .ui-date-popup::-webkit-scrollbar-button {
     display: none;
     width: 0;
@@ -1473,7 +1502,6 @@ body.ibems-modern :is(.admin-modal-close, .acct-modal-close, .inv-modal-close, .
         scrollbar-width: thin;
     }
 
-    .ibems-modern .app-menu::before,
     .ibems-modern .app-menu a.is-active::before,
     .ibems-modern .app-sidebar-spacer,
     .ibems-modern .sidebar-logout {
@@ -1481,6 +1509,7 @@ body.ibems-modern :is(.admin-modal-close, .acct-modal-close, .inv-modal-close, .
     }
 
     .ibems-modern .app-menu a {
+        height: auto;
         min-width: max-content;
         min-height: 38px;
         padding: 7px 10px;
@@ -1766,8 +1795,8 @@ html[data-theme="dark"] .ibems-modern .app-main {
 html[data-theme="dark"] .ibems-modern .app-container {
     background-color: var(--dark-canvas);
     background-image:
-        linear-gradient(rgba(7, 17, 31, .91), rgba(7, 17, 31, .96)),
-        url('../images/ibems-app-background.jpg');
+        linear-gradient(rgba(7, 17, 31, .7), rgba(7, 17, 31, .82)),
+        url('../images/ibems-app-background.svg?v=20260823a');
 }
 
 html[data-theme="dark"] .ibems-modern .app-sidebar {
@@ -1781,8 +1810,10 @@ html[data-theme="dark"] .ibems-modern :is(.app-brand h1, .app-brand p) {
 }
 
 html[data-theme="dark"] .ibems-modern .app-brand-logo {
-    background: #f8fafc;
-    border-color: #46617f;
+    background: #e8f1ff;
+    border-color: #6f8fb4;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .32), inset 0 0 0 1px rgba(255, 255, 255, .55);
+    filter: none;
 }
 
 html[data-theme="dark"] .ibems-modern .app-menu::before,
@@ -2036,6 +2067,19 @@ html[data-theme="dark"] .ibems-modern :is(.secondary-btn, .btn-secondary, .ghost
     color: #fff;
     border-color: #59779e;
     background: #1b304c;
+}
+
+html[data-theme="dark"] .ibems-modern .secondary-btn.sidebar-toggle-in-sidebar {
+    color: #9bc4ff;
+    border-color: #315d91;
+    background: #102c52;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, .28);
+}
+
+html[data-theme="dark"] .ibems-modern .secondary-btn.sidebar-toggle-in-sidebar:hover:not(:disabled) {
+    color: #dbeafe;
+    border-color: #4b76a8;
+    background: #173b66;
 }
 
 html[data-theme="dark"] .ibems-modern :is(
@@ -2620,6 +2664,67 @@ html[data-theme="dark"] .ibems-modern :is(
     background: var(--dark-surface-raised) !important;
 }
 
+/* Admin debt-account modal: keep audit information readable and interactive in dark mode. */
+html[data-theme="dark"] .ibems-modern .ad-account-identity {
+    background: linear-gradient(135deg, #172a43 0%, #122239 100%) !important;
+}
+
+html[data-theme="dark"] .ibems-modern .ad-account-tabs {
+    background: #0d1b2d !important;
+}
+
+html[data-theme="dark"] .ibems-modern .ad-account-tab {
+    color: #b9cbe2 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .ad-account-tab:is(:hover, :focus-visible) {
+    color: #e8f1ff !important;
+    background: #17345a !important;
+}
+
+html[data-theme="dark"] .ibems-modern .ad-account-tab[aria-selected="true"] {
+    color: #fff !important;
+    background: #145a96 !important;
+    box-shadow: 0 5px 14px rgba(0, 0, 0, .28) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .ad-account-identity h5, .ad-detail-item strong,
+    .ad-detail-section-title, .ad-detail-section-head h6,
+    .ad-store-card-main strong, .ad-store-card > span strong
+) {
+    color: var(--dark-text) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(
+    .ad-account-identity p, .ad-detail-item span,
+    .ad-detail-section-head p, .ad-store-card-main small,
+    .ad-store-card-main span, .ad-store-card > span
+) {
+    color: var(--dark-text-secondary) !important;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.ad-detail-item, .ad-store-card, .ad-store-date-filter) {
+    border-color: var(--dark-border) !important;
+    background: #172740 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .ad-store-card:is(:hover, .is-expanded) {
+    border-color: #4f78a8 !important;
+    background: #1a2d49 !important;
+}
+
+html[data-theme="dark"] .ibems-modern .ad-store-date-filter label {
+    color: var(--dark-text-secondary) !important;
+}
+
+html[data-theme="dark"] .ibems-modern .ad-store-date-filter input {
+    color: var(--dark-text) !important;
+    border-color: var(--dark-border-strong) !important;
+    background: #0d1b2d !important;
+    color-scheme: dark;
+}
+
 html[data-theme="dark"] .ibems-modern .audit-payload-block :is(pre, code) {
     color: var(--dark-text-secondary) !important;
 }
@@ -2904,9 +3009,10 @@ html[data-theme="dark"] .ibems-modern .pos-context-separator {
 }
 
 html[data-theme="dark"] .ibems-modern :is(
-    .acct-status.is-active, .user-availability.is-available,
+    .table-status.is-active, .acct-status.is-active, .user-availability.is-available,
     .user-deduction-status, .variance-pill.is-success,
-    .ap-stock-badge.is-healthy, .history-payment-pill.payment-cash
+    .ap-stock-badge.is-healthy, .history-payment-pill.payment-cash,
+    .inv-stock-in
 ) {
     color: #86efac !important;
     border-color: #25764b !important;
@@ -2914,8 +3020,9 @@ html[data-theme="dark"] .ibems-modern :is(
 }
 
 html[data-theme="dark"] .ibems-modern :is(
-    .acct-status.is-inactive, .variance-pill.is-warning,
-    .ap-stock-badge.is-warning, .history-payment-pill.payment-debt
+    .table-status.is-inactive, .acct-status.is-inactive, .variance-pill.is-warning,
+    .ap-stock-badge.is-warning, .history-payment-pill.payment-debt,
+    .inv-stock-low
 ) {
     color: #fcd38d !important;
     border-color: #8a5a18 !important;
@@ -2923,7 +3030,8 @@ html[data-theme="dark"] .ibems-modern :is(
 }
 
 html[data-theme="dark"] .ibems-modern :is(
-    .ap-stock-badge.is-danger, .ap-stock-badge.is-inactive
+    .ap-stock-badge.is-danger, .ap-stock-badge.is-inactive,
+    .inv-stock-out
 ) {
     color: #fda4af !important;
     border-color: #7f3542 !important;
@@ -3045,6 +3153,220 @@ html[data-theme="dark"] body.ibems-modern :is(
     background: transparent !important;
 }
 
+/* Every semantic dialog close control uses one unboxed multiplication sign.
+   This selector is intentionally independent of portal-specific class names so
+   newly added modals cannot silently fall back to a bordered icon button. */
+body.ibems-modern [role="dialog"] button[aria-label^="Close"] {
+    display: grid !important;
+    width: 34px !important;
+    height: 34px !important;
+    min-width: 34px !important;
+    min-height: 34px !important;
+    flex: 0 0 34px !important;
+    place-items: center !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    background: transparent !important;
+    color: transparent !important;
+    box-shadow: none !important;
+    font-size: 0 !important;
+    line-height: 1 !important;
+    transform: none !important;
+}
+
+body.ibems-modern [role="dialog"] button[aria-label^="Close"] > i {
+    display: none !important;
+}
+
+body.ibems-modern [role="dialog"] button[aria-label^="Close"]::before {
+    content: "\00d7";
+    color: #64748b;
+    font-size: 1.5rem;
+    font-weight: 500;
+    line-height: 1;
+    transition: color .15s ease;
+}
+
+body.ibems-modern [role="dialog"] button[aria-label^="Close"]:is(:hover, :focus-visible) {
+    border: 0 !important;
+    background: transparent !important;
+    color: transparent !important;
+    outline: none !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+
+body.ibems-modern [role="dialog"] button[aria-label^="Close"]:is(:hover, :focus-visible)::before {
+    color: #dc2626 !important;
+}
+
+html[data-theme="dark"] body.ibems-modern [role="dialog"] button[aria-label^="Close"]::before {
+    color: #b8c7d9;
+}
+
+html[data-theme="dark"] body.ibems-modern [role="dialog"] button[aria-label^="Close"]:is(:hover, :focus-visible)::before {
+    color: #f87171 !important;
+}
+
+/* Accountable-person assignments stay read-only until their card is opened. */
+.ibems-modern .assignment-summary,
+.ibems-modern .assignment-summary-list {
+    display: grid;
+    gap: .6rem;
+}
+
+.ibems-modern .assignment-person-card {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr) auto auto;
+    width: 100%;
+    min-height: 68px;
+    align-items: center;
+    gap: .75rem;
+    padding: .6rem .75rem;
+    border: 1px solid #cbd5e1;
+    border-radius: .85rem;
+    background: #f8fafc;
+    color: #0f172a;
+    text-align: left;
+    box-shadow: none;
+    cursor: pointer;
+    transition: border-color .15s ease, background .15s ease, box-shadow .15s ease;
+}
+
+.ibems-modern .assignment-person-card:is(:hover, :focus-visible) {
+    border-color: #60a5fa;
+    background: #eff6ff;
+    outline: none;
+    box-shadow: 0 0 0 3px rgb(37 99 235 / 14%);
+}
+
+.ibems-modern .assignment-person-avatar,
+.ibems-modern .assigned-officer-avatar,
+.ibems-modern .assignment-empty-icon {
+    width: 48px;
+    height: 48px;
+    flex: 0 0 48px;
+    border: 1px solid #cbd5e1;
+    border-radius: 999px;
+    background: #eaf2fb;
+    object-fit: cover;
+}
+
+.ibems-modern .assignment-empty-icon {
+    display: grid;
+    place-items: center;
+    color: #64748b;
+    font-size: 1.15rem;
+}
+
+.ibems-modern .assignment-person-copy,
+.ibems-modern .assigned-officer-copy {
+    display: grid;
+    min-width: 0;
+    gap: .18rem;
+}
+
+.ibems-modern .assignment-person-copy strong,
+.ibems-modern .assignment-person-copy small {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.ibems-modern .assignment-person-copy small,
+.ibems-modern .assignment-role-label {
+    color: #64748b;
+    font-size: .76rem;
+}
+
+.ibems-modern .assignment-role-label {
+    font-weight: 700;
+}
+
+.ibems-modern .assignment-change-label {
+    color: #1d4ed8;
+    font-size: .76rem;
+    font-weight: 800;
+}
+
+.ibems-modern .assignment-editor {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: start;
+    gap: .55rem;
+    margin-top: .55rem;
+    padding: .65rem;
+    border: 1px solid #bfdbfe;
+    border-radius: .85rem;
+    background: #eff6ff;
+}
+
+.ibems-modern .assignment-editor.is-hidden {
+    display: none;
+}
+
+.ibems-modern .assignment-editor > :is(.people-picker, .ui-select, select) {
+    min-width: 0;
+}
+
+.ibems-modern .assignment-done {
+    min-height: 2.75rem;
+}
+
+.ibems-modern .assigned-officer-card {
+    display: grid;
+    grid-template-columns: 48px minmax(0, 1fr);
+    align-items: center;
+    gap: .75rem;
+}
+
+html[data-theme="dark"] .ibems-modern .assignment-person-card {
+    border-color: #405672;
+    background: #122238;
+    color: #e5edf7;
+}
+
+html[data-theme="dark"] .ibems-modern .assignment-person-card:is(:hover, :focus-visible) {
+    border-color: #60a5fa;
+    background: #17345a;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.assignment-person-avatar, .assigned-officer-avatar, .assignment-empty-icon) {
+    border-color: #405672;
+    background: #17345a;
+}
+
+html[data-theme="dark"] .ibems-modern :is(.assignment-person-copy small, .assignment-role-label) {
+    color: #aebfd3;
+}
+
+html[data-theme="dark"] .ibems-modern .assignment-change-label {
+    color: #93c5fd;
+}
+
+html[data-theme="dark"] .ibems-modern .assignment-editor {
+    border-color: #315d91;
+    background: #102c52;
+}
+
+@media (max-width: 620px) {
+    .ibems-modern .assignment-person-card {
+        grid-template-columns: 42px minmax(0, 1fr) auto;
+    }
+    .ibems-modern :is(.assignment-person-avatar, .assigned-officer-avatar, .assignment-empty-icon) {
+        width: 42px;
+        height: 42px;
+    }
+    .ibems-modern .assignment-role-label {
+        display: none;
+    }
+    .ibems-modern .assignment-editor {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* Final shared dark-mode coverage for semantic tiles and scroll regions used
    by page-specific inventory, audit, POS, and confirmation components. */
 html[data-theme="dark"] .ibems-modern .metric-card-icon--alerts {
@@ -3076,7 +3398,7 @@ html[data-theme="dark"] .ibems-modern .app-dialog[data-tone="danger"] .app-dialo
 }
 
 html[data-theme="dark"] .ibems-modern :is(
-    .product-grid, .pos-right, .app-inset-modal-scroll,
+    .product-grid, .pos-right, .app-inset-modal-scroll, .ui-select-menu,
     .admin-stores-modal-body, .variant-builder-list,
     .inventory-movement-list
 ) {
@@ -3084,12 +3406,12 @@ html[data-theme="dark"] .ibems-modern :is(
 }
 
 html[data-theme="dark"] .ibems-modern :is(
-    .product-grid, .pos-right, .app-inset-modal-scroll,
+    .product-grid, .pos-right, .app-inset-modal-scroll, .ui-select-menu,
     .admin-stores-modal-body, .variant-builder-list,
     .inventory-movement-list
 )::-webkit-scrollbar-track,
 html[data-theme="dark"] .ibems-modern :is(
-    .product-grid, .pos-right, .app-inset-modal-scroll,
+    .product-grid, .pos-right, .app-inset-modal-scroll, .ui-select-menu,
     .admin-stores-modal-body, .variant-builder-list,
     .inventory-movement-list
 )::-webkit-scrollbar-corner {
@@ -3097,7 +3419,7 @@ html[data-theme="dark"] .ibems-modern :is(
 }
 
 html[data-theme="dark"] .ibems-modern :is(
-    .product-grid, .pos-right, .app-inset-modal-scroll,
+    .product-grid, .pos-right, .app-inset-modal-scroll, .ui-select-menu,
     .admin-stores-modal-body, .variant-builder-list,
     .inventory-movement-list
 )::-webkit-scrollbar-thumb {
@@ -3108,7 +3430,7 @@ html[data-theme="dark"] .ibems-modern :is(
 }
 
 html[data-theme="dark"] .ibems-modern :is(
-    .product-grid, .pos-right, .app-inset-modal-scroll,
+    .product-grid, .pos-right, .app-inset-modal-scroll, .ui-select-menu,
     .admin-stores-modal-body, .variant-builder-list,
     .inventory-movement-list
 )::-webkit-scrollbar-button {
@@ -3120,4 +3442,33 @@ html[data-theme="dark"] .ibems-modern :is(
 
 @media (max-width: 640px) {
     .ibems-modern .notification-panel { position: fixed; top: 66px; right: 12px; left: 12px; width: auto; }
+}
+.portal-navigation-progress {
+    position: fixed;
+    z-index: 1200;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 3px;
+    pointer-events: none;
+    opacity: 0;
+    transform: scaleX(0);
+    transform-origin: left;
+    background: var(--primary, #2563eb);
+    transition: opacity 120ms ease, transform 180ms ease;
+}
+
+.app-shell.is-portal-navigating .portal-navigation-progress {
+    opacity: 1;
+    transform: scaleX(.72);
+}
+
+.app-shell.is-portal-navigating [data-portal-page-content] {
+    cursor: progress;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .portal-navigation-progress {
+        transition: none;
+    }
 }

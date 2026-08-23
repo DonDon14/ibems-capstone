@@ -46,6 +46,41 @@ final class ThemeConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('html[data-theme="dark"] .auth-modern #status.error', $styles);
     }
 
+    public function testAuthenticationLogoIsProminentAndResponsive(): void
+    {
+        $login = (string) file_get_contents(APPPATH . 'Views/auth/login.php');
+        $roleSelection = (string) file_get_contents(APPPATH . 'Views/auth/select_role.php');
+        $styles = (string) file_get_contents(FCPATH . 'assets/css/auth-login.css');
+
+        foreach ([$login, $roleSelection] as $view) {
+            $this->assertStringContainsString('class="auth-mark-logo"', $view);
+            $this->assertStringContainsString('auth-login.css\') ?>?v=20260823f', $view);
+        }
+
+        $this->assertStringContainsString('width: clamp(108px, 9vw, 128px);', $styles);
+        $this->assertStringContainsString('@media (max-width: 640px), (max-height: 760px)', $styles);
+        $this->assertStringContainsString('width: 96px;', $styles);
+        $this->assertStringContainsString('width: 84px;', $styles);
+    }
+
+    public function testRoleSelectionUsesAccessibleDescriptivePortalCards(): void
+    {
+        $roleSelection = (string) file_get_contents(APPPATH . 'Views/auth/select_role.php');
+        $styles = (string) file_get_contents(FCPATH . 'assets/css/auth-login.css');
+
+        $this->assertStringContainsString('class="auth-modern auth-role-selection"', $roleSelection);
+        $this->assertStringContainsString('role="group" aria-label="Available portals"', $roleSelection);
+        $this->assertStringContainsString("'icon' => 'bi-shield-check'", $roleSelection);
+        $this->assertStringContainsString("'icon' => 'bi-shop-window'", $roleSelection);
+        $this->assertStringContainsString("'description' => 'Shop products, review purchases, and manage your account.'", $roleSelection);
+        $this->assertStringContainsString('class="auth-role-copy"', $roleSelection);
+        $this->assertStringContainsString('bi-arrow-right auth-role-arrow', $roleSelection);
+        $this->assertStringContainsString('class="auth-role-meta"', $roleSelection);
+        $this->assertStringContainsString("'roleStores' => \$roleStores", (string) file_get_contents(APPPATH . 'Controllers/AuthController.php'));
+        $this->assertStringContainsString('.auth-modern .auth-role-icon', $styles);
+        $this->assertStringContainsString('html[data-theme="dark"] .auth-modern .auth-role-btn', $styles);
+    }
+
     public function testDarkThemeDefinesContrastingDataSurfacesAndControls(): void
     {
         $css = file_get_contents(FCPATH . 'assets/css/modern-ui.css');
@@ -66,6 +101,10 @@ final class ThemeConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('.employee-profile-overview', $css);
         $this->assertStringContainsString('.receipt-head, .receipt-actions, .confirm-actions', $css);
         $this->assertStringContainsString('.acct-status.is-active, .user-availability.is-available', $css);
+        $this->assertStringContainsString('.table-status.is-active, .acct-status.is-active', $css);
+        $this->assertStringContainsString('.inv-stock-in', $css);
+        $this->assertStringContainsString('.inv-stock-low', $css);
+        $this->assertStringContainsString('.inv-stock-out', $css);
         $this->assertStringContainsString('.create-product-section', $css);
         $this->assertStringContainsString('.image-grid .image-preview-box, .modal-image-preview-grid .image-preview-box', $css);
         $this->assertStringContainsString('.readonly-value, .readiness-item', $css);
@@ -96,6 +135,10 @@ final class ThemeConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('.product-visual.placeholder, .prod-thumb-fallback', $css);
         $this->assertStringContainsString('.app-dialog[data-tone="danger"] .app-dialog-icon', $css);
         $this->assertStringContainsString('.product-grid, .pos-right, .app-inset-modal-scroll', $css);
+        $this->assertStringContainsString("url('../images/ibems-app-background.svg?v=20260823a')", $css);
+        $this->assertStringContainsString('linear-gradient(rgba(7, 17, 31, .7), rgba(7, 17, 31, .82))', $css);
+        $this->assertStringContainsString("background: #e8f1ff;\n    border-color: #6f8fb4;", $css);
+        $this->assertStringContainsString('box-shadow: 0 1px 2px rgba(0, 0, 0, .32), inset 0 0 0 1px rgba(255, 255, 255, .55);', $css);
         $this->assertStringContainsString('color: #dc2626 !important;', $css);
         $this->assertStringContainsString('color: #f87171 !important;', $css);
         $this->assertStringContainsString('outline: none !important;', $css);
@@ -122,8 +165,31 @@ final class ThemeConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('html[data-theme="dark"] .account-menu-actions :is(button, a) > i', $css);
         $this->assertStringContainsString('background: #17345a', $css);
         $this->assertStringContainsString('html[data-theme="dark"] .account-menu-logout button', $css);
+        $this->assertStringContainsString('.account-menu-logout button:is(:hover, :focus-visible)', $css);
+        $this->assertStringContainsString('background: #dc2626;', $css);
+        $this->assertStringContainsString('color: #fff;', $css);
+        $this->assertStringContainsString('account-menu.css\') ?>?v=20260824a', (string) file_get_contents(APPPATH . 'Views/components/portal_shell.php'));
         $this->assertStringContainsString('background: #2a1720', $css);
         $this->assertStringContainsString('color: #fda4af', $css);
+    }
+
+    public function testEverySemanticModalCloseIsUnboxedAndTurnsRedInDarkMode(): void
+    {
+        $css = (string) file_get_contents(FCPATH . 'assets/css/modern-ui.css');
+        $departmentAdmin = (string) file_get_contents(APPPATH . 'Views/admin/departments.php');
+        $departmentAccounting = (string) file_get_contents(APPPATH . 'Views/accounting/department-debts.php');
+
+        $selector = 'body.ibems-modern [role="dialog"] button[aria-label^="Close"]';
+        $darkSelector = 'html[data-theme="dark"] body.ibems-modern [role="dialog"] button[aria-label^="Close"]:is(:hover, :focus-visible)::before';
+
+        $this->assertStringContainsString($selector . ' {', $css);
+        $this->assertStringContainsString('border: 0 !important;', $css);
+        $this->assertStringContainsString('background: transparent !important;', $css);
+        $this->assertStringContainsString('content: "\\00d7";', $css);
+        $this->assertStringContainsString($darkSelector, $css);
+        $this->assertStringContainsString('color: #f87171 !important;', $css);
+        $this->assertStringContainsString('id="department-close" class="app-modal-close"', $departmentAdmin);
+        $this->assertStringContainsString('id="department-finance-close" class="app-modal-close"', $departmentAccounting);
     }
 
     public function testLoginUsesTheActiveFrontControllerPrefix(): void

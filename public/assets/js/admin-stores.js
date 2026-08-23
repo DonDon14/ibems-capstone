@@ -7,6 +7,8 @@ let logoInputMode = "upload";
 let storeLogoPreviewObjectUrl = null;
 let selectedSupervisorIds = [];
 let editingInitialIsActive = true;
+let officerEditorOpen = false;
+let supervisorEditorOpen = false;
 let activeOfficerSuggestionIndex = -1;
 let activeSupervisorSuggestionIndex = -1;
 let storePage = 1;
@@ -108,6 +110,8 @@ function renderSelectedOfficer() {
     if (officerId <= 0) {
         wrap.innerHTML = "";
         input.placeholder = "Search name, email, or employee ID";
+        renderOfficerSummary();
+        updateAssignmentEditors();
         return;
     }
 
@@ -120,6 +124,39 @@ function renderSelectedOfficer() {
         </span>
     `;
     input.placeholder = "Search to replace officer";
+    renderOfficerSummary();
+    updateAssignmentEditors();
+}
+
+function assignmentCard(person, role, changeAttribute) {
+    if (!person) {
+        return `<button type="button" class="assignment-person-card is-empty" ${changeAttribute}><span class="assignment-empty-icon"><i class="bi bi-person-plus" aria-hidden="true"></i></span><span class="assignment-person-copy"><strong>Not assigned</strong><small>Click to assign ${sEscape(role.toLowerCase())}</small></span><span class="assignment-change-label">Assign</span></button>`;
+    }
+    return `<button type="button" class="assignment-person-card" ${changeAttribute}>
+        ${window.IbemsAvatar.html(person.name, person.profile_image_url, "assignment-person-avatar")}
+        <span class="assignment-person-copy"><strong>${sEscape(person.name)}</strong><small>${sEscape(person.employee_id || person.email || role)}</small></span>
+        <span class="assignment-role-label">${sEscape(role)}</span><span class="assignment-change-label">Change</span>
+    </button>`;
+}
+
+function renderOfficerSummary() {
+    const summary = document.getElementById("store-officer-summary");
+    if (!summary) return;
+    summary.innerHTML = assignmentCard(findOfficerById(Number(document.getElementById("store-officer-id")?.value || 0)), "Primary Store Officer", "data-change-officer");
+}
+
+function renderSupervisorSummary() {
+    const summary = document.getElementById("store-supervisor-summary");
+    if (!summary) return;
+    const supervisors = selectedSupervisorIds.map(findOfficerById).filter(Boolean);
+    summary.innerHTML = supervisors.length
+        ? supervisors.map((person) => assignmentCard(person, "Store Supervisor", "data-change-supervisors")).join("")
+        : assignmentCard(null, "Store Supervisor", "data-change-supervisors");
+}
+
+function updateAssignmentEditors() {
+    document.getElementById("store-officer-editor")?.classList.toggle("is-hidden", !officerEditorOpen);
+    document.getElementById("store-supervisor-editor")?.classList.toggle("is-hidden", !supervisorEditorOpen);
 }
 
 function renderOfficerSuggestions(query) {
@@ -156,6 +193,8 @@ function renderSelectedSupervisors() {
     if (!wrap) return;
     if (selectedSupervisorIds.length === 0) {
         wrap.innerHTML = "";
+        renderSupervisorSummary();
+        updateAssignmentEditors();
         return;
     }
 
@@ -169,6 +208,8 @@ function renderSelectedSupervisors() {
             </span>
         `;
     }).join("");
+    renderSupervisorSummary();
+    updateAssignmentEditors();
 }
 
 function renderSupervisorSuggestions(query) {
@@ -461,6 +502,7 @@ function openStoreModal(mode, store) {
     document.getElementById("store-deactivation-reason").value = "";
     updateDeactivationReasonVisibility();
     const selectedOfficerId = mode === "edit" ? Number(store.officer_id || 0) : 0;
+    officerEditorOpen = mode !== "edit" || selectedOfficerId <= 0;
     document.getElementById("store-officer-id").value = selectedOfficerId > 0 ? String(selectedOfficerId) : "";
     document.getElementById("store-officer-search").value = "";
     renderSelectedOfficer();
@@ -469,6 +511,7 @@ function openStoreModal(mode, store) {
     selectedSupervisorIds = mode === "edit" && Array.isArray(store.supervisor_ids)
         ? store.supervisor_ids.map(Number).filter(Boolean)
         : [];
+    supervisorEditorOpen = mode !== "edit" || selectedSupervisorIds.length === 0;
     document.getElementById("store-supervisor-search").value = "";
     setSuggestionBoxOpen("store-supervisor-search", "store-supervisor-suggestions", false);
     document.getElementById("store-supervisor-suggestions").innerHTML = "";
@@ -492,6 +535,8 @@ function closeStoreModal() {
     editingStoreId = null;
     editingCurrentLogoUrl = "";
     selectedSupervisorIds = [];
+    officerEditorOpen = false;
+    supervisorEditorOpen = false;
     if (storeLogoPreviewObjectUrl) {
         URL.revokeObjectURL(storeLogoPreviewObjectUrl);
         storeLogoPreviewObjectUrl = null;
@@ -645,6 +690,7 @@ document.getElementById("store-officer-suggestions")?.addEventListener("click", 
 
     document.getElementById("store-officer-search").value = "";
     document.getElementById("store-officer-id").value = String(officerId);
+    officerEditorOpen = false;
     renderSelectedOfficer();
     setSuggestionBoxOpen("store-officer-search", "store-officer-suggestions", false);
 });
@@ -680,6 +726,30 @@ document.getElementById("store-supervisor-selected")?.addEventListener("click", 
     selectedSupervisorIds = selectedSupervisorIds.filter((id) => id !== supervisorId);
     renderSelectedSupervisors();
     document.getElementById("store-supervisor-search").focus();
+});
+document.getElementById("store-officer-summary")?.addEventListener("click", (event) => {
+    if (!event.target.closest("[data-change-officer]")) return;
+    officerEditorOpen = true;
+    updateAssignmentEditors();
+    requestAnimationFrame(() => document.getElementById("store-officer-search")?.focus());
+});
+document.getElementById("store-supervisor-summary")?.addEventListener("click", (event) => {
+    if (!event.target.closest("[data-change-supervisors]")) return;
+    supervisorEditorOpen = true;
+    updateAssignmentEditors();
+    requestAnimationFrame(() => document.getElementById("store-supervisor-search")?.focus());
+});
+document.getElementById("store-officer-change-done")?.addEventListener("click", () => {
+    officerEditorOpen = false;
+    setSuggestionBoxOpen("store-officer-search", "store-officer-suggestions", false);
+    updateAssignmentEditors();
+    document.querySelector("#store-officer-summary [data-change-officer]")?.focus();
+});
+document.getElementById("store-supervisor-change-done")?.addEventListener("click", () => {
+    supervisorEditorOpen = false;
+    setSuggestionBoxOpen("store-supervisor-search", "store-supervisor-suggestions", false);
+    updateAssignmentEditors();
+    document.querySelector("#store-supervisor-summary [data-change-supervisors]")?.focus();
 });
 
 document.querySelectorAll(".people-picker").forEach((picker) => {
