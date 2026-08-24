@@ -547,6 +547,28 @@
     box-shadow: 0 24px 48px rgba(15, 23, 42, 0.28);
 }
 
+body.audit-modal-open {
+    overflow: hidden;
+}
+
+body.ibems-modern .admin-overview-modal .audit-view-card {
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
+    width: min(840px, 100%);
+    max-height: min(92dvh, 820px);
+    overflow: hidden;
+    padding: 0;
+}
+
+body.ibems-modern .admin-overview-modal .audit-view-card > .admin-modal-head {
+    margin: 0;
+}
+
+body.ibems-modern .admin-overview-modal .audit-view-card > .app-inset-modal-scroll {
+    margin: 0 7px 8px 0;
+    overscroll-behavior: contain;
+}
+
 .admin-overview-modal .admin-modal-head {
     display: flex;
     justify-content: space-between;
@@ -656,6 +678,11 @@ body .admin-modal .ad-account-modal-card {
 .ad-account-modal-scroll {
     display: grid;
     gap: 16px;
+}
+
+#ad-account-modal-content {
+    display: grid;
+    gap: 14px;
 }
 
 .ad-account-identity {
@@ -1039,13 +1066,36 @@ body .admin-modal .ad-account-modal-card {
 
 .audit-payload-block pre {
     margin: 8px 0 0;
-    max-height: 360px;
-    overflow: auto;
+    max-height: none;
+    overflow-x: auto;
+    overflow-y: visible;
     color: #0f172a;
     font-size: 0.82rem;
     line-height: 1.45;
     white-space: pre-wrap;
     word-break: break-word;
+}
+
+.audit-payload-block pre::-webkit-scrollbar {
+    height: 9px;
+}
+
+.audit-payload-block pre::-webkit-scrollbar-track,
+.audit-payload-block pre::-webkit-scrollbar-corner {
+    background: transparent;
+}
+
+.audit-payload-block pre::-webkit-scrollbar-thumb {
+    border: 2px solid transparent;
+    border-radius: 999px;
+    background: #94a3b8;
+    background-clip: padding-box;
+}
+
+.audit-payload-block pre::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
 }
 
 .ap-product-cell {
@@ -1143,6 +1193,16 @@ body .admin-modal .ad-account-modal-card {
 .ap-detail-grid {
     display: grid;
     gap: 14px;
+}
+
+body.ibems-modern .admin-overview-modal .ap-view-card {
+    width: min(760px, 100%);
+    max-height: min(92dvh, 780px);
+}
+
+.ap-view-modal-scroll {
+    display: block;
+    overscroll-behavior: contain;
 }
 
 .ap-detail-hero {

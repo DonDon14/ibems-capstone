@@ -1750,7 +1750,9 @@ document.getElementById("deduction-mode-modal").addEventListener("click", (event
     if (event.target.id === "deduction-mode-modal") closeMode();
 });
 document.getElementById("deduction-workflow-modal").addEventListener("click", (event) => {
-    if (event.target.id === "deduction-workflow-modal") closeDeductionWorkflow();
+    if (event.target.id === "deduction-workflow-modal" && !event.currentTarget.classList.contains("deductions-page-shell")) {
+        closeDeductionWorkflow();
+    }
 });
 document.getElementById("debt-investigations-modal").addEventListener("click", (event) => {
     if (event.target.id === "debt-investigations-modal") closeInvestigationsModal();

@@ -322,7 +322,7 @@ class UserController extends Controller
         }
 
         $query = $db->table('products p')
-            ->select('p.id, p.store_id, p.family_id, p.sku, p.name, p.variant_label, p.category, p.image_url, p.price, p.stock_qty, p.updated_at, s.store_name, s.logo_url AS store_logo_url')
+            ->select('p.id, p.store_id, p.family_id, p.sku, p.name, p.variant_label, p.category, p.supplier, p.location_bin, p.barcode, p.image_url, p.price, p.stock_qty, p.updated_at, s.store_name, s.logo_url AS store_logo_url')
             ->join('stores s', 's.id = p.store_id', 'inner');
         $rows = $applyFilters($query)
             ->orderBy($sortColumn, $sortDir)
@@ -331,6 +331,28 @@ class UserController extends Controller
             ->limit($pageSize, $offset)
             ->get()
             ->getResultArray();
+
+        $familyIds = array_values(array_unique(array_filter(array_map(
+            static fn(array $row): int => (int) ($row['family_id'] ?? 0),
+            $rows
+        ))));
+        $variantsByFamily = [];
+        if ($familyIds !== []) {
+            $variantRows = $db->table('products p')
+                ->select('p.id, p.store_id, p.family_id, p.sku, p.name, p.variant_label, p.category, p.supplier, p.location_bin, p.barcode, p.image_url, p.price, p.stock_qty, p.updated_at')
+                ->whereIn('p.family_id', $familyIds)
+                ->where('p.is_active', true)
+                ->orderBy('p.variant_label', 'ASC')
+                ->orderBy('p.id', 'ASC')
+                ->get()
+                ->getResultArray();
+            foreach ($variantRows as $variantRow) {
+                $familyId = (int) ($variantRow['family_id'] ?? 0);
+                if ($familyId > 0) {
+                    $variantsByFamily[$familyId][] = $variantRow;
+                }
+            }
+        }
 
         $stores = [];
         $categories = [];
@@ -358,21 +380,44 @@ class UserController extends Controller
 
         return $this->response->setJSON([
             'status' => 'success',
-            'data' => array_map(static fn(array $row): array => [
+            'data' => array_map(static function (array $row) use ($variantsByFamily): array {
+                $familyId = (int) ($row['family_id'] ?? 0);
+                $variantRows = $familyId > 0 ? ($variantsByFamily[$familyId] ?? [$row]) : [$row];
+                $mapVariant = static fn(array $variant): array => [
+                    'id' => (int) ($variant['id'] ?? 0),
+                    'sku' => (string) ($variant['sku'] ?? ''),
+                    'variant_label' => (string) ($variant['variant_label'] ?? ''),
+                    'supplier' => (string) ($variant['supplier'] ?? ''),
+                    'location_bin' => (string) ($variant['location_bin'] ?? ''),
+                    'barcode' => (string) ($variant['barcode'] ?? ''),
+                    'image_url' => (string) ($variant['image_url'] ?? ''),
+                    'price' => (float) ($variant['price'] ?? 0),
+                    'stock_qty' => (int) ($variant['stock_qty'] ?? 0),
+                    'availability' => (int) ($variant['stock_qty'] ?? 0) > 0 ? 'available' : 'out',
+                    'updated_at' => (string) ($variant['updated_at'] ?? ''),
+                ];
+
+                return [
                 'id' => (int) ($row['id'] ?? 0),
                 'store_id' => (int) ($row['store_id'] ?? 0),
-                'family_id' => isset($row['family_id']) ? (int) $row['family_id'] : null,
+                'family_id' => $familyId > 0 ? $familyId : null,
                 'store_name' => (string) ($row['store_name'] ?? ''),
                 'store_logo_url' => (string) ($row['store_logo_url'] ?? ''),
                 'sku' => (string) ($row['sku'] ?? ''),
                 'name' => (string) ($row['name'] ?? ''),
                 'variant_label' => (string) ($row['variant_label'] ?? ''),
                 'category' => (string) ($row['category'] ?? ''),
+                'supplier' => (string) ($row['supplier'] ?? ''),
+                'location_bin' => (string) ($row['location_bin'] ?? ''),
+                'barcode' => (string) ($row['barcode'] ?? ''),
                 'image_url' => (string) ($row['image_url'] ?? ''),
                 'price' => (float) ($row['price'] ?? 0),
+                'stock_qty' => (int) ($row['stock_qty'] ?? 0),
                 'availability' => (int) ($row['stock_qty'] ?? 0) > 0 ? 'available' : 'out',
                 'updated_at' => (string) ($row['updated_at'] ?? ''),
-            ], $rows),
+                'variants' => array_map($mapVariant, $variantRows),
+                ];
+            }, $rows),
             'stores' => array_map(static fn(array $row): array => [
                 'id' => (int) ($row['id'] ?? 0),
                 'store_name' => (string) ($row['store_name'] ?? ''),

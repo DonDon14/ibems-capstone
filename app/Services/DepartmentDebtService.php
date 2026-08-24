@@ -2,7 +2,6 @@
 
 namespace App\Services;
 
-use App\Models\AuditLogModel;
 use CodeIgniter\Database\BaseConnection;
 use Config\Database;
 use RuntimeException;
@@ -120,96 +119,9 @@ class DepartmentDebtService
         if (!is_finite($allocation) || $allocation < 0 || !in_array($status, ['open', 'closed', 'suspended'], true)) {
             return $this->error('Enter a valid allocation and status.');
         }
-        $department = $this->db->table('departments')->where('id', $departmentId)->get()->getRowArray();
-        if (!$department) {
-            return $this->error('Department not found.', 404);
-        }
-        if ($status === 'open' && !ibems_bool($department['is_active'] ?? false)) {
-            return $this->error('An inactive department cannot have an open debt allocation.', 409);
-        }
-
-        $existing = $this->db->table('department_debt_periods')->where('department_id', $departmentId)->where('period_month', $periodMonth)->get()->getRowArray();
-        if ($existing && $allocation < (float) $existing['used_amount']) {
-            return $this->error('Allocation cannot be lower than the amount already used for this month.', 409);
-        }
-        if ($existing && ($allocation !== (float) $existing['allocation_amount'] || $status !== (string) $existing['status']) && trim($reason) === '') {
-            return $this->error('A reason is required when changing an existing allocation.');
-        }
-
-        $now = date('Y-m-d H:i:s');
         $this->db->transBegin();
         try {
-            if ($existing) {
-                $updated = $this->db->table('department_debt_periods')
-                    ->where('id', (int) $existing['id'])
-                    ->where('used_amount <=', $allocation)
-                    ->update([
-                    'allocation_amount' => $allocation,
-                    'status' => $status,
-                    'notes' => $reason !== '' ? $reason : ($existing['notes'] ?? null),
-                    'configured_by' => $actorId > 0 ? $actorId : null,
-                    'updated_at' => $now,
-                    ]);
-                if (!$updated) {
-                    throw new RuntimeException('Unable to update the department allocation.');
-                }
-                if ($this->db->affectedRows() !== 1) {
-                    $current = $this->db->table('department_debt_periods')->where('id', (int) $existing['id'])->get()->getRowArray();
-                    $isSafeNoOp = $current
-                        && (float) $current['used_amount'] <= $allocation
-                        && (float) $current['allocation_amount'] === $allocation
-                        && (string) $current['status'] === $status;
-                    if (!$isSafeNoOp) {
-                        throw new RuntimeException('Allocation cannot be lower than the amount already used for this month.');
-                    }
-                }
-                $periodId = (int) $existing['id'];
-                $used = (float) $existing['used_amount'];
-                $outstanding = (float) $existing['outstanding_amount'];
-                $beforeAllocation = (float) $existing['allocation_amount'];
-            } else {
-                $this->db->table('department_debt_periods')->insert([
-                    'department_id' => $departmentId,
-                    'period_month' => $periodMonth,
-                    'allocation_amount' => $allocation,
-                    'used_amount' => 0,
-                    'outstanding_amount' => 0,
-                    'status' => $status,
-                    'notes' => $reason !== '' ? $reason : null,
-                    'configured_by' => $actorId > 0 ? $actorId : null,
-                    'created_at' => $now,
-                    'updated_at' => $now,
-                ]);
-                $periodId = (int) $this->db->insertID();
-                $used = 0.0;
-                $outstanding = 0.0;
-                $beforeAllocation = 0.0;
-            }
-            $this->db->table('department_debt_entries')->insert([
-                'department_id' => $departmentId,
-                'period_id' => $periodId,
-                'entry_type' => $existing ? 'allocation_adjustment' : 'allocation_created',
-                'direction' => 'neutral',
-                'amount' => abs($allocation - $beforeAllocation),
-                'allocation_before' => $beforeAllocation,
-                'allocation_after' => $allocation,
-                'used_before' => $used,
-                'used_after' => $used,
-                'outstanding_before' => $outstanding,
-                'outstanding_after' => $outstanding,
-                'actor_id' => $actorId > 0 ? $actorId : null,
-                'remarks' => $reason !== '' ? $reason : 'Monthly allocation created',
-                'meta_json' => json_encode(['status_before' => $existing['status'] ?? null, 'status_after' => $status]),
-                'created_at' => $now,
-            ]);
-            $this->audit('ACCOUNTING_SET_DEPARTMENT_ALLOCATION', $departmentId, $actorId, [
-                'period_month' => $periodMonth,
-                'allocation_before' => $beforeAllocation,
-                'allocation_after' => $allocation,
-                'status_before' => $existing['status'] ?? null,
-                'status_after' => $status,
-                'reason' => $reason,
-            ]);
+            $periodId = $this->applyAllocation($departmentId, $periodMonth, $allocation, $status, trim($reason), $actorId);
             if (!$this->db->transStatus()) {
                 throw new RuntimeException('Allocation update failed.');
             }
@@ -217,8 +129,166 @@ class DepartmentDebtService
             return ['status' => 'success', 'code' => 200, 'period_id' => $periodId];
         } catch (Throwable $e) {
             $this->db->transRollback();
-            return $this->error($e->getMessage() ?: 'Unable to save the department allocation.', 500);
+            return $this->error($e->getMessage() ?: 'Unable to save the department allocation.', $this->exceptionCode($e));
         }
+    }
+
+    public function setAllocations(array $departmentIds, string $periodMonth, float $allocation, string $status, string $reason, int $actorId): array
+    {
+        if ($departmentIds === [] || count($departmentIds) > 250) {
+            return $this->error('Select between 1 and 250 departments and a valid month.');
+        }
+        $normalizedIds = [];
+        foreach ($departmentIds as $departmentId) {
+            if ((!is_int($departmentId) && !(is_string($departmentId) && ctype_digit($departmentId))) || (int) $departmentId <= 0) {
+                return $this->error('Every selected department must have a valid numeric ID.');
+            }
+            $normalizedIds[] = (int) $departmentId;
+        }
+        $departmentIds = array_values(array_unique($normalizedIds));
+        $periodMonth = trim($periodMonth);
+        $allocation = round($allocation, 2);
+        $status = strtolower(trim($status));
+        $reason = trim($reason);
+
+        if (!$this->validMonth($periodMonth)) {
+            return $this->error('Select between 1 and 250 departments and a valid month.');
+        }
+        if (!is_finite($allocation) || $allocation < 0 || !in_array($status, ['open', 'closed', 'suspended'], true)) {
+            return $this->error('Enter a valid allocation and status.');
+        }
+        if ($reason === '') {
+            return $this->error('An audit reason is required for a batch allocation.');
+        }
+
+        $periodMonth .= '-01';
+        $periodIds = [];
+        $this->db->transBegin();
+        try {
+            $batchReference = 'DEPT-ALLOC-' . strtoupper(bin2hex(random_bytes(6)));
+            foreach ($departmentIds as $departmentId) {
+                $periodIds[$departmentId] = $this->applyAllocation($departmentId, $periodMonth, $allocation, $status, $reason, $actorId, $batchReference);
+            }
+            if (!$this->db->transStatus()) {
+                throw new RuntimeException('Batch allocation update failed.');
+            }
+            $this->db->transCommit();
+            return [
+                'status' => 'success',
+                'code' => 200,
+                'updated_count' => count($periodIds),
+                'period_ids' => $periodIds,
+                'batch_reference' => $batchReference,
+            ];
+        } catch (Throwable $e) {
+            $this->db->transRollback();
+            return $this->error($e->getMessage() ?: 'Unable to save the batch allocation.', $this->exceptionCode($e));
+        }
+    }
+
+    private function applyAllocation(int $departmentId, string $periodMonth, float $allocation, string $status, string $reason, int $actorId, ?string $batchReference = null): int
+    {
+        $department = $this->db->table('departments')->where('id', $departmentId)->get()->getRowArray();
+        if (!$department) {
+            throw new RuntimeException('A selected department was not found.', 404);
+        }
+        if ($status === 'open' && !ibems_bool($department['is_active'] ?? false)) {
+            throw new RuntimeException('Inactive departments cannot receive an open debt allocation.', 409);
+        }
+
+        $existing = $this->db->table('department_debt_periods')->where('department_id', $departmentId)->where('period_month', $periodMonth)->get()->getRowArray();
+        if ($existing && $allocation < (float) $existing['used_amount']) {
+            throw new RuntimeException('The allocation for ' . (string) ($department['code'] ?? $departmentId) . ' is lower than the amount already used.', 409);
+        }
+        if ($existing && ($allocation !== (float) $existing['allocation_amount'] || $status !== (string) $existing['status']) && $reason === '') {
+            throw new RuntimeException('A reason is required when changing an existing allocation.', 400);
+        }
+
+        $now = date('Y-m-d H:i:s');
+        if ($existing) {
+            $updated = $this->db->table('department_debt_periods')
+                ->where('id', (int) $existing['id'])
+                ->where('used_amount <=', $allocation)
+                ->update([
+                    'allocation_amount' => $allocation,
+                    'status' => $status,
+                    'notes' => $reason !== '' ? $reason : ($existing['notes'] ?? null),
+                    'configured_by' => $actorId > 0 ? $actorId : null,
+                    'updated_at' => $now,
+                ]);
+            if (!$updated) {
+                throw new RuntimeException('Unable to update the department allocation.');
+            }
+            if ($this->db->affectedRows() !== 1) {
+                $current = $this->db->table('department_debt_periods')->where('id', (int) $existing['id'])->get()->getRowArray();
+                $isSafeNoOp = $current
+                    && (float) $current['used_amount'] <= $allocation
+                    && (float) $current['allocation_amount'] === $allocation
+                    && (string) $current['status'] === $status;
+                if (!$isSafeNoOp) {
+                    throw new RuntimeException('Allocation cannot be lower than the amount already used for this month.', 409);
+                }
+            }
+            $periodId = (int) $existing['id'];
+            $used = (float) $existing['used_amount'];
+            $outstanding = (float) $existing['outstanding_amount'];
+            $beforeAllocation = (float) $existing['allocation_amount'];
+        } else {
+            if (!$this->db->table('department_debt_periods')->insert([
+                'department_id' => $departmentId,
+                'period_month' => $periodMonth,
+                'allocation_amount' => $allocation,
+                'used_amount' => 0,
+                'outstanding_amount' => 0,
+                'status' => $status,
+                'notes' => $reason !== '' ? $reason : null,
+                'configured_by' => $actorId > 0 ? $actorId : null,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ])) {
+                throw new RuntimeException('Unable to create the department allocation.');
+            }
+            $periodId = (int) $this->db->insertID();
+            $used = 0.0;
+            $outstanding = 0.0;
+            $beforeAllocation = 0.0;
+        }
+
+        if (!$this->db->table('department_debt_entries')->insert([
+            'department_id' => $departmentId,
+            'period_id' => $periodId,
+            'entry_type' => $existing ? 'allocation_adjustment' : 'allocation_created',
+            'direction' => 'neutral',
+            'amount' => abs($allocation - $beforeAllocation),
+            'allocation_before' => $beforeAllocation,
+            'allocation_after' => $allocation,
+            'used_before' => $used,
+            'used_after' => $used,
+            'outstanding_before' => $outstanding,
+            'outstanding_after' => $outstanding,
+            'actor_id' => $actorId > 0 ? $actorId : null,
+            'remarks' => $reason !== '' ? $reason : 'Monthly allocation created',
+            'meta_json' => json_encode(['status_before' => $existing['status'] ?? null, 'status_after' => $status, 'batch' => $batchReference !== null, 'batch_reference' => $batchReference]),
+            'created_at' => $now,
+        ])) {
+            throw new RuntimeException('Unable to record the department allocation ledger entry.');
+        }
+        $this->audit('ACCOUNTING_SET_DEPARTMENT_ALLOCATION', $departmentId, $actorId, [
+            'period_month' => $periodMonth,
+            'allocation_before' => $beforeAllocation,
+            'allocation_after' => $allocation,
+            'status_before' => $existing['status'] ?? null,
+            'status_after' => $status,
+            'reason' => $reason,
+            'batch' => $batchReference !== null,
+            'batch_reference' => $batchReference,
+        ]);
+        return $periodId;
+    }
+
+    private function exceptionCode(Throwable $e): int
+    {
+        return in_array((int) $e->getCode(), [400, 404, 409], true) ? (int) $e->getCode() : 500;
     }
 
     public function recordSettlement(int $departmentId, int $periodId, float $amount, string $referenceNo, string $remarks, int $actorId): array
@@ -281,7 +351,7 @@ class DepartmentDebtService
 
     private function audit(string $action, int $departmentId, int $actorId, array $payload): void
     {
-        if (!(new AuditLogModel())->insert([
+        if (!$this->db->table('audit_logs')->insert([
             'actor_id' => $actorId > 0 ? $actorId : null,
             'action' => $action,
             'entity' => 'departments',

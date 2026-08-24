@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/user') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/user-portal.css') ?>?v=20260821b" data-user-page-style>
+<link rel="stylesheet" href="<?= base_url('assets/css/user-portal.css') ?>?v=20260824a" data-user-page-style>
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -14,11 +14,13 @@
     ]) ?>
 
     <div class="user-deduction-filter">
-        <label for="ud-period">Pay period</label>
-        <select id="ud-period" aria-describedby="ud-period-help">
-            <option value="">Loading pay periods...</option>
-        </select>
-        <p id="ud-period-help">Only deductions already applied by Accounting are shown.</p>
+        <div class="field">
+            <label for="ud-period">Pay period</label>
+            <select id="ud-period" aria-describedby="ud-period-help">
+                <option value="">Loading pay periods...</option>
+            </select>
+        </div>
+        <p id="ud-period-help"><i class="bi bi-info-circle" aria-hidden="true"></i> Only deductions already applied by Accounting are shown.</p>
     </div>
 
     <div class="dashboard-grid user-deduction-summary">
@@ -50,5 +52,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/user-deductions.js') ?>?v=20260823a" data-user-page-script></script>
+<script src="<?= base_url('assets/js/user-deductions.js') ?>?v=20260824a" data-user-page-script></script>
 <?= $this->endSection() ?>

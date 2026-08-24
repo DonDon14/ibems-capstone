@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/user') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/user-portal.css') ?>?v=20260821b" data-user-page-style>
+<link rel="stylesheet" href="<?= base_url('assets/css/user-portal.css') ?>?v=20260824a" data-user-page-style>
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -60,8 +60,11 @@
         <article class="dash-panel">
             <h4><i class="bi bi-graph-up-arrow"></i> Spending Trend (7 Days)</h4>
             <p>Daily purchases across all stores.</p>
-            <div class="dash-chart-wrap">
-                <canvas id="u-trend-chart"></canvas>
+            <div class="dash-chart-wrap user-chart-wrap">
+                <canvas id="u-trend-chart" class="is-hidden" aria-label="Spending trend for the last seven days" role="img"></canvas>
+                <div id="u-trend-chart-state" class="user-chart-state" role="status" aria-live="polite">
+                    <?= view('components/data_state', ['type' => 'loading', 'message' => 'Loading spending trend...']) ?>
+                </div>
             </div>
         </article>
         <article class="dash-panel">
@@ -97,5 +100,5 @@
 
 <?= $this->section('scripts') ?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" data-user-page-script data-user-page-once></script>
-<script src="<?= base_url('assets/js/user-dashboard.js') ?>?v=20260823a" data-user-page-script></script>
+<script src="<?= base_url('assets/js/user-dashboard.js') ?>?v=20260824a" data-user-page-script></script>
 <?= $this->endSection() ?>

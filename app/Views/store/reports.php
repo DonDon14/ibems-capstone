@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/store') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/store-reports.css') ?>?v=20260813g">
+<link rel="stylesheet" href="<?= base_url('assets/css/store-reports.css') ?>?v=20260824a">
 <link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20260821b">
 <?= $this->endSection() ?>
 
@@ -46,16 +46,22 @@
         <article class="dash-panel">
             <h4><i class="bi bi-bar-chart"></i> Sales Trend</h4>
             <p id="reports-range-label" class="muted">Selected period trend.</p>
-            <div class="dash-chart-wrap">
-                <canvas id="reports-trend-chart"></canvas>
+            <div class="dash-chart-wrap reports-chart-wrap">
+                <canvas id="reports-trend-chart" aria-label="Sales and transaction trend chart"></canvas>
+                <div id="reports-trend-chart-state" class="reports-chart-state" role="status" aria-live="polite">
+                    <i class="bi bi-arrow-repeat" aria-hidden="true"></i><strong>Loading sales trend...</strong>
+                </div>
             </div>
         </article>
 
         <article class="dash-panel">
             <h4><i class="bi bi-pie-chart"></i> Payment Mix</h4>
             <p class="muted">Share of payment methods in selected period.</p>
-            <div class="dash-chart-wrap">
-                <canvas id="reports-payment-mix-chart"></canvas>
+            <div class="dash-chart-wrap reports-chart-wrap">
+                <canvas id="reports-payment-mix-chart" aria-label="Payment method mix chart"></canvas>
+                <div id="reports-payment-mix-chart-state" class="reports-chart-state" role="status" aria-live="polite">
+                    <i class="bi bi-arrow-repeat" aria-hidden="true"></i><strong>Loading payment mix...</strong>
+                </div>
             </div>
         </article>
     </div>
@@ -228,6 +234,6 @@
 
 <?= $this->section('scripts') ?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260821a"></script>
-<script src="<?= base_url('assets/js/store-reports.js') ?>?v=20260822a"></script>
+<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260824a"></script>
+<script src="<?= base_url('assets/js/store-reports.js') ?>?v=20260824b"></script>
 <?= $this->endSection() ?>

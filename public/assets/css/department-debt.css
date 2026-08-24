@@ -21,7 +21,7 @@
 .department-toolbar select,
 .department-form-grid input,
 .department-form-grid select,
-.department-pin-panel input { width: 100%; min-height: 2.75rem; border: 1px solid var(--border); border-radius: 0.7rem; background: var(--surface-soft); color: var(--text-main); padding: 0.6rem 0.75rem; }
+.department-pin-panel input { width: 100%; min-height: 2.75rem; border: 1px solid var(--border); border-radius: 0.7rem; background-color: var(--surface-soft); color: var(--text-main); padding: 0.6rem 0.75rem; }
 .department-table-wrap { overflow: auto; border: 1px solid var(--border); border-radius: 1rem; background: var(--surface); }
 .department-table-wrap .table { margin: 0; min-width: 780px; }
 .department-identity { display: grid; gap: 0.15rem; }
@@ -40,7 +40,7 @@
 .department-modal { position: fixed; inset: 0; z-index: 1900; display: grid; place-items: center; padding: 1rem; background: rgb(2 6 23 / 0.62); backdrop-filter: blur(5px); }
 .department-modal.is-hidden { display: none; }
 body.department-modal-open { overflow: hidden; }
-.department-modal-card { width: min(46rem, 100%); max-height: min(90vh, 50rem); overflow: auto; border: 1px solid var(--border); border-radius: 1.15rem; background: var(--surface); color: var(--text-main); box-shadow: 0 24px 70px rgb(2 6 23 / 0.3); }
+.department-modal-card { display: flex; width: min(46rem, 100%); max-height: min(90vh, 50rem); flex-direction: column; overflow: hidden; border: 1px solid var(--border); border-radius: 1.15rem; background: var(--surface); color: var(--text-main); box-shadow: 0 24px 70px rgb(2 6 23 / 0.3); }
 .department-modal-card > header,
 .department-modal-card > footer,
 .department-ledger-panel > header,
@@ -50,8 +50,13 @@ body.department-modal-open { overflow: hidden; }
 .department-ledger-panel h3,
 .department-assignment-panel h3,
 .department-pin-panel h3 { margin: 0.15rem 0 0; font-size: 1.05rem; }
-.department-modal-card > header button { display: grid; place-items: center; width: 2.4rem; height: 2.4rem; border: 0; border-radius: 0.65rem; background: var(--surface-muted); color: var(--text-main); font-size: 1.5rem; }
+.department-modal-card > header button { display: grid; place-items: center; width: 2.4rem; height: 2.4rem; border: 0; border-radius: 0; background: transparent; color: var(--text-soft); font-size: 1.5rem; box-shadow: none; }
+.department-modal-card > header button:is(:hover, :focus-visible) { outline: 0; background: transparent; color: #dc2626; }
 .department-modal-card > footer { justify-content: flex-end; border-top: 1px solid var(--border); border-bottom: 0; }
+.department-modal-card > header,
+.department-modal-card > footer { flex: 0 0 auto; background: var(--surface); }
+.department-modal-scroll { min-height: 0; margin-right: 5px; padding: 0 5px 0 0; overflow-x: hidden; overflow-y: auto; overscroll-behavior: contain; }
+.department-finance-context { margin: 1rem 1.15rem 0; border: 1px solid color-mix(in srgb, #2563eb 26%, var(--border)); border-radius: 0.8rem; padding: 0.75rem 0.85rem; background: color-mix(in srgb, #2563eb 7%, var(--surface)); color: var(--text-soft); font-size: 0.84rem; line-height: 1.45; }
 .department-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.9rem; padding: 1.15rem; }
 .department-form-grid label { display: grid; gap: 0.35rem; min-width: 0; }
 .department-head-field { display: grid; gap: 0.35rem; min-width: 0; }
@@ -73,7 +78,8 @@ body.department-modal-open { overflow: hidden; }
 .department-head-search-hint { margin: 0; padding: 0.8rem; text-align: center; }
 .department-form-grid label small { color: var(--text-soft); font-size: 0.75rem; }
 .department-wide { grid-column: 1 / -1; }
-.department-modal-card > .department-result { padding: 0 1.15rem; }
+.department-modal-card > .department-result,
+.department-modal-scroll > .department-result { padding: 0 1.15rem; }
 .department-progress { display: grid; gap: 0.35rem; min-width: 10rem; }
 .department-progress-track { height: 0.38rem; overflow: hidden; border-radius: 99px; background: var(--surface-muted); }
 .department-progress-track span { display: block; height: 100%; border-radius: inherit; background: #2563eb; }
@@ -93,6 +99,33 @@ body.department-modal-open { overflow: hidden; }
 .department-pin-panel > label { display: grid; gap: 0.35rem; }
 .department-pin-panel > small { color: var(--text-soft); }
 .department-finance-card { width: min(38rem, 100%); }
+.department-batch-card { width: min(52rem, 100%); }
+.department-batch-picker { display: grid; gap: 0.75rem; margin: 1rem 1.15rem 0; }
+.department-batch-picker-heading { display: flex; align-items: center; justify-content: space-between; gap: 0.75rem; }
+.department-batch-picker-heading > div:first-child { display: grid; gap: 0.2rem; }
+.department-batch-picker-heading strong { color: var(--text-main); font-size: 0.88rem; }
+.department-batch-picker-actions { display: flex; flex-wrap: wrap; gap: 0.4rem; }
+.department-batch-picker-actions button { min-height: 2.35rem; padding-block: 0.4rem; }
+.department-batch-search { position: relative; display: block; }
+.department-batch-search i { position: absolute; z-index: 1; top: 50%; left: 0.85rem; transform: translateY(-50%); color: var(--text-soft); pointer-events: none; }
+.department-batch-search input { width: 100%; min-height: 2.75rem; border: 1px solid var(--border); border-radius: 0.7rem; padding: 0.6rem 0.75rem 0.6rem 2.45rem; background: var(--surface-soft); color: var(--text-main); }
+.department-batch-options { display: grid; gap: 0.45rem; max-height: min(17rem, 35vh); overflow-y: auto; overscroll-behavior: contain; padding: 0.15rem 5px 0.15rem 0; scrollbar-color: color-mix(in srgb, var(--text-soft) 58%, transparent) transparent; scrollbar-width: thin; }
+.department-batch-option { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 0.75rem; min-height: 3.4rem; border: 1px solid var(--border); border-radius: 0.75rem; padding: 0.65rem 0.75rem; background: var(--surface-soft); color: var(--text-main); cursor: pointer; }
+.department-batch-option:has(input:checked) { border-color: color-mix(in srgb, #2563eb 62%, var(--border)); background: color-mix(in srgb, #2563eb 10%, var(--surface)); box-shadow: inset 3px 0 #2563eb; }
+.department-batch-option input { width: 1rem; height: 1rem; accent-color: #2563eb; }
+.department-batch-option > span { display: grid; gap: 0.12rem; min-width: 0; }
+.department-batch-option strong,
+.department-batch-option small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.department-batch-option small { color: var(--text-soft); }
+.department-batch-option em { color: var(--text-soft); font-size: 0.73rem; font-style: normal; font-weight: 750; text-transform: uppercase; }
+.department-batch-option.is-inactive { opacity: 0.68; }
+.department-batch-empty { margin: 0; padding: 1rem; border: 1px dashed var(--border); border-radius: 0.75rem; color: var(--text-soft); text-align: center; }
+.department-batch-fields { padding-bottom: 0.8rem; }
+.department-batch-preview { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0.2rem 1rem; margin: 0 1.15rem 1rem; border: 1px solid color-mix(in srgb, #2563eb 26%, var(--border)); border-radius: 0.8rem; padding: 0.8rem 0.9rem; background: color-mix(in srgb, #2563eb 7%, var(--surface)); }
+.department-batch-preview span,
+.department-batch-preview small { color: var(--text-soft); }
+.department-batch-preview strong { color: var(--text-main); }
+.department-batch-preview small { grid-column: 1 / -1; }
 
 @media (max-width: 900px) {
     .department-summary-grid,
@@ -107,4 +140,8 @@ body.department-modal-open { overflow: hidden; }
     .department-wide { grid-column: auto; }
     .department-toolbar { align-items: stretch; flex-direction: column; }
     .department-toolbar button { width: 100%; }
+    .department-batch-picker-heading { align-items: stretch; flex-direction: column; }
+    .department-batch-picker-actions button { width: auto; }
+    .department-batch-option { grid-template-columns: auto minmax(0, 1fr); }
+    .department-batch-option em { grid-column: 2; }
 }

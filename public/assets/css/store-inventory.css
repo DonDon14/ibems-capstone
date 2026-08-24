@@ -847,6 +847,38 @@ body.ibems-modern #inventory-product-modal :is(.inv-modal-head, .inv-modal-actio
     min-width: 0;
 }
 
+body.ibems-modern #inventory-product-action-modal .inventory-product-action-card {
+    width: min(1080px, 100%);
+    max-height: min(90dvh, 860px);
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    padding: 0;
+    overflow: hidden;
+}
+
+body.ibems-modern #inventory-product-action-modal .inv-modal-head {
+    min-width: 0;
+    margin: 0;
+    padding: 20px 22px 16px;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+body.ibems-modern #inventory-product-action-modal .product-actions-body {
+    min-width: 0;
+    min-height: 0;
+    margin: 0 7px 8px 0;
+    padding: 16px 15px 14px 22px;
+    overflow-x: hidden;
+    overflow-y: auto;
+}
+
+body.ibems-modern #inventory-product-action-modal .inv-modal-actions {
+    min-width: 0;
+    margin: 0;
+    padding: 14px 22px;
+    border-top: 1px solid #e2e8f0;
+}
+
 .projection {
     margin-top: 12px;
     background: #f8fafc;

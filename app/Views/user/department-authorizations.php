@@ -1,11 +1,11 @@
 <?= $this->extend('layouts/user') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/department-debt.css') ?>?v=20260824d" data-user-page-style>
+<link rel="stylesheet" href="<?= base_url('assets/css/department-debt.css') ?>?v=20260824g" data-user-page-style>
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
-<section id="department-user-page" class="department-page">
+<section id="department-user-page" class="department-page dashboard-shell">
     <?= view('components/page_header', [
         'eyebrow' => 'Department authorization',
         'title' => 'Department approval PIN',
@@ -16,7 +16,9 @@
     <div class="department-user-grid">
         <article class="department-assignment-panel">
             <header><span>Your authority</span><h3>Departments you head</h3></header>
-            <div id="department-user-assignments"><p>Loading assignments...</p></div>
+            <div id="department-user-assignments" aria-live="polite">
+                <?= view('components/data_state', ['type' => 'loading', 'message' => 'Loading department assignments...']) ?>
+            </div>
         </article>
         <form id="department-pin-form" class="department-pin-panel">
             <header><span>Secure authorization</span><h3 id="department-pin-heading">Set approval PIN</h3></header>
@@ -33,5 +35,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/department-debt-pages.js') ?>?v=20260824d" data-user-page-script></script>
+<script src="<?= base_url('assets/js/department-debt-pages.js') ?>?v=20260824e" data-user-page-script></script>
 <?= $this->endSection() ?>

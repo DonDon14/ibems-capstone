@@ -82,17 +82,39 @@
         </article>
     </div>
 
-    <div class="dash-panels">
-        <article class="dash-panel">
-            <h4><i class="bi bi-graph-up-arrow"></i> Revenue over Time (Last 7 Days)</h4>
-            <div class="dash-chart-wrap">
-                <canvas id="ad-sales-trend-chart"></canvas>
+    <div class="dash-panels dashboard-analytics-grid">
+        <article class="dash-panel dashboard-chart-panel">
+            <div class="dashboard-panel-heading">
+                <div>
+                    <h4><i class="bi bi-graph-up-arrow"></i> Revenue trend</h4>
+                    <p>Daily collected revenue across all stores.</p>
+                </div>
+                <span class="dashboard-panel-meta">Last 7 days</span>
             </div>
+            <div class="dashboard-chart-summary" aria-live="polite">
+                <div>
+                    <span>7-day revenue</span>
+                    <strong id="ad-sales-total">PHP 0.00</strong>
+                </div>
+                <p id="ad-sales-peak">No revenue recorded yet.</p>
+            </div>
+            <div class="dash-chart-wrap dashboard-revenue-chart">
+                <canvas id="ad-sales-trend-chart" role="img" aria-label="Revenue collected during the last seven days" aria-describedby="ad-sales-chart-summary">
+                    Revenue trend chart for the last seven days.
+                </canvas>
+            </div>
+            <p id="ad-sales-chart-summary" class="sr-only">Revenue data is loading.</p>
         </article>
-        <article class="dash-panel">
-            <h4><i class="bi bi-bar-chart-fill"></i> Top Selling Items (Last 7 Days)</h4>
-            <div class="dash-chart-wrap">
-                <canvas id="ad-top-items-chart"></canvas>
+        <article class="dash-panel dashboard-ranking-panel">
+            <div class="dashboard-panel-heading">
+                <div>
+                    <h4><i class="bi bi-bar-chart-fill"></i> Top-selling items</h4>
+                    <p>Products ranked by units sold, with sales value.</p>
+                </div>
+                <span class="dashboard-panel-meta">Last 7 days</span>
+            </div>
+            <div id="ad-top-items-ranking" class="dashboard-ranking-list" aria-live="polite" aria-busy="true">
+                <?= view('components/data_state', ['type' => 'loading', 'message' => 'Loading product ranking...']) ?>
             </div>
         </article>
     </div>
@@ -124,5 +146,5 @@
 
 <?= $this->section('scripts') ?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="<?= base_url('assets/js/admin-dashboard.js') ?>?v=20260822b"></script>
+<script src="<?= base_url('assets/js/admin-dashboard.js') ?>?v=20260824a"></script>
 <?= $this->endSection() ?>

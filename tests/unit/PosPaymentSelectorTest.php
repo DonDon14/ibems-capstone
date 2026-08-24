@@ -17,8 +17,14 @@ final class PosPaymentSelectorTest extends TestCase
         $this->assertStringContainsString('secondary-btn payment-method-option', $js);
         $this->assertStringContainsString('aria-pressed=', $js);
         $this->assertStringContainsString('.payment-method-grid', $css);
+        $this->assertStringContainsString('.payment-method-grid > :only-child', $css);
         $this->assertStringContainsString('.payment-method-option.secondary-btn.is-active', $css);
+        $this->assertMatchesRegularExpression('/\.payment-method-option\.secondary-btn\s*\{[^}]*white-space:\s*normal;/s', $css);
         $this->assertStringContainsString('id="split-payment-toggle"', $view);
+        $this->assertStringContainsString('id="pos-transaction-note" class="pos-transaction-note is-locked"', $view);
+        $this->assertStringContainsString('.split-payment-editor.is-hidden', $css);
+        $this->assertMatchesRegularExpression('/\.debt-search-wrap #debt-customer-search\s*\{[^}]*padding:\s*10px 62px 10px 40px;/s', $css);
+        $this->assertMatchesRegularExpression('/\.debt-search-wrap #debt-customer-search\s*\{[^}]*background-color:\s*#fff;/s', $css);
         $this->assertStringContainsString('function getSplitPaymentLines', $js);
         $this->assertStringContainsString('Balance Split Payment', $js);
         $this->assertStringContainsString('splitTenderSupported', $js);

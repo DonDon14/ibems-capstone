@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/admin') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/admin-overview.css') ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/admin-overview.css') ?>?v=20260824b">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -117,12 +117,14 @@
 </section>
 
 <div id="ap-view-modal" class="admin-modal admin-overview-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="ap-view-title">
-    <div class="admin-modal-card max-h-[92vh] w-[min(760px,95vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+    <div class="admin-modal-card app-inset-modal-card ap-view-card max-h-[92vh] w-[min(760px,95vw)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
         <div class="admin-modal-head">
             <h4 id="ap-view-title" class="text-lg font-bold text-slate-900">Product Snapshot</h4>
             <button id="ap-view-close" type="button" class="admin-modal-close" aria-label="Close product snapshot">x</button>
         </div>
-        <div id="ap-view-content" class="ap-detail-grid"></div>
+        <div class="app-inset-modal-scroll ap-view-modal-scroll">
+            <div id="ap-view-content" class="ap-detail-grid"></div>
+        </div>
         <div class="admin-modal-actions">
             <a id="ap-store-link" class="secondary-btn" href="<?= site_url('admin/stores') ?>">Open Store Details</a>
         </div>
@@ -131,5 +133,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/admin-products.js') ?>"></script>
+<script src="<?= base_url('assets/js/admin-products.js') ?>?v=20260824a"></script>
 <?= $this->endSection() ?>

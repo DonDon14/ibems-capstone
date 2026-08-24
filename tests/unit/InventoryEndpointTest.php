@@ -172,6 +172,28 @@ final class InventoryEndpointTest extends CIUnitTestCase
         $this->assertSame(49.0, (float) ($movement['expected_profit'] ?? 0));
     }
 
+    public function testRestockRejectsFractionalQuantityWithoutChangingStock(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+        $this->seedStore($now);
+        $this->seedProduct(101, 'SKU-101', 'BAR-101', 5, $now);
+
+        $result = $this->inventoryPost('store/inventory/restock', [
+            'store_id' => 1,
+            'product_id' => 101,
+            'qty' => 1.5,
+            'unit_cost' => 8,
+            'sell_price' => 15,
+            'reason' => 'Invalid fractional delivery',
+        ]);
+
+        $result->assertStatus(400);
+        $product = $db->table('products')->where('id', 101)->get()->getRowArray();
+        $this->assertSame(5, (int) ($product['stock_qty'] ?? -1));
+        $this->assertSame(0, $db->table('inventory_movements')->where('product_id', 101)->countAllResults());
+    }
+
     public function testAdjustStockSetsActualQuantityAndWritesMovement(): void
     {
         $db = Database::connect();
@@ -201,6 +223,26 @@ final class InventoryEndpointTest extends CIUnitTestCase
         $this->assertNotNull($movement);
         $this->assertSame(-3, (int) ($movement['qty'] ?? 0));
         $this->assertSame('Physical count', $movement['reason'] ?? null);
+    }
+
+    public function testAdjustStockRejectsFractionalActualQuantityWithoutChangingStock(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+        $this->seedStore($now);
+        $this->seedProduct(101, 'SKU-101', 'BAR-101', 5, $now);
+
+        $result = $this->inventoryPost('store/inventory/adjust-stock', [
+            'store_id' => 1,
+            'product_id' => 101,
+            'actual_qty' => 2.5,
+            'reason' => 'Invalid fractional count',
+        ]);
+
+        $result->assertStatus(400);
+        $product = $db->table('products')->where('id', 101)->get()->getRowArray();
+        $this->assertSame(5, (int) ($product['stock_qty'] ?? -1));
+        $this->assertSame(0, $db->table('inventory_movements')->where('product_id', 101)->countAllResults());
     }
 
     private function actingAsStoreOfficer(): self

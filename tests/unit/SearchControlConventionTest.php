@@ -20,15 +20,18 @@ final class SearchControlConventionTest extends CIUnitTestCase
             );
         }
 
-        $modernUi = (string) file_get_contents(FCPATH . 'assets/css/modern-ui.css');
+        $modernUi = str_replace("\r\n", "\n", (string) file_get_contents(FCPATH . 'assets/css/modern-ui.css'));
         $this->assertStringContainsString('.ibems-modern input[type="search"]', $modernUi);
         $this->assertStringContainsString('background-image:', $modernUi);
+        $this->assertStringContainsString('transparent 60%) !important;', $modernUi);
+        $this->assertStringContainsString('background-position: 13px 50%, 22px calc(50% + 6px) !important;', $modernUi);
+        $this->assertStringContainsString('background-size: 13px 13px, 8px 8px !important;', $modernUi);
     }
 
     public function testEnhancedControlsRenderOneVisibleTrigger(): void
     {
         $controls = (string) file_get_contents(FCPATH . 'assets/js/modern-controls.js');
-        $modernUi = (string) file_get_contents(FCPATH . 'assets/css/modern-ui.css');
+        $modernUi = str_replace("\r\n", "\n", (string) file_get_contents(FCPATH . 'assets/css/modern-ui.css'));
 
         $this->assertStringContainsString('select:not([multiple]):not([size])', $controls);
         $this->assertStringContainsString("input[type='date']", $controls);

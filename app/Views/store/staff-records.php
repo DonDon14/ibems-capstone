@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/store') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/store-staff-records.css') ?>?v=20260823c">
+<link rel="stylesheet" href="<?= base_url('assets/css/store-staff-records.css') ?>?v=20260824e">
 <link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20260821b">
 <?= $this->endSection() ?>
 
@@ -71,7 +71,7 @@
 </section>
 
 <div id="staff-employee-modal" class="receipt-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="staff-employee-title">
-    <div class="receipt-card staff-employee-card">
+    <div class="receipt-card staff-employee-card app-inset-modal-card">
         <div class="receipt-head staff-modal-head">
             <div>
                 <span class="staff-modal-eyebrow">Employee account</span>
@@ -80,7 +80,7 @@
             <button id="staff-employee-close" type="button" class="secondary-btn btn-icon receipt-close" aria-label="Close employee transactions"><i class="bi bi-x-lg"></i></button>
         </div>
 
-        <div class="staff-modal-body">
+        <div class="staff-modal-body app-inset-modal-scroll">
         <div id="staff-employee-summary" class="staff-employee-summary"></div>
 
         <div class="staff-filters staff-modal-filters">
@@ -178,6 +178,6 @@
 
 <?= $this->section('scripts') ?>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260821a"></script>
-<script src="<?= base_url('assets/js/store-staff-records.js') ?>?v=20260823a"></script>
+<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260824a"></script>
+<script src="<?= base_url('assets/js/store-staff-records.js') ?>?v=20260824b"></script>
 <?= $this->endSection() ?>

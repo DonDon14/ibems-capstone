@@ -44,6 +44,32 @@ function uDataState(type, message, colspan = 0) {
 }
 
 let uTrendChart = null;
+let uTrendRows = [];
+
+function uSetTrendState(type, message) {
+    const canvas = document.getElementById("u-trend-chart");
+    const state = document.getElementById("u-trend-chart-state");
+    if (!canvas || !state) return;
+    const safeType = ["loading", "empty", "error"].includes(type) ? type : "empty";
+    canvas.classList.add("is-hidden");
+    state.classList.remove("is-hidden");
+    state.innerHTML = uDataState(safeType, message);
+}
+
+function uShowTrendChart() {
+    document.getElementById("u-trend-chart")?.classList.remove("is-hidden");
+    document.getElementById("u-trend-chart-state")?.classList.add("is-hidden");
+}
+
+function uChartTheme() {
+    const dark = document.documentElement.dataset.theme === "dark";
+    return {
+        line: dark ? "#7db5ff" : "#1d4ed8",
+        fill: dark ? "rgba(96, 165, 250, 0.18)" : "rgba(59, 130, 246, 0.18)",
+        text: dark ? "#b5c4d6" : "#64748b",
+        grid: dark ? "rgba(96, 116, 145, 0.26)" : "rgba(148, 163, 184, 0.28)",
+    };
+}
 
 function uSetText(id, value) {
     const el = document.getElementById(id);
@@ -102,17 +128,28 @@ function uRenderCreditMeter(summary) {
 
 function uRenderTrend(rows) {
     const canvas = document.getElementById("u-trend-chart");
-    if (!canvas || typeof window.Chart === "undefined") return;
+    if (!canvas) return;
+    uTrendRows = Array.isArray(rows) ? rows : [];
 
     if (uTrendChart) {
         uTrendChart.destroy();
         uTrendChart = null;
     }
 
-    if (!Array.isArray(rows) || rows.length === 0) return;
+    if (!Array.isArray(rows) || rows.length === 0 || rows.every((row) => Number(row.amount || 0) === 0)) {
+        uSetTrendState("empty", "No spending was recorded in the last seven days.");
+        return;
+    }
+
+    if (typeof window.Chart === "undefined") {
+        uSetTrendState("error", "The spending chart could not be loaded.");
+        return;
+    }
 
     const labels = rows.map((row) => String(row.date || "").slice(5));
     const amounts = rows.map((row) => Number(row.amount || 0));
+    const theme = uChartTheme();
+    uShowTrendChart();
 
     uTrendChart = new window.Chart(canvas, {
         type: "line",
@@ -124,11 +161,11 @@ function uRenderTrend(rows) {
                 tension: 0.35,
                 fill: true,
                 borderWidth: 2,
-                borderColor: "rgba(29, 78, 216, 1)",
-                backgroundColor: "rgba(59, 130, 246, 0.18)",
+                borderColor: theme.line,
+                backgroundColor: theme.fill,
                 pointRadius: 3,
                 pointHoverRadius: 4,
-                pointBackgroundColor: "rgba(29, 78, 216, 1)",
+                pointBackgroundColor: theme.line,
             }],
         },
         options: {
@@ -145,10 +182,15 @@ function uRenderTrend(rows) {
                 },
             },
             scales: {
-                x: { grid: { display: false } },
+                x: {
+                    grid: { display: false },
+                    ticks: { color: theme.text },
+                },
                 y: {
                     beginAtZero: true,
+                    grid: { color: theme.grid },
                     ticks: {
+                        color: theme.text,
                         callback(value) {
                             return window.IbemsFormat?.money(value, { decimals: 0 }) || `PHP ${Number(value).toFixed(0)}`;
                         },
@@ -206,6 +248,7 @@ function uRenderRecentTransactions(rows) {
 }
 
 async function loadUserDashboard() {
+    uSetTrendState("loading", "Loading spending trend...");
     try {
         const response = await fetch("/user/dashboard/data", { signal: uPageSignal });
         const data = await response.json();
@@ -236,7 +279,7 @@ async function loadUserDashboard() {
             debt_status_message: "Unable to load your debt status right now.",
         });
         uRenderCreditMeter({});
-        uRenderTrend([]);
+        uSetTrendState("error", error.message || "Unable to load the spending trend.");
         document.getElementById("u-recent-cashbook").innerHTML = uDataState("error", error.message || "Unable to load recent cashbook.");
         document.getElementById("u-recent-transactions-body").innerHTML = uDataState("error", error.message || "Unable to load recent transactions.", 5);
     }
@@ -246,5 +289,9 @@ uPageSignal.addEventListener("abort", () => {
     uTrendChart?.destroy();
     uTrendChart = null;
 }, { once: true });
+window.addEventListener("ibems:themechange", () => {
+    if (!uTrendChart) return;
+    uRenderTrend(uTrendRows);
+}, { signal: uPageSignal });
 loadUserDashboard();
 }());

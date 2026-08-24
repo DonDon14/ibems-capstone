@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/store') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/store-settings.css') ?>?v=20260821c">
+<link rel="stylesheet" href="<?= base_url('assets/css/store-settings.css') ?>?v=20260824d">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -62,7 +62,7 @@
 </section>
 
 <div id="category-edit-modal" class="settings-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="category-edit-title" aria-describedby="category-edit-subtitle">
-    <div class="settings-modal-card category-edit-card">
+    <div class="settings-modal-card category-edit-card app-inset-modal-card">
         <header class="settings-modal-head category-edit-head">
             <div class="category-modal-heading">
                 <span class="category-modal-icon" aria-hidden="true"><i class="bi bi-tags"></i></span>
@@ -74,7 +74,7 @@
             </div>
             <button id="category-edit-close" class="icon-btn" type="button" aria-label="Close category editor"><i class="bi bi-x-lg"></i></button>
         </header>
-        <div class="settings-modal-body category-edit-body">
+        <div class="settings-modal-body category-edit-body app-inset-modal-scroll">
             <div class="category-edit-summary">
                 <i class="bi bi-box-seam" aria-hidden="true"></i>
                 <div>
@@ -97,9 +97,9 @@
 </div>
 
 <div id="payment-method-modal" class="settings-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="payment-method-modal-title">
-    <div class="settings-modal-card">
+    <div class="settings-modal-card app-inset-modal-card">
         <header class="settings-modal-head"><div><span class="settings-modal-eyebrow">Payment settings</span><h3 id="payment-method-modal-title">Edit payment method</h3></div><button id="payment-method-modal-close" class="icon-btn" type="button" aria-label="Close payment method editor"><i class="bi bi-x-lg"></i></button></header>
-        <div class="settings-modal-body">
+        <div class="settings-modal-body app-inset-modal-scroll">
             <section class="method-editor-section">
                 <h4>Display</h4>
                 <div class="method-display-grid">
@@ -128,5 +128,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/store-settings.js') ?>?v=20260821c"></script>
+<script src="<?= base_url('assets/js/store-settings.js') ?>?v=20260824d"></script>
 <?= $this->endSection() ?>

@@ -194,10 +194,12 @@ async function apLoad() {
 
 function apOpenModal(id) {
     document.getElementById(id).classList.remove("is-hidden");
+    document.body.classList.add("app-modal-open");
 }
 
 function apCloseModal(id) {
     document.getElementById(id).classList.add("is-hidden");
+    document.body.classList.remove("app-modal-open");
 }
 
 function apDetailItem(label, value) {

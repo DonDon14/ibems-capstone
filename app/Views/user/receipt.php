@@ -1,19 +1,23 @@
 <?= $this->extend('layouts/user') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/user-portal.css') ?>?v=20260821b">
-<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20260821b">
+<link rel="stylesheet" href="<?= base_url('assets/css/user-portal.css') ?>?v=20260824a" data-user-page-style>
+<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20260821b" data-user-page-style>
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
-<section class="user-shell">
-    <div class="user-head">
-        <h3>Receipt Details</h3>
-        <p>Your transaction reference view.</p>
-    </div>
+<section class="dashboard-shell user-receipt-page">
+    <?= view('components/page_header', [
+        'eyebrow' => 'Personal records',
+        'title' => 'Receipt details',
+        'description' => 'Review and print this transaction record.',
+        'icon' => 'bi bi-receipt',
+    ]) ?>
 
-    <div id="user-receipt-page-content"></div>
-    <p id="user-receipt-page-result" class="stores-result"></p>
+    <div id="user-receipt-page-content" class="user-receipt-document" aria-live="polite">
+        <?= view('components/data_state', ['type' => 'loading', 'message' => 'Loading receipt...']) ?>
+    </div>
+    <div id="user-receipt-page-result" class="user-receipt-result" aria-live="assertive"></div>
     <div class="user-receipt-actions">
         <a href="<?= site_url('user/history') ?>" class="secondary-btn">
             <i class="bi bi-arrow-left"></i> Back to History
@@ -26,13 +30,14 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260821a"></script>
+<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260824a" data-user-page-script data-user-page-once></script>
 <script {csp-script-nonce}>
     (async function () {
         const transactionId = <?= (int) ($transaction_id ?? 0) ?>;
         const resultEl = document.getElementById("user-receipt-page-result");
         const printBtn = document.getElementById("user-receipt-page-print");
         let currentReceipt = null;
+        printBtn.disabled = true;
 
         try {
             const response = await fetch(`/user/transactions/${transactionId}`);
@@ -55,9 +60,12 @@
             };
 
             window.IbemsReceipt.renderReceipt("user-receipt-page-content", currentReceipt);
+            printBtn.disabled = false;
         } catch (error) {
-            resultEl.textContent = error.message || "Unable to load receipt.";
-            resultEl.style.color = "#b91c1c";
+            document.getElementById("user-receipt-page-content").innerHTML = '';
+            resultEl.className = "data-state data-state--error";
+            resultEl.innerHTML = '<i class="bi bi-exclamation-circle" aria-hidden="true"></i><div><strong></strong><small>Return to History and try opening the receipt again.</small></div>';
+            resultEl.querySelector('strong').textContent = error.message || "Unable to load receipt.";
         }
 
         printBtn?.addEventListener("click", () => {

@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/admin') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/admin-overview.css') ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/admin-overview.css') ?>?v=20260824a">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -108,7 +108,7 @@
 </section>
 
 <div id="audit-view-modal" class="admin-modal admin-overview-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="audit-view-title">
-    <div class="admin-modal-card max-h-[92vh] w-[min(840px,95vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl">
+    <div class="admin-modal-card app-inset-modal-card audit-view-card max-h-[92vh] w-[min(840px,95vw)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl">
         <div class="admin-modal-head">
             <div>
                 <span class="modal-eyebrow">Event details</span>
@@ -116,11 +116,11 @@
             </div>
             <button id="audit-view-close" type="button" class="admin-modal-close" aria-label="Close audit event">x</button>
         </div>
-        <div id="audit-view-content" class="audit-detail-grid"></div>
+        <div id="audit-view-content" class="app-inset-modal-scroll audit-detail-grid"></div>
     </div>
 </div>
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/admin-audit.js') ?>?v=20260822a"></script>
+<script src="<?= base_url('assets/js/admin-audit.js') ?>?v=20260824a"></script>
 <?= $this->endSection() ?>

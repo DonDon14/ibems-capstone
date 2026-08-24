@@ -54,4 +54,19 @@ final class InventoryUiTest extends CIUnitTestCase
         $this->assertStringContainsString('cancelLabel: "Continue editing"', $script);
         $this->assertMatchesRegularExpression('/\.app-dialog\s*\{[^}]*z-index:\s*3000;/s', $sharedStyles);
     }
+
+    public function testManageProductUsesSharedScrollLayoutAndValidatesStockActions(): void
+    {
+        $view = (string) file_get_contents(APPPATH . 'Views/store/inventory.php');
+        $styles = (string) file_get_contents(FCPATH . 'assets/css/store-inventory.css');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/store-inventory.js');
+        $darkStyles = (string) file_get_contents(FCPATH . 'assets/css/modern-ui.css');
+
+        $this->assertStringContainsString('inventory-product-action-card', $view);
+        $this->assertMatchesRegularExpression('/id="inventory-product-action-modal"[\s\S]+?<div class="inv-modal-card app-inset-modal-card inventory-product-action-card">/', $view);
+        $this->assertStringContainsString('product-actions-body app-inset-modal-scroll', $view);
+        $this->assertStringContainsString('grid-template-rows: auto minmax(0, 1fr) auto;', $styles);
+        $this->assertStringContainsString('!Number.isInteger(qty)', $script);
+        $this->assertStringContainsString('.adjust-preview, .projection,', $darkStyles);
+    }
 }

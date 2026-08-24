@@ -1,5 +1,5 @@
 (function () {
-    const CONTROL_SELECTOR = "select:not([multiple]):not([size]):not([data-no-enhance]), input[type='date']:not([data-no-enhance])";
+    const CONTROL_SELECTOR = "select:not([multiple]):not([size]):not([data-no-enhance]), input[type='date']:not([data-no-enhance]), input[type='month']:not([data-no-enhance])";
     const enhanced = new WeakSet();
     let openControl = null;
 
@@ -355,12 +355,152 @@
         sync();
     };
 
+    const parseMonth = (value) => {
+        if (!/^\d{4}-\d{2}$/.test(value || "")) return null;
+        const [year, month] = value.split("-").map(Number);
+        return month >= 1 && month <= 12 ? new Date(year, month - 1, 1) : null;
+    };
+    const isoMonth = (date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+    const displayMonth = (value) => parseMonth(value)?.toLocaleDateString("en-US", { month: "long", year: "numeric" }) || "";
+
+    const enhanceMonth = (input) => {
+        if (enhanced.has(input) || input.closest(".ui-date")) return;
+        enhanced.add(input);
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "ui-date ui-month";
+        input.parentNode.insertBefore(wrapper, input);
+        wrapper.appendChild(input);
+        input.classList.add("ui-native-control");
+
+        const trigger = document.createElement("button");
+        trigger.type = "button";
+        trigger.className = "ui-date-trigger ui-month-trigger";
+        trigger.setAttribute("aria-haspopup", "dialog");
+        trigger.innerHTML = '<span class="ui-date-value"></span><span class="ui-control-icon" aria-hidden="true"><i class="bi bi-calendar3"></i></span>';
+        wrapper.appendChild(trigger);
+
+        const explicitLabel = input.id ? document.querySelector(`label[for="${CSS.escape(input.id)}"]`) : null;
+        const ariaLabel = input.getAttribute("aria-label") || explicitLabel?.textContent?.trim();
+        if (ariaLabel) trigger.setAttribute("aria-label", ariaLabel);
+        if (input.required) trigger.setAttribute("aria-required", "true");
+
+        const popup = document.createElement("div");
+        popup.className = "ui-date-popup ui-month-popup";
+        popup.hidden = true;
+        popup.setAttribute("role", "dialog");
+        popup.setAttribute("aria-label", "Choose month");
+        document.body.appendChild(popup);
+
+        let viewYear = (parseMonth(input.value) || new Date()).getFullYear();
+        const minMonth = () => parseMonth(input.min);
+        const maxMonth = () => parseMonth(input.max);
+        const unavailable = (date) => Boolean((minMonth() && date < minMonth()) || (maxMonth() && date > maxMonth()));
+        const selected = () => parseMonth(input.value);
+
+        const sync = () => {
+            const value = trigger.querySelector(".ui-date-value");
+            value.textContent = displayMonth(input.value) || input.placeholder || "Select month";
+            value.classList.toggle("is-placeholder", !input.value);
+            trigger.disabled = input.disabled;
+            trigger.toggleAttribute("aria-invalid", input.getAttribute("aria-invalid") === "true");
+        };
+
+        const choose = (date) => {
+            if (unavailable(date)) return;
+            input.value = isoMonth(date);
+            emitChange(input);
+            sync();
+            api.close(true);
+        };
+
+        const render = () => {
+            const months = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+            popup.innerHTML = `
+                <div class="ui-date-head">
+                    <button type="button" data-year="-1" aria-label="Previous year"><i class="bi bi-chevron-left"></i></button>
+                    <div><strong>${viewYear}</strong><span>Select a month</span></div>
+                    <button type="button" data-year="1" aria-label="Next year"><i class="bi bi-chevron-right"></i></button>
+                </div>
+                <div class="ui-month-grid"></div>
+                <div class="ui-date-actions"><button type="button" data-month-clear>Clear</button><button type="button" data-month-current>This month</button></div>`;
+            const current = new Date();
+            const grid = popup.querySelector(".ui-month-grid");
+            months.forEach((name, month) => {
+                const date = new Date(viewYear, month, 1);
+                const button = document.createElement("button");
+                button.type = "button";
+                button.className = "ui-month-option";
+                button.textContent = name.slice(0, 3);
+                button.classList.toggle("is-current", isoMonth(date) === isoMonth(current));
+                button.classList.toggle("is-selected", isoMonth(date) === input.value);
+                button.disabled = unavailable(date);
+                button.setAttribute("aria-label", date.toLocaleDateString("en-US", { month: "long", year: "numeric" }));
+                button.addEventListener("click", () => choose(date));
+                grid.appendChild(button);
+            });
+            popup.querySelectorAll("[data-year]").forEach((button) => button.addEventListener("click", () => {
+                viewYear += Number(button.dataset.year);
+                render();
+            }));
+            popup.querySelector("[data-month-clear]").addEventListener("click", () => {
+                input.value = "";
+                emitChange(input);
+                sync();
+                api.close(true);
+            });
+            const currentButton = popup.querySelector("[data-month-current]");
+            const currentMonth = new Date(current.getFullYear(), current.getMonth(), 1);
+            currentButton.disabled = unavailable(currentMonth);
+            currentButton.addEventListener("click", () => choose(currentMonth));
+        };
+
+        const api = {
+            close(restoreFocus) {
+                popup.hidden = true;
+                trigger.classList.remove("is-open");
+                trigger.setAttribute("aria-expanded", "false");
+                if (restoreFocus) trigger.focus();
+                if (openControl === api) openControl = null;
+            },
+            reposition() {
+                if (!popup.hidden) positionPopup(trigger, popup, 320);
+            },
+        };
+
+        const open = () => {
+            closeOpenControl(false);
+            viewYear = (selected() || new Date()).getFullYear();
+            render();
+            popup.hidden = false;
+            trigger.classList.add("is-open");
+            trigger.setAttribute("aria-expanded", "true");
+            positionPopup(trigger, popup, 320);
+            openControl = api;
+        };
+
+        trigger.addEventListener("click", () => popup.hidden ? open() : api.close(false));
+        trigger.addEventListener("keydown", (event) => {
+            if (event.key === "Escape" && !popup.hidden) {
+                event.preventDefault();
+                api.close(true);
+            }
+        });
+        input.addEventListener("change", sync);
+        input.addEventListener("focus", () => trigger.focus());
+        input.addEventListener("invalid", () => {
+            trigger.setAttribute("aria-invalid", "true");
+            trigger.focus();
+        });
+        sync();
+    };
+
     const enhance = (root) => {
         if (root.matches?.(CONTROL_SELECTOR)) {
-            root.matches("select") ? enhanceSelect(root) : enhanceDate(root);
+            root.matches("select") ? enhanceSelect(root) : root.matches("input[type='month']") ? enhanceMonth(root) : enhanceDate(root);
         }
         root.querySelectorAll?.(CONTROL_SELECTOR).forEach((control) => {
-            control.matches("select") ? enhanceSelect(control) : enhanceDate(control);
+            control.matches("select") ? enhanceSelect(control) : control.matches("input[type='month']") ? enhanceMonth(control) : enhanceDate(control);
         });
     };
 

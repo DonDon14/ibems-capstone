@@ -172,6 +172,34 @@
         wireQrFallback(target);
     }
 
+    function printWhenQrReady(popup, maximumWaitMs = 5000) {
+        const startedAt = Date.now();
+        let hasPrinted = false;
+
+        const printOnce = () => {
+            if (hasPrinted || popup.closed) return;
+            hasPrinted = true;
+            popup.focus();
+            popup.print();
+        };
+
+        const check = () => {
+            if (hasPrinted || popup.closed) return;
+            const qr = popup.document.querySelector(".ibems-receipt-qr");
+            if (qr?.complete && Number(qr.naturalWidth || 0) > 0) {
+                printOnce();
+                return;
+            }
+            if (Date.now() - startedAt >= maximumWaitMs) {
+                printOnce();
+                return;
+            }
+            window.setTimeout(check, 100);
+        };
+
+        check();
+    }
+
     function printReceipt(receipt) {
         const popup = window.open("", "_blank", "width=780,height=920");
         if (!popup) return false;
@@ -226,8 +254,7 @@
         popup.document.open();
         popup.document.write(html);
         popup.document.close();
-        popup.focus();
-        popup.print();
+        printWhenQrReady(popup);
         return true;
     }
 
@@ -238,5 +265,6 @@
         getLookupUrl,
         formatDateTime,
         wireQrFallback,
+        printWhenQrReady,
     };
 })();

@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/accounting') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/accounting-debts.css') ?>?v=20260823d">
+<link rel="stylesheet" href="<?= base_url('assets/css/accounting-debts.css') ?>?v=20260824c">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -220,7 +220,7 @@
             <button id="close-settlement-run" type="button" class="acct-modal-close" aria-label="Close legacy deduction history"></button>
         </div>
 
-        <div class="mb-3 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        <div class="settlement-warning-panel mb-3 rounded-xl border p-3 text-sm">
             This workflow is read-only. Create and process all new deductions through <strong>Deduction Workflow</strong>.
         </div>
 
@@ -236,7 +236,7 @@
             <button id="settlement-preview-btn" class="secondary-btn" type="button">Preview Deductions</button>
             <button id="settlement-apply-btn" class="primary-btn" type="button" disabled>Review & Confirm</button>
         </div>
-        <div id="settlement-existing-run" class="settlement-existing-run mt-3 flex items-center justify-between gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 hidden">
+        <div id="settlement-existing-run" class="settlement-existing-run settlement-warning-panel mt-3 flex items-center justify-between gap-2 rounded-xl border px-3 py-2 text-sm font-semibold hidden">
             <span id="settlement-existing-run-text"></span>
             <button id="settlement-existing-run-view" type="button" class="secondary-btn">View Existing Batch</button>
         </div>
@@ -290,7 +290,7 @@
             <button id="close-settlement-confirm" type="button" class="acct-modal-close" aria-label="Close salary deduction confirmation">x</button>
         </div>
 
-        <div id="settlement-confirm-summary" class="settlement-confirm-summary rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+        <div id="settlement-confirm-summary" class="settlement-confirm-summary settlement-warning-panel rounded-xl border p-3 text-sm">
             Review the employees below before applying the payroll deduction batch.
         </div>
         <label class="settlement-select-all">
@@ -362,8 +362,8 @@
     </div>
 </div>
 
-<div id="deduction-workflow-modal" class="acct-modal is-hidden<?= !empty($deductionsPage) ? ' deductions-page-shell' : '' ?>" role="dialog" aria-modal="true" aria-labelledby="deduction-workflow-title" data-current-role="<?= esc((string) session()->get('role')) ?>" data-current-user="<?= (int) session()->get('user_id') ?>">
-    <div class="acct-modal-card max-h-[94vh] w-[min(1380px,97vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl<?= !empty($deductionsPage) ? ' deductions-page-card' : '' ?>">
+<section id="deduction-workflow-modal" class="<?= !empty($deductionsPage) ? 'deductions-page-shell' : 'acct-modal is-hidden' ?>" role="<?= !empty($deductionsPage) ? 'region' : 'dialog' ?>"<?= !empty($deductionsPage) ? '' : ' aria-modal="true"' ?> aria-labelledby="deduction-workflow-title" data-current-role="<?= esc((string) session()->get('role')) ?>" data-current-user="<?= (int) session()->get('user_id') ?>">
+    <div class="<?= !empty($deductionsPage) ? 'deductions-page-card' : 'acct-modal-card max-h-[94vh] w-[min(1380px,97vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl' ?>">
         <?php if (!empty($deductionsPage)): ?>
             <?= view('components/page_header', [
                 'eyebrow' => 'Payroll controls',
@@ -382,9 +382,9 @@
             </div>
         <?php endif; ?>
 
-        <div class="grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
-            <div class="space-y-4">
-                <section class="rounded-xl border border-slate-200 bg-slate-50 p-4">
+        <div class="deductions-workflow-layout grid gap-4 xl:grid-cols-[360px_minmax(0,1fr)]">
+            <div class="deductions-workflow-column space-y-4">
+                <section class="deductions-workflow-card rounded-xl border border-slate-200 bg-slate-50 p-4">
                     <h5 class="text-sm font-bold text-slate-900">1. Create deduction period</h5>
                     <div class="mt-3 grid gap-3">
                         <div class="rounded-xl border border-dashed border-slate-300 bg-white p-3 text-sm text-slate-600">
@@ -413,14 +413,14 @@
                     </div>
                 </section>
 
-                <section class="rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+                <section class="deductions-safeguard rounded-xl border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
                     <strong class="block">Workflow safeguard</strong>
                     <p class="mt-1">Prepared means reviewed but not yet deducted. Only Apply deductions changes employee balances.</p>
                 </section>
             </div>
 
-            <div class="space-y-4">
-                <section class="rounded-xl border border-slate-200 bg-white p-4">
+            <div class="deductions-workflow-column space-y-4">
+                <section class="deductions-workflow-card rounded-xl border border-slate-200 bg-white p-4">
                     <div class="flex flex-wrap items-end gap-3">
                         <label class="field min-w-[260px] grow">
                             <span class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Deduction period</span>
@@ -433,7 +433,7 @@
                     <div id="workflow-period-summary" class="mt-3 rounded-xl border border-dashed border-slate-300 bg-slate-50 p-3 text-sm text-slate-600">Choose or create a deduction period.</div>
                 </section>
 
-                <section id="workflow-prepare-section" class="rounded-xl border border-slate-200 bg-white p-4">
+                <section id="workflow-prepare-section" class="deductions-workflow-card rounded-xl border border-slate-200 bg-white p-4">
                     <div class="flex flex-wrap items-center justify-between gap-2">
                         <div>
                             <h5 class="text-sm font-bold text-slate-900">2. Prepare employee requests</h5>
@@ -441,11 +441,11 @@
                         </div>
                         <button id="workflow-open-employees" type="button" class="primary-btn"><i class="bi bi-people"></i> Review employees</button>
                     </div>
-                    <div class="mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3"><span class="text-xs text-slate-500">Employees with debt</span><strong id="workflow-summary-employees" class="mt-1 block text-xl text-slate-900">0</strong></div>
-                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3"><span class="text-xs text-slate-500">Debt at cutoff</span><strong id="workflow-summary-debt" class="mt-1 block text-xl text-slate-900">PHP 0.00</strong></div>
-                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3"><span class="text-xs text-slate-500">Salary not provided</span><strong id="workflow-summary-missing" class="mt-1 block text-xl text-slate-900">0</strong></div>
-                        <div class="rounded-xl border border-slate-200 bg-slate-50 p-3"><span class="text-xs text-slate-500">Selected for batch</span><strong id="workflow-summary-selected" class="mt-1 block text-xl text-slate-900">0</strong></div>
+                    <div class="deductions-summary-grid mt-3 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <div class="deductions-summary-card rounded-xl border border-slate-200 bg-slate-50 p-3"><span class="text-xs text-slate-500">Employees with debt</span><strong id="workflow-summary-employees" class="mt-1 block text-xl text-slate-900">0</strong></div>
+                        <div class="deductions-summary-card rounded-xl border border-slate-200 bg-slate-50 p-3"><span class="text-xs text-slate-500">Debt at cutoff</span><strong id="workflow-summary-debt" class="mt-1 block text-xl text-slate-900">PHP 0.00</strong></div>
+                        <div class="deductions-summary-card rounded-xl border border-slate-200 bg-slate-50 p-3"><span class="text-xs text-slate-500">Salary not provided</span><strong id="workflow-summary-missing" class="mt-1 block text-xl text-slate-900">0</strong></div>
+                        <div class="deductions-summary-card rounded-xl border border-slate-200 bg-slate-50 p-3"><span class="text-xs text-slate-500">Selected for batch</span><strong id="workflow-summary-selected" class="mt-1 block text-xl text-slate-900">0</strong></div>
                     </div>
                 </section>
 
@@ -487,7 +487,7 @@
                     </div>
                 </div>
 
-                <section id="workflow-results-section" class="hidden rounded-xl border border-slate-200 bg-white p-4">
+                <section id="workflow-results-section" class="deductions-workflow-card hidden rounded-xl border border-slate-200 bg-white p-4">
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div>
                             <h5 class="text-sm font-bold text-slate-900">3. Apply and finalize deductions</h5>
@@ -501,7 +501,7 @@
             </div>
         </div>
     </div>
-</div>
+</section>
 
 <div id="debt-investigations-modal" class="acct-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="debt-investigations-title" data-current-role="<?= esc((string) session()->get('role')) ?>" data-current-user="<?= (int) session()->get('user_id') ?>">
     <div class="acct-modal-card max-h-[94vh] w-[min(1180px,97vw)] overflow-y-auto rounded-2xl border border-slate-200 bg-white p-5 shadow-xl" data-inset-modal-scroll>
@@ -590,5 +590,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/accounting-debts.js') ?>?v=20260824g"></script>
+<script src="<?= base_url('assets/js/accounting-debts.js') ?>?v=20260824h"></script>
 <?= $this->endSection() ?>

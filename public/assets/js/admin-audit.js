@@ -143,10 +143,12 @@ function auditDetailItem(label, value) {
 
 function auditOpenModal() {
     document.getElementById("audit-view-modal").classList.remove("is-hidden");
+    document.body.classList.add("audit-modal-open");
 }
 
 function auditCloseModal() {
     document.getElementById("audit-view-modal").classList.add("is-hidden");
+    document.body.classList.remove("audit-modal-open");
 }
 
 function auditOpenDetail(auditId) {

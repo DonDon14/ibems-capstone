@@ -704,12 +704,13 @@
 }
 
 .deductions-page-shell {
-    display: block !important;
+    display: grid !important;
     position: static !important;
     inset: auto !important;
     width: 100% !important;
     min-height: 0 !important;
-    padding: 1.5rem !important;
+    gap: 1.25rem;
+    padding: 0 !important;
     overflow: visible !important;
     background: transparent !important;
     backdrop-filter: none !important;
@@ -721,9 +722,9 @@
 
 .deductions-page-card {
     width: 100% !important;
-    max-width: 1380px !important;
+    max-width: none !important;
     max-height: none !important;
-    margin: 0 auto !important;
+    margin: 0 !important;
     padding: 0 !important;
     overflow: visible !important;
     border: 0 !important;
@@ -739,6 +740,72 @@
 
 .deductions-page-card > .grid {
     min-width: 0;
+}
+
+.deductions-workflow-layout {
+    display: grid;
+    grid-template-columns: minmax(18rem, 22rem) minmax(0, 1fr);
+    align-items: start;
+    gap: 1rem;
+}
+
+.deductions-workflow-column {
+    display: grid;
+    min-width: 0;
+    gap: 1rem;
+}
+
+.deductions-workflow-card,
+.deductions-safeguard {
+    border: 1px solid var(--border) !important;
+    border-radius: 1rem !important;
+    padding: 1rem !important;
+    background: var(--surface) !important;
+    color: var(--text-main);
+    box-shadow: 0 8px 24px rgb(15 23 42 / 0.05);
+}
+
+.deductions-workflow-card > :first-child,
+.deductions-safeguard > :first-child {
+    margin-top: 0;
+}
+
+.deductions-workflow-card :is(.bg-white, .bg-slate-50),
+.deductions-summary-card {
+    border-color: var(--border) !important;
+    background: var(--surface-soft) !important;
+}
+
+.deductions-safeguard {
+    border-color: color-mix(in srgb, #2563eb 32%, var(--border)) !important;
+    background: color-mix(in srgb, #2563eb 8%, var(--surface)) !important;
+    color: var(--text-main) !important;
+}
+
+.deductions-safeguard p {
+    color: var(--text-soft) !important;
+}
+
+.deductions-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+}
+
+.deductions-summary-card {
+    min-width: 0;
+    border: 1px solid var(--border) !important;
+    border-radius: 0.8rem !important;
+    padding: 0.85rem !important;
+}
+
+.deductions-summary-card span {
+    color: var(--text-soft) !important;
+}
+
+.deductions-summary-card strong {
+    color: var(--text-main) !important;
+    overflow-wrap: anywhere;
 }
 
 body #workflow-employees-modal {
@@ -799,8 +866,21 @@ body #workflow-employees-modal .workflow-candidate .workflow-preparation-reason 
 }
 
 @media (max-width: 1279px) {
-    .deductions-page-card > .grid {
+    .deductions-page-card > .grid,
+    .deductions-workflow-layout {
         grid-template-columns: minmax(0, 1fr) !important;
+    }
+}
+
+@media (max-width: 760px) {
+    .deductions-summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 480px) {
+    .deductions-summary-grid {
+        grid-template-columns: 1fr;
     }
 }
 
@@ -1148,13 +1228,30 @@ body #workflow-employees-modal .workflow-candidate .workflow-preparation-reason 
     align-items: center;
     justify-content: space-between;
     gap: 10px;
-    background: #fff7d1;
-    border: 1px solid #f6de8b;
     border-radius: 10px;
     padding: 10px 12px;
     margin-bottom: 10px;
-    color: #713f12;
     font-weight: 600;
+}
+
+.settlement-warning-panel {
+    border-color: color-mix(in srgb, #f59e0b 48%, var(--border));
+    background: color-mix(in srgb, #f59e0b 12%, var(--surface));
+    color: color-mix(in srgb, #b45309 72%, var(--text-main));
+}
+
+.ibems-modern .settlement-warning-panel strong {
+    color: inherit;
+}
+
+html[data-theme="dark"] .ibems-modern .settlement-warning-panel {
+    border-color: color-mix(in srgb, #fbbf24 38%, var(--border));
+    background: color-mix(in srgb, #f59e0b 10%, var(--surface));
+    color: #fcd34d;
+}
+
+html[data-theme="dark"] .ibems-modern .app-container .settlement-warning-panel strong {
+    color: inherit;
 }
 
 .settlement-summary {
