@@ -72,4 +72,16 @@ final class StaffRecordsUiTest extends CIUnitTestCase
         $this->assertLessThan($divisionPosition, $pageSizePosition);
         $this->assertStringContainsString("'amount' => 't.amount'", $method);
     }
+
+    public function testEmployeeTransactionModalUsesFixedHeaderAndSharedScrollBody(): void
+    {
+        $view = (string) file_get_contents(APPPATH . 'Views/store/staff-records.php');
+        $styles = (string) file_get_contents(FCPATH . 'assets/css/store-staff-records.css');
+
+        $this->assertStringContainsString('staff-employee-card app-inset-modal-card', $view);
+        $this->assertStringContainsString('staff-modal-body app-inset-modal-scroll', $view);
+        $this->assertMatchesRegularExpression('/body\.ibems-modern #staff-employee-modal \.staff-modal-head\s*\{[^}]*margin:\s*0;[^}]*padding:\s*20px 24px 18px;/s', $styles);
+        $this->assertStringContainsString('grid-template-rows: auto minmax(0, 1fr);', $styles);
+        $this->assertStringContainsString('min-height: 0;', $styles);
+    }
 }

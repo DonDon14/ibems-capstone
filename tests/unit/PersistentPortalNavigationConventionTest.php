@@ -57,8 +57,8 @@ final class PersistentPortalNavigationConventionTest extends CIUnitTestCase
 
     public function testDesktopSidebarCollapseUsesCoordinatedMotionWithoutSnappingLabels(): void
     {
-        $baseStyles = (string) file_get_contents(FCPATH . 'assets/css/app.css');
-        $modernStyles = (string) file_get_contents(FCPATH . 'assets/css/modern-ui.css');
+        $baseStyles = str_replace("\r\n", "\n", (string) file_get_contents(FCPATH . 'assets/css/app.css'));
+        $modernStyles = str_replace("\r\n", "\n", (string) file_get_contents(FCPATH . 'assets/css/modern-ui.css'));
         $shell = (string) file_get_contents(APPPATH . 'Views/components/portal_shell.php');
 
         $this->assertStringContainsString('max-width 0.24s cubic-bezier(0.4, 0, 0.2, 1)', $baseStyles);
@@ -84,8 +84,11 @@ final class PersistentPortalNavigationConventionTest extends CIUnitTestCase
         $this->assertStringContainsString("color: #9bc4ff;\n    border-color: #315d91;\n    background: #102c52;", $modernStyles);
         $this->assertStringNotContainsString('content: "Workspace";', $modernStyles);
         $this->assertStringContainsString('@media (prefers-reduced-motion: reduce)', $modernStyles);
-        $this->assertStringContainsString("assets/css/app.css') ?>?v=20260823e", $shell);
-        $this->assertStringContainsString("assets/css/modern-ui.css') ?>?v=20260824d", $shell);
+        $this->assertStringContainsString("assets/css/app.css') ?>?v=20260824e", $shell);
+        $this->assertStringContainsString("assets/css/modern-ui.css') ?>?v=20260824m", $shell);
+        $this->assertStringContainsString('body:is(.app-modal-open, .user-product-modal-open) .app-container', $baseStyles);
+        $this->assertStringContainsString('body.account-menu-open .app-container', $baseStyles);
+        $this->assertStringContainsString('.app-modal, .user-product-modal)', $modernStyles);
     }
 
     public function testOnlyExactCurrentRoleSidebarDestinationsArePartiallyLoaded(): void

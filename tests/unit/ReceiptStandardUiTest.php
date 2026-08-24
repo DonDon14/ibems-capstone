@@ -35,7 +35,7 @@ final class ReceiptStandardUiTest extends CIUnitTestCase
         foreach ($views as $viewPath) {
             $view = (string) file_get_contents($viewPath);
             $this->assertStringContainsString('receipt-standard.css\') ?>?v=20260821b', $view, $viewPath);
-            $this->assertStringContainsString('receipt-standard.js\') ?>?v=20260821a', $view, $viewPath);
+            $this->assertStringContainsString('receipt-standard.js\') ?>?v=20260824a', $view, $viewPath);
         }
     }
 

@@ -118,7 +118,7 @@ body.settings-modal-open .app-container { overflow:hidden; }
 .settings-modal-head,.settings-modal-actions { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1rem 1.1rem; border-bottom:1px solid #dce5ef; }
 .settings-modal-head h3 { margin:.15rem 0 0;color:#082e5d; }.settings-modal-eyebrow { color:#2563eb;font-size:.7rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase; }
 .settings-modal-head .icon-btn { width:38px;height:38px;border:1px solid #ccd9e8;border-radius:10px;background:#fff;color:#4f6582; }
-.settings-modal-body { overflow:auto; padding:1rem 1.1rem; display:grid; gap:1rem; }
+.settings-modal-body { min-height:0; margin:0 7px 8px 0; overflow-x:hidden; overflow-y:auto; padding:1rem .65rem 1rem 1.1rem; display:grid; gap:1rem; }
 .settings-modal-actions { justify-content:flex-end;border-top:1px solid #dce5ef;border-bottom:0;background:#f8fafc; }
 .settings-modal-spacer { flex:1; }
 .settings-submit-spinner { display:inline-block; animation:settings-submit-spin .8s linear infinite; }

@@ -512,11 +512,13 @@ function srOpenEmployeeModal(employee) {
     srUpdateTransactionScope();
     srUpdateTransactionResetVisibility();
     document.getElementById("staff-employee-modal").style.display = "grid";
+    document.body.classList.add("app-modal-open");
     window.requestAnimationFrame(() => document.getElementById("staff-employee-close").focus());
 }
 
 function srCloseEmployeeModal() {
     document.getElementById("staff-employee-modal").style.display = "none";
+    document.body.classList.remove("app-modal-open");
     srSelectedEmployee = null;
     document.getElementById("txn-date-from").value = "";
     document.getElementById("txn-date-to").value = "";
@@ -759,7 +761,10 @@ document.getElementById("staff-receipt-modal").addEventListener("click", (event)
     if (event.target.id === "staff-receipt-modal") srCloseReceipt();
 });
 
-const srCleanupScanner = () => srStopScanner();
+const srCleanupScanner = () => {
+    document.body.classList.remove("app-modal-open");
+    return srStopScanner();
+};
 window.addEventListener("beforeunload", srCleanupScanner);
 window.IbemsPortalNavigation?.onCleanup(srCleanupScanner);
 

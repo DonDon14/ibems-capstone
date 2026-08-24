@@ -40,6 +40,13 @@ function setResult(id, message = "", type = "") {
     element.className = `department-result${type ? ` is-${type}` : ""}`;
 }
 
+function dataState(type, message) {
+    const safeType = ["loading", "empty", "error"].includes(type) ? type : "empty";
+    const icon = safeType === "loading" ? "bi-arrow-repeat" : safeType === "error" ? "bi-exclamation-circle" : "bi-inbox";
+    const role = safeType === "error" ? "alert" : "status";
+    return `<div class="data-state data-state--${safeType}" role="${role}" aria-live="polite"><i class="bi ${icon}" aria-hidden="true"></i><div><strong>${escapeHtml(message)}</strong></div></div>`;
+}
+
 function mountDepartmentModal(id) {
     const modal = document.getElementById(id);
     if (!modal) return null;
@@ -91,8 +98,8 @@ function initAdmin() {
         const matches = headMatches(query);
         activeHeadSuggestionIndex = -1;
         if (!String(query || "").trim()) {
-            suggestions.innerHTML = '<p class="department-head-search-hint">Start typing to find an active employee.</p>';
-            setHeadSuggestionsOpen(true);
+            suggestions.replaceChildren();
+            setHeadSuggestionsOpen(false);
             return;
         }
         if (!matches.length) {
@@ -194,7 +201,7 @@ function initAdmin() {
         document.getElementById("department-head").value = department?.head_user_id || "";
         document.getElementById("department-head-search").value = "";
         setHeadSuggestionsOpen(false);
-        headEditorOpen = !department || !department.head_user_id;
+        headEditorOpen = false;
         renderHeadSummary();
         document.getElementById("department-active-input").value = department?.is_active === false ? "0" : "1";
         document.getElementById("department-status-reason").value = department?.status_reason || "";
@@ -217,7 +224,9 @@ function initAdmin() {
         renderHeadSummary();
         requestAnimationFrame(() => document.getElementById("department-head-search").focus());
     });
-    document.getElementById("department-head-search").addEventListener("focus", (event) => renderHeadSuggestions(event.target.value));
+    document.getElementById("department-head-search").addEventListener("focus", (event) => {
+        if (String(event.target.value || "").trim()) renderHeadSuggestions(event.target.value);
+    });
     document.getElementById("department-head-search").addEventListener("input", (event) => renderHeadSuggestions(event.target.value));
     document.getElementById("department-head-search").addEventListener("keydown", (event) => {
         const options = () => Array.from(document.querySelectorAll("#department-head-suggestions .department-head-option"));
@@ -242,7 +251,13 @@ function initAdmin() {
         const option = event.target.closest("[data-department-head-id]");
         if (option) chooseDepartmentHead(Number(option.dataset.departmentHeadId));
     });
-    document.getElementById("department-modal").addEventListener("click", (event) => { if (event.target.id === "department-modal") closeModal(); });
+    document.getElementById("department-modal").addEventListener("click", (event) => {
+        if (event.target.id === "department-modal") {
+            closeModal();
+            return;
+        }
+        if (!event.target.closest("#department-head-editor, #department-head-summary")) setHeadSuggestionsOpen(false);
+    });
     document.getElementById("department-admin-body").addEventListener("click", (event) => {
         const button = event.target.closest("[data-edit-department]");
         if (!button) return;
@@ -282,9 +297,11 @@ function initAccounting() {
     const page = document.getElementById("department-accounting-page");
     if (!page) return;
     const financeModal = mountDepartmentModal("department-finance-modal");
+    const batchModal = mountDepartmentModal("department-batch-allocation-modal");
     const canOperate = page.dataset.canOperate === "true";
     let departments = [];
     let entries = [];
+    const batchSelected = new Set();
 
     function render() {
         const query = String(document.getElementById("department-accounting-search").value || "").trim().toLowerCase();
@@ -344,6 +361,9 @@ function initAccounting() {
         document.getElementById("department-finance-period-id").value = department.period_id || "";
         document.getElementById("department-finance-title").textContent = mode === "settlement" ? `Record settlement · ${department.code}` : `Monthly allocation · ${department.code}`;
         document.getElementById("department-finance-eyebrow").textContent = department.name;
+        document.getElementById("department-finance-context").textContent = mode === "settlement"
+            ? `Outstanding liability: ${money(department.outstanding_amount)}. Record only a verified payment with its official reference and reconciliation remarks.`
+            : `Used this month: ${money(department.used_amount)}. The allocation cannot be reduced below this amount.`;
         document.getElementById("department-allocation-fields").classList.toggle("is-hidden", mode !== "allocation");
         document.getElementById("department-settlement-fields").classList.toggle("is-hidden", mode !== "settlement");
         document.querySelectorAll("#department-allocation-fields input, #department-allocation-fields select").forEach((control) => {
@@ -357,13 +377,57 @@ function initAccounting() {
         document.getElementById("department-period-status").value = department.period_status === "unconfigured" ? "open" : department.period_status;
         document.getElementById("department-allocation-reason").value = "";
         document.getElementById("department-settlement-amount").value = Number(department.outstanding_amount || 0).toFixed(2);
+        document.getElementById("department-settlement-amount").max = Number(department.outstanding_amount || 0).toFixed(2);
         document.getElementById("department-settlement-reference").value = "";
         document.getElementById("department-settlement-remarks").value = "";
+        document.querySelector("#department-finance-save span").textContent = mode === "settlement" ? "Record settlement" : "Save allocation";
         setResult("department-finance-result");
         setDepartmentModalOpen(financeModal, true);
     }
 
     function closeFinance() { setDepartmentModalOpen(financeModal, false); }
+
+    function updateBatchSummary() {
+        const count = batchSelected.size;
+        const amount = Math.max(0, Number(document.getElementById("department-batch-amount")?.value || 0));
+        document.getElementById("department-batch-selected-count").textContent = `${count} selected`;
+        document.getElementById("department-batch-total").textContent = money(count * amount);
+        document.getElementById("department-batch-preview-detail").textContent = count
+            ? `${money(amount)} per department across ${count} department${count === 1 ? "" : "s"}.`
+            : "Select departments and enter an amount.";
+    }
+
+    function renderBatchOptions() {
+        const options = document.getElementById("department-batch-options");
+        const query = String(document.getElementById("department-batch-search").value || "").trim().toLowerCase();
+        const visible = departments.filter((department) => !query || [department.code, department.name, department.head_name]
+            .some((value) => String(value || "").toLowerCase().includes(query)));
+        options.innerHTML = visible.length ? visible.map((department) => {
+            const id = Number(department.id);
+            return `<label class="department-batch-option${department.is_active ? "" : " is-inactive"}">
+                <input type="checkbox" value="${id}" ${batchSelected.has(id) ? "checked" : ""}>
+                <span><strong>${escapeHtml(department.name)}</strong><small>${escapeHtml(department.code)} · Head: ${escapeHtml(department.head_name || "Not assigned")}</small></span>
+                <em>${department.is_active ? "Active" : "Inactive"}</em>
+            </label>`;
+        }).join("") : '<p class="department-batch-empty">No departments match this search.</p>';
+        updateBatchSummary();
+    }
+
+    function openBatchAllocation() {
+        batchSelected.clear();
+        document.getElementById("department-batch-search").value = "";
+        document.getElementById("department-batch-month").value = document.getElementById("department-period-month").value;
+        document.getElementById("department-batch-amount").value = "";
+        document.getElementById("department-batch-status").value = "open";
+        document.getElementById("department-batch-reason").value = "";
+        setResult("department-batch-allocation-result");
+        renderBatchOptions();
+        setDepartmentModalOpen(batchModal, true);
+        window.setTimeout(() => document.getElementById("department-batch-search")?.focus(), 0);
+    }
+
+    function closeBatchAllocation() { setDepartmentModalOpen(batchModal, false); }
+
     document.getElementById("department-period-month").addEventListener("change", load);
     document.getElementById("department-accounting-search").addEventListener("input", render);
     document.getElementById("department-accounting-refresh").addEventListener("click", load);
@@ -412,6 +476,51 @@ function initAccounting() {
             if (!pageSignal.aborted) setResult("department-finance-result", error.message, "error");
         } finally { save.disabled = false; }
     });
+    document.getElementById("department-batch-allocation-open").addEventListener("click", openBatchAllocation);
+    document.getElementById("department-batch-allocation-close").addEventListener("click", closeBatchAllocation);
+    document.getElementById("department-batch-allocation-cancel").addEventListener("click", closeBatchAllocation);
+    document.getElementById("department-batch-allocation-modal").addEventListener("click", (event) => { if (event.target.id === "department-batch-allocation-modal") closeBatchAllocation(); });
+    document.getElementById("department-batch-search").addEventListener("input", renderBatchOptions);
+    document.getElementById("department-batch-amount").addEventListener("input", updateBatchSummary);
+    document.getElementById("department-batch-options").addEventListener("change", (event) => {
+        const checkbox = event.target.closest('input[type="checkbox"]');
+        if (!checkbox) return;
+        const id = Number(checkbox.value);
+        if (checkbox.checked) batchSelected.add(id); else batchSelected.delete(id);
+        updateBatchSummary();
+    });
+    document.getElementById("department-batch-select-all").addEventListener("click", () => {
+        departments.filter((department) => department.is_active).forEach((department) => batchSelected.add(Number(department.id)));
+        renderBatchOptions();
+    });
+    document.getElementById("department-batch-clear").addEventListener("click", () => {
+        batchSelected.clear();
+        renderBatchOptions();
+    });
+    document.getElementById("department-batch-allocation-form").addEventListener("submit", async (event) => {
+        event.preventDefault();
+        if (batchSelected.size === 0) {
+            setResult("department-batch-allocation-result", "Select at least one department.", "error");
+            return;
+        }
+        const save = document.getElementById("department-batch-allocation-save");
+        save.disabled = true;
+        try {
+            const result = await api("/accounting/department-debts/allocations", jsonOptions({
+                department_ids: Array.from(batchSelected),
+                period_month: document.getElementById("department-batch-month").value,
+                allocation_amount: Number(document.getElementById("department-batch-amount").value),
+                status: document.getElementById("department-batch-status").value,
+                reason: document.getElementById("department-batch-reason").value,
+            }));
+            setResult("department-batch-allocation-result", `${Number(result.updated_count || batchSelected.size)} department allocations saved.`, "success");
+            document.getElementById("department-period-month").value = document.getElementById("department-batch-month").value;
+            await load();
+            closeBatchAllocation();
+        } catch (error) {
+            if (!pageSignal.aborted) setResult("department-batch-allocation-result", error.message, "error");
+        } finally { save.disabled = false; }
+    });
     load();
 }
 
@@ -420,13 +529,14 @@ function initUser() {
     if (!page) return;
     let pinIsSet = false;
     async function load() {
+        document.getElementById("department-user-assignments").innerHTML = dataState("loading", "Loading department assignments...");
         try {
             const data = await api("/user/department-authorizations/data");
             const assignments = Array.isArray(data.assignments) ? data.assignments : [];
             const canApprove = assignments.length > 0;
             document.getElementById("department-user-assignments").innerHTML = assignments.length
                 ? assignments.map((assignment) => `<article class="department-assignment-card"><strong>${escapeHtml(assignment.name)}</strong><span>${escapeHtml(assignment.code)}</span><small>Department head</small></article>`).join("")
-                : '<p>You do not currently have an active department approval assignment.</p>';
+                : dataState("empty", "You do not currently have an active department approval assignment.");
             pinIsSet = Boolean(data.pin?.is_set);
             document.getElementById("department-pin-heading").textContent = pinIsSet ? "Replace approval PIN" : "Set approval PIN";
             const currentPasswordWrap = document.getElementById("department-current-password-wrap");
@@ -439,7 +549,10 @@ function initUser() {
                 ? `PIN is set${data.pin.updated_at ? ` · last changed ${formatDate(data.pin.updated_at)}` : ""}${data.pin.last_success_at ? ` · last used ${formatDate(data.pin.last_success_at)}` : ""}`
                 : (canApprove ? "No department approval PIN is set." : "A department head assignment is required before a PIN can be set.");
         } catch (error) {
-            if (!pageSignal.aborted) setResult("department-pin-result", error.message, "error");
+            if (!pageSignal.aborted) {
+                document.getElementById("department-user-assignments").innerHTML = dataState("error", error.message || "Unable to load department assignments.");
+                setResult("department-pin-result", "PIN status is unavailable until assignments can be loaded.", "error");
+            }
         }
     }
     ["department-pin", "department-pin-confirmation"].forEach((id) => document.getElementById(id).addEventListener("input", (event) => {

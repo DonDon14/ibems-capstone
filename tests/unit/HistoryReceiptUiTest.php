@@ -32,4 +32,17 @@ final class HistoryReceiptUiTest extends CIUnitTestCase
         $this->assertStringContainsString('"history-date-from"', $script);
         $this->assertStringContainsString('classList.toggle("is-hidden", !hasActiveFilters)', $script);
     }
+
+    public function testHistoryControlsAlignRightAndPrintingWaitsForQrImage(): void
+    {
+        $styles = (string) file_get_contents(FCPATH . 'assets/css/store-history.css');
+        $receipt = (string) file_get_contents(FCPATH . 'assets/js/receipt-standard.js');
+
+        $this->assertStringContainsString('.history-filters.compact-filter-bar .compact-filter-primary', $styles);
+        $this->assertStringContainsString('justify-content: flex-end;', $styles);
+        $this->assertStringContainsString('function printWhenQrReady', $receipt);
+        $this->assertStringContainsString('qr?.complete && Number(qr.naturalWidth || 0) > 0', $receipt);
+        $this->assertStringContainsString('printWhenQrReady(popup);', $receipt);
+        $this->assertStringNotContainsString("popup.document.close();\n        popup.focus();\n        popup.print();", $receipt);
+    }
 }

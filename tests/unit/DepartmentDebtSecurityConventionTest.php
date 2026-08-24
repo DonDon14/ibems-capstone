@@ -124,5 +124,29 @@ final class DepartmentDebtSecurityConventionTest extends TestCase
         $this->assertStringContainsString('event.key === "ArrowDown"', $script);
         $this->assertStringContainsString('event.key === "Enter"', $script);
         $this->assertStringContainsString('event.key === "Escape"', $script);
+        $this->assertStringContainsString('suggestions.replaceChildren()', $script);
+        $this->assertStringContainsString('headEditorOpen = false;', $script);
+        $this->assertStringNotContainsString('Start typing to find an active employee.', $script);
+        $this->assertStringContainsString('if (!event.target.closest("#department-head-editor, #department-head-summary"))', $script);
+    }
+
+    public function testDepartmentSearchesPreserveTheSharedThemeAwareMagnifier(): void
+    {
+        $adminView = (string) file_get_contents(ROOTPATH . 'app/Views/admin/departments.php');
+        $accountingView = (string) file_get_contents(ROOTPATH . 'app/Views/accounting/department-debts.php');
+        $styles = (string) file_get_contents(ROOTPATH . 'public/assets/css/department-debt.css');
+
+        foreach ([$adminView, $accountingView] as $view) {
+            $this->assertStringContainsString('type="search"', $view);
+            $this->assertStringNotContainsString('search-icon', $view);
+        }
+        $this->assertMatchesRegularExpression(
+            '/\.department-toolbar input,[^{]+\{[^}]*background-color:\s*var\(--surface-soft\);/s',
+            $styles
+        );
+        $this->assertDoesNotMatchRegularExpression(
+            '/\.department-toolbar input,[^{]+\{[^}]*background:\s*var\(--surface-soft\);/s',
+            $styles
+        );
     }
 }

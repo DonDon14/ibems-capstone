@@ -72,9 +72,9 @@ $ibemsLogoUrl = base_url('assets/images/ibems-logo.png');
     </script>
     <link rel="icon" type="image/png" href="<?= esc($ibemsLogoUrl) ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.css') ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/css/app.css') ?>?v=20260823e">
-    <link rel="stylesheet" href="<?= base_url('assets/css/modern-ui.css') ?>?v=20260824d">
-    <link rel="stylesheet" href="<?= base_url('assets/css/account-menu.css') ?>?v=20260824a">
+    <link rel="stylesheet" href="<?= base_url('assets/css/app.css') ?>?v=20260824e">
+    <link rel="stylesheet" href="<?= base_url('assets/css/modern-ui.css') ?>?v=20260824m">
+    <link rel="stylesheet" href="<?= base_url('assets/css/account-menu.css') ?>?v=20260824c">
     <link rel="stylesheet" href="<?= base_url('assets/css/password-visibility.css') ?>?v=20260813b">
     <?php if ($userMobileExperience): ?>
         <link rel="stylesheet" href="<?= base_url('assets/css/user-mobile.css') ?>?v=20260823d">
@@ -319,8 +319,8 @@ $ibemsLogoUrl = base_url('assets/images/ibems-logo.png');
 <script {csp-script-nonce} id="portal-context-data" type="application/json"><?= json_encode($portalContext, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
 <template id="portal-page-scripts"><?= $pageScripts ?></template>
 <script src="<?= base_url('assets/js/user-navigation.js') ?>?v=20260824c"></script>
-<script src="<?= base_url('assets/js/app-layout.js') ?>?v=20260823c"></script>
-<script src="<?= base_url('assets/js/modern-controls.js') ?>?v=20260823a"></script>
+<script src="<?= base_url('assets/js/app-layout.js') ?>?v=20260824a"></script>
+<script src="<?= base_url('assets/js/modern-controls.js') ?>?v=20260824a"></script>
 <script src="<?= base_url('assets/js/app-dialog.js') ?>"></script>
 <script src="<?= base_url('assets/js/password-visibility.js') ?>?v=20260813a"></script>
 <?php if ($userMobileExperience): ?>

@@ -163,4 +163,5 @@ $routes->post('accounting/debts/financial-profile', 'AccountingController::updat
 $routes->get('accounting/department-debts', 'DepartmentDebtController::accountingPage', ['filter' => 'access:accounting.inspect']);
 $routes->get('accounting/department-debts/data', 'DepartmentDebtController::accountingData', ['filter' => 'access:accounting.inspect']);
 $routes->post('accounting/department-debts/allocation', 'DepartmentDebtController::setAllocation', ['filter' => 'access:accounting.operate']);
+$routes->post('accounting/department-debts/allocations', 'DepartmentDebtController::setAllocations', ['filter' => 'access:accounting.operate']);
 $routes->post('accounting/department-debts/settlement', 'DepartmentDebtController::recordSettlement', ['filter' => 'access:accounting.operate']);

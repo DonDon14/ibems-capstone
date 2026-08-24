@@ -83,7 +83,7 @@ final class ThemeConventionTest extends CIUnitTestCase
 
     public function testDarkThemeDefinesContrastingDataSurfacesAndControls(): void
     {
-        $css = file_get_contents(FCPATH . 'assets/css/modern-ui.css');
+        $css = str_replace("\r\n", "\n", (string) file_get_contents(FCPATH . 'assets/css/modern-ui.css'));
 
         $this->assertIsString($css);
         $this->assertStringContainsString('--dark-text: #f4f7fb', $css);
@@ -96,6 +96,10 @@ final class ThemeConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('.bg-white, .bg-slate-50, .bg-slate-100', $css);
         $this->assertStringContainsString('.user-deduction-filter', $css);
         $this->assertStringContainsString('.variance-case, .variance-pill.is-muted', $css);
+        $this->assertStringContainsString('.variance-review-guidance {', $css);
+        $this->assertStringContainsString('.variance-review-guidance strong', $css);
+        $this->assertStringContainsString('.variance-note, .variance-case-timeline, .variance-case-files', $css);
+        $this->assertStringContainsString('.variance-case-overdue', $css);
         $this->assertStringContainsString('.payment-method-card.needs-setup', $css);
         $this->assertStringContainsString('.product-action-info, .product-detail-view, .modal-action-tabs', $css);
         $this->assertStringContainsString('.employee-profile-overview', $css);
@@ -168,9 +172,14 @@ final class ThemeConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('.account-menu-logout button:is(:hover, :focus-visible)', $css);
         $this->assertStringContainsString('background: #dc2626;', $css);
         $this->assertStringContainsString('color: #fff;', $css);
-        $this->assertStringContainsString('account-menu.css\') ?>?v=20260824a', (string) file_get_contents(APPPATH . 'Views/components/portal_shell.php'));
+        $this->assertStringContainsString('account-menu.css\') ?>?v=20260824c', (string) file_get_contents(APPPATH . 'Views/components/portal_shell.php'));
+        $this->assertStringContainsString('height: 100dvh;', $css);
+        $this->assertStringContainsString('overscroll-behavior: contain;', $css);
         $this->assertStringContainsString('background: #2a1720', $css);
         $this->assertStringContainsString('color: #fda4af', $css);
+        $this->assertStringContainsString('.topbar-profile[aria-expanded="true"]:not(:focus-visible)', $css);
+        $this->assertStringContainsString('border-color: #526b8c !important;', $css);
+        $this->assertStringContainsString('box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.22)', $css);
     }
 
     public function testEverySemanticModalCloseIsUnboxedAndTurnsRedInDarkMode(): void

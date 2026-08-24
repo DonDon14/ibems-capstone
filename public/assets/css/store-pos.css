@@ -110,7 +110,7 @@
     border: 1px solid #c7d5e4;
     border-radius: 11px;
     padding: 10px 12px;
-    background: #fff;
+    background-color: #fff;
 }
 
 #payment-method,
@@ -134,11 +134,11 @@
 
 .debt-search-wrap #debt-customer-search {
     width: 100%;
-    padding: 10px 62px 10px 16px;
+    padding: 10px 62px 10px 40px;
     height: 44px;
     border: 1px solid #c7d5e4;
     border-radius: 10px;
-    background: #fff;
+    background-color: #fff;
     line-height: 1.35;
 }
 
@@ -1282,6 +1282,10 @@
     gap: 8px;
 }
 
+.payment-method-grid > :only-child {
+    grid-column: 1 / -1;
+}
+
 .payment-method-help {
     color: #64748b;
     font-size: 0.75rem;
@@ -1339,6 +1343,12 @@
     justify-content: flex-start;
     padding: 9px 34px 9px 11px;
     text-align: left;
+    white-space: normal;
+}
+
+.payment-method-option.secondary-btn > span:not(.payment-method-option-icon) {
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
 
 .payment-method-option-icon {
@@ -1386,6 +1396,10 @@
     border: 1px solid #bfd1e5;
     border-radius: 11px;
     background: #f8fbff;
+}
+
+.split-payment-editor.is-hidden {
+    display: none;
 }
 
 .split-payment-head,

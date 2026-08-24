@@ -75,6 +75,10 @@
     gap: 8px;
 }
 
+.history-filters.compact-filter-bar .compact-filter-primary {
+    justify-content: flex-end;
+}
+
 .history-table-wrap {
     overflow: auto;
 }

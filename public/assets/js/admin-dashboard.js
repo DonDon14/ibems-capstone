@@ -1,10 +1,38 @@
 let adSalesTrendChart = null;
-let adTopItemsChart = null;
+let adSalesTrendRows = [];
 let adAlertPage = 1;
 let adAlertsLoading = false;
 
 function adMoney(value) {
     return window.IbemsFormat?.money(value) || `PHP ${Number(value || 0).toFixed(2)}`;
+}
+
+function adCompactMoney(value) {
+    return new Intl.NumberFormat("en-PH", {
+        style: "currency",
+        currency: "PHP",
+        minimumFractionDigits: 0,
+        maximumFractionDigits: Number(value || 0) < 100 ? 1 : 0,
+    }).format(Number(value || 0));
+}
+
+function adDateLabel(value, options = { month: "short", day: "numeric" }) {
+    const parts = String(value || "").split("-").map(Number);
+    if (parts.length !== 3 || parts.some((part) => !Number.isFinite(part))) return String(value || "-");
+    return new Intl.DateTimeFormat("en-PH", options).format(new Date(parts[0], parts[1] - 1, parts[2]));
+}
+
+function adChartPalette() {
+    const dark = document.documentElement.dataset.theme === "dark";
+    return {
+        line: dark ? "#70a8ff" : "#2563eb",
+        fill: dark ? "rgba(69, 133, 230, 0.18)" : "rgba(37, 99, 235, 0.10)",
+        grid: dark ? "rgba(148, 163, 184, 0.13)" : "rgba(148, 163, 184, 0.20)",
+        ticks: dark ? "#aebed1" : "#64748b",
+        tooltipBackground: dark ? "#e8eef8" : "#0f172a",
+        tooltipText: dark ? "#0f172a" : "#f8fafc",
+        tooltipBorder: dark ? "#c7d3e3" : "#1e293b",
+    };
 }
 
 function adEscape(value) {
@@ -21,18 +49,34 @@ function adDestroyCharts() {
         adSalesTrendChart.destroy();
         adSalesTrendChart = null;
     }
-    if (adTopItemsChart) {
-        adTopItemsChart.destroy();
-        adTopItemsChart = null;
-    }
 }
 
 function adRenderSalesTrendChart(rows) {
     const canvas = document.getElementById("ad-sales-trend-chart");
     if (!canvas || typeof window.Chart === "undefined") return;
 
-    const labels = Array.isArray(rows) ? rows.map((row) => String(row.date || "").slice(5)) : [];
-    const sales = Array.isArray(rows) ? rows.map((row) => Number(row.sales || 0)) : [];
+    adSalesTrendRows = Array.isArray(rows) ? rows.map((row) => ({ ...row })) : [];
+    const labels = adSalesTrendRows.map((row) => adDateLabel(row.date));
+    const sales = adSalesTrendRows.map((row) => Number(row.sales || 0));
+    const palette = adChartPalette();
+    const total = sales.reduce((sum, value) => sum + value, 0);
+    const peakIndex = sales.indexOf(Math.max(...sales, 0));
+    const peakValue = peakIndex >= 0 ? sales[peakIndex] : 0;
+    const totalEl = document.getElementById("ad-sales-total");
+    const peakEl = document.getElementById("ad-sales-peak");
+    const summaryEl = document.getElementById("ad-sales-chart-summary");
+
+    if (totalEl) totalEl.textContent = adMoney(total);
+    if (peakEl) {
+        peakEl.textContent = peakValue > 0
+            ? `Peak ${adMoney(peakValue)} on ${adDateLabel(adSalesTrendRows[peakIndex]?.date, { month: "short", day: "numeric", year: "numeric" })}`
+            : "No revenue recorded yet.";
+    }
+    if (summaryEl) {
+        summaryEl.textContent = total > 0
+            ? `Total revenue was ${adMoney(total)}. ${peakEl?.textContent || ""}`
+            : "No revenue was recorded during the last seven days.";
+    }
 
     adSalesTrendChart = new window.Chart(canvas, {
         type: "line",
@@ -42,34 +86,63 @@ function adRenderSalesTrendChart(rows) {
                 {
                     label: "Revenue",
                     data: sales,
-                    borderColor: "#1d4ed8",
-                    backgroundColor: "rgba(37, 99, 235, 0.14)",
-                    tension: 0.34,
+                    borderColor: palette.line,
+                    backgroundColor: palette.fill,
+                    borderWidth: 2.5,
+                    tension: 0,
                     fill: true,
-                    pointRadius: 3,
-                    pointHoverRadius: 4,
+                    pointRadius: sales.length <= 7 ? 3 : 0,
+                    pointHoverRadius: 5,
+                    pointBorderWidth: 2,
+                    pointBorderColor: palette.line,
+                    pointBackgroundColor: darkModeFillColor(),
                 },
             ],
         },
         options: {
             responsive: true,
             maintainAspectRatio: false,
+            interaction: { mode: "index", intersect: false },
+            animation: { duration: 450 },
+            layout: { padding: { top: 8, right: 8 } },
             plugins: {
                 legend: { display: false },
                 tooltip: {
+                    displayColors: false,
+                    backgroundColor: palette.tooltipBackground,
+                    titleColor: palette.tooltipText,
+                    bodyColor: palette.tooltipText,
+                    borderColor: palette.tooltipBorder,
+                    borderWidth: 1,
+                    cornerRadius: 10,
+                    padding: 11,
                     callbacks: {
+                        title(items) {
+                            const index = items[0]?.dataIndex ?? 0;
+                            return adDateLabel(adSalesTrendRows[index]?.date, { month: "long", day: "numeric", year: "numeric" });
+                        },
                         label(context) {
-                            return adMoney(context.parsed.y);
+                            return `Revenue  ${adMoney(context.parsed.y)}`;
                         },
                     },
                 },
             },
             scales: {
+                x: {
+                    border: { display: false },
+                    grid: { display: false },
+                    ticks: { color: palette.ticks, maxRotation: 0, autoSkip: false },
+                },
                 y: {
                     beginAtZero: true,
+                    border: { display: false },
+                    grid: { color: palette.grid, drawTicks: false },
                     ticks: {
+                        color: palette.ticks,
+                        maxTicksLimit: 5,
+                        padding: 10,
                         callback(value) {
-                            return adMoney(value);
+                            return adCompactMoney(value);
                         },
                     },
                 },
@@ -78,43 +151,45 @@ function adRenderSalesTrendChart(rows) {
     });
 }
 
-function adRenderTopItemsChart(rows) {
-    const canvas = document.getElementById("ad-top-items-chart");
-    if (!canvas || typeof window.Chart === "undefined") return;
+function darkModeFillColor() {
+    return document.documentElement.dataset.theme === "dark" ? "#14243b" : "#ffffff";
+}
 
-    const labels = Array.isArray(rows) ? rows.map((row) => String(row.name || "Item")) : [];
-    const qty = Array.isArray(rows) ? rows.map((row) => Number(row.qty_sold || 0)) : [];
+function adRenderTopItemsRanking(rows) {
+    const container = document.getElementById("ad-top-items-ranking");
+    if (!container) return;
+    const items = Array.isArray(rows) ? rows.slice(0, 5) : [];
+    container.removeAttribute("aria-busy");
 
-    adTopItemsChart = new window.Chart(canvas, {
-        type: "bar",
-        data: {
-            labels,
-            datasets: [
-                {
-                    label: "Units Sold",
-                    data: qty,
-                    backgroundColor: "rgba(14, 165, 233, 0.72)",
-                    borderColor: "#0284c7",
-                    borderWidth: 1,
-                    borderRadius: 8,
-                },
-            ],
-        },
-        options: {
-            indexAxis: "y",
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false },
-            },
-            scales: {
-                x: {
-                    beginAtZero: true,
-                    ticks: { precision: 0 },
-                },
-            },
-        },
-    });
+    if (items.length === 0) {
+        container.removeAttribute("role");
+        container.innerHTML = adDataState("empty", "No product sales in the last seven days.");
+        return;
+    }
+
+    container.setAttribute("role", "list");
+    const highestQty = Math.max(...items.map((row) => Number(row.qty_sold || 0)), 1);
+    container.innerHTML = items.map((row, index) => {
+        const quantity = Math.max(0, Number(row.qty_sold || 0));
+        const sales = Math.max(0, Number(row.sales || 0));
+        const progress = Math.max(quantity > 0 ? 8 : 0, Math.round((quantity / highestQty) * 100));
+        const unitLabel = `${quantity} unit${quantity === 1 ? "" : "s"}`;
+        return `
+            <article class="dashboard-rank-item" role="listitem">
+                <div class="dashboard-rank-row">
+                    <span class="dashboard-rank-number" aria-label="Rank ${index + 1}">${index + 1}</span>
+                    <div class="dashboard-rank-copy">
+                        <strong title="${adEscape(row.name || "Item")}">${adEscape(row.name || "Item")}</strong>
+                        <small>${adEscape(unitLabel)} <span aria-hidden="true">·</span> ${adEscape(adMoney(sales))}</small>
+                    </div>
+                    <strong class="dashboard-rank-value">${quantity}</strong>
+                </div>
+                <div class="dashboard-rank-track" aria-hidden="true">
+                    <i style="width: ${progress}%;"></i>
+                </div>
+            </article>
+        `;
+    }).join("");
 }
 
 function adDataState(type, message, colspan = 0) {
@@ -336,7 +411,7 @@ async function adLoadDashboard() {
         const analytics = data.analytics || {};
         adDestroyCharts();
         adRenderSalesTrendChart(analytics.trend || []);
-        adRenderTopItemsChart(analytics.top_selling_items || []);
+        adRenderTopItemsRanking(analytics.top_selling_items || []);
         adRenderTopStores(analytics.top_stores || []);
         adRenderPaymentBreakdown(analytics.payment_breakdown || []);
     } catch (error) {
@@ -351,6 +426,10 @@ async function adLoadDashboard() {
         document.getElementById("ad-alerts-summary").textContent = "Unavailable";
         document.getElementById("ad-alerts-pager").innerHTML = "";
         document.getElementById("ad-payment-breakdown").innerHTML = adDataState("error", "Unable to load payment breakdown.");
+        const rankingEl = document.getElementById("ad-top-items-ranking");
+        rankingEl.removeAttribute("role");
+        rankingEl.removeAttribute("aria-busy");
+        rankingEl.innerHTML = adDataState("error", "Unable to load product ranking.");
         adDestroyCharts();
         document.getElementById("ad-top-stores-body").innerHTML = adDataState("error", "Unable to load top stores.", 3);
     }
@@ -363,3 +442,10 @@ document.getElementById("ad-alerts-pager")?.addEventListener("click", (event) =>
 });
 
 adLoadDashboard();
+
+window.addEventListener("ibems:themechange", () => {
+    if (adSalesTrendRows.length === 0) return;
+    adSalesTrendChart?.destroy();
+    adSalesTrendChart = null;
+    adRenderSalesTrendChart(adSalesTrendRows);
+});

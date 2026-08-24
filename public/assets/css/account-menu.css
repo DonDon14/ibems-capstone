@@ -83,6 +83,7 @@
     width: min(370px, calc(100vw - 28px));
     max-height: calc(100dvh - 82px);
     overflow-y: auto;
+    overscroll-behavior: contain;
     padding: 14px;
     border: 1px solid #dbe5f0;
     border-radius: 18px;
@@ -233,6 +234,17 @@ html[data-theme="dark"] .topbar-profile[aria-expanded="true"] {
     background: #111c2e !important;
 }
 
+html[data-theme="dark"] .topbar-profile[aria-expanded="true"]:not(:focus-visible) {
+    border-color: #526b8c !important;
+    background: #111c2e !important;
+    box-shadow: 0 8px 22px rgba(2, 6, 23, 0.3) !important;
+}
+
+html[data-theme="dark"] .topbar-profile:focus-visible {
+    border-color: #60a5fa !important;
+    box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.22), 0 8px 22px rgba(2, 6, 23, 0.3) !important;
+}
+
 html[data-theme="dark"] .topbar-profile:not(:hover):not(:focus-visible):not([aria-expanded="true"]) {
     border-color: var(--dark-border, #31435b) !important;
     background: #111c2e !important;
@@ -317,6 +329,11 @@ html[data-theme="dark"] .account-menu-logout button:is(:hover, :focus-visible) {
 
     .account-menu {
         inset: 0;
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh;
+        max-width: none;
+        margin: 0;
         display: flex;
         align-items: flex-end;
         justify-content: center;
@@ -329,6 +346,7 @@ html[data-theme="dark"] .account-menu-logout button:is(:hover, :focus-visible) {
         border: 0;
         background: rgba(15, 23, 42, 0.46);
         backdrop-filter: blur(2px);
+        touch-action: none;
     }
 
     .account-menu-panel {

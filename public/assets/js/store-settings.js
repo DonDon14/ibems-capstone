@@ -829,6 +829,9 @@ document.getElementById("delete-method-btn")?.addEventListener("click", async ()
     } catch (error) { setAccountResult(error.message, true); }
 });
 document.getElementById("payment-method-modal")?.addEventListener("click", (event) => { if (!paymentMethodSavePending && event.target.id === "payment-method-modal") closePaymentMethodModal(); });
+window.IbemsPortalNavigation?.onCleanup(() => {
+    document.body.classList.remove("settings-modal-open");
+});
 document.getElementById("payment-account-list")?.addEventListener("click", async (event) => {
     const editButton = event.target.closest("[data-account-edit]");
     if (editButton) {

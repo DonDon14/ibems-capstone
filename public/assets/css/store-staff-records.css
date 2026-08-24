@@ -361,12 +361,20 @@
     border-radius: 18px;
     border: 1px solid #d5e0ec;
     background: #fff;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr);
 }
 
 .staff-modal-head {
     margin: 0;
-    padding: 18px 20px;
+    padding: 20px 24px 18px;
     border-bottom: 1px solid #e2e8f0;
+}
+
+body.ibems-modern #staff-employee-modal .staff-modal-head {
+    align-items: flex-start;
+    margin: 0;
+    padding: 20px 24px 18px;
 }
 
 .staff-modal-head h3 {
@@ -383,9 +391,10 @@
 }
 
 .staff-modal-body {
+    min-height: 0;
+    margin: 0 7px 8px 0;
     overflow-y: auto;
-    max-height: calc(90vh - 78px);
-    padding: 18px 20px 20px;
+    padding: 18px 13px 20px 20px;
 }
 
 .staff-employee-summary {

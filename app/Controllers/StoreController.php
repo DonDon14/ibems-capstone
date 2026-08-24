@@ -2675,12 +2675,13 @@ class StoreController extends BaseController
         $role = (string) session()->get('role');
         $storeId = (int) ($request['store_id'] ?? 0);
         $productId = (int) ($request['product_id'] ?? 0);
-        $qty = (int) ($request['qty'] ?? 0);
+        $qtyRaw = $request['qty'] ?? null;
+        $qty = filter_var($qtyRaw, FILTER_VALIDATE_INT);
         $unitCost = (float) ($request['unit_cost'] ?? 0);
         $sellPrice = (float) ($request['sell_price'] ?? 0);
         $reason = trim((string) ($request['reason'] ?? 'Stock in'));
 
-        if ($storeId <= 0 || $productId <= 0 || $qty <= 0 || $unitCost < 0 || $sellPrice < 0) {
+        if ($storeId <= 0 || $productId <= 0 || $qty === false || $qty <= 0 || $unitCost < 0 || $sellPrice < 0) {
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
                 'message' => 'Invalid restock payload.',
@@ -2772,10 +2773,11 @@ class StoreController extends BaseController
         $role = (string) session()->get('role');
         $storeId = (int) ($request['store_id'] ?? 0);
         $productId = (int) ($request['product_id'] ?? 0);
-        $actualQty = (int) ($request['actual_qty'] ?? -1);
+        $actualQtyRaw = $request['actual_qty'] ?? null;
+        $actualQty = filter_var($actualQtyRaw, FILTER_VALIDATE_INT);
         $reason = trim((string) ($request['reason'] ?? 'Physical count adjustment'));
 
-        if ($storeId <= 0 || $productId <= 0 || $actualQty < 0) {
+        if ($storeId <= 0 || $productId <= 0 || $actualQty === false || $actualQty < 0) {
             return $this->response->setStatusCode(400)->setJSON([
                 'status' => 'error',
                 'message' => 'Invalid stock adjustment payload.',

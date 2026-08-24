@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/admin') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/department-debt.css') ?>?v=20260824d">
+<link rel="stylesheet" href="<?= base_url('assets/css/department-debt.css') ?>?v=20260824g">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -63,5 +63,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/department-debt-pages.js') ?>?v=20260824d"></script>
+<script src="<?= base_url('assets/js/department-debt-pages.js') ?>?v=20260824f"></script>
 <?= $this->endSection() ?>

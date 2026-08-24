@@ -21,7 +21,10 @@ function udStatus(value) {
 }
 
 function udState(message, type = "empty") {
-    return `<tr class="data-state-row"><td colspan="7"><div class="data-state is-${udEscape(type)}">${udEscape(message)}</div></td></tr>`;
+    const safeType = ["loading", "empty", "error"].includes(type) ? type : "empty";
+    const icon = safeType === "loading" ? "bi-arrow-repeat" : safeType === "error" ? "bi-exclamation-circle" : "bi-inbox";
+    const role = safeType === "error" ? "alert" : "status";
+    return `<tr class="data-state-row"><td colspan="7"><div class="data-state data-state--${safeType}" role="${role}" aria-live="polite"><i class="bi ${icon}" aria-hidden="true"></i><div><strong>${udEscape(message)}</strong></div></div></td></tr>`;
 }
 
 function udRender(data) {

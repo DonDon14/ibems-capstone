@@ -171,7 +171,7 @@
 
         const searchInput = bar.querySelector('input[type="search"]');
         const searchWrapper = searchInput ? controlWrapper(searchInput, bar) : null;
-        const advancedControls = Array.from(bar.querySelectorAll('select, input[type="date"], input[type="checkbox"]'));
+        const advancedControls = Array.from(bar.querySelectorAll('select, input[type="date"], input[type="month"], input[type="checkbox"]'));
         const sortControls = advancedControls.filter((control) => /sort/i.test(control.id || control.name || ""));
         const filterControls = advancedControls.filter((control) => !sortControls.includes(control));
         if (!sortControls.length && !filterControls.length) return;

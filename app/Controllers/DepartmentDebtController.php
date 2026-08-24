@@ -222,6 +222,24 @@ class DepartmentDebtController extends Controller
         return $this->result($result);
     }
 
+    public function setAllocations()
+    {
+        $payload = $this->payload();
+        $departmentIds = $payload['department_ids'] ?? [];
+        if (!is_array($departmentIds)) {
+            return $this->result(['status' => 'error', 'code' => 400, 'message' => 'Select one or more departments.']);
+        }
+        $result = (new DepartmentDebtService())->setAllocations(
+            $departmentIds,
+            (string) ($payload['period_month'] ?? ''),
+            (float) ($payload['allocation_amount'] ?? -1),
+            (string) ($payload['status'] ?? 'open'),
+            trim((string) ($payload['reason'] ?? '')),
+            (int) session()->get('user_id')
+        );
+        return $this->result($result);
+    }
+
     public function recordSettlement()
     {
         $payload = $this->payload();

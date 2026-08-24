@@ -61,20 +61,53 @@ function rSetPeriod(nextPeriod) {
     document.getElementById("reports-custom-range").classList.toggle("hidden", reportsPeriod !== "custom");
 }
 
+function rSetChartState(canvasId, stateId, type, message) {
+    const canvas = document.getElementById(canvasId);
+    const state = document.getElementById(stateId);
+    if (!canvas || !state) return;
+
+    const safeType = ["loading", "empty", "error"].includes(type) ? type : "empty";
+    const icons = {
+        loading: "bi bi-arrow-repeat",
+        empty: "bi bi-bar-chart-line",
+        error: "bi bi-exclamation-circle",
+    };
+    state.className = `reports-chart-state reports-chart-state--${safeType}`;
+    state.innerHTML = `<i class="${icons[safeType]}" aria-hidden="true"></i><strong>${rEscape(message)}</strong>`;
+    canvas.classList.add("is-hidden");
+}
+
+function rShowChart(canvasId, stateId) {
+    document.getElementById(canvasId)?.classList.remove("is-hidden");
+    document.getElementById(stateId)?.classList.add("is-hidden");
+}
+
 function rRenderTrendBars(rows) {
     const canvas = document.getElementById("reports-trend-chart");
-    if (!canvas || typeof window.Chart === "undefined") return;
+    if (!canvas) return;
 
     if (reportsTrendChart) {
         reportsTrendChart.destroy();
         reportsTrendChart = null;
     }
 
-    if (!Array.isArray(rows) || rows.length === 0) return;
+    const usableRows = Array.isArray(rows)
+        ? rows.filter((row) => Number(row.sales || 0) !== 0 || Number(row.transactions || 0) !== 0)
+        : [];
+    if (usableRows.length === 0) {
+        rSetChartState("reports-trend-chart", "reports-trend-chart-state", "empty", "No sales were recorded for this period.");
+        return;
+    }
+    if (typeof window.Chart === "undefined") {
+        rSetChartState("reports-trend-chart", "reports-trend-chart-state", "error", "The chart library could not be loaded.");
+        return;
+    }
 
-    const labels = rows.map((row) => String(row.date || "").slice(5));
-    const sales = rows.map((row) => Number(row.sales || 0));
-    const transactions = rows.map((row) => Number(row.transactions || 0));
+    rShowChart("reports-trend-chart", "reports-trend-chart-state");
+
+    const labels = usableRows.map((row) => String(row.date || "").slice(5));
+    const sales = usableRows.map((row) => Number(row.sales || 0));
+    const transactions = usableRows.map((row) => Number(row.transactions || 0));
 
     reportsTrendChart = new window.Chart(canvas, {
         data: {
@@ -143,17 +176,27 @@ function rRenderTrendBars(rows) {
 
 function rRenderPaymentMix(rows) {
     const canvas = document.getElementById("reports-payment-mix-chart");
-    if (!canvas || typeof window.Chart === "undefined") return;
+    if (!canvas) return;
 
     if (reportsPaymentMixChart) {
         reportsPaymentMixChart.destroy();
         reportsPaymentMixChart = null;
     }
 
-    if (!Array.isArray(rows) || rows.length === 0) return;
+    const usableRows = Array.isArray(rows) ? rows.filter((row) => Number(row.sales || 0) > 0) : [];
+    if (usableRows.length === 0) {
+        rSetChartState("reports-payment-mix-chart", "reports-payment-mix-chart-state", "empty", "No payments were recorded for this period.");
+        return;
+    }
+    if (typeof window.Chart === "undefined") {
+        rSetChartState("reports-payment-mix-chart", "reports-payment-mix-chart-state", "error", "The chart library could not be loaded.");
+        return;
+    }
 
-    const labels = rows.map((row) => String(row.payment_method || "unknown").toUpperCase());
-    const values = rows.map((row) => Number(row.sales || 0));
+    rShowChart("reports-payment-mix-chart", "reports-payment-mix-chart-state");
+
+    const labels = usableRows.map((row) => String(row.payment_method || "unknown").toUpperCase());
+    const values = usableRows.map((row) => Number(row.sales || 0));
 
     reportsPaymentMixChart = new window.Chart(canvas, {
         type: "doughnut",
@@ -475,6 +518,8 @@ async function rLoadSummary() {
     }
 
     rRenderTableStates("loading", "Loading report data...");
+    rSetChartState("reports-trend-chart", "reports-trend-chart-state", "loading", "Loading sales trend...");
+    rSetChartState("reports-payment-mix-chart", "reports-payment-mix-chart-state", "loading", "Loading payment mix...");
 
     let data;
     try {
@@ -486,6 +531,8 @@ async function rLoadSummary() {
         rRenderTableStates("error", message);
         rRenderTrendBars([]);
         rRenderPaymentMix([]);
+        rSetChartState("reports-trend-chart", "reports-trend-chart-state", "error", message);
+        rSetChartState("reports-payment-mix-chart", "reports-payment-mix-chart-state", "error", message);
         rSetResult(message, "error");
         return;
     }
@@ -496,6 +543,8 @@ async function rLoadSummary() {
         rRenderTableStates("error", message);
         rRenderTrendBars([]);
         rRenderPaymentMix([]);
+        rSetChartState("reports-trend-chart", "reports-trend-chart-state", "error", message);
+        rSetChartState("reports-payment-mix-chart", "reports-payment-mix-chart-state", "error", message);
         return;
     }
     if (requestId !== reportsRequestSequence) return;

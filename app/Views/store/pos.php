@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/store') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/store-pos.css') ?>?v=20260823d">
+<link rel="stylesheet" href="<?= base_url('assets/css/store-pos.css') ?>?v=20260824f">
 <link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20260821b">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 <?= $this->endSection() ?>
@@ -32,7 +32,7 @@
             </div>
         </header>
 
-        <p id="pos-transaction-note" class="pos-transaction-note" role="status" aria-live="polite">
+        <p id="pos-transaction-note" class="pos-transaction-note is-locked" role="status" aria-live="polite">
             <i class="bi bi-lock" aria-hidden="true"></i>
             <span>Open today&apos;s store day before adding items.</span>
         </p>
@@ -410,7 +410,7 @@
 
 <?= $this->section('scripts') ?>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260821a"></script>
+<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260824a"></script>
 <script src="<?= base_url('assets/js/store-pos.js') ?>?v=20260823e"></script>
 <?= $this->endSection() ?>
 

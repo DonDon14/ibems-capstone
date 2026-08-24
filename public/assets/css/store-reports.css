@@ -106,6 +106,33 @@
     grid-template-columns: 1fr 1fr;
 }
 
+.reports-chart-wrap {
+    position: relative;
+    min-height: 246px;
+}
+
+.reports-chart-state {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    min-height: 220px;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 24px;
+    color: #64748b;
+    text-align: center;
+}
+
+.reports-chart-state.is-hidden {
+    display: none;
+}
+
+.reports-chart-state i {
+    color: #2563eb;
+    font-size: 1.2rem;
+}
+
 .summary-card {
     background: #fff;
     border: 1px solid #dbe3ea;

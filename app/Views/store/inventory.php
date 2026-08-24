@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/store') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/store-inventory.css') ?>?v=20260823c">
+<link rel="stylesheet" href="<?= base_url('assets/css/store-inventory.css') ?>?v=20260824d">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -259,13 +259,13 @@
 </div>
 
 <div id="inventory-product-action-modal" class="inv-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="inventory-product-action-title">
-    <div class="inv-modal-card">
+    <div class="inv-modal-card app-inset-modal-card inventory-product-action-card">
         <div class="inv-modal-head">
             <h4 id="inventory-product-action-title">Manage Product</h4>
             <button id="close-product-action-modal" type="button" class="inv-modal-close" aria-label="Close product management">x</button>
         </div>
 
-        <div class="product-actions-body">
+        <div class="product-actions-body app-inset-modal-scroll">
             <div id="product-action-info" class="product-action-info"></div>
 
             <div class="product-detail-view">
@@ -446,5 +446,5 @@
 
 <?= $this->section('scripts') ?>
 <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
-<script src="<?= base_url('assets/js/store-inventory.js') ?>?v=20260823a"></script>
+<script src="<?= base_url('assets/js/store-inventory.js') ?>?v=20260824b"></script>
 <?= $this->endSection() ?>

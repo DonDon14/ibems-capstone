@@ -19,6 +19,12 @@ let invBarcodeCameraTarget = null;
 const invSelectedFamilyVariants = new Map();
 const invExpandedFamilies = new Set();
 
+function invSyncModalBodyLock() {
+    const hasOpenModal = Array.from(document.querySelectorAll(".inv-modal"))
+        .some((modal) => modal.style.display === "grid");
+    document.body.classList.toggle("app-modal-open", hasOpenModal);
+}
+
 function invProductFamilyKey(product) {
     const familyId = Number(product?.family_id || 0);
     if (familyId > 0) return `family-${familyId}`;
@@ -542,6 +548,8 @@ function invOpenProductActionModal(productId) {
     invSetProductEditMode(false);
     invSetModalPanel("adjust");
     document.getElementById("inventory-product-action-modal").style.display = "grid";
+    invSyncModalBodyLock();
+    window.requestAnimationFrame(() => document.getElementById("close-product-action-modal")?.focus());
 }
 
 function invCloseProductActionModal() {
@@ -552,6 +560,7 @@ function invCloseProductActionModal() {
         invModalPreviewObjectUrl = null;
     }
     document.getElementById("inventory-product-action-modal").style.display = "none";
+    invSyncModalBodyLock();
 }
 
 function invSetProductEditMode(enabled) {
@@ -724,7 +733,7 @@ async function invSubmitModalRestock() {
     const reason = (document.getElementById("modal-restock-reason").value || "Stock in").trim();
     const button = document.getElementById("modal-restock-submit");
 
-    if (!invActiveStoreId || productId <= 0 || qty <= 0 || unitCost < 0 || sellPrice < 0) {
+    if (!invActiveStoreId || productId <= 0 || !Number.isInteger(qty) || qty <= 0 || unitCost < 0 || sellPrice < 0 || reason === "") {
         invSetResult("Please complete a valid stock-in form.", "error");
         return;
     }
@@ -1237,6 +1246,7 @@ async function invOpenProductModal() {
     invToggleProductImageInput();
     invUpdateCreateProductProjection();
     document.getElementById("inventory-product-modal").style.display = "grid";
+    invSyncModalBodyLock();
     invCreateSnapshot = invCaptureCreateFormState();
 }
 
@@ -1246,6 +1256,7 @@ function invCloseProductModal() {
         invCreatePreviewObjectUrl = null;
     }
     document.getElementById("inventory-product-modal").style.display = "none";
+    invSyncModalBodyLock();
     invCreateSnapshot = null;
 }
 
@@ -1337,6 +1348,12 @@ document.getElementById("inventory-product-modal").addEventListener("click", (ev
 
 document.addEventListener("keydown", (event) => {
     if (event.key !== "Escape") return;
+    const actionModal = document.getElementById("inventory-product-action-modal");
+    if (actionModal?.style.display === "grid") {
+        event.preventDefault();
+        invCloseProductActionModal();
+        return;
+    }
     const modal = document.getElementById("inventory-product-modal");
     if (!modal || modal.style.display !== "grid") return;
     event.preventDefault();
@@ -1378,7 +1395,10 @@ document.getElementById("modal-save-product").addEventListener("click", async ()
     await invUpdateProduct(invModalProductId);
 });
 
-window.IbemsPortalNavigation?.onCleanup(invCloseBarcodeCamera);
+window.IbemsPortalNavigation?.onCleanup(() => {
+    invCloseBarcodeCamera();
+    document.body.classList.remove("app-modal-open");
+});
 
 (async () => {
     try {
