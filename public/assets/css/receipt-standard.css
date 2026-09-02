@@ -1,5 +1,41 @@
 .receipt-card { max-width: 620px; }
 
+body.ibems-receipt-print-document {
+    min-height: 100vh;
+    margin: 0;
+    padding: 16px;
+    background: #eef2f7;
+    color: #172033;
+    font-family: Arial, Helvetica, sans-serif;
+    color-scheme: light;
+}
+
+.receipt-print-card {
+    width: min(100%, 440px);
+    max-width: 440px;
+    margin: 0 auto;
+}
+
+@media print {
+    @page { margin: 10mm; }
+
+    body.ibems-receipt-print-document {
+        min-height: 0;
+        padding: 0;
+        background: #fff;
+    }
+
+    .receipt-print-card {
+        width: 100%;
+        max-width: 440px;
+    }
+
+    .receipt-print-card .ibems-receipt {
+        box-shadow: none;
+        break-inside: avoid;
+    }
+}
+
 /*
  * Shared receipt modal shell
  *

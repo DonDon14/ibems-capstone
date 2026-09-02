@@ -216,7 +216,7 @@ class IbemsDataAudit extends BaseCommand
             CLI::write("[FAIL] stores with invalid officer mapping: {$invalidStoreOfficers}", 'red');
             $errors++;
         } else {
-            CLI::write('[OK] all assigned store officers reference valid users', 'green');
+            CLI::write('[OK] all assigned Store Cashiers reference valid users', 'green');
         }
 
         $orphanSupervisorMappings = $db->tableExists('store_supervisors')

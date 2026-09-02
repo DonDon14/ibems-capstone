@@ -36,6 +36,7 @@ final class AuthRoleSelectionIntegrationTest extends CIUnitTestCase
         $html = (string) $result->getBody();
         $this->assertStringContainsString('value="ADMIN"', $html);
         $this->assertStringContainsString('value="STORE_SYSTEM"', $html);
+        $this->assertStringContainsString('Store Cashier', $html);
         $this->assertStringContainsString('value="STORE_SUPERVISOR"', $html);
         $this->assertStringContainsString('value="USER"', $html);
         $this->assertStringContainsString('Dashboard Demo Store', $html);

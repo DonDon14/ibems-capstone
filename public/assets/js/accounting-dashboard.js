@@ -52,7 +52,7 @@ function acdRenderTrend(rows) {
         canvas.hidden = true;
         const empty = document.createElement("div");
         empty.className = "acd-trend-empty";
-        empty.innerHTML = acdDataState("No confirmed deductions", "No payroll deductions were confirmed in the last 7 days.", "bi-bar-chart");
+        empty.innerHTML = acdDataState("No confirmed deductions", "No payroll deductions were confirmed in the selected period.", "bi-bar-chart");
         wrap?.appendChild(empty);
         return;
     }
@@ -242,17 +242,20 @@ async function acdLoad() {
     const lastSettlementEl = document.getElementById("acd-last-settlement");
 
     try {
-        const response = await fetch("/accounting/dashboard/data");
+        const period = window.IbemsDashboardPeriod?.get() || "day";
+        const response = await fetch(`/accounting/dashboard/data?period=${encodeURIComponent(period)}`);
         const data = await response.json();
+        if ((window.IbemsDashboardPeriod?.get() || "day") !== period) return;
         if (!data || data.status !== "success") {
             throw new Error(data?.message || "Failed to load accounting dashboard.");
         }
 
         const summary = data.summary || {};
+        window.IbemsDashboardPeriod?.setMeta(data.period);
         if (totalAccountsEl) totalAccountsEl.textContent = String(Number(summary.total_accounts || 0));
         if (withDebtEl) withDebtEl.textContent = String(Number(summary.with_debt || 0));
         if (totalDebtEl) totalDebtEl.textContent = acdMoney(summary.total_debt || 0);
-        if (todayDeductedEl) todayDeductedEl.textContent = acdMoney(summary.today_deduction_amount || 0);
+        if (todayDeductedEl) todayDeductedEl.textContent = acdMoney(summary.period_deduction_amount || summary.today_deduction_amount || 0);
         if (overLimitEl) overLimitEl.textContent = String(Number(summary.over_limit_count || 0));
 
         if (lastSettlementEl) {
@@ -283,3 +286,4 @@ async function acdLoad() {
 }
 
 acdLoad();
+window.addEventListener("ibems:dashboard-period-change", acdLoad);

@@ -16,7 +16,7 @@ class DepartmentDebtService
 
     public function currentPeriod(int $departmentId, ?string $date = null): ?array
     {
-        $month = substr($date ?: date('Y-m-d'), 0, 7) . '-01';
+        $month = substr($date ?: ibems_business_date(), 0, 7) . '-01';
         return $this->db->table('department_debt_periods')
             ->where('department_id', $departmentId)
             ->where('period_month', $month)

@@ -9,7 +9,7 @@ class AccountingUiConventionTest extends TestCase
     public function testAccountingPagesUseSharedPageAndDataStateComponents(): void
     {
         $dashboard = file_get_contents(APPPATH . 'Views/accounting/dashboard.php');
-        $debts = file_get_contents(APPPATH . 'Views/accounting/debts.php');
+        $debts = file_get_contents(APPPATH . 'Views/accounting/debts.php') . file_get_contents(APPPATH . 'Views/components/accounting_debt_modals.php');
 
         $this->assertIsString($dashboard);
         $this->assertIsString($debts);
@@ -24,8 +24,8 @@ class AccountingUiConventionTest extends TestCase
 
     public function testDebtPagerUsesTheSharedPaginationConvention(): void
     {
-        $view = file_get_contents(APPPATH . 'Views/accounting/debts.php');
-        $script = file_get_contents(ROOTPATH . 'public/assets/js/accounting-debts.js');
+        $view = file_get_contents(APPPATH . 'Views/accounting/debts.php') . file_get_contents(APPPATH . 'Views/components/accounting_debt_modals.php');
+        $script = file_get_contents(ROOTPATH . 'public/assets/js/accounting-debts.js') . file_get_contents(ROOTPATH . 'public/assets/js/accounting-debts.part2.js') . file_get_contents(ROOTPATH . 'public/assets/js/accounting-debts.part3.js');
 
         $this->assertIsString($view);
         $this->assertIsString($script);
@@ -39,8 +39,8 @@ class AccountingUiConventionTest extends TestCase
 
     public function testAccountingStatesAndModalScrollingUseSharedUiPrimitives(): void
     {
-        $view = file_get_contents(APPPATH . 'Views/accounting/debts.php');
-        $debtScript = file_get_contents(ROOTPATH . 'public/assets/js/accounting-debts.js');
+        $view = file_get_contents(APPPATH . 'Views/accounting/debts.php') . file_get_contents(APPPATH . 'Views/components/accounting_debt_modals.php');
+        $debtScript = file_get_contents(ROOTPATH . 'public/assets/js/accounting-debts.js') . file_get_contents(ROOTPATH . 'public/assets/js/accounting-debts.part2.js') . file_get_contents(ROOTPATH . 'public/assets/js/accounting-debts.part3.js');
         $dashboardScript = file_get_contents(ROOTPATH . 'public/assets/js/accounting-dashboard.js');
         $layoutScript = file_get_contents(ROOTPATH . 'public/assets/js/app-layout.js');
         $styles = file_get_contents(ROOTPATH . 'public/assets/css/app.css');
@@ -50,7 +50,7 @@ class AccountingUiConventionTest extends TestCase
         $this->assertIsString($dashboardScript);
         $this->assertIsString($layoutScript);
         $this->assertIsString($styles);
-        $this->assertSame(7, substr_count($view, 'data-inset-modal-scroll'));
+        $this->assertSame(5, substr_count($view, 'data-inset-modal-scroll'));
         $this->assertStringContainsString('function aDataState', $debtScript);
         $this->assertStringContainsString('function buildEmployeeProfileHtml', $debtScript);
         $this->assertStringContainsString('function acdDataState', $dashboardScript);
@@ -61,7 +61,7 @@ class AccountingUiConventionTest extends TestCase
 
     public function testEmployeeDetailsUsesTheAccountingFinancialProfileConvention(): void
     {
-        $view = file_get_contents(APPPATH . 'Views/accounting/debts.php');
+        $view = file_get_contents(APPPATH . 'Views/accounting/debts.php') . file_get_contents(APPPATH . 'Views/components/accounting_debt_modals.php');
         $styles = file_get_contents(ROOTPATH . 'public/assets/css/accounting-debts.css');
 
         $this->assertIsString($view);

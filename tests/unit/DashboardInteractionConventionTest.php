@@ -9,7 +9,7 @@ final class DashboardInteractionConventionTest extends CIUnitTestCase
     {
         $view = (string) file_get_contents(APPPATH . 'Views/admin/dashboard.php');
         $script = (string) file_get_contents(FCPATH . 'assets/js/admin-dashboard.js');
-        $controller = (string) file_get_contents(APPPATH . 'Controllers/AdminController.php');
+        $dashboardService = (string) file_get_contents(APPPATH . 'Services/AdminDashboardService.php');
 
         $this->assertStringContainsString('id="ad-alerts-summary"', $view);
         $this->assertStringContainsString('id="ad-alerts-pager"', $view);
@@ -19,9 +19,9 @@ final class DashboardInteractionConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('adRenderAlertPagination', $script);
         $this->assertStringContainsString('class="secondary-btn btn-sm"', $script);
         $this->assertStringContainsString('Page ${page} of ${totalPages}', $script);
-        $this->assertStringContainsString('DashboardAlertPagination::paginate', $controller);
-        $this->assertStringContainsString("'label' => 'Inactive Store'", $controller);
-        $this->assertStringNotContainsString('array_slice($alerts, 0, 12)', $controller);
+        $this->assertStringContainsString('DashboardAlertPagination::paginate', $dashboardService);
+        $this->assertStringContainsString("'label' => 'Inactive Store'", $dashboardService);
+        $this->assertStringNotContainsString('array_slice($alerts, 0, 12)', $dashboardService);
     }
 
     public function testSharedPortalLogoutRequiresTheApplicationConfirmationDialog(): void
@@ -37,5 +37,21 @@ final class DashboardInteractionConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('Log out of IBEMS?', $layoutScript);
         $this->assertStringContainsString('Stay signed in', $layoutScript);
         $this->assertStringContainsString('HTMLFormElement.prototype.submit.call(form)', $layoutScript);
+    }
+
+    public function testSidebarBrandAlwaysOpensThePortalHomeInsteadOfTheLastVisitedTab(): void
+    {
+        $shell = (string) file_get_contents(APPPATH . 'Views/components/portal_shell.php');
+        $layoutScript = (string) file_get_contents(FCPATH . 'assets/js/app-layout.js');
+
+        $this->assertStringContainsString('const dashboardLink = navLinks.find', $layoutScript);
+        $this->assertStringContainsString('const portalHomeLink = dashboardLink || navLinks[0] || null;', $layoutScript);
+        $this->assertStringContainsString('portalHomeLink.click();', $layoutScript);
+        $this->assertStringContainsString('brand.setAttribute("title", `Open ${homeLabel}`);', $layoutScript);
+        $this->assertStringNotContainsString('ibems.nav.last.', $layoutScript);
+        $this->assertStringNotContainsString('Open last visited page', $layoutScript);
+        $this->assertStringContainsString('class="app-brand-text" href="<?= esc(site_url($portalHomePath)) ?>"', $shell);
+        $this->assertStringContainsString('data-portal-navigation-link aria-label="Open <?= esc($portalHomeLabel) ?>"', $shell);
+        $this->assertStringContainsString("assets/js/app-layout.js') ?>?v=20260825b", $shell);
     }
 }

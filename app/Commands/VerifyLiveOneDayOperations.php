@@ -69,7 +69,7 @@ final class VerifyLiveOneDayOperations extends BaseCommand
 
             $this->recordElectronicDebtCollection($fixture, 20.0);
 
-            $expected = (new StoreDayExpectedService())->calculate($fixture['store'], $this->db->table('store_day_sessions')->where('store_id', $fixture['store'])->where('business_date', date('Y-m-d'))->get()->getRowArray());
+            $expected = (new StoreDayExpectedService())->calculate($fixture['store'], $this->db->table('store_day_sessions')->where('store_id', $fixture['store'])->where('business_date', ibems_business_date())->get()->getRowArray());
             $this->assertMoney($expected, 'cash_sales', 33, 'cash sales including split line');
             $this->assertMoney($expected, 'ecash_sales', 22, 'e-cash sales including split line');
             $this->assertMoney($expected, 'debt_sales', 20, 'debt sales including split line');
@@ -88,7 +88,7 @@ final class VerifyLiveOneDayOperations extends BaseCommand
             $this->closeDayBalanced($fixture, $expected);
             $this->reopenDayPreservingOriginal($fixture);
             $this->success($service, $base + ['payment_method' => 'cash', 'cash_received' => 10, 'items' => [['product_id' => $fixture['product10'], 'qty' => 1]]], $fixture, 'approved sale after admin reopen');
-            $reopenedExpected = (new StoreDayExpectedService())->calculate($fixture['store'], $this->db->table('store_day_sessions')->where('store_id', $fixture['store'])->where('business_date', date('Y-m-d'))->get()->getRowArray());
+            $reopenedExpected = (new StoreDayExpectedService())->calculate($fixture['store'], $this->db->table('store_day_sessions')->where('store_id', $fixture['store'])->where('business_date', ibems_business_date())->get()->getRowArray());
             $this->assertMoney($reopenedExpected, 'expected_cash_on_hand', 143, 'reopened closing cash expectation');
             $this->closeDayBalanced($fixture, $reopenedExpected);
             $this->expectError($service, $base + ['payment_method' => 'cash', 'cash_received' => 10, 'items' => [['product_id' => $fixture['product10'], 'qty' => 1]]], $fixture, 'Store day is not open', 'sale after day close');
@@ -134,13 +134,13 @@ final class VerifyLiveOneDayOperations extends BaseCommand
 
     private function insertStore(string $name, int $actor, string $now): int { $this->db->table('stores')->insert(['store_name' => $name, 'officer_id' => $actor, 'is_active' => true, 'created_at' => $now]); $id = (int) $this->db->insertID(); $this->ids['stores'][] = $id; return $id; }
     private function insertProduct(int $store, string $sku, float $price, int $stock, string $now): int { $this->db->table('products')->insert(['store_id' => $store, 'sku' => $this->marker . '-' . $sku, 'name' => $this->marker . ' ' . $sku, 'category' => 'QA', 'price' => $price, 'stock_qty' => $stock, 'low_stock_threshold' => 0, 'location_bin' => 'QA', 'is_active' => true, 'updated_at' => $now]); $id = (int) $this->db->insertID(); $this->ids['products'][] = $id; return $id; }
-    private function openDay(array $f): void { $now = date('Y-m-d H:i:s'); $this->db->table('store_day_sessions')->insert(['store_id' => $f['store'], 'business_date' => date('Y-m-d'), 'status' => 'open', 'opening_cash' => 100, 'opening_ecash' => 200, 'opening_note' => $this->marker, 'opened_by' => $f['actor'], 'opened_at' => $now, 'created_at' => $now, 'updated_at' => $now]); $session = (int) $this->db->insertID(); $this->db->table('store_day_payment_account_balances')->insert(['store_day_session_id' => $session, 'destination_account_id' => $f['account'], 'account_name_snapshot' => 'QA Receiver', 'account_number_snapshot' => '09000000000', 'opening_balance' => 50, 'created_at' => $now, 'updated_at' => $now]); }
+    private function openDay(array $f): void { $now = date('Y-m-d H:i:s'); $this->db->table('store_day_sessions')->insert(['store_id' => $f['store'], 'business_date' => ibems_business_date(), 'status' => 'open', 'opening_cash' => 100, 'opening_ecash' => 200, 'opening_note' => $this->marker, 'opened_by' => $f['actor'], 'opened_at' => $now, 'created_at' => $now, 'updated_at' => $now]); $session = (int) $this->db->insertID(); $this->db->table('store_day_payment_account_balances')->insert(['store_day_session_id' => $session, 'destination_account_id' => $f['account'], 'account_name_snapshot' => 'QA Receiver', 'account_number_snapshot' => '09000000000', 'opening_balance' => 50, 'created_at' => $now, 'updated_at' => $now]); }
     private function recordElectronicDebtCollection(array $f, float $amount): void
     {
         $now = date('Y-m-d H:i:s'); $before = 100.0; $after = $before - $amount;
         $this->db->transStart();
         $this->db->table('balances')->where('user_id', $f['customer'])->update(['current_debt' => $after, 'updated_at' => $now]);
-        $this->db->table('store_cash_movements')->insert(['store_id' => $f['store'], 'business_date' => date('Y-m-d'), 'channel' => 'ecash', 'movement_type' => 'cash_in', 'amount' => $amount, 'reason' => 'Debt repayment | Method: gcash | Account: ' . $f['account'] . ' | ' . $this->marker, 'created_by' => $f['actor'], 'created_at' => $now, 'updated_at' => $now]);
+        $this->db->table('store_cash_movements')->insert(['store_id' => $f['store'], 'business_date' => ibems_business_date(), 'channel' => 'ecash', 'movement_type' => 'cash_in', 'amount' => $amount, 'reason' => 'Debt repayment | Method: gcash | Account: ' . $f['account'] . ' | ' . $this->marker, 'created_by' => $f['actor'], 'created_at' => $now, 'updated_at' => $now]);
         $movementId = (int) $this->db->insertID();
         $this->db->table('debt_cashbook_entries')->insert(['user_id' => $f['customer'], 'entry_type' => 'store_repayment', 'direction' => 'credit', 'amount' => $amount, 'debt_before' => $before, 'debt_after' => $after, 'credit_limit_snapshot' => 100, 'available_credit_snapshot' => 20, 'reference_type' => 'store_cash_movement', 'reference_id' => $movementId, 'actor_id' => $f['actor'], 'remarks' => $this->marker, 'meta_json' => json_encode(['payment_method' => 'gcash', 'destination_account_id' => $f['account']]), 'created_at' => $now, 'updated_at' => $now]);
         $this->db->table('audit_logs')->insert(['actor_id' => $f['actor'], 'action' => 'STORE_DEBT_REPAYMENT', 'entity' => 'balances', 'entity_id' => $f['customer'], 'payload_json' => json_encode(['cash_movement_id' => $movementId, 'payment_method' => 'gcash']), 'created_at' => $now]);
@@ -151,14 +151,14 @@ final class VerifyLiveOneDayOperations extends BaseCommand
     private function closeDayBalanced(array $f, array $expected): void
     {
         $now = date('Y-m-d H:i:s');
-        $this->db->table('store_day_sessions')->where('store_id', $f['store'])->where('business_date', date('Y-m-d'))->update(['status' => 'closed', 'expected_cash' => $expected['expected_cash_on_hand'], 'expected_ecash' => $expected['expected_ecash_on_hand'], 'counted_cash' => $expected['expected_cash_on_hand'], 'counted_ecash' => $expected['expected_ecash_on_hand'], 'variance_cash' => 0, 'variance_ecash' => 0, 'variance_status' => 'balanced', 'review_status' => 'not_required', 'closing_note' => $this->marker . ' verified close', 'closed_by' => $f['actor'], 'closed_at' => $now, 'updated_at' => $now]);
-        $session = $this->db->table('store_day_sessions')->where('store_id', $f['store'])->where('business_date', date('Y-m-d'))->get()->getRowArray();
+        $this->db->table('store_day_sessions')->where('store_id', $f['store'])->where('business_date', ibems_business_date())->update(['status' => 'closed', 'expected_cash' => $expected['expected_cash_on_hand'], 'expected_ecash' => $expected['expected_ecash_on_hand'], 'counted_cash' => $expected['expected_cash_on_hand'], 'counted_ecash' => $expected['expected_ecash_on_hand'], 'variance_cash' => 0, 'variance_ecash' => 0, 'variance_status' => 'balanced', 'review_status' => 'not_required', 'closing_note' => $this->marker . ' verified close', 'closed_by' => $f['actor'], 'closed_at' => $now, 'updated_at' => $now]);
+        $session = $this->db->table('store_day_sessions')->where('store_id', $f['store'])->where('business_date', ibems_business_date())->get()->getRowArray();
         $this->db->table('store_day_payment_account_balances')->where('store_day_session_id', (int) ($session['id'] ?? 0))->where('destination_account_id', $f['account'])->update(['expected_balance' => 92, 'counted_balance' => 92, 'variance' => 0, 'updated_at' => $now]);
         if (($session['status'] ?? '') !== 'closed') throw new \RuntimeException('Balanced store-day close did not persist.');
     }
     private function reopenDayPreservingOriginal(array $f): void
     {
-        $session = $this->db->table('store_day_sessions')->where('store_id', $f['store'])->where('business_date', date('Y-m-d'))->get()->getRowArray();
+        $session = $this->db->table('store_day_sessions')->where('store_id', $f['store'])->where('business_date', ibems_business_date())->get()->getRowArray();
         $cash = (float) ($session['opening_cash'] ?? -1); $ecash = (float) ($session['opening_ecash'] ?? -1);
         $reopened = (new StoreDaySessionModel())->reopenDay((int) $session['id'], $f['actor']);
         if (($reopened['status'] ?? '') !== 'open' || (float) ($reopened['opening_cash'] ?? -2) !== $cash || (float) ($reopened['opening_ecash'] ?? -2) !== $ecash || ($reopened['counted_cash'] ?? null) !== null) throw new \RuntimeException('Admin reopen did not preserve original openings or clear the prior close state.');

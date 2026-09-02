@@ -74,7 +74,7 @@ class StoreOpeningBalanceModel extends Model
         $now = date('Y-m-d H:i:s');
         $payload = [
             'store_id' => $storeId,
-            'business_date' => date('Y-m-d'),
+            'business_date' => ibems_business_date(),
             'opening_balance' => $openingBalance,
             'note' => $note !== '' ? $note : null,
             'opened_by' => $openedBy > 0 ? $openedBy : null,

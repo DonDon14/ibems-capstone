@@ -10,7 +10,7 @@ function setStatus(message, type) {
 
 function roleLabel(role) {
     const key = String(role || "").toUpperCase();
-    if (key === "STORE_SYSTEM") return "Store Officer";
+    if (key === "STORE_SYSTEM") return "Store Cashier";
     if (key === "STORE_SUPERVISOR") return "Store Supervisor";
     if (key === "ACCOUNTING_OFFICE") return "Accounting Office";
     if (key === "ADMIN") return "Admin";

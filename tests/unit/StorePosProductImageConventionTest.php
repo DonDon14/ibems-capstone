@@ -8,7 +8,7 @@ final class StorePosProductImageConventionTest extends CIUnitTestCase
 {
     public function testCatalogUsesAnyAvailableVariantImageAndHandlesMissingAssets(): void
     {
-        $script = file_get_contents(FCPATH . 'assets/js/store-pos.js');
+        $script = file_get_contents(FCPATH . 'assets/js/store-pos.js') . file_get_contents(FCPATH . 'assets/js/store-pos.part2.js') . file_get_contents(FCPATH . 'assets/js/store-pos.part3.js') . file_get_contents(FCPATH . 'assets/js/store-pos.part4.js') . file_get_contents(FCPATH . 'assets/js/store-pos.part5.js') . file_get_contents(FCPATH . 'assets/js/store-pos.part6.js');
 
         $this->assertIsString($script);
         $this->assertStringContainsString('function getCatalogImageUrl(variants)', $script);

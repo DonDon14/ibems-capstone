@@ -9,8 +9,8 @@ Named route permissions are defined centrally in `app/Config/Authorization.php`.
 | Role code | Business name | Scope | Primary responsibility |
 | --- | --- | --- | --- |
 | `ADMIN` | System Administrator | Institution-wide | Configure and audit the platform, manage users and stores, and handle documented escalations. |
-| `STORE_SUPERVISOR` | Store Administrator | Assigned stores only | Monitor assigned stores and independently review store-day exceptions. |
-| `STORE_SYSTEM` | Store Officer | Officer-assigned store only | Run POS, inventory, cash movements, and store-day operations. |
+| `STORE_SUPERVISOR` | Store Supervisor | Assigned stores only | Manage assigned-store inventory, configuration, records, reports, and independently review store-day exceptions. |
+| `STORE_SYSTEM` | Store Cashier | Cashier-assigned store only | Open the POS, process sales and repayments, and perform store-day cash custody. |
 | `ACCOUNTING_OFFICE` | Accounting Officer | Institution-wide accounting | Manage debt, deductions, investigations, and settlement workflows. |
 | `USER` | Employee / User | Own account only | View personal transactions, debt, receipts, and cashbook records. |
 
@@ -20,15 +20,16 @@ Named route permissions are defined centrally in `app/Config/Authorization.php`.
 
 Legend: **Manage** includes create/update actions; **Review** is an independent approval action; **Inspect** is read-only.
 
-| Capability | System Administrator | Store Administrator | Store Officer | Accounting Officer | User |
+| Capability | System Administrator | Store Supervisor | Store Cashier | Accounting Officer | User |
 | --- | --- | --- | --- | --- | --- |
 | Manage users and role assignments | Manage | No | No | No | No |
-| Manage stores and officer/supervisor assignments | Manage | No | No | No | No |
-| View stores | All stores | Assigned stores | Officer-assigned store | No | No |
-| Inspect store sales, inventory, and transactions | All stores | Assigned stores | Officer-assigned store | No | No |
+| Manage stores and cashier/supervisor assignments | Manage | No | No | No | No |
+| View stores | All stores | Assigned stores | Cashier-assigned store | No | No |
+| Inspect store sales, inventory, and transactions | All stores | Assigned stores | POS-required data only | No | No |
 | Create POS transactions | No | No | Assigned store | No | No |
 | Open or close a store day | No | No | Assigned store | No | No |
-| Restock or adjust inventory | No | No | Assigned store | No | No |
+| Restock or adjust inventory | No | Assigned stores | No | No | No |
+| Configure categories and payment settings | No | Assigned stores | No | No | No |
 | Review a store-day variance | Escalation only | Assigned stores | No | No | No |
 | Review a store day closed by the same person | No | No | No | No | No |
 | Reset an opening balance | Audited escalation | No | No | No | No |
@@ -48,10 +49,10 @@ Legend: **Manage** includes create/update actions; **Review** is an independent 
 
 ## Review workflow
 
-1. The Store Officer opens, operates, and closes the store day.
+1. The Store Cashier opens, operates, and closes the store day through the POS.
 2. A balanced close requires no approval.
-3. A variance is sent to a Store Administrator assigned to that store.
-4. The closing Store Officer cannot review that variance, even if the same account also has the Store Administrator role.
-5. If no independent assigned Store Administrator is available, the case is escalated to the System Administrator and the override reason is audited.
+3. A variance is sent to a Store Supervisor assigned to that store.
+4. The closing Store Cashier cannot review that variance, even if the same account also has the Store Supervisor role.
+5. If no independent assigned Store Supervisor is available, the case is escalated to the System Administrator and the override reason is audited.
 
 Changes to this matrix are business-rule changes. Update the related route, policy, endpoint, audit, and authorization tests together.

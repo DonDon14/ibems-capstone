@@ -24,6 +24,22 @@ final class ThemeConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('localStorage.setItem("ibems-theme"', $script);
         $this->assertStringContainsString('aria-pressed', $script);
         $this->assertStringContainsString('ibems:themechange', $script);
+        $this->assertStringContainsString('document.startViewTransition', $script);
+        $this->assertStringContainsString('theme-transitioning-fallback', $script);
+        $this->assertStringContainsString('prefers-reduced-motion: reduce', $script);
+        $this->assertStringContainsString('transitionDuration = 240', $script);
+
+        $styles = (string) file_get_contents(FCPATH . 'assets/css/modern-ui.css');
+        $this->assertStringContainsString('html.theme-transitioning::view-transition-old(root)', $styles);
+        $this->assertStringContainsString('html.theme-transitioning::view-transition-new(root)', $styles);
+        $this->assertStringContainsString('html.theme-transitioning-fallback body *::before', $styles);
+        $this->assertStringContainsString('animation: ibems-theme-fallback-fade 240ms', $styles);
+        $this->assertStringContainsString('45%, 55% { opacity: 0; }', $styles);
+
+        $authStyles = (string) file_get_contents(FCPATH . 'assets/css/auth-login.css');
+        $this->assertStringContainsString('html.theme-transitioning::view-transition-old(root)', $authStyles);
+        $this->assertStringContainsString('html.theme-transitioning-fallback body *::after', $authStyles);
+        $this->assertStringContainsString('animation: ibems-theme-fallback-fade 240ms', $authStyles);
     }
 
     public function testAuthenticationScreensExposeThePersistentThemeControl(): void
@@ -34,7 +50,7 @@ final class ThemeConventionTest extends CIUnitTestCase
 
         foreach ([$login, $roleSelection] as $view) {
             $this->assertStringContainsString('id="theme-toggle"', $view);
-            $this->assertStringContainsString('assets/js/theme.js', $view);
+                $this->assertStringContainsString("assets/js/theme.js') ?>?v=20260825c", $view);
             $this->assertStringContainsString("localStorage.getItem('ibems-theme')", $view);
             $this->assertStringContainsString('name="theme-color"', $view);
         }
@@ -54,7 +70,7 @@ final class ThemeConventionTest extends CIUnitTestCase
 
         foreach ([$login, $roleSelection] as $view) {
             $this->assertStringContainsString('class="auth-mark-logo"', $view);
-            $this->assertStringContainsString('auth-login.css\') ?>?v=20260823f', $view);
+            $this->assertStringContainsString('auth-login.css\') ?>?v=20260825c', $view);
         }
 
         $this->assertStringContainsString('width: clamp(108px, 9vw, 128px);', $styles);
@@ -71,7 +87,7 @@ final class ThemeConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('class="auth-modern auth-role-selection"', $roleSelection);
         $this->assertStringContainsString('role="group" aria-label="Available portals"', $roleSelection);
         $this->assertStringContainsString("'icon' => 'bi-shield-check'", $roleSelection);
-        $this->assertStringContainsString("'icon' => 'bi-shop-window'", $roleSelection);
+        $this->assertStringContainsString("'icon' => 'bi-cart3'", $roleSelection);
         $this->assertStringContainsString("'description' => 'Shop products, review purchases, and manage your account.'", $roleSelection);
         $this->assertStringContainsString('class="auth-role-copy"', $roleSelection);
         $this->assertStringContainsString('bi-arrow-right auth-role-arrow', $roleSelection);
@@ -133,6 +149,7 @@ final class ThemeConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('.audit-payload-block :is(pre, code)', $css);
         $this->assertStringContainsString('.metric-card-icon--sales', $css);
         $this->assertStringContainsString('.category-edit-summary', $css);
+        $this->assertStringContainsString('.store-card-logo, .store-logo-fallback', $css);
         $this->assertStringContainsString('.employee-identity-copy h5', $css);
         $this->assertStringContainsString('.staff-summary-finance span', $css);
         $this->assertStringContainsString('.metric-card-icon--alerts', $css);
@@ -172,7 +189,7 @@ final class ThemeConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('.account-menu-logout button:is(:hover, :focus-visible)', $css);
         $this->assertStringContainsString('background: #dc2626;', $css);
         $this->assertStringContainsString('color: #fff;', $css);
-        $this->assertStringContainsString('account-menu.css\') ?>?v=20260824c', (string) file_get_contents(APPPATH . 'Views/components/portal_shell.php'));
+        $this->assertStringContainsString('account-menu.css\') ?>?v=20260902a', (string) file_get_contents(APPPATH . 'Views/components/portal_shell.php'));
         $this->assertStringContainsString('height: 100dvh;', $css);
         $this->assertStringContainsString('overscroll-behavior: contain;', $css);
         $this->assertStringContainsString('background: #2a1720', $css);

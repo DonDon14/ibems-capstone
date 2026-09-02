@@ -63,7 +63,7 @@ class InitialSeeder extends Seeder
             ],
             [
                 'employee_id' => 'STR001',
-                'name' => 'Main Store Officer',
+                'name' => 'Main Store Cashier',
                 'email' => 'store.main@ibems.local',
                 'password_hash' => $passwordHash,
                 'debt_pin_hash' => null,
@@ -76,7 +76,7 @@ class InitialSeeder extends Seeder
             ],
             [
                 'employee_id' => 'STR002',
-                'name' => 'Tech Store Officer',
+                'name' => 'Tech Store Cashier',
                 'email' => 'store.tech@ibems.local',
                 'password_hash' => $passwordHash,
                 'debt_pin_hash' => null,

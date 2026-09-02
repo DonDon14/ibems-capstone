@@ -14,7 +14,7 @@ final class UserMobilePortalConventionTest extends CIUnitTestCase
         $this->assertStringContainsString("strtoupper(\$role) === 'USER'", $userLayout);
         $this->assertStringContainsString('user-mobile-enabled', $userLayout);
         $this->assertStringContainsString("strtoupper(\$role) === 'USER'", $shell);
-        $this->assertStringContainsString('aria-label="User mobile navigation"', $shell);
+        $this->assertStringContainsString('aria-label="<?= esc($portalTitle) ?> mobile navigation"', $shell);
         $this->assertStringContainsString('assets/css/user-mobile.css', $shell);
         $this->assertStringContainsString('assets/js/user-mobile.js', $shell);
         $this->assertStringContainsString('assets/js/user-navigation.js', $shell);
@@ -36,7 +36,8 @@ final class UserMobilePortalConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('@media (max-width: 760px)', $styles);
         $this->assertStringContainsString('.user-mobile-enabled .app-sidebar', $styles);
         $this->assertStringContainsString('.user-mobile-enabled .user-mobile-nav', $styles);
-        $this->assertStringContainsString('grid-template-columns: repeat(4, minmax(0, 1fr))', $styles);
+        $this->assertStringContainsString('grid-template-columns: repeat(var(--user-mobile-nav-count, 4)', $styles);
+        $this->assertStringContainsString('.user-mobile-nav-count-5', $styles);
         $this->assertStringContainsString('--user-mobile-nav-height: 64px', $styles);
         $this->assertStringContainsString('.user-mobile-nav a span', $styles);
         $this->assertStringContainsString('aria-label="<?= esc($label) ?>"', $shell);
@@ -115,32 +116,34 @@ final class UserMobilePortalConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('window.IbemsUserNavigation = api', $navigation);
         $this->assertStringContainsString('ibems:user-page-loaded', $navigation);
 
-        foreach (['dashboard.php', 'stores.php', 'history.php', 'deductions.php'] as $view) {
+        foreach (['dashboard.php', 'stores.php', 'history.php', 'deductions.php', 'card.php'] as $view) {
             $contents = (string) file_get_contents(APPPATH . 'Views/user/' . $view);
             $this->assertStringContainsString('data-user-page-script', $contents, $view);
             $this->assertStringContainsString('data-user-page-style', $contents, $view);
         }
 
-        foreach (['user-dashboard.js', 'user-stores.js', 'user-history.js', 'user-deductions.js'] as $script) {
+        foreach (['user-dashboard.js', 'user-stores.js', 'user-history.js', 'user-deductions.js', 'user-purchase-card.js'] as $script) {
             $contents = (string) file_get_contents(FCPATH . 'assets/js/' . $script);
             $this->assertStringContainsString('IbemsUserNavigation?.currentSignal', $contents, $script);
             $this->assertStringContainsString('signal:', $contents, $script);
         }
     }
 
-    public function testUserAccountSettingsAreAvailableFromEveryUserPage(): void
+    public function testPurchaseCardControlsReplaceTheSharedDebtPinPrompt(): void
     {
         $shell = (string) file_get_contents(APPPATH . 'Views/components/portal_shell.php');
-        $dashboard = (string) file_get_contents(APPPATH . 'Views/user/dashboard.php');
-        $accountScript = (string) file_get_contents(FCPATH . 'assets/js/user-account-settings.js');
+        $layout = (string) file_get_contents(APPPATH . 'Views/layouts/user.php');
+        $cardView = (string) file_get_contents(APPPATH . 'Views/user/card.php');
+        $cardScript = (string) file_get_contents(FCPATH . 'assets/js/user-purchase-card.js');
 
         $this->assertStringContainsString('id="account-menu-toggle"', $shell);
-        $this->assertStringContainsString('id="u-open-pin-modal"', $shell);
-        $this->assertStringContainsString('id="u-debt-pin-modal"', $shell);
-        $this->assertStringContainsString('assets/js/user-account-settings.js', $shell);
-        $this->assertStringNotContainsString('id="u-open-pin-modal"', $dashboard);
-        $this->assertStringContainsString('/user/debt-pin/status', $accountScript);
-        $this->assertStringContainsString('/user/debt-pin/set', $accountScript);
-        $this->assertStringContainsString('current_password', $accountScript);
+        $this->assertStringNotContainsString('id="u-open-pin-modal"', $shell);
+        $this->assertStringNotContainsString('id="u-debt-pin-modal"', $shell);
+        $this->assertStringContainsString("'path' => 'user/card'", $layout);
+        $this->assertStringContainsString('id="purchase-card-unlock"', $cardView);
+        $this->assertStringContainsString('one successful debt purchase', $cardView);
+        $this->assertStringContainsString('/user/purchase-card/status', $cardScript);
+        $this->assertStringContainsString('/user/purchase-card/unlock', $cardScript);
+        $this->assertStringContainsString('/user/purchase-card/lock', $cardScript);
     }
 }

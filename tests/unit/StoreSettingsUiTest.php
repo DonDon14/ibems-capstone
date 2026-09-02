@@ -5,9 +5,21 @@ use CodeIgniter\Test\CIUnitTestCase;
 /** @internal */
 final class StoreSettingsUiTest extends CIUnitTestCase
 {
+    public function testCapabilityCardsUseTheApplicationDarkThemeAndCspSafeStatuses(): void
+    {
+        $script = (string) file_get_contents(FCPATH . 'assets/js/store-settings.js') . file_get_contents(FCPATH . 'assets/js/store-settings.part2.js');
+        $styles = (string) file_get_contents(FCPATH . 'assets/css/store-settings.css');
+
+        $this->assertStringContainsString('html[data-theme="dark"] .ibems-modern .capability-option>span', $styles);
+        $this->assertStringContainsString('html[data-theme="dark"] .ibems-modern .capability-option strong', $styles);
+        $this->assertStringNotContainsString('.dark-mode .capability-option', $styles);
+        $this->assertStringNotContainsString('.style.color', $script);
+        $this->assertStringContainsString('classList.toggle("is-error"', $script);
+    }
+
     public function testPaymentMethodSaveShowsAndClearsAnExclusiveLoadingState(): void
     {
-        $script = (string) file_get_contents(FCPATH . 'assets/js/store-settings.js');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/store-settings.js') . file_get_contents(FCPATH . 'assets/js/store-settings.part2.js');
         $styles = (string) file_get_contents(FCPATH . 'assets/css/store-settings.css');
 
         $this->assertStringContainsString('let paymentMethodSavePending = false;', $script);
@@ -24,8 +36,9 @@ final class StoreSettingsUiTest extends CIUnitTestCase
     public function testCategoryManagementShowsUsageAndProtectedDefaultActions(): void
     {
         $view = (string) file_get_contents(APPPATH . 'Views/store/settings.php');
-        $controller = (string) file_get_contents(APPPATH . 'Controllers/StoreController.php');
-        $script = (string) file_get_contents(FCPATH . 'assets/js/store-settings.js');
+        $controller = (string) file_get_contents(APPPATH . 'Controllers/StoreController.php')
+            . (string) file_get_contents(APPPATH . 'Services/StoreCatalogQueryService.php');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/store-settings.js') . file_get_contents(FCPATH . 'assets/js/store-settings.part2.js');
         $styles = (string) file_get_contents(FCPATH . 'assets/css/store-settings.css');
 
         $this->assertStringContainsString('id="category-count"', $view);
@@ -44,7 +57,7 @@ final class StoreSettingsUiTest extends CIUnitTestCase
     public function testCategoryUpdateUsesTheDedicatedAccessibleEditor(): void
     {
         $view = (string) file_get_contents(APPPATH . 'Views/store/settings.php');
-        $script = (string) file_get_contents(FCPATH . 'assets/js/store-settings.js');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/store-settings.js') . file_get_contents(FCPATH . 'assets/js/store-settings.part2.js');
         $styles = (string) file_get_contents(FCPATH . 'assets/css/store-settings.css');
 
         $this->assertStringContainsString('id="category-edit-modal"', $view);
@@ -62,7 +75,7 @@ final class StoreSettingsUiTest extends CIUnitTestCase
     public function testCategoryCreationUsesTheSameModalPatternAsPaymentMethods(): void
     {
         $view = (string) file_get_contents(APPPATH . 'Views/store/settings.php');
-        $script = (string) file_get_contents(FCPATH . 'assets/js/store-settings.js');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/store-settings.js') . file_get_contents(FCPATH . 'assets/js/store-settings.part2.js');
         $styles = (string) file_get_contents(FCPATH . 'assets/css/store-settings.css');
 
         $this->assertStringNotContainsString('id="new-category-name"', $view);

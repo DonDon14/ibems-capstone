@@ -17,7 +17,7 @@
     ]) ?>
 
     <div class="department-toolbar" data-compact-filters>
-        <label for="department-period-month"><span>Allocation month</span><input id="department-period-month" type="month" value="<?= esc(date('Y-m')) ?>" aria-label="Allocation month"></label>
+        <label for="department-period-month"><span>Allocation month</span><input id="department-period-month" type="month" value="<?= esc(substr(ibems_business_date(), 0, 7)) ?>" aria-label="Allocation month"></label>
         <label for="department-accounting-search"><span>Search</span><input id="department-accounting-search" type="search" placeholder="Code, department, or head"></label>
         <button id="department-accounting-refresh" class="secondary-btn" type="button"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
         <?php if ($canOperateDepartmentDebt): ?><button id="department-batch-allocation-open" class="primary-btn" type="button"><i class="bi bi-collection"></i> Batch allocation</button><?php endif; ?>

@@ -56,7 +56,7 @@ class StoreLifecycleService
     {
         $officerId = (int) ($store['officer_id'] ?? 0);
         if ($officerId <= 0 || $this->db->table('users')->where('id', $officerId)->where('is_active', true)->countAllResults() === 0) {
-            return ['Assign an active primary officer before reactivation.'];
+            return ['Assign an active Store Cashier before reactivation.'];
         }
 
         $activeSupervisors = $this->db->table('store_supervisors ss')

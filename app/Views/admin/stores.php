@@ -109,12 +109,12 @@
                 </div>
                 <div class="form-grid">
                     <div class="field store-officer-field">
-                        <label for="store-officer-search">Primary Store Officer</label>
+                        <label for="store-officer-search">Store Cashier</label>
                         <div id="store-officer-summary" class="assignment-summary"></div>
                         <div id="store-officer-editor" class="assignment-editor is-hidden">
                             <div id="store-officer-picker" class="people-picker" data-selection-mode="single">
                                 <div id="store-officer-selected" class="people-picker-values"></div>
-                                <input id="store-officer-search" type="search" role="combobox" autocomplete="off" aria-label="Search primary store officer" aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false" aria-controls="store-officer-suggestions" placeholder="Search name, email, or employee ID">
+                                <input id="store-officer-search" type="search" role="combobox" autocomplete="off" aria-label="Search Store Cashiers" aria-autocomplete="list" aria-haspopup="listbox" aria-expanded="false" aria-controls="store-officer-suggestions" placeholder="Search name, email, or employee ID">
                             </div>
                             <button id="store-officer-change-done" class="secondary-btn assignment-done" type="button">Done</button>
                         </div>
@@ -150,7 +150,7 @@
                             <option value="0">Inactive — finish setup first</option>
                             <option value="1">Active — available for operations</option>
                         </select>
-                        <small class="field-help">New stores default to inactive until setup is complete. An active store must have a primary officer and at least one supervisor.</small>
+                        <small class="field-help">New stores default to inactive so they can be saved before staffing is complete. Activation requires a Store Cashier and at least one supervisor.</small>
                     </div>
                     <div class="field is-hidden" id="store-deactivation-reason-field" hidden>
                         <label for="store-deactivation-reason">Deactivation Reason</label>
@@ -171,4 +171,5 @@
 
 <?= $this->section('scripts') ?>
 <script src="<?= base_url('assets/js/admin-stores.js') ?>?v=20260824b"></script>
+<script src="<?= base_url('assets/js/admin-stores.part2.js') ?>?v=20260824b"></script>
 <?= $this->endSection() ?>

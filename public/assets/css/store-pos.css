@@ -75,6 +75,72 @@
     grid-column: 1 / -1;
 }
 
+.pos-account-trigger {
+    display: flex;
+    min-height: 48px;
+    align-items: center;
+    gap: 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 14px;
+    padding: 5px 12px 5px 6px;
+    background: #fff;
+    color: #0f172a;
+    font: inherit;
+    text-align: left;
+    cursor: pointer;
+    box-shadow: 0 5px 16px rgba(15, 23, 42, 0.08);
+}
+
+.pos-account-trigger:hover,
+.pos-account-trigger:focus-visible,
+.pos-account-trigger[aria-expanded="true"] {
+    border-color: #60a5fa;
+    outline: 0;
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.16);
+}
+
+.pos-account-trigger[aria-expanded="true"] .profile-avatar-status {
+    transform: rotate(180deg);
+}
+
+.pos-account-label {
+    display: grid;
+    gap: 1px;
+}
+
+.pos-account-label strong,
+.pos-account-label small {
+    max-width: 170px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.pos-account-label small {
+    color: #64748b;
+    font-size: 0.72rem;
+}
+
+html[data-theme="dark"] .pos-account-trigger {
+    border-color: #405672;
+    background: #111c2e;
+    color: #e5edf7;
+}
+
+html[data-theme="dark"] .pos-account-label small {
+    color: #94a3b8;
+}
+
+@media (max-width: 560px) {
+    .pos-account-trigger {
+        padding-right: 6px;
+    }
+
+    .pos-account-label {
+        display: none;
+    }
+}
+
 .panel {
     background:
         linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 250, 255, 0.94));
@@ -2461,11 +2527,6 @@
     color: #0f3f72;
     font-size: 0.78rem;
 }
-.product-card-action.is-locked {
-    border-color: #f2c572;
-    background: #fffaf0;
-    color: #92400e;
-}
 .product-card.is-pos-locked {
     cursor: not-allowed;
     opacity: 0.82;
@@ -2609,13 +2670,6 @@
     background: #f1f7ff;
     color: #0f3f72;
     font-size: 0.76rem;
-}
-.product-card-action.is-locked {
-    width: fit-content;
-    align-self: flex-end;
-    border-color: #efd7a0;
-    background: #fffaf0;
-    color: #8a5a0a;
 }
 .product-card-action i {
     font-size: 0.82rem;

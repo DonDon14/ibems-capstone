@@ -17,11 +17,31 @@ class ProfileImageConventionTest extends TestCase
         $this->assertStringContainsString('data-current-user-avatar', $shell);
         $this->assertStringContainsString('data-profile-image-open', $shell);
         $this->assertStringContainsString('id="account-menu-toggle"', $shell);
+        $this->assertStringContainsString('data-account-menu-toggle', $shell);
+        $this->assertStringContainsString('data-account-security-open', $shell);
         $this->assertStringContainsString('Change or upload your account photo', $shell);
         foreach (['admin', 'accounting', 'store', 'store_admin', 'user'] as $layout) {
             $source = (string) file_get_contents(APPPATH . 'Views/layouts/' . $layout . '.php');
             $this->assertStringContainsString("session()->get('profile_image_url')", $source);
         }
+    }
+
+    public function testSharedAccountSecuritySupportsPasswordAndEmployeePinChanges(): void
+    {
+        $routes = (string) file_get_contents(APPPATH . 'Config/Routes.php');
+        $controller = (string) file_get_contents(APPPATH . 'Controllers/ProfileController.php');
+        $shell = (string) file_get_contents(APPPATH . 'Views/components/portal_shell.php');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/account-security.js');
+
+        $this->assertStringContainsString("profile/password', 'ProfileController::updatePassword', ['filter' => 'access:account.self']", $routes);
+        $this->assertStringContainsString("profile/debt-pin', 'ProfileController::updateDebtPin', ['filter' => 'access:account.self']", $routes);
+        $this->assertStringContainsString('password_verify($currentPassword', $controller);
+        $this->assertStringContainsString("in_array('USER', ibems_available_roles(), true)", $controller);
+        $this->assertStringContainsString("'USER_CHANGE_PASSWORD'", $controller);
+        $this->assertStringContainsString('id="account-security-modal"', $shell);
+        $this->assertStringContainsString('autocomplete="current-password"', $shell);
+        $this->assertStringContainsString('submitJson("/profile/password"', $script);
+        $this->assertStringContainsString('submitJson("/profile/debt-pin"', $script);
     }
 
     public function testAuthenticatedUploadUsesTheManagedImageStoragePath(): void
@@ -51,12 +71,22 @@ class ProfileImageConventionTest extends TestCase
 
         foreach ($scripts as $script) {
             $source = (string) file_get_contents($script);
+            $parts = glob(substr($script, 0, -3) . '.part*.js') ?: [];
+            natsort($parts);
+            foreach ($parts as $part) {
+                $source .= (string) file_get_contents($part);
+            }
             $this->assertStringContainsString('IbemsAvatar.html', $source, basename($script));
         }
 
         $admin = (string) file_get_contents(APPPATH . 'Controllers/AdminController.php');
-        $accounting = (string) file_get_contents(APPPATH . 'Controllers/AccountingController.php');
-        $store = (string) file_get_contents(APPPATH . 'Controllers/StoreController.php');
+        $accounting = (string) file_get_contents(APPPATH . 'Controllers/AccountingController.php')
+            . (string) file_get_contents(APPPATH . 'Services/AccountingDebtQueryService.php')
+            . (string) file_get_contents(APPPATH . 'Services/AccountingReportingService.php');
+        $store = (string) file_get_contents(APPPATH . 'Controllers/StoreController.php')
+            . (string) file_get_contents(APPPATH . 'Services/StoreDashboardService.php')
+            . (string) file_get_contents(APPPATH . 'Services/StoreCatalogQueryService.php')
+            . (string) file_get_contents(APPPATH . 'Services/StoreTransactionQueryService.php');
         $this->assertStringContainsString('u.profile_image_url', $admin);
         $this->assertStringContainsString('u.profile_image_url', $accounting);
         $this->assertStringContainsString('u.profile_image_url', $store);
@@ -68,7 +98,13 @@ class ProfileImageConventionTest extends TestCase
             FCPATH . 'assets/js/store-admin-dashboard.js',
             FCPATH . 'assets/js/store-reports.js',
         ] as $identitySurface) {
-            $this->assertStringContainsString('IbemsAvatar.html', (string) file_get_contents($identitySurface));
+            $source = (string) file_get_contents($identitySurface);
+            $parts = glob(substr($identitySurface, 0, -3) . '.part*.js') ?: [];
+            natsort($parts);
+            foreach ($parts as $part) {
+                $source .= (string) file_get_contents($part);
+            }
+            $this->assertStringContainsString('IbemsAvatar.html', $source);
         }
     }
 

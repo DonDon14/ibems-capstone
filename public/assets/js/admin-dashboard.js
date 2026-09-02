@@ -75,7 +75,7 @@ function adRenderSalesTrendChart(rows) {
     if (summaryEl) {
         summaryEl.textContent = total > 0
             ? `Total revenue was ${adMoney(total)}. ${peakEl?.textContent || ""}`
-            : "No revenue was recorded during the last seven days.";
+            : "No revenue was recorded during the selected period.";
     }
 
     adSalesTrendChart = new window.Chart(canvas, {
@@ -163,7 +163,7 @@ function adRenderTopItemsRanking(rows) {
 
     if (items.length === 0) {
         container.removeAttribute("role");
-        container.innerHTML = adDataState("empty", "No product sales in the last seven days.");
+        container.innerHTML = adDataState("empty", "No product sales in the selected period.");
         return;
     }
 
@@ -309,7 +309,7 @@ function adRenderPaymentBreakdown(rows) {
     if (!container) return;
 
     if (!Array.isArray(rows) || rows.length === 0) {
-        container.innerHTML = adDataState("empty", "No payments recorded in the last 7 days.");
+        container.innerHTML = adDataState("empty", "No payments recorded in the selected period.");
         return;
     }
 
@@ -336,7 +336,10 @@ function adRenderPaymentBreakdown(rows) {
 }
 
 async function adFetchDashboard(alertsPage = 1) {
-    const query = new URLSearchParams({ alerts_page: String(Math.max(1, Number(alertsPage || 1))) });
+    const query = new URLSearchParams({
+        alerts_page: String(Math.max(1, Number(alertsPage || 1))),
+        period: window.IbemsDashboardPeriod?.get() || "day",
+    });
     const response = await fetch(`/admin/dashboard/data?${query.toString()}`);
     const data = await response.json();
     if (!response.ok || !data || data.status !== "success") {
@@ -373,8 +376,11 @@ async function adLoadDashboard() {
     const healthMessageEl = document.getElementById("ad-health-message");
     const healthBreakdownEl = document.getElementById("ad-health-breakdown");
 
+    const requestedPeriod = window.IbemsDashboardPeriod?.get() || "day";
     try {
         const data = await adFetchDashboard(1);
+        if ((window.IbemsDashboardPeriod?.get() || "day") !== requestedPeriod) return;
+        window.IbemsDashboardPeriod?.setMeta(data.period);
 
         const summary = data.summary || {};
         totalStoresEl.textContent = String(Number(summary.total_stores || 0));
@@ -399,8 +405,8 @@ async function adLoadDashboard() {
             : adEscape(health.message || "No health data available.");
         healthBreakdownEl.innerHTML = `
             <span class="dashboard-meta-line">
-                <span class="dashboard-meta-item"><i class="bi bi-receipt" aria-hidden="true"></i><span>Today Transactions: ${Number(summary.today_transactions || 0)}</span></span>
-                <span class="dashboard-meta-item"><i class="bi bi-cash-coin" aria-hidden="true"></i><span>Today Sales: ${adEscape(adMoney(summary.today_sales || 0))}</span></span>
+                <span class="dashboard-meta-item"><i class="bi bi-receipt" aria-hidden="true"></i><span>Period Transactions: ${Number(summary.period_transactions || summary.today_transactions || 0)}</span></span>
+                <span class="dashboard-meta-item"><i class="bi bi-cash-coin" aria-hidden="true"></i><span>Period Sales: ${adEscape(adMoney(summary.period_sales || summary.today_sales || 0))}</span></span>
                 <span class="dashboard-meta-item"><i class="bi bi-wallet2" aria-hidden="true"></i><span>Total Debt: ${adEscape(adMoney(summary.total_debt || 0))}</span></span>
             </span>
         `;
@@ -442,6 +448,10 @@ document.getElementById("ad-alerts-pager")?.addEventListener("click", (event) =>
 });
 
 adLoadDashboard();
+window.addEventListener("ibems:dashboard-period-change", () => {
+    adAlertPage = 1;
+    adLoadDashboard();
+});
 
 window.addEventListener("ibems:themechange", () => {
     if (adSalesTrendRows.length === 0) return;

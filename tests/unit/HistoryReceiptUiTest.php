@@ -41,7 +41,9 @@ final class HistoryReceiptUiTest extends CIUnitTestCase
         $this->assertStringContainsString('.history-filters.compact-filter-bar .compact-filter-primary', $styles);
         $this->assertStringContainsString('justify-content: flex-end;', $styles);
         $this->assertStringContainsString('function printWhenQrReady', $receipt);
-        $this->assertStringContainsString('qr?.complete && Number(qr.naturalWidth || 0) > 0', $receipt);
+        $this->assertStringContainsString('const stylesReady = !stylesheet || Boolean(stylesheet.sheet);', $receipt);
+        $this->assertStringContainsString('const qrReady = !qr || (qr.complete && Number(qr.naturalWidth || 0) > 0);', $receipt);
+        $this->assertStringContainsString('if (stylesReady && qrReady)', $receipt);
         $this->assertStringContainsString('printWhenQrReady(popup);', $receipt);
         $this->assertStringNotContainsString("popup.document.close();\n        popup.focus();\n        popup.print();", $receipt);
     }

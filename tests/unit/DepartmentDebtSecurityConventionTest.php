@@ -59,12 +59,12 @@ final class DepartmentDebtSecurityConventionTest extends TestCase
     public function testSelectedRequesterIdentityAndImageUrlsCannotBeSpoofed(): void
     {
         $transactions = (string) file_get_contents(ROOTPATH . 'app/Services/TransactionService.php');
-        $store = (string) file_get_contents(ROOTPATH . 'app/Controllers/StoreController.php');
+        $storeConfiguration = (string) file_get_contents(ROOTPATH . 'app/Services/StoreConfigurationService.php');
 
         $this->assertStringContainsString("\$departmentRequesterName = trim((string) (\$requester['name']", $transactions);
-        $this->assertStringContainsString('private function isAllowedImageUrl', $store);
-        $this->assertStringContainsString("=== 'https'", $store);
-        $this->assertStringContainsString("str_starts_with(\$url, '/uploads/')", $store);
+        $this->assertStringContainsString('private function isAllowedImageUrl', $storeConfiguration);
+        $this->assertStringContainsString("=== 'https'", $storeConfiguration);
+        $this->assertStringContainsString("str_starts_with(\$url, '/uploads/')", $storeConfiguration);
     }
 
     public function testDepartmentApprovalHasOneAccountableHeadAndNoDelegateControls(): void
@@ -73,7 +73,7 @@ final class DepartmentDebtSecurityConventionTest extends TestCase
         $authorization = (string) file_get_contents(ROOTPATH . 'app/Services/DepartmentAuthorizationService.php');
         $adminView = (string) file_get_contents(ROOTPATH . 'app/Views/admin/departments.php');
         $adminScript = (string) file_get_contents(ROOTPATH . 'public/assets/js/department-debt-pages.js');
-        $posView = (string) file_get_contents(ROOTPATH . 'app/Views/store/pos.php');
+        $posView = (string) file_get_contents(ROOTPATH . 'app/Views/store/pos.php') . file_get_contents(ROOTPATH . 'app/Views/components/store_pos_modals.php');
 
         $this->assertStringContainsString("'approval_policy' => 'department_head_only'", $controller);
         $this->assertStringContainsString("->where('d.head_user_id', \$userId)", $authorization);

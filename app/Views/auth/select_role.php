@@ -18,7 +18,7 @@
     </script>
     <link rel="icon" type="image/png" href="<?= base_url('assets/images/ibems-logo.png') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.css') ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/css/auth-login.css') ?>?v=20260823f">
+    <link rel="stylesheet" href="<?= base_url('assets/css/auth-login.css') ?>?v=20260825c">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 </head>
 <body class="auth-modern auth-role-selection">
@@ -42,13 +42,13 @@
                     'icon' => 'bi-shield-check',
                 ],
                 'STORE_SYSTEM' => [
-                    'label' => 'Store Officer',
-                    'description' => 'Run store operations, inventory, sales, and assigned staff.',
-                    'icon' => 'bi-shop-window',
+                    'label' => 'Store Cashier',
+                    'description' => 'Open the assigned store POS and process checkout transactions.',
+                    'icon' => 'bi-cart3',
                 ],
                 'STORE_SUPERVISOR' => [
                     'label' => 'Store Supervisor',
-                    'description' => 'Oversee assigned stores, staff activity, and operational reports.',
+                    'description' => 'Manage assigned stores, inventory, settings, staff activity, and reports.',
                     'icon' => 'bi-diagram-3',
                 ],
                 'ACCOUNTING_OFFICE' => [
@@ -120,6 +120,6 @@
         </section>
     </main>
 
-    <script src="<?= base_url('assets/js/theme.js') ?>?v=20260822b"></script>
+    <script src="<?= base_url('assets/js/theme.js') ?>?v=20260825c"></script>
 </body>
 </html>

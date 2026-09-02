@@ -56,6 +56,33 @@ final class TransactionServiceTest extends CIUnitTestCase
         $this->assertNotEmpty($audit['created_at'] ?? '');
     }
 
+    public function testUntrackedServiceSaleKeepsStockAndWritesCatalogSnapshot(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+        $this->seedStore($now);
+        $this->seedOpenStoreDay($now);
+        $this->seedPaymentMethod('cash', true, $now);
+        $this->seedProduct(101, 0, 35, $now, 'service', 'untracked', 'gallon');
+
+        $result = (new TransactionService())->createTransaction([
+            'store_id' => 1,
+            'payment_method' => 'cash',
+            'cash_received' => 100,
+            'customer_type' => 'walk_in',
+            'items' => [['product_id' => 101, 'qty' => 2]],
+        ], 7, 'STORE_SYSTEM');
+
+        $this->assertSame('success', $result['status'], json_encode($result));
+        $this->assertSame(0, (int) $db->table('products')->where('id', 101)->get()->getRowArray()['stock_qty']);
+        $this->assertSame(0, $db->table('inventory_movements')->countAllResults());
+        $item = $db->table('transaction_items')->get()->getRowArray();
+        $this->assertSame('Coffee', $item['item_name_snapshot'] ?? null);
+        $this->assertSame('SKU-101', $item['sku_snapshot'] ?? null);
+        $this->assertSame('gallon', $item['unit_code_snapshot'] ?? null);
+        $this->assertSame('service', $item['item_type_snapshot'] ?? null);
+    }
+
     public function testInsufficientStockRollsBackTransactionAndAudit(): void
     {
         $db = Database::connect();
@@ -481,7 +508,7 @@ final class TransactionServiceTest extends CIUnitTestCase
     {
         Database::connect()->table('store_day_sessions')->insert([
             'store_id' => 1,
-            'business_date' => date('Y-m-d'),
+            'business_date' => ibems_business_date(),
             'status' => 'open',
             'opening_cash' => 1000,
             'opening_ecash' => 500,
@@ -508,7 +535,7 @@ final class TransactionServiceTest extends CIUnitTestCase
         ]);
     }
 
-    private function seedProduct(int $id, int $stockQty, float $price, string $now): void
+    private function seedProduct(int $id, int $stockQty, float $price, string $now, string $itemType = 'stock_item', string $stockPolicy = 'tracked', string $unitCode = 'piece'): void
     {
         Database::connect()->table('products')->insert([
             'id' => $id,
@@ -517,6 +544,9 @@ final class TransactionServiceTest extends CIUnitTestCase
             'name' => 'Coffee',
             'price' => $price,
             'stock_qty' => $stockQty,
+            'item_type' => $itemType,
+            'stock_policy' => $stockPolicy,
+            'unit_code' => $unitCode,
             'is_active' => 1,
             'updated_at' => $now,
         ]);
@@ -646,6 +676,96 @@ final class TransactionServiceTest extends CIUnitTestCase
         $this->assertSame(75.0, (float) ($cashbook['debt_after'] ?? 0));
     }
 
+    public function testLockedEmployeePurchaseCardBlocksDebtWithoutUsingPin(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+        $this->seedStore($now);
+        $this->seedOpenStoreDay($now);
+        $this->seedPaymentMethod('debt', true, $now);
+        $this->seedDebtCustomer(501, 'staff', 500, 0, '1234', $now);
+        $this->seedProduct(101, 3, 50, $now);
+        $this->createPurchaseCardTable();
+        $this->assertTrue((new \App\Services\UserPurchaseCardService($db))->isAvailable());
+        $db->table('user_purchase_cards')->insert(['user_id' => 501, 'is_locked' => 1, 'created_at' => $now, 'updated_at' => $now]);
+
+        $result = (new TransactionService())->createTransaction([
+            'store_id' => 1,
+            'payment_method' => 'debt',
+            'customer_user_id' => 501,
+            'customer_type' => 'staff',
+            'items' => [['product_id' => 101, 'qty' => 1]],
+        ], 7, 'STORE_SYSTEM');
+
+        $this->assertSame('error', $result['status']);
+        $this->assertSame(423, $result['code']);
+        $this->assertStringContainsString('purchase card is locked', $result['message']);
+        $this->assertSame(0, $db->table('transactions')->countAllResults());
+    }
+
+    public function testUnlockedEmployeePurchaseCardAuthorizesOneDebtPurchaseThenLocks(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+        $this->seedStore($now);
+        $this->seedOpenStoreDay($now);
+        $this->seedPaymentMethod('debt', true, $now);
+        $this->seedDebtCustomer(501, 'staff', 500, 0, '1234', $now);
+        $this->seedProduct(101, 3, 50, $now);
+        $this->createPurchaseCardTable();
+        $this->assertTrue((new \App\Services\UserPurchaseCardService($db))->isAvailable());
+        $db->table('user_purchase_cards')->insert([
+            'user_id' => 501,
+            'is_locked' => 0,
+            'unlocked_until' => date('Y-m-d H:i:s', time() + 300),
+            'created_at' => $now,
+            'updated_at' => $now,
+        ]);
+
+        $result = (new TransactionService())->createTransaction([
+            'store_id' => 1,
+            'payment_method' => 'debt',
+            'customer_user_id' => 501,
+            'customer_type' => 'staff',
+            'items' => [['product_id' => 101, 'qty' => 1]],
+        ], 7, 'STORE_SYSTEM');
+
+        $this->assertSame('success', $result['status'], json_encode($result));
+        $card = $db->table('user_purchase_cards')->where('user_id', 501)->get()->getRowArray();
+        $this->assertSame(1, (int) $card['is_locked']);
+        $this->assertNull($card['unlocked_until']);
+        $this->assertNotEmpty($card['last_transaction_at']);
+        $this->assertSame(50.0, (float) $db->table('balances')->where('user_id', 501)->get()->getRowArray()['current_debt']);
+    }
+
+    public function testFailedDebtPurchaseDoesNotConsumePurchaseCardUnlock(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+        $unlockedUntil = date('Y-m-d H:i:s', time() + 300);
+        $this->seedStore($now);
+        $this->seedOpenStoreDay($now);
+        $this->seedPaymentMethod('debt', true, $now);
+        $this->seedDebtCustomer(501, 'staff', 500, 0, '1234', $now);
+        $this->seedProduct(101, 1, 50, $now);
+        $this->createPurchaseCardTable();
+        $db->table('user_purchase_cards')->insert(['user_id' => 501, 'is_locked' => 0, 'unlocked_until' => $unlockedUntil, 'created_at' => $now, 'updated_at' => $now]);
+
+        $result = (new TransactionService())->createTransaction([
+            'store_id' => 1,
+            'payment_method' => 'debt',
+            'customer_user_id' => 501,
+            'customer_type' => 'staff',
+            'items' => [['product_id' => 101, 'qty' => 2]],
+        ], 7, 'STORE_SYSTEM');
+
+        $this->assertSame('error', $result['status']);
+        $card = $db->table('user_purchase_cards')->where('user_id', 501)->get()->getRowArray();
+        $this->assertSame(0, (int) $card['is_locked']);
+        $this->assertSame($unlockedUntil, $card['unlocked_until']);
+        $this->assertSame(0, $db->table('transactions')->countAllResults());
+    }
+
     private function resetSchema(): void
     {
         $db = Database::connect();
@@ -653,6 +773,7 @@ final class TransactionServiceTest extends CIUnitTestCase
         $tn = static fn (string $name): string => $prefix . $name;
 
         $tables = [
+            'user_purchase_cards',
             'debt_pin_security',
             'debt_cashbook_entries',
             'inventory_movements',
@@ -773,6 +894,9 @@ final class TransactionServiceTest extends CIUnitTestCase
             barcode TEXT,
             price REAL NOT NULL DEFAULT 0,
             stock_qty INTEGER NOT NULL DEFAULT 0,
+            item_type TEXT NOT NULL DEFAULT \'stock_item\',
+            stock_policy TEXT NOT NULL DEFAULT \'tracked\',
+            unit_code TEXT NOT NULL DEFAULT \'piece\',
             is_active INTEGER NOT NULL DEFAULT 1,
             updated_at TEXT
         )');
@@ -806,6 +930,11 @@ final class TransactionServiceTest extends CIUnitTestCase
             qty INTEGER NOT NULL,
             unit_price REAL NOT NULL DEFAULT 0,
             line_total REAL NOT NULL DEFAULT 0,
+            item_name_snapshot TEXT,
+            sku_snapshot TEXT,
+            variant_snapshot TEXT,
+            unit_code_snapshot TEXT,
+            item_type_snapshot TEXT,
             created_at TEXT
         )');
 
@@ -845,6 +974,22 @@ final class TransactionServiceTest extends CIUnitTestCase
             actor_id INTEGER,
             remarks TEXT,
             meta_json TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )');
+    }
+
+    private function createPurchaseCardTable(): void
+    {
+        $db = Database::connect();
+        $prefix = $db->getPrefix();
+        $db->query('CREATE TABLE ' . $prefix . 'user_purchase_cards (
+            user_id INTEGER PRIMARY KEY,
+            is_locked INTEGER NOT NULL DEFAULT 1,
+            unlocked_until TEXT,
+            last_unlocked_at TEXT,
+            last_locked_at TEXT,
+            last_transaction_at TEXT,
             created_at TEXT,
             updated_at TEXT
         )');

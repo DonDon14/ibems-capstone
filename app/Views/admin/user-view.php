@@ -5,7 +5,7 @@
     <?= view('components/page_header', [
         'eyebrow' => 'Identity administration',
         'title' => 'Employee records',
-        'description' => 'Manage identities, roles, salary-grade profiles, and each employee\'s adjustable credit percentage.',
+        'description' => 'Create employee identities as Users. Store roles update automatically when staff assignments change.',
         'icon' => 'bi bi-people',
     ]) ?>
 
@@ -13,14 +13,14 @@
         <?= view('components/stat_card', ['title' => 'Total Users', 'value' => '0', 'valueId' => 'uv-total-users', 'icon' => 'bi bi-people', 'tone' => 'users']) ?>
         <?= view('components/stat_card', ['title' => 'Outstanding Debt', 'value' => 'PHP 0.00', 'valueId' => 'uv-total-debt', 'icon' => 'bi bi-cash-stack', 'tone' => 'debt']) ?>
         <?= view('components/stat_card', ['title' => 'Active Faculty', 'value' => '0', 'valueId' => 'uv-active-faculty', 'icon' => 'bi bi-person-check', 'tone' => 'sales']) ?>
-        <?= view('components/stat_card', ['title' => 'Store Officers', 'value' => '0', 'valueId' => 'uv-store-officers', 'icon' => 'bi bi-person-badge', 'tone' => 'finance']) ?>
+        <?= view('components/stat_card', ['title' => 'Store Cashiers', 'value' => '0', 'valueId' => 'uv-store-officers', 'icon' => 'bi bi-person-badge', 'tone' => 'finance']) ?>
     </div>
 
     <div class="uv-chip-row flex flex-wrap gap-2">
         <button class="uv-chip is-active rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:bg-slate-50" data-uv-quick="all" type="button">All Users</button>
         <button class="uv-chip rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:bg-slate-50" data-uv-quick="active" type="button">Active</button>
         <button class="uv-chip rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:bg-slate-50" data-uv-quick="debt" type="button">Debt</button>
-        <button class="uv-chip rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:bg-slate-50" data-uv-quick="store_system" type="button">Store System</button>
+        <button class="uv-chip rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:-translate-y-0.5 hover:bg-slate-50" data-uv-quick="store_system" type="button">Store Cashiers</button>
     </div>
 
     <div class="overview-filter uv-filter-panel rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" data-compact-filters>
@@ -38,7 +38,7 @@
                     <option value="ADMIN">Admin</option>
                     <option value="ACCOUNTING_OFFICE">Accounting Office</option>
                     <option value="STORE_SUPERVISOR">Store Supervisor</option>
-                    <option value="STORE_SYSTEM">Store System</option>
+                    <option value="STORE_SYSTEM">Store Cashier</option>
                     <option value="USER">User</option>
                 </select>
             </label>
@@ -113,8 +113,8 @@
                 <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Roles</label>
                 <div class="role-check-grid grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
                     <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-e-roles" value="USER"> User</label>
-                    <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-e-roles" value="STORE_SYSTEM"> Store System</label>
-                    <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-e-roles" value="STORE_SUPERVISOR"> Store Supervisor</label>
+                    <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-e-roles" value="STORE_SYSTEM" disabled> Store Cashier (from store assignment)</label>
+                    <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-e-roles" value="STORE_SUPERVISOR" disabled> Store Supervisor (from store assignment)</label>
                     <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-e-roles" value="ACCOUNTING_OFFICE"> Accounting Office</label>
                     <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-e-roles" value="ADMIN"> Admin</label>
                 </div>
@@ -200,15 +200,9 @@
             <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-a-name">Name</label><input id="uv-a-name" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="text"></div>
             <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-a-email">Email</label><input id="uv-a-email" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="email"></div>
             <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-a-password">Password (optional)</label><input id="uv-a-password" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="password" placeholder="defaults to 123456"></div>
-            <div class="field">
-                <label class="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Roles</label>
-                <div class="role-check-grid grid grid-cols-2 gap-2 rounded-xl border border-slate-200 bg-slate-50 p-3 text-sm text-slate-700">
-                    <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-a-roles" value="USER" checked> User</label>
-                    <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-a-roles" value="STORE_SYSTEM"> Store System</label>
-                    <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-a-roles" value="STORE_SUPERVISOR"> Store Supervisor</label>
-                    <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-a-roles" value="ACCOUNTING_OFFICE"> Accounting Office</label>
-                    <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-a-roles" value="ADMIN"> Admin</label>
-                </div>
+            <div class="field rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-slate-700">
+                <strong class="block text-slate-900">Initial role: User</strong>
+                <span>Store Cashier and Store Supervisor access will be added automatically when this employee is assigned to a store.</span>
             </div>
             <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-500" for="uv-a-type">Category</label>
                 <select id="uv-a-type" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm">

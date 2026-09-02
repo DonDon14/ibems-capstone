@@ -1,0 +1,31 @@
+.dashboard-period-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    margin: -2px 0 18px;
+    padding: 10px 12px 10px 16px;
+    border: 1px solid #dbe5f0;
+    border-radius: 15px;
+    background: #fff;
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.05);
+}
+
+.dashboard-period-copy { display: grid; gap: 2px; }
+.dashboard-period-copy span { color: #64748b; font-size: .72rem; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.dashboard-period-copy strong { color: #0f172a; font-size: .9rem; }
+.dashboard-period-options { display: flex; gap: 5px; padding: 4px; border-radius: 12px; background: #eef2f7; }
+.dashboard-period-options button { min-height: 36px; border: 0; border-radius: 9px; padding: 7px 14px; background: transparent; color: #475569; font: inherit; font-size: .8rem; font-weight: 800; cursor: pointer; }
+.dashboard-period-options button:hover,
+.dashboard-period-options button:focus-visible { outline: 0; background: #dbeafe; color: #1d4ed8; }
+.dashboard-period-options button[aria-pressed="true"] { background: #2563eb; color: #fff; box-shadow: 0 4px 10px rgba(37, 99, 235, .22); }
+html[data-theme="dark"] .dashboard-period-bar { border-color: #26364d; background: #0f1a2c; }
+html[data-theme="dark"] .dashboard-period-copy strong { color: #e5edf7; }
+html[data-theme="dark"] .dashboard-period-options { background: #111c2e; }
+html[data-theme="dark"] .dashboard-period-options button { color: #aebed1; }
+html[data-theme="dark"] .dashboard-period-options button[aria-pressed="true"] { color: #fff; }
+@media (max-width: 640px) {
+    .dashboard-period-bar { align-items: stretch; flex-direction: column; }
+    .dashboard-period-options { display: grid; grid-template-columns: repeat(4, 1fr); }
+    .dashboard-period-options button { padding-inline: 7px; }
+}

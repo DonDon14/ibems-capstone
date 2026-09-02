@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/store') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20260821b">
+<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20260825a">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -19,7 +19,7 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260824a"></script>
+<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260825a"></script>
 <script {csp-script-nonce}>
     (async function () {
         const transactionId = <?= (int) ($transaction_id ?? 0) ?>;

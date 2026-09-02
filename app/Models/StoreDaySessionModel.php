@@ -60,7 +60,7 @@ class StoreDaySessionModel extends Model
 
     public function getToday(int $storeId): ?array
     {
-        return $this->getByStoreAndDate($storeId, date('Y-m-d'));
+        return $this->getByStoreAndDate($storeId, ibems_business_date());
     }
 
     public function openDay(int $storeId, string $businessDate, float $openingCash, float $openingEcash, int $openedBy, string $note = ''): array

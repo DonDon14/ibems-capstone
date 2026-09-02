@@ -8,11 +8,14 @@ final class StaffRecordsUiTest extends CIUnitTestCase
     public function testEmployeeRecordsUsesAccessibleExplicitActions(): void
     {
         $view = (string) file_get_contents(APPPATH . 'Views/store/staff-records.php');
-        $script = (string) file_get_contents(FCPATH . 'assets/js/store-staff-records.js');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/store-staff-records.js') . file_get_contents(FCPATH . 'assets/js/store-staff-records.part2.js');
+        $styles = (string) file_get_contents(FCPATH . 'assets/css/store-staff-records.css');
 
         $this->assertStringContainsString('aria-label="Scan employee QR or ID"', $view);
         $this->assertStringContainsString('id="debt-clear-btn"', $view);
         $this->assertStringContainsString('class="search-clear-btn is-hidden"', $view);
+        $layout = (string) file_get_contents(FCPATH . 'assets/js/app-layout.js');
+        $this->assertStringContainsString('.staff-search-wrap', $layout);
         $this->assertStringContainsString('id="txn-clear-btn"', $view);
         $this->assertStringContainsString('id="txn-clear-btn" class="secondary-btn is-hidden"', $view);
         $this->assertStringContainsString('Reset filters', $view);
@@ -28,11 +31,15 @@ final class StaffRecordsUiTest extends CIUnitTestCase
         $this->assertStringContainsString('data-current-debt', $script);
         $this->assertStringContainsString('staff-summary-finance', $script);
         $this->assertStringContainsString('srStores.some', $script);
+        $this->assertStringContainsString('cdn.jsdelivr.net/npm/html5-qrcode@2.3.8', $view);
+        $this->assertStringNotContainsString('unpkg.com/html5-qrcode', $view);
+        $this->assertStringNotContainsString('.style.', $script);
+        $this->assertMatchesRegularExpression('/\.staff-filter-panel\.compact-filter-bar \.compact-filter-actions \.search-scan-btn\s*\{[^}]*position:\s*static;[^}]*width:\s*44px;/s', $styles);
     }
 
     public function testEmployeeTransactionFiltersHaveValidationAndDataStates(): void
     {
-        $script = (string) file_get_contents(FCPATH . 'assets/js/store-staff-records.js');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/store-staff-records.js') . file_get_contents(FCPATH . 'assets/js/store-staff-records.part2.js');
 
         $this->assertStringContainsString('srTransactionDataState', $script);
         $this->assertStringContainsString('From date cannot be later than To date.', $script);
@@ -60,8 +67,8 @@ final class StaffRecordsUiTest extends CIUnitTestCase
 
     public function testEmployeeTransactionsClampPaginationBeforeDividing(): void
     {
-        $controller = (string) file_get_contents(APPPATH . 'Controllers/StoreController.php');
-        $methodStart = strpos($controller, 'public function staffTransactions()');
+        $controller = (string) file_get_contents(APPPATH . 'Services/StoreTransactionQueryService.php');
+        $methodStart = strpos($controller, 'public function staff(');
         $this->assertNotFalse($methodStart);
         $method = substr($controller, (int) $methodStart);
 

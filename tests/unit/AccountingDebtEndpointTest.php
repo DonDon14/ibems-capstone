@@ -13,8 +13,8 @@ final class AccountingDebtEndpointTest extends CIUnitTestCase
 
     public function testDeductionWorkflowProvidesScalableEmployeeFilters(): void
     {
-        $view = file_get_contents(APPPATH . 'Views/accounting/debts.php');
-        $script = file_get_contents(FCPATH . 'assets/js/accounting-debts.js');
+        $view = file_get_contents(APPPATH . 'Views/accounting/debts.php') . file_get_contents(APPPATH . 'Views/components/accounting_debt_modals.php');
+        $script = file_get_contents(FCPATH . 'assets/js/accounting-debts.js') . file_get_contents(FCPATH . 'assets/js/accounting-debts.part2.js') . file_get_contents(FCPATH . 'assets/js/accounting-debts.part3.js');
         $styles = file_get_contents(FCPATH . 'assets/css/accounting-debts.css');
 
         $this->assertStringContainsString('workflow-candidate-search', $view);
@@ -39,12 +39,16 @@ final class AccountingDebtEndpointTest extends CIUnitTestCase
     {
         $layout = file_get_contents(APPPATH . 'Views/layouts/accounting.php');
         $routes = file_get_contents(APPPATH . 'Config/Routes.php');
-        $view = file_get_contents(APPPATH . 'Views/accounting/debts.php');
-        $script = file_get_contents(FCPATH . 'assets/js/accounting-debts.js');
+        $controller = file_get_contents(APPPATH . 'Controllers/AccountingController.php');
+        $view = file_get_contents(APPPATH . 'Views/accounting/debts.php') . file_get_contents(APPPATH . 'Views/components/accounting_debt_modals.php');
+        $script = file_get_contents(FCPATH . 'assets/js/accounting-debts.js') . file_get_contents(FCPATH . 'assets/js/accounting-debts.part2.js') . file_get_contents(FCPATH . 'assets/js/accounting-debts.part3.js');
 
         $this->assertStringContainsString("'accounting/deductions'", $layout);
         $this->assertStringNotContainsString("accounting/deduction-batches/(:num)/export", $routes);
         $this->assertStringNotContainsString("accounting/deduction-batches/(:num)/import-results", $routes);
+        $this->assertStringNotContainsString('public function exportDeductionBatch(', $controller);
+        $this->assertStringNotContainsString('public function importDeductionResults(', $controller);
+        $this->assertStringNotContainsString('private function addDebtCashbookEntry(', $controller);
         $this->assertStringNotContainsString('workflow-results-import', $view);
         $this->assertStringContainsString('Edit deductions', $script);
     }
@@ -54,13 +58,14 @@ final class AccountingDebtEndpointTest extends CIUnitTestCase
         parent::setUp();
         $this->resetSchema();
         $this->withRoutes([
+            ['GET', 'accounting/dashboard/data', 'AccountingController::dashboardData'],
             ['GET', 'accounting/debts/data', 'AccountingController::debtsData'],
             ['GET', 'accounting/debts/daily-summary', 'AccountingController::dailySummary'],
             ['GET', 'accounting/salary-schedules', 'AccountingController::salarySchedules'],
-            ['POST', 'accounting/debts/deduct', 'AccountingController::deductDebt'],
-            ['POST', 'accounting/debts/deduct-full', 'AccountingController::deductFullDebt'],
+            ['GET', 'accounting/settlement/preview', 'AccountingController::settlementPreview'],
+            ['GET', 'accounting/settlement/runs', 'AccountingController::settlementRuns'],
+            ['GET', 'accounting/settlement/runs/(:num)', 'AccountingController::settlementRunDetails/$1'],
             ['POST', 'accounting/debts/financial-profile', 'AccountingController::updateFinancialProfile'],
-            ['POST', 'accounting/settlement/apply', 'AccountingController::applySettlementRun'],
         ]);
     }
 
@@ -88,33 +93,85 @@ final class AccountingDebtEndpointTest extends CIUnitTestCase
         $this->assertSame('No Outstanding Debt', $statuses[503] ?? null);
     }
 
-    public function testManualDeductionUpdatesBalanceCashbookAndAudit(): void
+    public function testDashboardReportingPreservesItsResponseContractAfterExtraction(): void
     {
-        $this->seedBalance(501, 500, 180);
+        $this->seedBalance(501, 500, 125);
 
-        $result = $this->accountingPost('accounting/debts/deduct', [
-            'user_id' => 501,
-            'amount' => 55,
-            'reason' => 'Payroll deduction',
-        ]);
+        $result = $this->withSession([
+            'logged_in' => true,
+            'user_id' => 900,
+            'role' => 'ACCOUNTING_OFFICE',
+            'available_roles' => ['ACCOUNTING_OFFICE'],
+        ])->get('accounting/dashboard/data');
 
         $result->assertOK();
         $body = $this->jsonBody($result);
         $this->assertSame('success', $body['status'] ?? null);
-        $this->assertSame(180.0, (float) ($body['previous_debt'] ?? 0));
-        $this->assertSame(125.0, (float) ($body['new_debt'] ?? 0));
+        $this->assertSame(1, (int) ($body['summary']['total_accounts'] ?? 0));
+        $this->assertSame(1, (int) ($body['summary']['with_debt'] ?? 0));
+        $this->assertSame(125.0, (float) ($body['summary']['total_debt'] ?? 0));
+        $this->assertSame(501, (int) ($body['top_debt_accounts'][0]['user_id'] ?? 0));
+        $this->assertSame('day', $body['period']['key'] ?? null);
+        $this->assertCount(1, $body['trend'] ?? []);
+        $this->assertArrayHasKey('over_limit', $body['alerts'] ?? []);
+        $this->assertArrayHasKey('stale_debts', $body['alerts'] ?? []);
+        $this->assertArrayHasKey('failed_imports', $body['alerts'] ?? []);
+    }
 
+    public function testLegacySettlementPreviewRemainsReadOnlyAndPreservesItsContract(): void
+    {
+        $this->seedBalance(501, 1000, 600, 250);
+
+        $result = $this->accountingGet('accounting/settlement/preview?run_month=2026-07');
+
+        $result->assertOK();
+        $body = $this->jsonBody($result);
+        $this->assertSame('2026-07', $body['run_month'] ?? null);
+        $this->assertSame(1, (int) ($body['summary']['candidate_count'] ?? 0));
+        $this->assertSame(250.0, (float) ($body['summary']['total_deductible'] ?? 0));
+        $this->assertSame(350.0, (float) ($body['summary']['total_debt_after'] ?? 0));
+        $this->assertSame(0, Database::connect()->table('debt_cashbook_entries')->countAllResults());
+    }
+
+    public function testLegacySettlementHistoryRemainsReadableAfterExtraction(): void
+    {
+        $this->seedBalance(501, 1000, 350, 250);
         $db = Database::connect();
-        $balance = $db->table('balances')->where('user_id', 501)->get()->getRowArray();
-        $cashbook = $db->table('debt_cashbook_entries')->where('user_id', 501)->get()->getRowArray();
-        $audit = $db->table('audit_logs')->where('action', 'ACCOUNTING_DEDUCT_DEBT')->get()->getRowArray();
+        $db->table('settlement_runs')->insert([
+            'id' => 7,
+            'run_month' => '2026-07',
+            'run_by' => 900,
+            'run_at' => '2026-07-31 09:00:00',
+            'total_accounts' => 1,
+            'total_debt_before' => 600,
+            'notes' => json_encode(['note' => 'Legacy payroll run']),
+        ]);
+        $db->table('audit_logs')->insert([
+            'actor_id' => 900,
+            'action' => 'ACCOUNTING_SETTLEMENT_DEDUCT',
+            'entity' => 'balances',
+            'entity_id' => 501,
+            'payload_json' => json_encode([
+                'run_id' => 7,
+                'previous_debt' => 600,
+                'deducted_amount' => 250,
+                'new_debt' => 350,
+                'monthly_salary' => 250,
+            ]),
+            'created_at' => '2026-07-31 09:00:00',
+        ]);
 
-        $this->assertSame(125.0, (float) ($balance['current_debt'] ?? 0));
-        $this->assertSame('credit', $cashbook['direction'] ?? null);
-        $this->assertSame(55.0, (float) ($cashbook['amount'] ?? 0));
-        $this->assertSame(180.0, (float) ($cashbook['debt_before'] ?? 0));
-        $this->assertSame(125.0, (float) ($cashbook['debt_after'] ?? 0));
-        $this->assertSame(900, (int) ($audit['actor_id'] ?? 0));
+        $runs = $this->accountingGet('accounting/settlement/runs');
+        $runs->assertOK();
+        $runsBody = $this->jsonBody($runs);
+        $this->assertSame(7, (int) ($runsBody['data'][0]['id'] ?? 0));
+
+        $details = $this->accountingGet('accounting/settlement/runs/7');
+        $details->assertOK();
+        $detailsBody = $this->jsonBody($details);
+        $this->assertSame(1, (int) ($detailsBody['summary']['processed_accounts'] ?? 0));
+        $this->assertSame(250.0, (float) ($detailsBody['summary']['total_deducted'] ?? 0));
+        $this->assertSame(350.0, (float) ($detailsBody['items'][0]['new_debt'] ?? 0));
     }
 
     public function testDailySummaryUsesManilaBusinessDayForUtcCashbookTimestamps(): void
@@ -161,50 +218,6 @@ final class AccountingDebtEndpointTest extends CIUnitTestCase
         $this->assertSame(40.0, (float) ($body['deducted_amount'] ?? 0));
     }
 
-    public function testDeductionCannotExceedCurrentDebtAndWritesNothing(): void
-    {
-        $this->seedBalance(501, 500, 40);
-
-        $result = $this->accountingPost('accounting/debts/deduct', [
-            'user_id' => 501,
-            'amount' => 41,
-            'reason' => 'Too much',
-        ]);
-
-        $result->assertStatus(400);
-        $body = $this->jsonBody($result);
-        $this->assertSame('Deduction cannot exceed current debt.', $body['message'] ?? null);
-
-        $db = Database::connect();
-        $balance = $db->table('balances')->where('user_id', 501)->get()->getRowArray();
-        $this->assertSame(40.0, (float) ($balance['current_debt'] ?? 0));
-        $this->assertSame(0, $db->table('debt_cashbook_entries')->countAllResults());
-        $this->assertSame(0, $db->table('audit_logs')->countAllResults());
-    }
-
-    public function testFullDeductionClearsDebtAndRecordsCreditEntry(): void
-    {
-        $this->seedBalance(501, 500, 275);
-
-        $result = $this->accountingPost('accounting/debts/deduct-full', [
-            'user_id' => 501,
-            'reason' => 'Final payroll settlement',
-        ]);
-
-        $result->assertOK();
-        $body = $this->jsonBody($result);
-        $this->assertSame(0.0, (float) ($body['new_debt'] ?? -1));
-        $this->assertSame(275.0, (float) ($body['deducted_amount'] ?? 0));
-
-        $db = Database::connect();
-        $balance = $db->table('balances')->where('user_id', 501)->get()->getRowArray();
-        $cashbook = $db->table('debt_cashbook_entries')->where('entry_type', 'full_deduction')->get()->getRowArray();
-        $this->assertSame(0.0, (float) ($balance['current_debt'] ?? -1));
-        $this->assertSame('credit', $cashbook['direction'] ?? null);
-        $this->assertSame(275.0, (float) ($cashbook['amount'] ?? 0));
-        $this->assertSame(500.0, (float) ($cashbook['available_credit_snapshot'] ?? 0));
-    }
-
     public function testSalaryReductionPreservesDebtAndDerivesCreditLimit(): void
     {
         $this->seedBalance(501, 5000, 1200, 32000);
@@ -236,7 +249,7 @@ final class AccountingDebtEndpointTest extends CIUnitTestCase
 
     public function testAccountingSetsSalaryAndCreditTogetherWithAuditTrail(): void
     {
-        $adminSource = file_get_contents(APPPATH . 'Controllers/AdminController.php');
+        $adminSource = file_get_contents(APPPATH . 'Services/AdminUserService.php');
         $adminView = file_get_contents(APPPATH . 'Views/admin/user-view.php');
         $this->assertStringContainsString('resolveEmployeeFinancialProfile', $adminSource);
         $this->assertStringNotContainsString('DEFAULT_EMPLOYEE_CREDIT_LIMIT', $adminSource);
@@ -322,59 +335,6 @@ final class AccountingDebtEndpointTest extends CIUnitTestCase
         $this->assertSame(0.0, (float) ($balance['current_debt'] ?? -1));
     }
 
-    public function testSettlementDeductsUpToSalaryAndWritesConnectedLedger(): void
-    {
-        $this->seedBalance(501, 1000, 600, 250);
-
-        $result = $this->accountingPost('accounting/settlement/apply', [
-            'run_month' => '2026-07',
-            'selected_user_ids' => [501],
-            'notes' => 'July payroll settlement',
-        ]);
-
-        $result->assertOK();
-        $body = $this->jsonBody($result);
-        $this->assertSame(1, (int) ($body['total_accounts'] ?? 0));
-        $this->assertSame(600.0, (float) ($body['total_debt_before'] ?? 0));
-        $this->assertSame(250.0, (float) ($body['total_deducted'] ?? 0));
-        $this->assertSame(350.0, (float) ($body['total_debt_after'] ?? 0));
-
-        $db = Database::connect();
-        $balance = $db->table('balances')->where('user_id', 501)->get()->getRowArray();
-        $cashbook = $db->table('debt_cashbook_entries')->where('entry_type', 'salary_deduction')->get()->getRowArray();
-        $this->assertSame(350.0, (float) ($balance['current_debt'] ?? 0));
-        $this->assertSame('settlement_run', $cashbook['reference_type'] ?? null);
-        $this->assertSame(250.0, (float) ($cashbook['amount'] ?? 0));
-        $this->assertSame(1, $db->table('settlement_runs')->countAllResults());
-        $this->assertSame(1, $db->table('audit_logs')->where('action', 'ACCOUNTING_SETTLEMENT_DEDUCT')->countAllResults());
-        $this->assertSame(1, $db->table('audit_logs')->where('action', 'ACCOUNTING_RUN_SETTLEMENT')->countAllResults());
-    }
-
-    public function testDuplicateSettlementMonthIsRejectedWithoutSecondDeduction(): void
-    {
-        $this->seedBalance(501, 1000, 600, 250);
-
-        $first = $this->accountingPost('accounting/settlement/apply', [
-            'run_month' => '2026-07',
-            'selected_user_ids' => [501],
-        ]);
-        $first->assertOK();
-
-        $second = $this->accountingPost('accounting/settlement/apply', [
-            'run_month' => '2026-07',
-            'selected_user_ids' => [501],
-        ]);
-        $second->assertStatus(409);
-        $body = $this->jsonBody($second);
-        $this->assertSame('Settlement run for 2026-07 already exists.', $body['message'] ?? null);
-
-        $db = Database::connect();
-        $balance = $db->table('balances')->where('user_id', 501)->get()->getRowArray();
-        $this->assertSame(350.0, (float) ($balance['current_debt'] ?? 0));
-        $this->assertSame(1, $db->table('settlement_runs')->countAllResults());
-        $this->assertSame(1, $db->table('debt_cashbook_entries')->where('entry_type', 'salary_deduction')->countAllResults());
-    }
-
     private function accountingPost(string $path, array $payload)
     {
         $security = service('security');
@@ -386,6 +346,16 @@ final class AccountingDebtEndpointTest extends CIUnitTestCase
             'role' => 'ACCOUNTING_OFFICE',
             'available_roles' => ['ACCOUNTING_OFFICE'],
         ])->withBodyFormat('json')->post($path, $payload);
+    }
+
+    private function accountingGet(string $path)
+    {
+        return $this->withSession([
+            'logged_in' => true,
+            'user_id' => 900,
+            'role' => 'ACCOUNTING_OFFICE',
+            'available_roles' => ['ACCOUNTING_OFFICE'],
+        ])->get($path);
     }
 
     private function jsonBody($result): array
@@ -430,7 +400,7 @@ final class AccountingDebtEndpointTest extends CIUnitTestCase
         $prefix = $db->getPrefix();
         $tn = static fn (string $name): string => $prefix . $name;
 
-        foreach (['deduction_batch_items', 'debt_cashbook_entries', 'audit_logs', 'settlement_runs', 'salary_schedule_rates', 'salary_schedules', 'balances', 'users'] as $table) {
+        foreach (['salary_import_batches', 'deduction_periods', 'deduction_batch_items', 'debt_cashbook_entries', 'audit_logs', 'settlement_runs', 'salary_schedule_rates', 'salary_schedules', 'balances', 'users'] as $table) {
             $db->query('DROP TABLE IF EXISTS ' . $tn($table));
         }
 
@@ -439,6 +409,7 @@ final class AccountingDebtEndpointTest extends CIUnitTestCase
             employee_id TEXT,
             name TEXT NOT NULL,
             email TEXT NOT NULL,
+            profile_image_url TEXT,
             role TEXT NOT NULL,
             user_type TEXT NOT NULL,
             base_salary REAL NOT NULL DEFAULT 0,
@@ -541,6 +512,24 @@ final class AccountingDebtEndpointTest extends CIUnitTestCase
             confirmed_at TEXT,
             created_at TEXT,
             updated_at TEXT
+        )');
+
+        $db->query('CREATE TABLE ' . $tn('deduction_periods') . ' (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            period_code TEXT,
+            label TEXT,
+            status TEXT,
+            updated_at TEXT
+        )');
+
+        $db->query('CREATE TABLE ' . $tn('salary_import_batches') . ' (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            filename TEXT,
+            imported_by INTEGER,
+            imported_at TEXT,
+            total_rows INTEGER NOT NULL DEFAULT 0,
+            valid_rows INTEGER NOT NULL DEFAULT 0,
+            invalid_rows INTEGER NOT NULL DEFAULT 0
         )');
 
         $db->resetDataCache();

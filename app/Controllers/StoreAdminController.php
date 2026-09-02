@@ -5,6 +5,7 @@ namespace App\Controllers;
 use App\Models\StoreSupervisorModel;
 use App\Models\StoreModel;
 use App\Services\StoreOversightService;
+use App\Services\DashboardPeriod;
 use CodeIgniter\Controller;
 use Config\Database;
 
@@ -19,9 +20,11 @@ class StoreAdminController extends Controller
     {
         $db = Database::connect();
         $actorId = (int) session()->get('user_id');
+        $period = DashboardPeriod::resolve((string) ($this->request->getGet('period') ?? 'day'));
         $storeIds = (new StoreSupervisorModel())->getStoreIdsBySupervisor($actorId);
         $emptyPayload = [
             'status' => 'success',
+            'period' => DashboardPeriod::publicMeta($period),
             'summary' => [
                 'assigned_store_count' => 0,
                 'active_store_count' => 0,
@@ -46,9 +49,9 @@ class StoreAdminController extends Controller
             ->get()
             ->getResultArray();
 
-        $todayDate = date('Y-m-d');
-        $todayStart = $todayDate . ' 00:00:00';
-        $todayEnd = $todayDate . ' 23:59:59';
+        $todayDate = $period['to'];
+        $todayStart = $period['start'];
+        $todayEnd = $period['end'];
         $todayRows = $db->table('transactions')
             ->select('store_id, COUNT(*) AS txn_count, COALESCE(SUM(amount), 0) AS sales_total')
             ->whereIn('store_id', $storeIds)
@@ -93,6 +96,8 @@ class StoreAdminController extends Controller
                 $sessionQuery->join('store_day_variance_case_handoffs h', 'h.id = (SELECT MAX(h2.id) FROM store_day_variance_case_handoffs h2 WHERE h2.case_id = c.id)', 'left', false);
             }
             $sessionRows = $sessionQuery->whereIn('sds.store_id', $storeIds)
+                ->where('sds.business_date >=', $period['from'])
+                ->where('sds.business_date <=', $period['to'])
                 ->orderBy('sds.business_date', 'DESC')
                 ->orderBy('sds.id', 'DESC')
                 ->get()
@@ -111,7 +116,7 @@ class StoreAdminController extends Controller
         }
 
         $activeStoreCount = 0;
-        $openDayCount = 0;
+        $openDayCount = count($sessionRows ?? []);
         $todaySalesTotal = 0.0;
         $storePayload = [];
         foreach ($stores as $store) {
@@ -123,11 +128,7 @@ class StoreAdminController extends Controller
             if ($isActive) {
                 $activeStoreCount++;
             }
-            $dayStatus = $this->dayStatusForDate($session, $todayDate);
-            if ($dayStatus === 'open') {
-                $openDayCount++;
-            }
-
+            $dayStatus = $this->dayStatusForDate($session, $todayDate, $period['key'] === 'day');
             $storePayload[] = [
                 'id' => $storeId,
                 'store_name' => (string) ($store['store_name'] ?? ''),
@@ -176,6 +177,7 @@ class StoreAdminController extends Controller
 
         return $this->response->setJSON([
             'status' => 'success',
+            'period' => DashboardPeriod::publicMeta($period),
             'summary' => [
                 'assigned_store_count' => count($stores),
                 'active_store_count' => $activeStoreCount,
@@ -189,10 +191,13 @@ class StoreAdminController extends Controller
         ]);
     }
 
-    protected function dayStatusForDate(?array $session, string $todayDate): string
+    protected function dayStatusForDate(?array $session, string $todayDate, bool $strictDate = true): string
     {
         $sessionDate = (string) ($session['business_date'] ?? '');
         $sessionStatus = (string) ($session['status'] ?? '');
+        if (!$strictDate) {
+            return $sessionStatus !== '' ? $sessionStatus : 'not_started';
+        }
         if ($sessionDate === $todayDate) {
             return $sessionStatus !== '' ? $sessionStatus : 'not_started';
         }

@@ -39,10 +39,10 @@ function sadVarianceLabel(value) {
 
 function sadDayStatusLabel(value) {
     const labels = {
-        open: "Open Today",
-        closed: "Closed Today",
+        open: "Open in selected period",
+        closed: "Closed in selected period",
         stale_open: "Previous Day Still Open",
-        not_started: "Not Opened Today",
+        not_started: "No store day in period",
     };
     return labels[String(value || "not_started")] || "Store Day Unknown";
 }
@@ -99,7 +99,7 @@ function sadRenderStores(stores) {
                 </div>
                 <div class="store-admin-store-metrics">
                     <span>${sadEscape(sadMoney(store.today_sales_total || 0))}</span>
-                    <small>${Number(store.today_txn_count || 0)} transaction${Number(store.today_txn_count || 0) === 1 ? "" : "s"} today</small>
+                    <small>${Number(store.today_txn_count || 0)} transaction${Number(store.today_txn_count || 0) === 1 ? "" : "s"} in period</small>
                     <small>${sadEscape(dayStatus)}</small>
                     ${reviewStatus !== "not_required" ? `<small class="text-warning">${sadEscape(sadReviewLabel(reviewStatus))}</small>` : ""}
                 </div>
@@ -159,8 +159,12 @@ function sadRenderReviews(reviews) {
 async function sadLoadDashboard() {
     const root = sadRoot();
     if (!root) return;
-    const response = await fetch(root.getAttribute("data-dashboard-url") || "/store-admin/dashboard/data");
+    const period = window.IbemsDashboardPeriod?.get() || "day";
+    const dashboardUrl = new URL(root.getAttribute("data-dashboard-url") || "/store-admin/dashboard/data", window.location.origin);
+    dashboardUrl.searchParams.set("period", period);
+    const response = await fetch(dashboardUrl);
     const data = await response.json().catch(() => ({}));
+    if ((window.IbemsDashboardPeriod?.get() || "day") !== period) return;
     if (!response.ok || data.status !== "success") {
         document.getElementById("sad-pending-reviews-list").innerHTML = sadDataState("error", "Variance reviews could not be loaded", "Refresh the page or check the server connection.");
         document.getElementById("sad-store-list").innerHTML = sadDataState("error", "Assigned stores could not be loaded", "Refresh the page or check the server connection.");
@@ -168,6 +172,7 @@ async function sadLoadDashboard() {
     }
 
     const summary = data.summary || {};
+    window.IbemsDashboardPeriod?.setMeta(data.period);
     sadSetText("sad-assigned-stores", String(summary.assigned_store_count || 0));
     sadSetText("sad-open-days", String(summary.open_day_count || 0));
     sadSetText("sad-pending-reviews", String(summary.pending_review_count || 0));
@@ -219,3 +224,4 @@ document.addEventListener("click", (event) => {
 });
 
 sadLoadDashboard();
+window.addEventListener("ibems:dashboard-period-change", sadLoadDashboard);

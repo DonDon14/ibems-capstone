@@ -72,15 +72,15 @@ final class StoreAdminDayStatusTest extends CIUnitTestCase
     public function testHistoricalStoreDayReviewsRemainDiscoverable(): void
     {
         $service = (string) file_get_contents(APPPATH . 'Services/StoreOversightService.php');
-        $adminController = (string) file_get_contents(APPPATH . 'Controllers/AdminController.php');
+        $adminDashboard = (string) file_get_contents(APPPATH . 'Services/AdminDashboardService.php');
         $adminView = (string) file_get_contents(APPPATH . 'Views/admin/store-details.php');
         $supervisorView = (string) file_get_contents(APPPATH . 'Views/store-admin/store-details.php');
         $script = (string) file_get_contents(FCPATH . 'assets/js/admin-store-details.js');
 
         $this->assertStringContainsString("'day_sessions' => array_map", $service);
         $this->assertStringContainsString("->limit(60)", $service);
-        $this->assertStringContainsString("whereIn('sds.review_status', ['pending', 'needs_investigation'])", $adminController);
-        $this->assertStringContainsString('unresolved_store_day_reviews', $adminController);
+        $this->assertStringContainsString("whereIn('sds.review_status', ['pending', 'needs_investigation'])", $adminDashboard);
+        $this->assertStringContainsString('unresolved_store_day_reviews', $adminDashboard);
         $this->assertSame(1, substr_count($adminView, 'id="sd-session-history-body"'));
         $this->assertSame(1, substr_count($supervisorView, 'id="sd-session-history-body"'));
         $this->assertStringContainsString('function sdRenderSessionHistory()', $script);
@@ -90,18 +90,18 @@ final class StoreAdminDayStatusTest extends CIUnitTestCase
     public function testStaleDayResolutionIsIndependentAuditedAndUsesSharedExpectedBalances(): void
     {
         $oversight = (string) file_get_contents(APPPATH . 'Services/StoreOversightService.php');
-        $storeController = (string) file_get_contents(APPPATH . 'Controllers/StoreController.php');
+        $dayOperations = (string) file_get_contents(APPPATH . 'Services/StoreDayOperationService.php');
         $calculator = (string) file_get_contents(APPPATH . 'Services/StoreDayExpectedService.php');
         $routes = (string) file_get_contents(APPPATH . 'Config/Routes.php');
         $script = (string) file_get_contents(FCPATH . 'assets/js/admin-store-details.js');
 
-        $this->assertStringContainsString('StoreDayExpectedService', $storeController);
+        $this->assertStringContainsString('StoreDayExpectedService', $dayOperations);
         $this->assertStringContainsString('StoreDayExpectedService', $oversight);
         $this->assertStringContainsString("where('business_date', \$businessDate)", $calculator);
         $this->assertStringContainsString("join('transaction_payments tp'", $calculator);
         $this->assertStringContainsString('CASE WHEN tp.id IS NOT NULL THEN tp.amount ELSE t.amount END', $calculator);
         $this->assertStringContainsString('m.code, m.label, m.sort_order, a.image_url', $calculator);
-        $this->assertStringContainsString("'payment_account_balances' => array_values", $storeController);
+        $this->assertStringContainsString("'payment_account_balances' => array_values", $dayOperations);
         $this->assertStringContainsString("\$actorId === (int) (\$session['opened_by']", $oversight);
         $this->assertStringContainsString('RESOLVE_STALE_STORE_DAY_SESSION', $oversight);
         $this->assertStringContainsString('StoreDayVarianceCaseService', $oversight);
@@ -152,7 +152,7 @@ final class StoreAdminDayStatusTest extends CIUnitTestCase
 
     public function testCloseDayPreviewRefreshesExpectedBalancesBeforeShowingCounts(): void
     {
-        $script = (string) file_get_contents(FCPATH . 'assets/js/store-pos.js');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/store-pos.js') . file_get_contents(FCPATH . 'assets/js/store-pos.part2.js') . file_get_contents(FCPATH . 'assets/js/store-pos.part3.js') . file_get_contents(FCPATH . 'assets/js/store-pos.part4.js') . file_get_contents(FCPATH . 'assets/js/store-pos.part5.js') . file_get_contents(FCPATH . 'assets/js/store-pos.part6.js');
 
         $this->assertStringContainsString('async function openStoreDayCloseModal()', $script);
         $this->assertStringContainsString('await loadOpeningBalanceStatus();', $script);
@@ -163,7 +163,7 @@ final class StoreAdminDayStatusTest extends CIUnitTestCase
     {
         $source = (string) file_get_contents(APPPATH . 'Controllers/AdminController.php');
 
-        $this->assertSame(2, substr_count($source, 'An active store requires a primary officer and at least one supervisor.'));
+        $this->assertSame(2, substr_count($source, 'An active store requires a Store Cashier and at least one supervisor.'));
         $this->assertStringContainsString('$willBeActive', $source);
     }
 
@@ -224,7 +224,7 @@ final class StoreAdminDayStatusTest extends CIUnitTestCase
     public function testFinalVarianceDispositionRequiresAcknowledgedOwnershipAndEvidence(): void
     {
         $service = (string) file_get_contents(APPPATH . 'Services/StoreOversightService.php');
-        $admin = (string) file_get_contents(APPPATH . 'Controllers/AdminController.php');
+        $adminDashboard = (string) file_get_contents(APPPATH . 'Services/AdminDashboardService.php');
         $script = (string) file_get_contents(FCPATH . 'assets/js/admin-store-details.js');
 
         $this->assertStringContainsString('Only the assigned case owner can finalize this variance.', $service);
@@ -233,7 +233,7 @@ final class StoreAdminDayStatusTest extends CIUnitTestCase
         $this->assertStringContainsString('acknowledgeVarianceCase', $service);
         $this->assertStringContainsString("'retention_until'", $service);
         $this->assertStringContainsString("'due_at'", $service);
-        $this->assertStringContainsString('Acknowledgment overdue', $admin);
+        $this->assertStringContainsString('Acknowledgment overdue', $adminDashboard);
         $this->assertStringContainsString('data-case-acknowledge', $script);
     }
 }

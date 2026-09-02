@@ -137,7 +137,7 @@ function uRenderTrend(rows) {
     }
 
     if (!Array.isArray(rows) || rows.length === 0 || rows.every((row) => Number(row.amount || 0) === 0)) {
-        uSetTrendState("empty", "No spending was recorded in the last seven days.");
+        uSetTrendState("empty", "No spending was recorded in the selected period.");
         return;
     }
 
@@ -250,13 +250,16 @@ function uRenderRecentTransactions(rows) {
 async function loadUserDashboard() {
     uSetTrendState("loading", "Loading spending trend...");
     try {
-        const response = await fetch("/user/dashboard/data", { signal: uPageSignal });
+        const period = window.IbemsDashboardPeriod?.get() || "day";
+        const response = await fetch(`/user/dashboard/data?period=${encodeURIComponent(period)}`, { signal: uPageSignal });
         const data = await response.json();
+        if ((window.IbemsDashboardPeriod?.get() || "day") !== period) return;
         if (!data || data.status !== "success") {
             throw new Error(data?.message || "Failed to load user dashboard.");
         }
 
         const s = data.summary || {};
+        window.IbemsDashboardPeriod?.setMeta(data.period);
         const byId = (id) => document.getElementById(id);
         if (byId("u-credit-limit")) byId("u-credit-limit").textContent = uMoney(s.credit_limit);
         if (byId("u-current-debt")) byId("u-current-debt").textContent = uMoney(s.current_debt);
@@ -293,5 +296,6 @@ window.addEventListener("ibems:themechange", () => {
     if (!uTrendChart) return;
     uRenderTrend(uTrendRows);
 }, { signal: uPageSignal });
+window.addEventListener("ibems:dashboard-period-change", loadUserDashboard, { signal: uPageSignal });
 loadUserDashboard();
 }());

@@ -405,7 +405,7 @@
         left: 0;
         z-index: 100;
         display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
+        grid-template-columns: repeat(var(--user-mobile-nav-count, 4), minmax(0, 1fr));
         min-height: calc(var(--user-mobile-nav-height) + env(safe-area-inset-bottom, 0px));
         padding: 6px 8px calc(6px + env(safe-area-inset-bottom, 0px));
         border-top: 1px solid #dbe5f0;
@@ -414,6 +414,11 @@
         backdrop-filter: blur(16px);
         -webkit-backdrop-filter: blur(16px);
     }
+
+    .user-mobile-enabled .user-mobile-nav-count-2 { --user-mobile-nav-count: 2; }
+    .user-mobile-enabled .user-mobile-nav-count-3 { --user-mobile-nav-count: 3; }
+    .user-mobile-enabled .user-mobile-nav-count-4 { --user-mobile-nav-count: 4; }
+    .user-mobile-enabled .user-mobile-nav-count-5 { --user-mobile-nav-count: 5; }
 
     .user-mobile-enabled .user-mobile-nav a {
         display: flex;

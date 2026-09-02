@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/store') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/store-settings.css') ?>?v=20260824d">
+<link rel="stylesheet" href="<?= base_url('assets/css/store-settings.css') ?>?v=20260824f">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -9,9 +9,28 @@
     <?= view('components/page_header', [
         'eyebrow' => 'Store configuration',
         'title' => 'Store settings',
-        'description' => 'Manage product categories and payment methods for this store.',
+        'description' => 'Configure how this store operates, organizes products, and accepts payments.',
         'icon' => 'bi bi-gear',
     ]) ?>
+
+    <article class="settings-card capability-settings-card">
+        <div class="settings-card-head">
+            <div>
+                <h4>Business capabilities</h4>
+                <p class="settings-note">Select every operation this store performs. Capabilities can be combined; a cafeteria can also sell retail goods and produced items.</p>
+            </div>
+            <button id="save-capabilities-btn" class="primary-btn" type="button"><i class="bi bi-check2-circle"></i> Save capabilities</button>
+        </div>
+        <div id="store-capability-grid" class="store-capability-grid" aria-live="polite">
+            <label class="capability-option"><input type="checkbox" value="retail"><span><i class="bi bi-basket2"></i><strong>Retail goods</strong><small>Packaged snacks, bottled products, supplies, and other stocked items.</small></span></label>
+            <label class="capability-option"><input type="checkbox" value="food_service"><span><i class="bi bi-cup-hot"></i><strong>Food service</strong><small>Prepared meals, daily dishes, servings, and made-to-order products.</small></span></label>
+            <label class="capability-option"><input type="checkbox" value="production"><span><i class="bi bi-gear-wide-connected"></i><strong>Production</strong><small>Products made by the university, including processed dairy goods.</small></span></label>
+            <label class="capability-option"><input type="checkbox" value="refill_service"><span><i class="bi bi-droplet"></i><strong>Refill service</strong><small>Water refills and products sold by gallon, liter, or container.</small></span></label>
+            <label class="capability-option"><input type="checkbox" value="container_deposits"><span><i class="bi bi-arrow-left-right"></i><strong>Container deposits</strong><small>Separate refundable container or bottle deposit line items.</small></span></label>
+        </div>
+        <p class="settings-note capability-guidance"><i class="bi bi-info-circle"></i> Fixed sizes remain product variants. Checkout customizations and production recipes are separate concerns and are not disguised as variants.</p>
+        <p id="capability-result" class="settings-result" role="status" aria-live="polite"></p>
+    </article>
 
     <article id="category-settings-card" class="settings-card category-settings-card">
         <div class="settings-card-head category-card-head">
@@ -128,5 +147,6 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/store-settings.js') ?>?v=20260824d"></script>
+<script src="<?= base_url('assets/js/store-settings.js') ?>?v=20260824f"></script>
+<script src="<?= base_url('assets/js/store-settings.part2.js') ?>?v=20260824f"></script>
 <?= $this->endSection() ?>

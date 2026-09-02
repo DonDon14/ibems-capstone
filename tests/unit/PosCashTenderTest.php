@@ -6,7 +6,7 @@ final class PosCashTenderTest extends TestCase
 {
     public function testCashCheckoutRequiresTenderAndShowsChange(): void
     {
-        $js = file_get_contents(ROOTPATH . 'public/assets/js/store-pos.js');
+        $js = file_get_contents(ROOTPATH . 'public/assets/js/store-pos.js') . file_get_contents(ROOTPATH . 'public/assets/js/store-pos.part2.js') . file_get_contents(ROOTPATH . 'public/assets/js/store-pos.part3.js') . file_get_contents(ROOTPATH . 'public/assets/js/store-pos.part4.js') . file_get_contents(ROOTPATH . 'public/assets/js/store-pos.part5.js') . file_get_contents(ROOTPATH . 'public/assets/js/store-pos.part6.js');
         $receipt = file_get_contents(ROOTPATH . 'public/assets/js/receipt-standard.js');
 
         $this->assertStringContainsString('id="confirm-cash-received"', $js);
@@ -26,7 +26,7 @@ final class PosCashTenderTest extends TestCase
 
     public function testProductBarcodeCanBeEnteredWithoutScanner(): void
     {
-        $view = file_get_contents(ROOTPATH . 'app/Views/store/inventory.php');
+        $view = file_get_contents(ROOTPATH . 'app/Views/store/inventory.php') . file_get_contents(ROOTPATH . 'app/Views/components/store_inventory_modals.php');
 
         $this->assertStringContainsString('Type the barcode digits manually', $view);
         $this->assertStringContainsString('No scanner required.', $view);
@@ -34,8 +34,8 @@ final class PosCashTenderTest extends TestCase
 
     public function testNonDebtSalesCanAttachAnEmployeeCustomer(): void
     {
-        $js = file_get_contents(ROOTPATH . 'public/assets/js/store-pos.js');
-        $view = file_get_contents(ROOTPATH . 'app/Views/store/pos.php');
+        $js = file_get_contents(ROOTPATH . 'public/assets/js/store-pos.js') . file_get_contents(ROOTPATH . 'public/assets/js/store-pos.part2.js') . file_get_contents(ROOTPATH . 'public/assets/js/store-pos.part3.js') . file_get_contents(ROOTPATH . 'public/assets/js/store-pos.part4.js') . file_get_contents(ROOTPATH . 'public/assets/js/store-pos.part5.js') . file_get_contents(ROOTPATH . 'public/assets/js/store-pos.part6.js');
+        $view = file_get_contents(ROOTPATH . 'app/Views/store/pos.php') . file_get_contents(ROOTPATH . 'app/Views/components/store_pos_modals.php');
 
         $this->assertStringContainsString('customer_user_id: selectedDebtCustomerId || null', $js);
         $this->assertStringContainsString('customer_type: selectedDebtCustomer?.user_type || "walk_in"', $js);

@@ -32,7 +32,7 @@ class NotificationConventionTest extends CIUnitTestCase
         $this->assertStringContainsString("\$routes->post('notifications/(:num)/read'", $routes);
         $this->assertStringContainsString("\$routes->post('notifications/read-all'", $routes);
         $this->assertSame(3, substr_count($routes, "NotificationController::"));
-        $this->assertSame(4, substr_count($routes, "['filter' => 'access:account.self']"));
+        $this->assertSame(7, substr_count($routes, "['filter' => 'access:account.self']"));
     }
 
     public function testAuditModelPublishesFromAuthoritativeEvents(): void

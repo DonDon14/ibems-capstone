@@ -44,4 +44,5 @@
 
 <?= $this->section('scripts') ?>
 <script src="<?= base_url('assets/js/admin-stores.js') ?>?v=20260824b"></script>
+<script src="<?= base_url('assets/js/admin-stores.part2.js') ?>?v=20260824b"></script>
 <?= $this->endSection() ?>

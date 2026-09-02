@@ -1,6 +1,5 @@
 (function () {
     const KEY = "ibems.sidebar.collapsed";
-    const LAST_NAV_PREFIX = "ibems.nav.last.";
     const shell = document.querySelector(".app-shell");
     const btn = document.getElementById("sidebar-toggle");
     const sidebar = document.querySelector(".app-sidebar");
@@ -12,15 +11,6 @@
     const isDesktop = () => window.matchMedia("(min-width: 1201px)").matches;
     const isTablet = () => window.matchMedia("(min-width: 981px) and (max-width: 1200px)").matches;
     const canCollapse = () => window.matchMedia("(min-width: 981px)").matches;
-
-    const portalKey = () => {
-        const path = window.location.pathname.toLowerCase().replace(/^\/index\.php(?=\/|$)/, "");
-        if (path.startsWith("/admin")) return "admin";
-        if (path.startsWith("/store")) return "store";
-        if (path.startsWith("/accounting")) return "accounting";
-        if (path.startsWith("/user")) return "user";
-        return "global";
-    };
 
     const applyState = (collapsed) => {
         if (!canCollapse()) {
@@ -82,21 +72,20 @@
         });
     });
 
-    const activeLink = navLinks.find((link) => link.classList.contains("is-active"));
-    if (activeLink) {
-        localStorage.setItem(`${LAST_NAV_PREFIX}${portalKey()}`, activeLink.getAttribute("href") || "");
-    }
+    const dashboardLink = navLinks.find((link) => {
+        const label = (link.querySelector("span")?.textContent || link.textContent || "").trim();
+        return label.toLowerCase() === "dashboard";
+    });
+    const portalHomeLink = dashboardLink || navLinks[0] || null;
 
-    if (brand) {
+    if (brand && portalHomeLink) {
         brand.style.cursor = "pointer";
         brand.addEventListener("click", (event) => {
-            if (event.target.closest("a")) return;
-            const last = localStorage.getItem(`${LAST_NAV_PREFIX}${portalKey()}`) || "";
-            if (last) {
-                window.location.href = last;
-            }
+            if (event.target.closest("a, button")) return;
+            portalHomeLink.click();
         });
-        brand.setAttribute("title", "Open last visited page");
+        const homeLabel = (portalHomeLink.querySelector("span")?.textContent || portalHomeLink.textContent || "Dashboard").trim();
+        brand.setAttribute("title", `Open ${homeLabel}`);
     }
 
     applyResponsiveState();
@@ -162,7 +151,7 @@
     let compactPanelSequence = 0;
 
     const controlWrapper = (control, bar) => {
-        const wrapper = control.closest("label, .field, .ui-field, .history-filter-field, .inventory-filter-field, .settings-input-field");
+        const wrapper = control.closest(".staff-search-wrap, .uv-search-wrap, .acct-search-wrap, .debt-search-wrap, label, .field, .ui-field, .history-filter-field, .inventory-filter-field, .settings-input-field");
         return wrapper && bar.contains(wrapper) ? wrapper : control;
     };
 
