@@ -7,8 +7,8 @@ final class InventoryUiTest extends CIUnitTestCase
 {
     public function testInventoryProvidesFilterAndFamilyManagementControls(): void
     {
-        $view = (string) file_get_contents(APPPATH . 'Views/store/inventory.php');
-        $script = (string) file_get_contents(FCPATH . 'assets/js/store-inventory.js');
+        $view = (string) file_get_contents(APPPATH . 'Views/store/inventory.php') . file_get_contents(APPPATH . 'Views/components/store_inventory_modals.php');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/store-inventory.js') . file_get_contents(FCPATH . 'assets/js/store-inventory.part2.js') . file_get_contents(FCPATH . 'assets/js/store-inventory.part3.js');
 
         foreach (['inventory-results-count', 'inventory-toggle-families', 'inventory-stock-summary'] as $id) {
             $this->assertStringContainsString('id="' . $id . '"', $view);
@@ -48,7 +48,7 @@ final class InventoryUiTest extends CIUnitTestCase
 
     public function testUnsavedProductConfirmationAppearsAboveInventoryModal(): void
     {
-        $script = (string) file_get_contents(FCPATH . 'assets/js/store-inventory.js');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/store-inventory.js') . file_get_contents(FCPATH . 'assets/js/store-inventory.part2.js') . file_get_contents(FCPATH . 'assets/js/store-inventory.part3.js');
         $sharedStyles = (string) file_get_contents(FCPATH . 'assets/css/modern-ui.css');
 
         $this->assertStringContainsString('cancelLabel: "Continue editing"', $script);
@@ -57,9 +57,9 @@ final class InventoryUiTest extends CIUnitTestCase
 
     public function testManageProductUsesSharedScrollLayoutAndValidatesStockActions(): void
     {
-        $view = (string) file_get_contents(APPPATH . 'Views/store/inventory.php');
+        $view = (string) file_get_contents(APPPATH . 'Views/store/inventory.php') . file_get_contents(APPPATH . 'Views/components/store_inventory_modals.php');
         $styles = (string) file_get_contents(FCPATH . 'assets/css/store-inventory.css');
-        $script = (string) file_get_contents(FCPATH . 'assets/js/store-inventory.js');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/store-inventory.js') . file_get_contents(FCPATH . 'assets/js/store-inventory.part2.js') . file_get_contents(FCPATH . 'assets/js/store-inventory.part3.js');
         $darkStyles = (string) file_get_contents(FCPATH . 'assets/css/modern-ui.css');
 
         $this->assertStringContainsString('inventory-product-action-card', $view);

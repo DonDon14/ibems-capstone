@@ -104,8 +104,9 @@ public function storeDetailsData(RequestInterface $request, ResponseInterface $r
             ->get()
             ->getRowArray();
 
-        $todayStart = date('Y-m-d 00:00:00');
-        $todayEnd = date('Y-m-d 23:59:59');
+        $todayBounds = ibems_business_day_utc_bounds();
+        $todayStart = $todayBounds['start'];
+        $todayEnd = $todayBounds['end'];
         $todaySummary = $db->table('transactions')
             ->select("COUNT(*) AS txn_count, COALESCE(SUM(amount), 0) AS sales_total, SUM(CASE WHEN payment_method = 'debt' THEN 1 ELSE 0 END) AS debt_txn_count, COALESCE(SUM(CASE WHEN payment_method = 'debt' THEN amount ELSE 0 END), 0) AS debt_sales_total", false)
             ->where('store_id', $storeId)
@@ -164,7 +165,7 @@ public function storeDetailsData(RequestInterface $request, ResponseInterface $r
                 'name' => $store['officer_name'] ?: 'No assigned officer',
                 'email' => $store['officer_email'] ?: null,
                 'profile_image_url' => $store['officer_profile_image_url'] ?? null,
-                'role' => 'Primary Store Officer',
+                'role' => 'Store Cashier',
             ],
         ];
         foreach ($this->getStoreSupervisors((int) $store['id']) as $supervisor) {
@@ -314,7 +315,7 @@ public function resolveStaleStoreDay(RequestInterface $request, ResponseInterfac
         if (!$this->canAccessStoreForAdminArea((int) ($session['store_id'] ?? 0))) {
             return $response->setStatusCode(403)->setJSON(['status' => 'error', 'message' => 'You cannot resolve this store day.']);
         }
-        if ((string) ($session['status'] ?? '') !== 'open' || (string) ($session['business_date'] ?? '') >= date('Y-m-d')) {
+        if ((string) ($session['status'] ?? '') !== 'open' || (string) ($session['business_date'] ?? '') >= ibems_business_date()) {
             return $response->setStatusCode(409)->setJSON(['status' => 'error', 'message' => 'Only an open store day from a previous date can be resolved here.']);
         }
 
@@ -365,7 +366,7 @@ public function resolveStaleStoreDay(RequestInterface $request, ResponseInterfac
             'payload_json' => json_encode([
                 'store_id' => (int) $session['store_id'],
                 'business_date' => (string) $session['business_date'],
-                'resolved_on' => date('Y-m-d'),
+                'resolved_on' => ibems_business_date(),
                 'expected_cash' => $expectedCash,
                 'expected_ecash' => $expectedEcash,
                 'counted_cash' => (float) $countedCash,

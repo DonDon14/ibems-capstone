@@ -27,7 +27,7 @@ class PortalAccountsSeeder extends Seeder
             ],
             [
                 'employee_id' => 'EMP101',
-                'name' => 'Portal Store Officer',
+                'name' => 'Portal Store Cashier',
                 'email' => 'store@ibems.local',
                 'password_hash' => password_hash('123456', PASSWORD_DEFAULT),
                 'role' => 'STORE_SYSTEM',

@@ -11,6 +11,8 @@ final class PasswordVisibilityTest extends TestCase
             ROOTPATH . 'app/Views/components/portal_shell.php',
             ROOTPATH . 'app/Views/admin/user-view.php',
             ROOTPATH . 'app/Views/store/pos.php',
+            ROOTPATH . 'app/Views/components/store_pos_modals.php',
+            ROOTPATH . 'app/Views/department/authorizations.php',
         ];
         $passwordFieldCount = 0;
         foreach ($views as $view) {
@@ -22,7 +24,7 @@ final class PasswordVisibilityTest extends TestCase
         $script = (string) file_get_contents(ROOTPATH . 'public/assets/js/password-visibility.js');
         $styles = (string) file_get_contents(ROOTPATH . 'public/assets/css/password-visibility.css');
 
-        $this->assertSame(6, $passwordFieldCount);
+        $this->assertSame(12, $passwordFieldCount);
         $this->assertStringContainsString('password-visibility.js', $shell);
         $this->assertStringContainsString('password-visibility.js', $login);
         $this->assertStringContainsString('input[type="password"]', $script);

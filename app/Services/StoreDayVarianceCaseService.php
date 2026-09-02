@@ -20,7 +20,7 @@ final class StoreDayVarianceCaseService
 
         $now ??= date('Y-m-d H:i:s');
         $db->table('store_day_variance_cases')->insert([
-            'case_ref' => sprintf('SDV-%s-%06d', str_replace('-', '', (string) ($session['business_date'] ?? date('Y-m-d'))), $sessionId),
+            'case_ref' => sprintf('SDV-%s-%06d', str_replace('-', '', (string) ($session['business_date'] ?? ibems_business_date())), $sessionId),
             'store_day_session_id' => $sessionId,
             'store_id' => (int) ($session['store_id'] ?? 0),
             'status' => 'open',

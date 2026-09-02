@@ -11,14 +11,14 @@ final class AdminStoreFormConventionTest extends CIUnitTestCase
 
         $this->assertStringNotContainsString('clear-store-officer', $view);
         $this->assertStringNotContainsString('clear-store-supervisor-search', $view);
-        $this->assertStringContainsString('data-remove-supervisor', (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js'));
+        $this->assertStringContainsString('data-remove-supervisor', (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js') . file_get_contents(FCPATH . 'assets/js/admin-stores.part2.js'));
     }
 
     public function testOfficerAndSupervisorUseTheSameAccessiblePeoplePickerPattern(): void
     {
         $view = (string) file_get_contents(APPPATH . 'Views/admin/stores.php');
         $styles = (string) file_get_contents(FCPATH . 'assets/css/admin-stores.css');
-        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js') . file_get_contents(FCPATH . 'assets/js/admin-stores.part2.js');
 
         $this->assertSame(2, substr_count($view, 'class="people-picker"'));
         $this->assertSame(2, substr_count($view, 'role="combobox"'));
@@ -34,7 +34,7 @@ final class AdminStoreFormConventionTest extends CIUnitTestCase
     {
         $view = (string) file_get_contents(APPPATH . 'Views/admin/stores.php');
         $styles = (string) file_get_contents(FCPATH . 'assets/css/admin-stores.css');
-        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js') . file_get_contents(FCPATH . 'assets/js/admin-stores.part2.js');
         $service = (string) file_get_contents(APPPATH . 'Services/StoreOversightService.php');
 
         foreach (['store-sort', 'stores-gallery'] as $id) {
@@ -58,7 +58,7 @@ final class AdminStoreFormConventionTest extends CIUnitTestCase
     {
         $view = (string) file_get_contents(APPPATH . 'Views/admin/stores.php');
         $styles = (string) file_get_contents(FCPATH . 'assets/css/admin-stores.css');
-        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js') . file_get_contents(FCPATH . 'assets/js/admin-stores.part2.js');
 
         foreach (['Store information', 'Staff assignments', 'Availability', 'cancel-store-modal', 'store-modal-description'] as $content) {
             $this->assertStringContainsString($content, $view);
@@ -71,7 +71,7 @@ final class AdminStoreFormConventionTest extends CIUnitTestCase
     public function testSharedStoreScriptTreatsAdminOnlyControlsAsOptional(): void
     {
         $storeAdminView = (string) file_get_contents(APPPATH . 'Views/store-admin/stores.php');
-        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js') . file_get_contents(FCPATH . 'assets/js/admin-stores.part2.js');
 
         $this->assertStringNotContainsString('id="store-sort"', $storeAdminView);
         $this->assertStringContainsString('document.getElementById("store-sort")?.addEventListener', $script);
@@ -82,7 +82,7 @@ final class AdminStoreFormConventionTest extends CIUnitTestCase
     {
         $view = (string) file_get_contents(APPPATH . 'Views/admin/stores.php');
         $styles = (string) file_get_contents(FCPATH . 'assets/css/admin-stores.css');
-        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js') . file_get_contents(FCPATH . 'assets/js/admin-stores.part2.js');
 
         $this->assertStringContainsString('admin-stores-modal-body', $view);
         $this->assertStringContainsString('store-deactivation-reason-field" hidden', $view);
@@ -97,7 +97,7 @@ final class AdminStoreFormConventionTest extends CIUnitTestCase
     public function testAssignmentsUseAvatarCardsBeforeEnteringChangeMode(): void
     {
         $view = (string) file_get_contents(APPPATH . 'Views/admin/stores.php');
-        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js') . file_get_contents(FCPATH . 'assets/js/admin-stores.part2.js');
         $detailScript = (string) file_get_contents(FCPATH . 'assets/js/admin-store-details.js');
         $service = (string) file_get_contents(APPPATH . 'Services/StoreOversightService.php');
         $styles = (string) file_get_contents(FCPATH . 'assets/css/modern-ui.css');
@@ -117,7 +117,7 @@ final class AdminStoreFormConventionTest extends CIUnitTestCase
     public function testStoreLogoMatchesTheProductMediaInputPattern(): void
     {
         $view = (string) file_get_contents(APPPATH . 'Views/admin/stores.php');
-        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js') . file_get_contents(FCPATH . 'assets/js/admin-stores.part2.js');
 
         foreach (['store-logo-source', 'store-logo-file', 'store-logo-url', 'store-logo-preview'] as $id) {
             $this->assertStringContainsString($id, $view);
@@ -135,14 +135,14 @@ final class AdminStoreFormConventionTest extends CIUnitTestCase
         $shell = (string) file_get_contents(APPPATH . 'Views/components/portal_shell.php');
 
         $this->assertStringContainsString("'STORE_SUPERVISOR' => 'Store Supervisor'", $shell);
-        $this->assertStringContainsString("'STORE_SYSTEM' => 'Store Officer'", $shell);
+        $this->assertStringContainsString("'STORE_SYSTEM' => 'Store Cashier'", $shell);
         $this->assertStringContainsString('$readableRole', $shell);
     }
 
     public function testStoreDeactivationRequiresReasonAndConfirmation(): void
     {
         $view = (string) file_get_contents(APPPATH . 'Views/admin/stores.php');
-        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js') . file_get_contents(FCPATH . 'assets/js/admin-stores.part2.js');
 
         $this->assertStringContainsString('store-deactivation-reason', $view);
         $this->assertStringContainsString('A deactivation reason is required.', $script);
@@ -153,7 +153,7 @@ final class AdminStoreFormConventionTest extends CIUnitTestCase
     public function testStoreStatusSupportsPostgreSqlBooleanValues(): void
     {
         $service = (string) file_get_contents(APPPATH . 'Services/StoreOversightService.php');
-        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js') . file_get_contents(FCPATH . 'assets/js/admin-stores.part2.js');
 
         $this->assertStringContainsString("\$row['is_active'] = ibems_bool", $service);
         $this->assertStringContainsString('function sBool(value)', $script);
@@ -169,13 +169,14 @@ final class AdminStoreFormConventionTest extends CIUnitTestCase
     {
         $controller = (string) file_get_contents(APPPATH . 'Controllers/AdminController.php');
         $view = (string) file_get_contents(APPPATH . 'Views/admin/stores.php');
-        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/admin-stores.js') . file_get_contents(FCPATH . 'assets/js/admin-stores.part2.js');
 
         $this->assertStringContainsString("\$isActive = (int) (\$request['is_active'] ?? 0) === 1;", $controller);
         $this->assertStringContainsString('if ($isActive && ($officerId <= 0 || $supervisorIds === []))', $controller);
         $this->assertStringContainsString('mode === "edit" ? sBool(store.is_active) : false', $script);
         $this->assertStringContainsString('formData.append("is_active", String(isActive))', $script);
-        $this->assertStringContainsString('Otherwise, choose Inactive and assign them later.', $script);
+        $this->assertStringContainsString('Otherwise, keep it inactive and assign them later.', $script);
         $this->assertStringContainsString('New stores default to inactive', $view);
+        $this->assertStringNotContainsString("'salary_profile' => \$financialProfile", $controller);
     }
 }

@@ -6,6 +6,7 @@ use App\Models\AuditLogModel;
 use App\Models\UserModel;
 use App\Services\DepartmentAuthorizationService;
 use App\Services\DepartmentDebtService;
+use App\Services\DepartmentPortalService;
 use CodeIgniter\Controller;
 use Config\Database;
 use Throwable;
@@ -24,7 +25,34 @@ class DepartmentDebtController extends Controller
 
     public function userPage()
     {
-        return view('user/department-authorizations');
+        if (!$this->hasDepartmentAccess()) {
+            return redirect()->to(site_url('user/dashboard'))->with('error', 'An active department-head assignment is required.');
+        }
+        return view('department/authorizations');
+    }
+
+    public function legacyUserPage()
+    {
+        return redirect()->to(site_url('department/authorizations'));
+    }
+
+    public function departmentDashboard()
+    {
+        if (!$this->hasDepartmentAccess()) {
+            return redirect()->to(site_url('user/dashboard'))->with('error', 'An active department-head assignment is required.');
+        }
+        return view('department/dashboard');
+    }
+
+    public function departmentDashboardData()
+    {
+        $result = (new DepartmentPortalService())->overview(
+            (int) session()->get('user_id'),
+            (string) ($this->request->getGet('period') ?? 'day')
+        );
+        $code = (int) ($result['code'] ?? 200);
+        unset($result['code']);
+        return $this->response->setStatusCode($code)->setJSON($result);
     }
 
     public function adminData()
@@ -261,6 +289,9 @@ class DepartmentDebtController extends Controller
         if (!$db->tableExists('departments')) {
             return $this->notMigrated();
         }
+        if (!$this->hasDepartmentAccess()) {
+            return $this->jsonError('An active department-head assignment is required.', 403);
+        }
         $headRows = $db->table('departments')->select("id, code, name, 'head' AS assignment_type", false)
             ->where('head_user_id', $userId)->where('is_active', true)->get()->getResultArray();
         $pin = $db->table('department_authorization_pins')->select('updated_at, last_success_at, locked_until')->where('user_id', $userId)->get()->getRowArray();
@@ -276,6 +307,9 @@ class DepartmentDebtController extends Controller
     {
         $payload = $this->payload();
         $userId = (int) session()->get('user_id');
+        if (!$this->hasDepartmentAccess()) {
+            return $this->jsonError('An active department-head assignment is required.', 403);
+        }
         $pin = trim((string) ($payload['pin'] ?? ''));
         $confirmation = trim((string) ($payload['pin_confirmation'] ?? ''));
         if (!hash_equals($pin, $confirmation)) {
@@ -366,6 +400,11 @@ class DepartmentDebtController extends Controller
     {
         $payload = $this->request->getJSON(true) ?? $this->request->getPost() ?? [];
         return is_array($payload) ? $payload : [];
+    }
+
+    private function hasDepartmentAccess(): bool
+    {
+        return (new DepartmentAuthorizationService())->userHasAssignment((int) session()->get('user_id'));
     }
 
     private function result(array $result)

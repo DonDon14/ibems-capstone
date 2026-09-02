@@ -17,7 +17,13 @@ final class ReceiptStandardUiTest extends CIUnitTestCase
         $this->assertStringContainsString('Verify this receipt', $script);
         $this->assertStringContainsString('ibems-receipt-qty', $styles);
         $this->assertStringContainsString('@media (max-width: 520px)', $styles);
-        $this->assertStringContainsString('@media print', $script);
+        $this->assertStringContainsString('@media print', $styles);
+        $this->assertStringContainsString('data-receipt-print-styles', $script);
+        $this->assertStringContainsString('wireQrFallback(popup.document)', $script);
+        $this->assertStringNotContainsString('<style>', $script);
+        $this->assertStringNotContainsString('<script>', $script);
+        $this->assertStringContainsString('body.ibems-receipt-print-document', $styles);
+        $this->assertStringContainsString('.receipt-print-card', $styles);
     }
 
     public function testReceiptAssetsAreVersionedAcrossEveryReceiptSurface(): void
@@ -34,8 +40,8 @@ final class ReceiptStandardUiTest extends CIUnitTestCase
 
         foreach ($views as $viewPath) {
             $view = (string) file_get_contents($viewPath);
-            $this->assertStringContainsString('receipt-standard.css\') ?>?v=20260821b', $view, $viewPath);
-            $this->assertStringContainsString('receipt-standard.js\') ?>?v=20260824a', $view, $viewPath);
+            $this->assertStringContainsString('receipt-standard.css\') ?>?v=20260825a', $view, $viewPath);
+            $this->assertStringContainsString('receipt-standard.js\') ?>?v=20260825a', $view, $viewPath);
         }
     }
 

@@ -22,7 +22,13 @@ $navigation = [
     ['path' => 'user/stores', 'label' => 'Stores & Products', 'icon' => 'bi bi-shop-window'],
     ['path' => 'user/history', 'label' => 'History', 'icon' => 'bi bi-clock-history'],
     ['path' => 'user/deductions', 'label' => 'My Deductions', 'icon' => 'bi bi-receipt-cutoff'],
-    ['path' => 'user/department-authorizations', 'label' => 'Department Approvals', 'icon' => 'bi bi-shield-lock', 'visible' => $hasDepartmentApprovalAssignment],
+    ['path' => 'user/card', 'label' => 'Purchase Card', 'icon' => 'bi bi-credit-card-2-front'],
 ];
+$portalSwitches = $hasDepartmentApprovalAssignment ? [[
+    'path' => 'department/dashboard',
+    'label' => 'Department Portal',
+    'description' => 'Open approvals and department accounts',
+    'icon' => 'bi bi-buildings',
+]] : [];
 
 include APPPATH . 'Views/components/portal_shell.php';

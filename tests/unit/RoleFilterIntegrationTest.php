@@ -28,6 +28,12 @@ final class RoleFilterIntegrationTest extends CIUnitTestCase
             ['GET', 'test/store-admin-only', static fn () => service('response')->setJSON([
                 'status' => 'success',
             ]), ['filter' => 'access:store.review_assigned']],
+            ['GET', 'test/store-checkout', static fn () => service('response')->setJSON([
+                'status' => 'success',
+            ]), ['filter' => 'access:store.checkout']],
+            ['GET', 'test/store-manage', static fn () => service('response')->setJSON([
+                'status' => 'success',
+            ]), ['filter' => 'access:store.manage_assigned']],
             ['GET', 'test/unknown-policy', static fn () => service('response')->setJSON([
                 'status' => 'success',
             ]), ['filter' => 'access:not.a.policy']],
@@ -92,7 +98,7 @@ final class RoleFilterIntegrationTest extends CIUnitTestCase
             'Sec-Fetch-Dest' => 'document',
         ])->get('test/admin-only');
 
-        $result->assertRedirectTo('/store/dashboard');
+        $result->assertRedirectTo('/store/pos');
     }
 
     public function testStoreAdministratorReachesScopedPortalButNotSystemAdministration(): void
@@ -114,6 +120,33 @@ final class RoleFilterIntegrationTest extends CIUnitTestCase
             ->withHeaders(['Accept' => 'application/json'])
             ->get('test/admin-only')
             ->assertStatus(403);
+    }
+
+    public function testCashierAndSupervisorPermissionsStaySeparated(): void
+    {
+        $this->seedUser(18, 'STORE_SYSTEM');
+        $cashier = [
+            'logged_in' => true,
+            'user_id' => 18,
+            'role' => 'STORE_SYSTEM',
+            'available_roles' => ['STORE_SYSTEM'],
+        ];
+        $this->withSession($cashier)->withHeaders(['Accept' => 'application/json'])
+            ->get('test/store-checkout')->assertOK();
+        $this->withSession($cashier)->withHeaders(['Accept' => 'application/json'])
+            ->get('test/store-manage')->assertStatus(403);
+
+        $this->seedUser(19, 'STORE_SUPERVISOR');
+        $supervisor = [
+            'logged_in' => true,
+            'user_id' => 19,
+            'role' => 'STORE_SUPERVISOR',
+            'available_roles' => ['STORE_SUPERVISOR'],
+        ];
+        $this->withSession($supervisor)->withHeaders(['Accept' => 'application/json'])
+            ->get('test/store-manage')->assertOK();
+        $this->withSession($supervisor)->withHeaders(['Accept' => 'application/json'])
+            ->get('test/store-checkout')->assertStatus(403);
     }
 
     public function testSystemAdministratorDoesNotEnterStoreAdministratorPortalImplicitly(): void

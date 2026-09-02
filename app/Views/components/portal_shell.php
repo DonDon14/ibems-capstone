@@ -16,7 +16,23 @@ $name = (string) ($name ?? 'User');
 $role = (string) ($role ?? '');
 $initials = (string) ($initials ?? 'IB');
 $availableRoles = is_array($availableRoles ?? null) ? $availableRoles : [];
+$portalSwitches = is_array($portalSwitches ?? null) ? $portalSwitches : [];
+$portalNavigationKey = trim((string) ($portalNavigationKey ?? strtoupper($role))) ?: strtoupper($role);
 $navigation = is_array($navigation ?? null) ? $navigation : [];
+$visibleNavigation = array_values(array_filter(
+    $navigation,
+    static fn (array $item): bool => ($item['visible'] ?? true) === true
+));
+$portalHomeItem = null;
+foreach ($visibleNavigation as $navigationItem) {
+    if (strcasecmp(trim((string) ($navigationItem['label'] ?? '')), 'Dashboard') === 0) {
+        $portalHomeItem = $navigationItem;
+        break;
+    }
+}
+$portalHomeItem ??= $visibleNavigation[0] ?? [];
+$portalHomePath = (string) ($portalHomeItem['path'] ?? '');
+$portalHomeLabel = trim((string) ($portalHomeItem['label'] ?? 'Dashboard')) ?: 'Dashboard';
 $profileImageUrl = trim((string) ($profileImageUrl ?? ''));
 $resolvedProfileImageUrl = ibems_profile_image_url($profileImageUrl);
 $bodyClass = trim((string) ($bodyClass ?? ''));
@@ -25,7 +41,7 @@ $roleLabels = [
     'ADMIN' => 'Administrator',
     'ACCOUNTING_OFFICE' => 'Accounting Office',
     'STORE_SUPERVISOR' => 'Store Supervisor',
-    'STORE_SYSTEM' => 'Store Officer',
+    'STORE_SYSTEM' => 'Store Cashier',
     'USER' => 'Employee',
 ];
 $readableRole = $roleLabels[strtoupper($role)] ?? ucwords(strtolower(str_replace('_', ' ', $role)));
@@ -73,8 +89,9 @@ $ibemsLogoUrl = base_url('assets/images/ibems-logo.png');
     <link rel="icon" type="image/png" href="<?= esc($ibemsLogoUrl) ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.css') ?>">
     <link rel="stylesheet" href="<?= base_url('assets/css/app.css') ?>?v=20260824e">
-    <link rel="stylesheet" href="<?= base_url('assets/css/modern-ui.css') ?>?v=20260824m">
-    <link rel="stylesheet" href="<?= base_url('assets/css/account-menu.css') ?>?v=20260824c">
+    <link rel="stylesheet" href="<?= base_url('assets/css/modern-ui.css') ?>?v=20260825e">
+    <link rel="stylesheet" href="<?= base_url('assets/css/account-menu.css') ?>?v=20260902a">
+    <link rel="stylesheet" href="<?= base_url('assets/css/dashboard-period.css') ?>?v=20260902a">
     <link rel="stylesheet" href="<?= base_url('assets/css/password-visibility.css') ?>?v=20260813b">
     <?php if ($userMobileExperience): ?>
         <link rel="stylesheet" href="<?= base_url('assets/css/user-mobile.css') ?>?v=20260823d">
@@ -83,7 +100,7 @@ $ibemsLogoUrl = base_url('assets/images/ibems-logo.png');
     <?= $pageStyles ?>
 </head>
 <body class="<?= esc($bodyClasses) ?>" data-portal-page-classes="<?= esc($bodyClass) ?>">
-<div class="app-shell" data-portal-navigation-shell data-portal-navigation-key="<?= esc(strtoupper($role)) ?>"<?= $userMobileExperience ? ' data-user-navigation-shell' : '' ?>>
+<div class="app-shell" data-portal-navigation-shell data-portal-navigation-key="<?= esc($portalNavigationKey) ?>"<?= $userMobileExperience ? ' data-user-navigation-shell' : '' ?>>
     <div class="portal-navigation-progress user-navigation-progress" aria-hidden="true"></div>
     <div id="user-navigation-status" class="sr-only" role="status" aria-live="polite" data-portal-navigation-status></div>
 
@@ -96,10 +113,10 @@ $ibemsLogoUrl = base_url('assets/images/ibems-logo.png');
                         <i class="sidebar-toggle-glyph" aria-hidden="true"></i>
                     </button>
                 </div>
-                <div class="app-brand-text">
+                <a class="app-brand-text" href="<?= esc(site_url($portalHomePath)) ?>" data-portal-navigation-link aria-label="Open <?= esc($portalHomeLabel) ?>">
                     <h1>IBEMS</h1>
                     <p><?= esc($portalTitle) ?></p>
-                </div>
+                </a>
             </div>
         </div>
 
@@ -159,7 +176,7 @@ $ibemsLogoUrl = base_url('assets/images/ibems-logo.png');
                 </div>
                 <?php endif; ?>
 
-                <button id="account-menu-toggle" class="topbar-profile" type="button" aria-label="Open account and settings" title="Account and settings" aria-expanded="false" aria-controls="account-menu">
+                <button id="account-menu-toggle" class="topbar-profile" type="button" data-account-menu-toggle aria-label="Open account and settings" title="Account and settings" aria-expanded="false" aria-controls="account-menu">
                     <span class="profile-avatar-wrap">
                         <img src="<?= esc($resolvedProfileImageUrl) ?>" alt="" class="profile-avatar-img" data-profile-avatar data-current-user-avatar>
                         <span class="profile-avatar-status" aria-hidden="true"><i class="bi bi-chevron-down"></i></span>
@@ -192,19 +209,25 @@ $ibemsLogoUrl = base_url('assets/images/ibems-logo.png');
                             <i class="bi bi-phone" aria-hidden="true"></i>
                             <span><strong>Install app</strong><small>Add the User Portal to this device</small></span>
                         </button>
-                        <button id="u-open-pin-modal" type="button" data-account-menu-action>
-                            <i class="bi bi-shield-lock" aria-hidden="true"></i>
-                            <span><strong>Debt authorization PIN</strong><small id="u-debt-pin-menu-status">Set or change your purchase PIN</small></span>
-                        </button>
                     <?php endif; ?>
                     <button type="button" data-profile-image-open data-account-menu-action>
                         <i class="bi bi-person-bounding-box" aria-hidden="true"></i>
                         <span><strong>Profile picture</strong><small>Change or upload your account photo</small></span>
                     </button>
+                    <button type="button" data-account-security-open data-account-menu-action>
+                        <i class="bi bi-shield-lock" aria-hidden="true"></i>
+                        <span><strong>Account security</strong><small>Change your password or purchase PIN</small></span>
+                    </button>
                     <button type="button" data-account-theme data-account-menu-action>
                         <i class="bi bi-moon-stars" aria-hidden="true"></i>
                         <span><strong>Appearance</strong><small>Switch light or dark mode</small></span>
                     </button>
+                    <?php foreach ($portalSwitches as $portalSwitch): ?>
+                        <a href="<?= site_url((string) ($portalSwitch['path'] ?? '')) ?>" data-account-menu-action>
+                            <i class="<?= esc((string) ($portalSwitch['icon'] ?? 'bi bi-shuffle')) ?>" aria-hidden="true"></i>
+                            <span><strong><?= esc((string) ($portalSwitch['label'] ?? 'Switch workspace')) ?></strong><small><?= esc((string) ($portalSwitch['description'] ?? 'Open another assigned workspace')) ?></small></span>
+                        </a>
+                    <?php endforeach; ?>
                     <?php if (count($availableRoles) > 1): ?>
                         <a href="<?= site_url('auth/select-role') ?>" data-account-menu-action>
                             <i class="bi bi-shuffle" aria-hidden="true"></i>
@@ -230,38 +253,7 @@ $ibemsLogoUrl = base_url('assets/images/ibems-logo.png');
 </div>
 
 <?php if ($userMobileExperience): ?>
-    <div id="u-debt-pin-modal" class="app-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="u-debt-pin-title">
-        <div class="app-modal-card">
-            <div class="app-modal-head">
-                <h4 id="u-debt-pin-title"><i class="bi bi-shield-lock"></i> Debt Authorization PIN</h4>
-                <button id="u-pin-modal-close" type="button" class="app-modal-close" aria-label="Close debt authorization PIN form">x</button>
-            </div>
-            <form id="u-debt-pin-form" class="user-pin-form">
-                <p id="u-pin-form-help">Use a 4 to 6 digit PIN. Stores will ask for this only when charging purchases to debt.</p>
-                <label id="u-current-password-wrap" class="user-pin-field is-hidden">
-                    <span>Current Password</span>
-                    <input id="u-current-password" name="current_password" type="password" autocomplete="current-password">
-                </label>
-                <label class="user-pin-field">
-                    <span>New Debt PIN</span>
-                    <input id="u-debt-pin" name="pin" type="password" inputmode="numeric" maxlength="6" autocomplete="off" required>
-                </label>
-                <label class="user-pin-field">
-                    <span>Confirm Debt PIN</span>
-                    <input id="u-debt-pin-confirm" name="pin_confirm" type="password" inputmode="numeric" maxlength="6" autocomplete="off" required>
-                </label>
-                <p id="u-pin-form-result" class="user-pin-result" aria-live="polite"></p>
-                <div class="app-modal-actions">
-                    <button id="u-pin-modal-cancel" type="button" class="secondary-btn">Cancel</button>
-                    <button id="u-save-pin" type="submit" class="primary-btn"><i class="bi bi-check2-circle"></i> Save PIN</button>
-                </div>
-            </form>
-        </div>
-    </div>
-<?php endif; ?>
-
-<?php if ($userMobileExperience): ?>
-    <nav class="user-mobile-nav" aria-label="User mobile navigation">
+    <nav class="user-mobile-nav user-mobile-nav-count-<?= count($visibleNavigation) ?>" aria-label="<?= esc($portalTitle) ?> mobile navigation">
         <?php foreach ($navigation as $item): ?>
             <?php
             if (($item['visible'] ?? true) !== true) {
@@ -280,6 +272,31 @@ $ibemsLogoUrl = base_url('assets/images/ibems-logo.png');
         <?php endforeach; ?>
     </nav>
 <?php endif; ?>
+
+<div id="account-security-modal" class="account-security-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="account-security-title">
+    <section class="account-security-card">
+        <div class="account-security-head">
+            <div><span>Personal account</span><h3 id="account-security-title">Account security</h3></div>
+            <button type="button" class="account-menu-close" data-account-security-close aria-label="Close account security"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
+        </div>
+        <form id="account-password-form" class="account-security-form">
+            <div class="account-security-copy"><i class="bi bi-key" aria-hidden="true"></i><div><strong>Change password</strong><small>Confirm your current password before setting a new one.</small></div></div>
+            <label>Current password<input id="account-current-password" type="password" autocomplete="current-password" required></label>
+            <label>New password<input id="account-new-password" type="password" autocomplete="new-password" minlength="8" required></label>
+            <label>Confirm new password<input id="account-new-password-confirm" type="password" autocomplete="new-password" minlength="8" required></label>
+            <p id="account-password-result" class="account-security-result" role="status" aria-live="polite"></p>
+            <button id="account-password-save" class="primary-btn" type="submit"><i class="bi bi-check2-circle" aria-hidden="true"></i> Update password</button>
+        </form>
+        <form id="account-pin-form" class="account-security-form" hidden>
+            <div class="account-security-copy"><i class="bi bi-credit-card-2-front" aria-hidden="true"></i><div><strong>Personal purchase PIN</strong><small id="account-pin-help">Used to authorize purchases charged to your employee account.</small></div></div>
+            <label id="account-pin-current-wrap" hidden>Current password<input id="account-pin-current-password" type="password" autocomplete="current-password"></label>
+            <label>New PIN<input id="account-new-pin" type="password" inputmode="numeric" autocomplete="new-password" maxlength="6" pattern="[0-9]{4,6}" required></label>
+            <label>Confirm new PIN<input id="account-new-pin-confirm" type="password" inputmode="numeric" autocomplete="new-password" maxlength="6" pattern="[0-9]{4,6}" required></label>
+            <p id="account-pin-result" class="account-security-result" role="status" aria-live="polite"></p>
+            <button id="account-pin-save" class="secondary-btn" type="submit"><i class="bi bi-shield-check" aria-hidden="true"></i> Save PIN</button>
+        </form>
+    </section>
+</div>
 
 <div id="profile-image-modal" class="profile-image-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="profile-image-title">
     <form id="profile-image-form" class="profile-image-card" enctype="multipart/form-data">
@@ -309,22 +326,23 @@ $ibemsLogoUrl = base_url('assets/images/ibems-logo.png');
 </div>
 
 <script src="<?= base_url('assets/js/csrf.js') ?>"></script>
-<script src="<?= base_url('assets/js/theme.js') ?>?v=20260822b"></script>
+<script src="<?= base_url('assets/js/theme.js') ?>?v=20260825c"></script>
 <?php if ($notificationsEnabled): ?>
     <script src="<?= base_url('assets/js/notifications.js') ?>?v=20260823a"></script>
 <?php endif; ?>
 <script src="<?= base_url('assets/js/ibems-format.js') ?>"></script>
 <script src="<?= base_url('assets/js/profile-avatar.js') ?>?v=20260822a"></script>
-<script src="<?= base_url('assets/js/account-menu.js') ?>?v=20260823a"></script>
+<script src="<?= base_url('assets/js/account-menu.js') ?>?v=20260902a"></script>
+<script src="<?= base_url('assets/js/account-security.js') ?>?v=20260902a"></script>
+<script src="<?= base_url('assets/js/dashboard-period.js') ?>?v=20260902a"></script>
 <script {csp-script-nonce} id="portal-context-data" type="application/json"><?= json_encode($portalContext, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
 <template id="portal-page-scripts"><?= $pageScripts ?></template>
-<script src="<?= base_url('assets/js/user-navigation.js') ?>?v=20260824c"></script>
-<script src="<?= base_url('assets/js/app-layout.js') ?>?v=20260824a"></script>
+<script src="<?= base_url('assets/js/user-navigation.js') ?>?v=20260825a"></script>
+<script src="<?= base_url('assets/js/app-layout.js') ?>?v=20260825b"></script>
 <script src="<?= base_url('assets/js/modern-controls.js') ?>?v=20260824a"></script>
 <script src="<?= base_url('assets/js/app-dialog.js') ?>"></script>
 <script src="<?= base_url('assets/js/password-visibility.js') ?>?v=20260813a"></script>
 <?php if ($userMobileExperience): ?>
-    <script src="<?= base_url('assets/js/user-account-settings.js') ?>?v=20260823a"></script>
     <script src="<?= base_url('assets/js/user-mobile.js') ?>?v=20260823a" data-service-worker-url="<?= esc(base_url('user/service-worker.js')) ?>"></script>
 <?php endif; ?>
 <script {csp-script-nonce}>

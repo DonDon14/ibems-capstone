@@ -28,21 +28,21 @@ final class AdminAccessRouteConfigTest extends CIUnitTestCase
         $routes = $this->routesFile();
 
         foreach ([
-            "pos/transactions', 'PosController::createTransaction', ['filter' => 'access:store.operate']",
-            "store/categories/create', 'StoreController::createCategory', ['filter' => 'access:store.operate']",
-            "store/categories/update', 'StoreController::updateCategory', ['filter' => 'access:store.operate']",
-            "store/categories/delete', 'StoreController::deleteCategory', ['filter' => 'access:store.operate']",
-            "store/payment-methods/create', 'StoreController::createPaymentMethod', ['filter' => 'access:store.operate']",
-            "store/payment-methods/update', 'StoreController::updatePaymentMethod', ['filter' => 'access:store.operate']",
-            "store/payment-methods/delete', 'StoreController::deletePaymentMethod', ['filter' => 'access:store.operate']",
-            "store/day-session/open', 'StoreController::openDaySession', ['filter' => 'access:store.operate']",
-            "store/day-session/close', 'StoreController::closeDaySession', ['filter' => 'access:store.operate']",
-            "store/opening-balance/set', 'StoreController::setOpeningBalance', ['filter' => 'access:store.operate']",
-            "store/cash-movements/create', 'StoreController::createCashMovement', ['filter' => 'access:store.operate']",
-            "store/inventory/restock', 'StoreController::restock', ['filter' => 'access:store.operate']",
-            "store/inventory/adjust-stock', 'StoreController::adjustStock', ['filter' => 'access:store.operate']",
-            "store/inventory/add-product', 'StoreController::addProduct', ['filter' => 'access:store.operate']",
-            "store/inventory/update-product', 'StoreController::updateProduct', ['filter' => 'access:store.operate']",
+            "pos/transactions', 'PosController::createTransaction', ['filter' => 'access:store.checkout']",
+            "store/day-session/open', 'StoreController::openDaySession', ['filter' => 'access:store.checkout']",
+            "store/day-session/close', 'StoreController::closeDaySession', ['filter' => 'access:store.checkout']",
+            "store/opening-balance/set', 'StoreController::setOpeningBalance', ['filter' => 'access:store.checkout']",
+            "store/cash-movements/create', 'StoreController::createCashMovement', ['filter' => 'access:store.checkout']",
+            "store/categories/create', 'StoreController::createCategory', ['filter' => 'access:store.manage_assigned']",
+            "store/categories/update', 'StoreController::updateCategory', ['filter' => 'access:store.manage_assigned']",
+            "store/categories/delete', 'StoreController::deleteCategory', ['filter' => 'access:store.manage_assigned']",
+            "store/payment-methods/create', 'StoreController::createPaymentMethod', ['filter' => 'access:store.manage_assigned']",
+            "store/payment-methods/update', 'StoreController::updatePaymentMethod', ['filter' => 'access:store.manage_assigned']",
+            "store/payment-methods/delete', 'StoreController::deletePaymentMethod', ['filter' => 'access:store.manage_assigned']",
+            "store/inventory/restock', 'StoreController::restock', ['filter' => 'access:store.manage_assigned']",
+            "store/inventory/adjust-stock', 'StoreController::adjustStock', ['filter' => 'access:store.manage_assigned']",
+            "store/inventory/add-product', 'StoreController::addProduct', ['filter' => 'access:store.manage_assigned']",
+            "store/inventory/update-product', 'StoreController::updateProduct', ['filter' => 'access:store.manage_assigned']",
             "accounting/deduction-batches/(:num)/apply', 'AccountingController::applyDeductionBatch/$1', ['filter' => 'access:accounting.operate']",
             "accounting/deduction-batches/(:num)/reconcile', 'AccountingController::reconcileDeductionBatch/$1', ['filter' => 'access:accounting.operate']",
             "accounting/deduction-batches/(:num)/finalize', 'AccountingController::finalizeDeductionBatch/$1', ['filter' => 'access:accounting.operate']",
@@ -96,6 +96,8 @@ final class AdminAccessRouteConfigTest extends CIUnitTestCase
         $allowedMixedPosts = [
             'accounting/debts/preview-csv',
             'profile/image',
+            'profile/password',
+            'profile/debt-pin',
             'notifications/(:num)/read',
             'notifications/read-all',
         ];
@@ -115,10 +117,12 @@ final class AdminAccessRouteConfigTest extends CIUnitTestCase
         }
 
         $this->assertArrayHasKey('dashboard', $mixedRoutes);
-        $this->assertArrayHasKey('store/dashboard', $mixedRoutes);
+        $this->assertArrayHasKey('store/products', $mixedRoutes);
         $this->assertArrayHasKey('accounting/dashboard', $mixedRoutes);
         $this->assertSame('post', $mixedRoutes['accounting/debts/preview-csv'] ?? null);
         $this->assertSame('post', $mixedRoutes['profile/image'] ?? null);
+        $this->assertSame('post', $mixedRoutes['profile/password'] ?? null);
+        $this->assertSame('post', $mixedRoutes['profile/debt-pin'] ?? null);
         $this->assertSame('post', $mixedRoutes['notifications/(:num)/read'] ?? null);
         $this->assertSame('post', $mixedRoutes['notifications/read-all'] ?? null);
     }
@@ -159,12 +163,12 @@ final class AdminAccessRouteConfigTest extends CIUnitTestCase
     {
         $authorization = config(Authorization::class);
 
-        $known = IbemsRouteAudit::inspectAuthorization("['filter' => 'access:store.operate']", $authorization);
+        $known = IbemsRouteAudit::inspectAuthorization("['filter' => 'access:store.checkout']", $authorization);
         $unknown = IbemsRouteAudit::inspectAuthorization("['filter' => 'access:not.a.policy']", $authorization);
         $missing = IbemsRouteAudit::inspectAuthorization('[]', $authorization);
 
         $this->assertTrue($known['protected']);
-        $this->assertSame('access policy store.operate', $known['label']);
+        $this->assertSame('access policy store.checkout', $known['label']);
         $this->assertFalse($unknown['protected']);
         $this->assertStringContainsString('unknown access policy', $unknown['message']);
         $this->assertFalse($missing['protected']);

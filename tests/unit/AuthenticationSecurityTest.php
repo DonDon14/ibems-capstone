@@ -69,6 +69,9 @@ final class AuthenticationSecurityTest extends CIUnitTestCase
         $this->assertStringContainsString('public bool $CSPEnabled = true;', $appConfig);
         $this->assertStringContainsString("public \$objectSrc = 'none';", $cspConfig);
         $this->assertStringContainsString("public \$frameAncestors = 'self';", $cspConfig);
+        $this->assertStringContainsString("'https://fonts.googleapis.com'", $cspConfig);
+        $this->assertStringContainsString("'https://fonts.gstatic.com'", $cspConfig);
+        $this->assertStringContainsString("'https://cdn.jsdelivr.net'", $cspConfig);
     }
 
     private function postLogin(array $payload)

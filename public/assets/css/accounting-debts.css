@@ -629,76 +629,6 @@
     font-weight: 700;
 }
 
-.mode-layout {
-    display: grid;
-    grid-template-columns: 320px 1fr;
-    gap: 14px;
-}
-
-.mode-left,
-.mode-right {
-    border: 1px solid #dbe3ea;
-    border-radius: 10px;
-    padding: 12px;
-    background: #f8fafc;
-}
-
-.mode-left label {
-    font-size: 0.82rem;
-    color: #64748b;
-    font-weight: 600;
-}
-
-#mode-search {
-    width: 100%;
-    margin: 6px 0 8px;
-    border: 1px solid #d1d5db;
-    border-radius: 8px;
-    padding: 8px 10px;
-}
-
-.mode-check {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-    color: #334155;
-    font-size: 0.82rem;
-    margin-bottom: 8px;
-}
-
-.mode-results {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    max-height: 62vh;
-    overflow: auto;
-}
-
-.mode-item {
-    border: 1px solid #dbe3ea;
-    border-radius: 8px;
-    background: #fff;
-    padding: 8px;
-    cursor: pointer;
-    text-align: left;
-}
-
-.mode-item.is-active {
-    border-color: #003366;
-    background: #e8f0fb;
-}
-
-.mode-item .name {
-    display: block;
-    font-weight: 700;
-}
-
-.mode-item .meta {
-    display: block;
-    color: #64748b;
-    font-size: 0.78rem;
-}
-
 .mode-profile-empty {
     color: #64748b;
 }
@@ -1131,39 +1061,9 @@ body #workflow-employees-modal .workflow-candidate .workflow-preparation-reason 
     }
 }
 
-.mode-profile-card h5,
-.mode-actions h5,
 .mode-history h5 {
     margin: 0 0 8px;
     color: #003366;
-}
-
-.mode-profile-grid {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-}
-
-.mode-profile-grid .kv {
-    background: #fff;
-    border: 1px solid #dbe3ea;
-    border-radius: 8px;
-    padding: 8px;
-}
-
-.mode-profile-grid .kv span {
-    display: block;
-    color: #64748b;
-    font-size: 0.76rem;
-}
-
-.mode-profile-grid .kv strong {
-    color: #0f172a;
-    font-size: 0.9rem;
-}
-
-.mode-actions {
-    margin-top: 12px;
 }
 
 .mode-history {
@@ -1215,25 +1115,6 @@ body #workflow-employees-modal .workflow-candidate .workflow-preparation-reason 
     margin-bottom: 10px;
 }
 
-.settlement-controls {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: end;
-    gap: 8px;
-    margin-bottom: 10px;
-}
-
-.settlement-existing-run {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 10px;
-    border-radius: 10px;
-    padding: 10px 12px;
-    margin-bottom: 10px;
-    font-weight: 600;
-}
-
 .settlement-warning-panel {
     border-color: color-mix(in srgb, #f59e0b 48%, var(--border));
     background: color-mix(in srgb, #f59e0b 12%, var(--surface));
@@ -1252,54 +1133,6 @@ html[data-theme="dark"] .ibems-modern .settlement-warning-panel {
 
 html[data-theme="dark"] .ibems-modern .app-container .settlement-warning-panel strong {
     color: inherit;
-}
-
-.settlement-summary {
-    margin-bottom: 10px;
-}
-
-.settlement-preview-tools {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 12px;
-    margin: 12px 0 10px;
-}
-
-.settlement-preview-count {
-    margin: 0;
-    color: #52677f;
-    font-size: 0.86rem;
-    white-space: nowrap;
-}
-
-.settlement-confirm-summary {
-    line-height: 1.45;
-    margin-bottom: 12px;
-}
-
-.settlement-select-all {
-    display: inline-flex;
-    align-items: center;
-    gap: 8px;
-    margin: 0 0 10px;
-    color: #334155;
-    font-size: 0.9rem;
-    font-weight: 700;
-}
-
-.settlement-select-all input,
-.settlement-confirm-check {
-    width: 16px;
-    height: 16px;
-    accent-color: #0b5ea8;
-}
-
-.settlement-confirm-actions {
-    display: flex;
-    justify-content: flex-end;
-    gap: 10px;
-    margin-top: 14px;
 }
 
 .import-guide p {
@@ -1385,16 +1218,6 @@ html[data-theme="dark"] .ibems-modern .app-container .settlement-warning-panel s
         flex-direction: column;
     }
 
-    .settlement-preview-tools,
-    .settlement-confirm-actions {
-        align-items: stretch;
-        flex-direction: column;
-    }
-
-    .settlement-preview-count {
-        white-space: normal;
-    }
-
     .acct-tab {
         width: 100%;
         justify-content: space-between;
@@ -1410,7 +1233,4 @@ html[data-theme="dark"] .ibems-modern .app-container .settlement-warning-panel s
         gap: 10px;
     }
 
-    .mode-layout {
-        grid-template-columns: 1fr;
-    }
 }

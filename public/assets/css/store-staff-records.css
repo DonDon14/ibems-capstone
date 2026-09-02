@@ -132,6 +132,9 @@
 .staff-search-wrap {
     position: relative;
     min-width: 260px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 44px;
+    gap: 8px;
 }
 .staff-modal-filters .field select{min-width:210px;min-height:44px;border:1px solid #d1d5db;border-radius:10px;background:#fff;padding:8px 10px;color:#223247}
 
@@ -153,11 +156,50 @@
     border-radius: 8px;
     background: #fff;
     padding-left: 42px;
-    padding-right: 88px;
+    padding-right: 44px;
     font-size: 0.92rem;
     line-height: 1.35;
     box-shadow: none;
 }
+
+.staff-search-wrap .search-scan-btn {
+    position: static;
+    grid-column: 2;
+    grid-row: 1;
+    width: 44px;
+    height: 44px;
+    transform: none;
+}
+
+.staff-search-wrap .search-scan-btn:hover,
+.staff-search-wrap .search-scan-btn:focus-visible {
+    transform: none;
+}
+
+.staff-filter-panel.compact-filter-bar .compact-filter-actions .search-scan-btn {
+    position: static;
+    inset: auto;
+    width: 44px;
+    height: 44px;
+    flex: 0 0 44px;
+    transform: none;
+}
+
+.staff-filter-panel.compact-filter-bar .compact-filter-actions .search-scan-btn:hover,
+.staff-filter-panel.compact-filter-bar .compact-filter-actions .search-scan-btn:focus-visible {
+    transform: none;
+}
+
+.staff-search-wrap .search-clear-btn {
+    right: 60px;
+}
+
+.staff-result { color: #166534; }
+.staff-result.is-error,
+.scanner-status.is-error { color: #b91c1c; }
+
+html[data-theme="dark"] .ibems-modern .staff-result { color: #86efac; }
+html[data-theme="dark"] .ibems-modern :is(.staff-result.is-error, .scanner-status.is-error) { color: #fca5a5; }
 
 
 .checkbox-field label {

@@ -8,6 +8,7 @@
     $lowStockProducts = is_array($lowStockProducts ?? null) ? $lowStockProducts : [];
     $recentTransactions = is_array($recentTransactions ?? null) ? $recentTransactions : [];
     $paymentBreakdown = is_array($paymentBreakdown ?? null) ? $paymentBreakdown : [];
+    $period = is_array($period ?? null) ? $period : \App\Services\DashboardPeriod::publicMeta(\App\Services\DashboardPeriod::resolve('day'));
     $money = static fn ($value): string => ibems_money($value);
     $paymentLabel = static function ($method): string {
         $key = strtolower((string) $method);
@@ -21,14 +22,15 @@
 <section class="dashboard-shell">
     <?= view('components/page_header', [
         'eyebrow' => 'Store operations',
-        'title' => 'Today at ' . $storeName,
-        'description' => 'Open the store day, watch live sales, and handle stock priorities.',
+        'title' => $storeName . ' overview',
+        'description' => "Review selected-period sales while keeping today's store readiness visible.",
         'icon' => 'bi bi-shop-window',
     ]) ?>
+    <?= view('components/dashboard_period_filter', ['selectedPeriod' => $period['key'] ?? 'day', 'mode' => 'reload']) ?>
 
     <div class="dashboard-grid">
-        <?= view('components/stat_card', ['title' => 'Today Sales', 'value' => ibems_money($summary['today_sales'] ?? 0), 'icon' => 'bi bi-cash-coin', 'tone' => 'sales']) ?>
-        <?= view('components/stat_card', ['title' => 'Transactions Today', 'value' => (string) ((int) ($summary['today_transactions'] ?? 0)), 'icon' => 'bi bi-receipt', 'tone' => 'users']) ?>
+        <?= view('components/stat_card', ['title' => 'Period Sales', 'value' => ibems_money($summary['today_sales'] ?? 0), 'icon' => 'bi bi-cash-coin', 'tone' => 'sales']) ?>
+        <?= view('components/stat_card', ['title' => 'Period Transactions', 'value' => (string) ((int) ($summary['today_transactions'] ?? 0)), 'icon' => 'bi bi-receipt', 'tone' => 'users']) ?>
         <?= view('components/stat_card', ['title' => 'Active Products', 'value' => (string) ((int) ($summary['active_products'] ?? 0)), 'icon' => 'bi bi-box-seam', 'tone' => 'finance']) ?>
         <?= view('components/stat_card', ['title' => 'Low Stock Items', 'value' => (string) ((int) ($summary['low_stock'] ?? 0)), 'icon' => 'bi bi-exclamation-triangle', 'tone' => 'warning']) ?>
     </div>
@@ -52,7 +54,7 @@
                 <div>
                     <span>Opening Cash</span>
                     <strong><?= esc($money($readiness['opening_cash'] ?? $readiness['opening_balance'] ?? 0)) ?></strong>
-                    <small>Business date: <?= esc((string) ($readiness['business_date'] ?? date('Y-m-d'))) ?></small>
+                    <small>Business date: <?= esc((string) ($readiness['business_date'] ?? ibems_business_date())) ?></small>
                 </div>
                 <div>
                     <span>Opening E-Cash</span>
@@ -164,7 +166,7 @@
                     <div class="stack-item">
                         <div class="stack-item-head">
                             <strong>No transactions yet</strong>
-                            <span>Today</span>
+                            <span>Selected period</span>
                         </div>
                         <div class="stack-meta">New completed POS sales will appear here.</div>
                     </div>
@@ -175,7 +177,7 @@
 
     <div class="dash-panels">
         <article class="dash-panel">
-            <h4><i class="bi bi-credit-card-2-front"></i> Today&apos;s Payment Mix</h4>
+                <h4><i class="bi bi-credit-card-2-front"></i> Selected-period Payment Mix</h4>
             <div class="stack-list">
                 <?php if ($paymentBreakdown !== []): ?>
                     <?php foreach ($paymentBreakdown as $payment): ?>
@@ -190,7 +192,7 @@
                 <?php else: ?>
                     <div class="stack-item">
                         <div class="stack-item-head">
-                            <strong>No payments recorded today</strong>
+                            <strong>No payments recorded in this period</strong>
                             <span>PHP 0.00</span>
                         </div>
                         <div class="stack-meta">Payment breakdown updates after completed sales.</div>

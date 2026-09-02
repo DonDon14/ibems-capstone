@@ -159,6 +159,8 @@ class TransactionService
         $balanceModel = new BalanceModel();
         $debtCashbookModel = new DebtCashbookEntryModel();
         $debtBalanceBefore = null;
+        $purchaseCardAuthorizationRequired = false;
+        $purchaseCardService = new UserPurchaseCardService();
         if ($debtLine !== null) {
             if ($debtAccountType === 'department') {
                 $db = Database::connect();
@@ -198,20 +200,25 @@ class TransactionService
                 if (!in_array($customerType, ['faculty', 'staff'], true)) {
                     return $this->error('Only faculty/staff can use debt payment.');
                 }
-                if ($debtPin === '') {
-                    return $this->error('Enter the customer debt PIN to authorize this debt transaction.');
+                if ($purchaseCardService->isAvailable()) {
+                    $purchaseCardAuthorizationRequired = true;
+                    $pinAuthorization = ['status' => 'success', 'code' => 200];
+                } else {
+                    if ($debtPin === '') {
+                        return $this->error('Enter the customer debt PIN to authorize this debt transaction.');
+                    }
+                    if (!$customer || trim((string) ($customer['debt_pin_hash'] ?? '')) === '') {
+                        return $this->error('Selected customer has no debt PIN set. Ask them to set it in their user portal first.');
+                    }
+                    $pinAuthorization = (new DebtPinAuthorizationService())->authorize(
+                        $customerUserId,
+                        (string) $customer['debt_pin_hash'],
+                        $debtPin,
+                        $actorId,
+                        $storeId,
+                        $debtAmount
+                    );
                 }
-                if (!$customer || trim((string) ($customer['debt_pin_hash'] ?? '')) === '') {
-                    return $this->error('Selected customer has no debt PIN set. Ask them to set it in their user portal first.');
-                }
-                $pinAuthorization = (new DebtPinAuthorizationService())->authorize(
-                    $customerUserId,
-                    (string) $customer['debt_pin_hash'],
-                    $debtPin,
-                    $actorId,
-                    $storeId,
-                    $debtAmount
-                );
             }
             if (($pinAuthorization['status'] ?? 'error') !== 'success') {
                 return $pinAuthorization;
@@ -226,6 +233,19 @@ class TransactionService
 
         $db = Database::connect();
         $db->transBegin();
+
+        if ($purchaseCardAuthorizationRequired) {
+            $cardAuthorization = $purchaseCardService->authorizeAndConsume(
+                (int) $customerUserId,
+                $actorId,
+                $storeId,
+                $debtAmount
+            );
+            if (($cardAuthorization['status'] ?? 'error') !== 'success') {
+                $db->transRollback();
+                return $cardAuthorization;
+            }
+        }
 
         $clientTxnId = uniqid('txn_', true);
         $createdAt = date('Y-m-d H:i:s');
@@ -282,32 +302,48 @@ class TransactionService
                 $product = $row['product'];
                 $qty = (int) $row['qty'];
 
-                if (!$transactionItemModel->insert([
+                $itemPayload = [
                     'transaction_id' => $txnId,
                     'product_id' => (int) $product['id'],
                     'qty' => $qty,
                     'unit_price' => $row['unit_price'],
                     'line_total' => $row['line_total'],
                     'created_at' => $createdAt,
-                ])) {
+                ];
+                $snapshotFields = [
+                    'item_name_snapshot' => (string) ($product['name'] ?? ''),
+                    'sku_snapshot' => (string) ($product['sku'] ?? ''),
+                    'variant_snapshot' => ($product['variant_label'] ?? null) ?: null,
+                    'unit_code_snapshot' => (string) ($product['unit_code'] ?? 'piece'),
+                    'item_type_snapshot' => (string) ($product['item_type'] ?? 'stock_item'),
+                ];
+                foreach ($snapshotFields as $field => $value) {
+                    if ($db->fieldExists($field, 'transaction_items')) {
+                        $itemPayload[$field] = $value;
+                    }
+                }
+
+                if (!$transactionItemModel->insert($itemPayload)) {
                     throw new \RuntimeException('Failed to create transaction item.');
                 }
 
-                // Atomic stock deduction to avoid race conditions during concurrent checkout.
-                if (!$productModel->deductStockIfAvailable((int) $product['id'], $qty)) {
-                    throw new \RuntimeException('Insufficient stock for ' . (string) ($product['name'] ?? 'product') . '.');
-                }
+                if (ProductBehaviorService::tracksStock($product)) {
+                    // Atomic stock deduction to avoid race conditions during concurrent checkout.
+                    if (!$productModel->deductStockIfAvailable((int) $product['id'], $qty)) {
+                        throw new \RuntimeException('Insufficient stock for ' . (string) ($product['name'] ?? 'product') . '.');
+                    }
 
-                if (!$movementModel->insert([
-                    'product_id' => (int) $product['id'],
-                    'store_id' => $storeId,
-                    'type' => 'sale',
-                    'qty' => $qty,
-                    'reason' => 'POS sale',
-                    'txn_id' => $txnId,
-                    'created_at' => $createdAt,
-                ])) {
-                    throw new \RuntimeException('Failed to create inventory movement.');
+                    if (!$movementModel->insert([
+                        'product_id' => (int) $product['id'],
+                        'store_id' => $storeId,
+                        'type' => 'sale',
+                        'qty' => $qty,
+                        'reason' => 'POS sale',
+                        'txn_id' => $txnId,
+                        'created_at' => $createdAt,
+                    ])) {
+                        throw new \RuntimeException('Failed to create inventory movement.');
+                    }
                 }
             }
 

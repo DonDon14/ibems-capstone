@@ -2,7 +2,7 @@
 
 <?= $this->section('styles') ?>
 <link rel="stylesheet" href="<?= base_url('assets/css/user-portal.css') ?>?v=20260824a" data-user-page-style>
-<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20260821b" data-user-page-style>
+<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20260825a" data-user-page-style>
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -154,6 +154,6 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260824a" data-user-page-script data-user-page-once></script>
+<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260825a" data-user-page-script data-user-page-once></script>
 <script src="<?= base_url('assets/js/user-history.js') ?>?v=20260823a" data-user-page-script></script>
 <?= $this->endSection() ?>

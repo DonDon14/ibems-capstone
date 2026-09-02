@@ -8,10 +8,11 @@
         'description' => 'Monitor stores, people, debt exposure, and operational exceptions.',
         'icon' => 'bi bi-grid-1x2',
     ]) ?>
+    <?= view('components/dashboard_period_filter') ?>
 
     <div class="dashboard-grid">
         <?= view('components/stat_card', ['title' => 'Total Stores', 'value' => '0', 'valueId' => 'ad-total-stores', 'icon' => 'bi bi-shop-window', 'tone' => 'finance']) ?>
-        <?= view('components/stat_card', ['title' => 'Active Store Officers', 'value' => '0', 'valueId' => 'ad-active-store-officers', 'icon' => 'bi bi-person-badge', 'tone' => 'users']) ?>
+        <?= view('components/stat_card', ['title' => 'Active Store Cashiers', 'value' => '0', 'valueId' => 'ad-active-store-officers', 'icon' => 'bi bi-person-badge', 'tone' => 'users']) ?>
         <?= view('components/stat_card', ['title' => 'Debt Accounts', 'value' => '0', 'valueId' => 'ad-debt-accounts', 'icon' => 'bi bi-cash-stack', 'tone' => 'debt']) ?>
         <?= view('components/stat_card', ['title' => 'Open Alerts', 'value' => '0', 'valueId' => 'ad-open-alerts', 'icon' => 'bi bi-bell', 'tone' => 'warning']) ?>
     </div>
@@ -72,9 +73,9 @@
             <div class="dashboard-panel-heading">
                 <div>
                     <h4><i class="bi bi-credit-card-2-front"></i> Payment Breakdown</h4>
-                    <p>Collected payment mix for the last seven days.</p>
+                    <p>Collected payment mix for the selected period.</p>
                 </div>
-                <span class="dashboard-panel-meta">7 days</span>
+                <span class="dashboard-panel-meta" data-dashboard-selected-period>Today</span>
             </div>
             <div id="ad-payment-breakdown" class="admin-payment-list">
                 <?= view('components/data_state', ['type' => 'loading', 'message' => 'Loading payment breakdown...']) ?>
@@ -89,18 +90,18 @@
                     <h4><i class="bi bi-graph-up-arrow"></i> Revenue trend</h4>
                     <p>Daily collected revenue across all stores.</p>
                 </div>
-                <span class="dashboard-panel-meta">Last 7 days</span>
+                <span class="dashboard-panel-meta" data-dashboard-selected-period>Today</span>
             </div>
             <div class="dashboard-chart-summary" aria-live="polite">
                 <div>
-                    <span>7-day revenue</span>
+                    <span>Selected-period revenue</span>
                     <strong id="ad-sales-total">PHP 0.00</strong>
                 </div>
                 <p id="ad-sales-peak">No revenue recorded yet.</p>
             </div>
             <div class="dash-chart-wrap dashboard-revenue-chart">
-                <canvas id="ad-sales-trend-chart" role="img" aria-label="Revenue collected during the last seven days" aria-describedby="ad-sales-chart-summary">
-                    Revenue trend chart for the last seven days.
+                <canvas id="ad-sales-trend-chart" role="img" aria-label="Revenue collected during the selected dashboard period" aria-describedby="ad-sales-chart-summary">
+                    Revenue trend chart for the selected dashboard period.
                 </canvas>
             </div>
             <p id="ad-sales-chart-summary" class="sr-only">Revenue data is loading.</p>
@@ -111,7 +112,7 @@
                     <h4><i class="bi bi-bar-chart-fill"></i> Top-selling items</h4>
                     <p>Products ranked by units sold, with sales value.</p>
                 </div>
-                <span class="dashboard-panel-meta">Last 7 days</span>
+                <span class="dashboard-panel-meta" data-dashboard-selected-period>Today</span>
             </div>
             <div id="ad-top-items-ranking" class="dashboard-ranking-list" aria-live="polite" aria-busy="true">
                 <?= view('components/data_state', ['type' => 'loading', 'message' => 'Loading product ranking...']) ?>
@@ -120,7 +121,7 @@
     </div>
 
     <article class="dash-panel">
-        <h4><i class="bi bi-trophy"></i> Top Stores (Last 7 Days)</h4>
+        <h4><i class="bi bi-trophy"></i> Top Stores for Selected Period</h4>
         <div class="table-standard-wrap">
             <table class="table table-standard">
                 <thead>
@@ -146,5 +147,5 @@
 
 <?= $this->section('scripts') ?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="<?= base_url('assets/js/admin-dashboard.js') ?>?v=20260824a"></script>
+<script src="<?= base_url('assets/js/admin-dashboard.js') ?>?v=20260902a"></script>
 <?= $this->endSection() ?>

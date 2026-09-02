@@ -6,8 +6,8 @@ final class PosPaymentSelectorTest extends TestCase
 {
     public function testPaymentSelectorSeparatesTenderAndAccountTransactions(): void
     {
-        $view = (string) file_get_contents(ROOTPATH . 'app/Views/store/pos.php');
-        $js = (string) file_get_contents(ROOTPATH . 'public/assets/js/store-pos.js');
+        $view = (string) file_get_contents(ROOTPATH . 'app/Views/store/pos.php') . file_get_contents(ROOTPATH . 'app/Views/components/store_pos_modals.php');
+        $js = (string) file_get_contents(ROOTPATH . 'public/assets/js/store-pos.js') . file_get_contents(ROOTPATH . 'public/assets/js/store-pos.part2.js') . file_get_contents(ROOTPATH . 'public/assets/js/store-pos.part3.js') . file_get_contents(ROOTPATH . 'public/assets/js/store-pos.part4.js') . file_get_contents(ROOTPATH . 'public/assets/js/store-pos.part5.js') . file_get_contents(ROOTPATH . 'public/assets/js/store-pos.part6.js');
         $css = (string) file_get_contents(ROOTPATH . 'public/assets/css/store-pos.css');
 
         $this->assertStringContainsString('class="payment-selector"', $view);
@@ -62,7 +62,9 @@ final class PosPaymentSelectorTest extends TestCase
     {
         $migration = (string) file_get_contents(ROOTPATH . 'app/Database/Migrations/2026-08-13-130000_CreateTransactionPayments.php');
         $service = (string) file_get_contents(ROOTPATH . 'app/Services/TransactionService.php');
-        $controller = (string) file_get_contents(ROOTPATH . 'app/Controllers/StoreController.php');
+        $controller = (string) file_get_contents(ROOTPATH . 'app/Controllers/StoreController.php')
+            . (string) file_get_contents(ROOTPATH . 'app/Services/StoreDashboardService.php')
+            . (string) file_get_contents(ROOTPATH . 'app/Services/StoreReportService.php');
         $receipt = (string) file_get_contents(ROOTPATH . 'public/assets/js/receipt-standard.js');
 
         $this->assertStringContainsString('transaction_payments', $migration);

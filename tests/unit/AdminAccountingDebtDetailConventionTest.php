@@ -10,15 +10,16 @@ class AdminAccountingDebtDetailConventionTest extends TestCase
     {
         $routes = (string) file_get_contents(APPPATH . 'Config/Routes.php');
         $controller = (string) file_get_contents(APPPATH . 'Controllers/AdminController.php');
+        $debtQuery = (string) file_get_contents(APPPATH . 'Services/AdminDebtQueryService.php');
         $view = (string) file_get_contents(APPPATH . 'Views/admin/accounting-debts.php');
         $script = (string) file_get_contents(FCPATH . 'assets/js/admin-accounting-debts.js');
 
         $this->assertStringContainsString("admin/accounting-debts/user/(:num)", $routes);
         $this->assertStringContainsString("'filter' => 'access:system.manage'", $routes);
         $this->assertStringContainsString('function accountingDebtUserDetail', $controller);
-        $this->assertStringContainsString("'general' => [", $controller);
-        $this->assertStringContainsString("'debt' => [", $controller);
-        $this->assertStringContainsString("'stores' => array_map", $controller);
+        $this->assertStringContainsString("'general' => [", $debtQuery);
+        $this->assertStringContainsString("'debt' => [", $debtQuery);
+        $this->assertStringContainsString("'stores' => array_map", $debtQuery);
         $this->assertStringContainsString('id="ad-account-modal"', $view);
         $this->assertStringContainsString('data-ad-account-user', $script);
         $this->assertStringContainsString('data-ad-account-tab="general"', $script);
@@ -30,15 +31,15 @@ class AdminAccountingDebtDetailConventionTest extends TestCase
 
     public function testDebtActivityUsesServerPaginationAndStoreFiltering(): void
     {
-        $controller = (string) file_get_contents(APPPATH . 'Controllers/AdminController.php');
+        $debtQuery = (string) file_get_contents(APPPATH . 'Services/AdminDebtQueryService.php');
         $script = (string) file_get_contents(FCPATH . 'assets/js/admin-accounting-debts.js');
 
-        $this->assertStringContainsString("getGet('page')", $controller);
-        $this->assertStringContainsString("getGet('page_size')", $controller);
-        $this->assertStringContainsString("getGet('store_id')", $controller);
-        $this->assertStringContainsString("getGet('date_from')", $controller);
-        $this->assertStringContainsString("getGet('date_to')", $controller);
-        $this->assertStringContainsString("'pagination' => [", $controller);
+        $this->assertStringContainsString('$filters[\'page\']', $debtQuery);
+        $this->assertStringContainsString('$filters[\'page_size\']', $debtQuery);
+        $this->assertStringContainsString('$filters[\'store_id\']', $debtQuery);
+        $this->assertStringContainsString('$filters[\'date_from\']', $debtQuery);
+        $this->assertStringContainsString('$filters[\'date_to\']', $debtQuery);
+        $this->assertStringContainsString("'pagination' => [", $debtQuery);
         $this->assertStringContainsString('data-ad-history-page', $script);
         $this->assertStringContainsString('data-ad-store-toggle', $script);
         $this->assertStringContainsString('data-ad-store-accordion', $script);

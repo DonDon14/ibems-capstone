@@ -85,7 +85,7 @@ final class PersistentPortalNavigationConventionTest extends CIUnitTestCase
         $this->assertStringNotContainsString('content: "Workspace";', $modernStyles);
         $this->assertStringContainsString('@media (prefers-reduced-motion: reduce)', $modernStyles);
         $this->assertStringContainsString("assets/css/app.css') ?>?v=20260824e", $shell);
-        $this->assertStringContainsString("assets/css/modern-ui.css') ?>?v=20260824m", $shell);
+        $this->assertStringContainsString("assets/css/modern-ui.css') ?>?v=20260825e", $shell);
         $this->assertStringContainsString('body:is(.app-modal-open, .user-product-modal-open) .app-container', $baseStyles);
         $this->assertStringContainsString('body.account-menu-open .app-container', $baseStyles);
         $this->assertStringContainsString('.app-modal, .user-product-modal)', $modernStyles);
@@ -128,10 +128,14 @@ final class PersistentPortalNavigationConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('AbortSignal.any', $navigation);
         $this->assertStringContainsString('runtime.controller.abort()', $navigation);
         $this->assertStringContainsString('runtime.disposeTimers()', $navigation);
+        $this->assertStringContainsString('A full document unload already tears down requests', $navigation);
+        $this->assertStringNotContainsString("window.addEventListener(\"beforeunload\", () => {\n        navigationController?.abort();", $navigation);
         $this->assertStringContainsString('cleanupCallbacks', $navigation);
         $this->assertStringContainsString('removeStaleStyles()', $navigation);
         $this->assertStringContainsString('updateBodyPageClasses(nextDocument)', $navigation);
         $this->assertStringContainsString('script.nonce = nonce', $navigation);
+        $this->assertStringContainsString('scopedSources.push({ text: sourceText, url: sourceUrl })', $navigation);
+        $this->assertStringContainsString('flushScopedSources()', $navigation);
         $this->assertStringContainsString('window.IbemsPortalNavigation = api', $navigation);
         $this->assertStringContainsString('window.IbemsUserNavigation = api', $navigation);
     }
@@ -148,6 +152,11 @@ final class PersistentPortalNavigationConventionTest extends CIUnitTestCase
 
         foreach (['store-pos.js', 'store-inventory.js', 'store-staff-records.js'] as $script) {
             $contents = (string) file_get_contents(FCPATH . 'assets/js/' . $script);
+            $parts = glob(FCPATH . 'assets/js/' . substr($script, 0, -3) . '.part*.js') ?: [];
+            natsort($parts);
+            foreach ($parts as $part) {
+                $contents .= (string) file_get_contents($part);
+            }
             $this->assertStringContainsString('IbemsPortalNavigation?.onCleanup', $contents, $script);
         }
     }

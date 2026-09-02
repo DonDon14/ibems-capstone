@@ -8,8 +8,8 @@ class InteractiveRecordHoverConventionTest extends TestCase
 {
     public function testClickableRecordCardsShareTheLeftEdgeHoverCue(): void
     {
-        $storeScript = file_get_contents(ROOTPATH . 'public/assets/js/store-staff-records.js');
-        $accountingScript = file_get_contents(ROOTPATH . 'public/assets/js/accounting-debts.js');
+        $storeScript = file_get_contents(ROOTPATH . 'public/assets/js/store-staff-records.js') . file_get_contents(ROOTPATH . 'public/assets/js/store-staff-records.part2.js');
+        $accountingScript = file_get_contents(ROOTPATH . 'public/assets/js/accounting-debts.js') . file_get_contents(ROOTPATH . 'public/assets/js/accounting-debts.part2.js') . file_get_contents(ROOTPATH . 'public/assets/js/accounting-debts.part3.js');
         $adminScript = file_get_contents(ROOTPATH . 'public/assets/js/admin-user-view.js');
         $styles = file_get_contents(ROOTPATH . 'public/assets/css/app.css');
 

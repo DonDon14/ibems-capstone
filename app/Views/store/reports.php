@@ -2,7 +2,7 @@
 
 <?= $this->section('styles') ?>
 <link rel="stylesheet" href="<?= base_url('assets/css/store-reports.css') ?>?v=20260824a">
-<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20260821b">
+<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20260825a">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -234,6 +234,6 @@
 
 <?= $this->section('scripts') ?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260824a"></script>
+<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260825a"></script>
 <script src="<?= base_url('assets/js/store-reports.js') ?>?v=20260824b"></script>
 <?= $this->endSection() ?>

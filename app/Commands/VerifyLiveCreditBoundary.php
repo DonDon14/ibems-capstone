@@ -31,7 +31,7 @@ class VerifyLiveCreditBoundary extends BaseCommand
 
         $marker = 'QA-CREDIT-' . gmdate('YmdHis');
         $now = date('Y-m-d H:i:s');
-        $today = date('Y-m-d');
+        $today = ibems_business_date();
         $actorId = $customerId = $storeId = $productId = $transactionId = null;
         $passed = false;
 

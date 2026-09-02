@@ -15,6 +15,37 @@ class DebtInvestigationService
     public const ISSUE_TYPES = ['incorrect_amount', 'unauthorized_purchase', 'duplicate_charge', 'wrong_employee', 'other'];
     public const ACTIONS = ['no_change', 'partial_reversal', 'full_reversal'];
 
+    /** @return array{status:string,investigations:array,transactions:array} */
+    public function data(int $userId = 0): array
+    {
+        $db = Database::connect();
+        $investigations = $db->table('debt_investigations di')
+            ->select('di.*, u.employee_id, u.name, t.client_txn_id, opener.name AS opened_by_name, recommender.name AS recommended_by_name, approver.name AS approved_by_name')
+            ->join('users u', 'u.id = di.user_id', 'inner')
+            ->join('transactions t', 't.id = di.transaction_id', 'left')
+            ->join('users opener', 'opener.id = di.opened_by', 'left')
+            ->join('users recommender', 'recommender.id = di.recommended_by', 'left')
+            ->join('users approver', 'approver.id = di.approved_by', 'left')
+            ->orderBy('di.id', 'DESC')
+            ->limit(100)
+            ->get()
+            ->getResultArray();
+
+        $transactions = [];
+        if ($userId > 0) {
+            $transactions = $db->table('transactions')
+                ->select('id, client_txn_id, amount, store_id, created_at')
+                ->where('user_id', $userId)
+                ->where('payment_method', 'debt')
+                ->orderBy('id', 'DESC')
+                ->limit(100)
+                ->get()
+                ->getResultArray();
+        }
+
+        return ['status' => 'success', 'investigations' => $investigations, 'transactions' => $transactions];
+    }
+
     public function open(array $input, int $actorId): array
     {
         $userId = (int) ($input['user_id'] ?? 0);

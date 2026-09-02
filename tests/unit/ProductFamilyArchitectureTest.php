@@ -20,9 +20,9 @@ final class ProductFamilyArchitectureTest extends TestCase
 
     public function testInventoryAndPosGroupFamiliesButRetainExactVariantActions(): void
     {
-        $inventoryJs = file_get_contents(ROOTPATH . 'public/assets/js/store-inventory.js');
-        $posJs = file_get_contents(ROOTPATH . 'public/assets/js/store-pos.js');
-        $posView = file_get_contents(ROOTPATH . 'app/Views/store/pos.php');
+        $inventoryJs = file_get_contents(ROOTPATH . 'public/assets/js/store-inventory.js') . file_get_contents(ROOTPATH . 'public/assets/js/store-inventory.part2.js') . file_get_contents(ROOTPATH . 'public/assets/js/store-inventory.part3.js');
+        $posJs = file_get_contents(ROOTPATH . 'public/assets/js/store-pos.js') . file_get_contents(ROOTPATH . 'public/assets/js/store-pos.part2.js') . file_get_contents(ROOTPATH . 'public/assets/js/store-pos.part3.js') . file_get_contents(ROOTPATH . 'public/assets/js/store-pos.part4.js') . file_get_contents(ROOTPATH . 'public/assets/js/store-pos.part5.js') . file_get_contents(ROOTPATH . 'public/assets/js/store-pos.part6.js');
+        $posView = file_get_contents(ROOTPATH . 'app/Views/store/pos.php') . file_get_contents(ROOTPATH . 'app/Views/components/store_pos_modals.php');
 
         $this->assertStringContainsString('function invGroupProducts', $inventoryJs);
         $this->assertStringContainsString('data-family-toggle', $inventoryJs);

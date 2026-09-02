@@ -40,6 +40,7 @@ class CompactFilterConventionTest extends TestCase
         $this->assertStringContainsString('aria-controls', $source);
         $this->assertStringContainsString('aria-expanded', $source);
         $this->assertStringContainsString('data-compact-filter-reset', $source);
+        $this->assertStringContainsString('.staff-search-wrap, .uv-search-wrap, .acct-search-wrap, .debt-search-wrap', $source);
         $this->assertStringContainsString('!button.closest(".ui-select, .ui-date")', $source);
         $this->assertStringContainsString('data-compact-filter-apply', $source);
         $this->assertStringContainsString('>Done</button>', $source);

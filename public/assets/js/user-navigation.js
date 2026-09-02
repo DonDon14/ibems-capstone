@@ -251,11 +251,24 @@
         const template = sourceDocument.getElementById("portal-page-scripts");
         if (!template) throw new Error("The destination page does not declare scoped page behavior.");
         const scripts = Array.from(template.content.querySelectorAll("script"));
+        let scopedSources = [];
+
+        const flushScopedSources = () => {
+            if (!scopedSources.length) return;
+            const sourceText = scopedSources.map(({ text, url }) => {
+                const sourceLabel = url ? `\n//# sourceURL=${url}` : "";
+                return `${text}${sourceLabel}`;
+            }).join("\n");
+            executeScopedScript(sourceText, "", runtime);
+            scopedSources = [];
+        };
+
         for (const source of scripts) {
             if (runtime.controller.signal.aborted) throw new DOMException("Page navigation was aborted.", "AbortError");
             const declaredSource = source.getAttribute("src");
             const sourceUrl = declaredSource ? new URL(declaredSource, window.location.href).href : "";
             if (shouldLoadOnce(source, sourceUrl)) {
+                flushScopedSources();
                 await loadOnceScript(source, sourceUrl);
                 continue;
             }
@@ -266,8 +279,9 @@
                 if (!response.ok) throw new Error(`Unable to load page behavior: ${sourceUrl}`);
                 sourceText = await response.text();
             }
-            executeScopedScript(sourceText, sourceUrl, runtime);
+            scopedSources.push({ text: sourceText, url: sourceUrl });
         }
+        flushScopedSources();
     }
 
     async function disposePageRuntime(runtime) {
@@ -388,8 +402,8 @@
     });
 
     window.addEventListener("beforeunload", () => {
-        navigationController?.abort();
-        pageRuntime.controller.abort();
+        // A full document unload already tears down requests and listeners.
+        // Explicit aborts here surface as noisy AbortError console entries.
         pageRuntime.disposeTimers();
     });
 

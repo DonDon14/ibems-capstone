@@ -531,7 +531,7 @@ function initUser() {
     async function load() {
         document.getElementById("department-user-assignments").innerHTML = dataState("loading", "Loading department assignments...");
         try {
-            const data = await api("/user/department-authorizations/data");
+            const data = await api("/department/authorizations/data");
             const assignments = Array.isArray(data.assignments) ? data.assignments : [];
             const canApprove = assignments.length > 0;
             document.getElementById("department-user-assignments").innerHTML = assignments.length
@@ -574,7 +574,7 @@ function initUser() {
                 setResult("department-pin-result", "Enter your current account password to replace the PIN.", "error");
                 return;
             }
-            await api("/user/department-authorizations/pin", jsonOptions({ pin, pin_confirmation: confirmation, current_password: currentPassword }));
+            await api("/department/authorizations/pin", jsonOptions({ pin, pin_confirmation: confirmation, current_password: currentPassword }));
             document.getElementById("department-current-password").value = "";
             document.getElementById("department-pin").value = "";
             document.getElementById("department-pin-confirmation").value = "";

@@ -6,8 +6,8 @@ final class ProductVariantBuilderTest extends TestCase
 {
     public function testCreateFormSupportsGeneratedSkusAndMultipleVariantImages(): void
     {
-        $view = file_get_contents(ROOTPATH . 'app/Views/store/inventory.php');
-        $js = file_get_contents(ROOTPATH . 'public/assets/js/store-inventory.js');
+        $view = file_get_contents(ROOTPATH . 'app/Views/store/inventory.php') . file_get_contents(ROOTPATH . 'app/Views/components/store_inventory_modals.php');
+        $js = file_get_contents(ROOTPATH . 'public/assets/js/store-inventory.js') . file_get_contents(ROOTPATH . 'public/assets/js/store-inventory.part2.js') . file_get_contents(ROOTPATH . 'public/assets/js/store-inventory.part3.js');
 
         $this->assertStringContainsString('Add Variant', $view);
         $this->assertStringContainsString('One image for all variants', $view);

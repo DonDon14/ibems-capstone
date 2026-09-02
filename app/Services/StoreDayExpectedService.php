@@ -16,7 +16,7 @@ final class StoreDayExpectedService
         ];
         if ($storeId <= 0) return $empty;
 
-        $businessDate = (string) ($session['business_date'] ?? date('Y-m-d'));
+        $businessDate = (string) ($session['business_date'] ?? ibems_business_date());
         $db = Database::connect();
         $paymentBuilder = $db->table('transactions t');
         if ($db->tableExists('transaction_payments')) {
@@ -31,9 +31,10 @@ final class StoreDayExpectedService
                 ->select('t.payment_method AS payment_method, COALESCE(SUM(t.amount), 0) AS total_sales', false)
                 ->groupBy('t.payment_method');
         }
+        $dayBounds = ibems_business_day_utc_bounds($businessDate);
         $paymentRows = $paymentBuilder
-            ->where('t.store_id', $storeId)->where('t.created_at >=', $businessDate . ' 00:00:00')
-            ->where('t.created_at <=', $businessDate . ' 23:59:59')->get()->getResultArray();
+            ->where('t.store_id', $storeId)->where('t.created_at >=', $dayBounds['start'])
+            ->where('t.created_at <=', $dayBounds['end'])->get()->getResultArray();
         $cashSales = $ecashSales = $debtSales = 0.0;
         $paymentMethodSales = [];
         foreach ($paymentRows as $row) {
@@ -83,7 +84,7 @@ final class StoreDayExpectedService
                 ->select('a.id, a.account_name, a.account_number, m.code AS payment_method, m.label AS payment_method_label, a.image_url, COALESCE(SUM(CASE WHEN t.id IS NOT NULL THEN tp.amount ELSE 0 END), 0) AS sales', false)
                 ->join('store_payment_methods m', 'm.id = a.payment_method_id')
                 ->join('transaction_payments tp', 'tp.destination_account_id = a.id', 'left')
-                ->join('transactions t', "t.id = tp.transaction_id AND t.store_id = " . $db->escape($storeId) . " AND t.created_at >= " . $db->escape($businessDate . ' 00:00:00') . " AND t.created_at <= " . $db->escape($businessDate . ' 23:59:59'), 'left', false)
+                ->join('transactions t', "t.id = tp.transaction_id AND t.store_id = " . $db->escape($storeId) . " AND t.created_at >= " . $db->escape($dayBounds['start']) . " AND t.created_at <= " . $db->escape($dayBounds['end']), 'left', false)
                 ->where('a.store_id', $storeId)->where('a.is_active', true)
                 ->groupBy('a.id, a.account_name, a.account_number, m.code, m.label, m.sort_order, a.image_url')->orderBy('m.sort_order', 'ASC')->get()->getResultArray();
             $openingByAccount = [];

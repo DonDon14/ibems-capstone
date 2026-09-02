@@ -18,21 +18,26 @@ $portalContext = [
     'default_store_id' => (int) ($activeStore['id'] ?? 0),
 ];
 
-$pageTitle = 'Store System';
-$portalTitle = $storeName;
-$portalSubtitle = 'School Store Operations';
-$footerText = 'USTP IBEMS Store System';
-$profileDetail = $role . ($email !== '' ? ' | ' . $email : '');
+$isCashierPortal = strtoupper($role) === 'STORE_SYSTEM';
+$pageTitle = $isCashierPortal ? 'Store Cashier POS' : 'Store Supervisor Portal';
+$portalTitle = $isCashierPortal ? $storeName . ' POS' : $storeName;
+$portalSubtitle = $isCashierPortal ? 'Cashier Checkout' : 'Assigned Store Management';
+$footerText = $isCashierPortal ? 'USTP IBEMS Store Cashier' : 'USTP IBEMS Store Supervision';
+$profileDetail = ($isCashierPortal ? 'Store Cashier' : 'Store Supervisor') . ($email !== '' ? ' | ' . $email : '');
 $requestPath = trim(service('uri')->getPath(), '/');
 $bodyClass = str_ends_with($requestPath, 'store/pos') ? 'pos-fullscreen' : '';
-$navigation = [
-    ['path' => 'store/dashboard', 'label' => 'Dashboard', 'icon' => 'bi bi-speedometer2'],
-    ['path' => 'store/pos', 'label' => 'POS', 'icon' => 'bi bi-cart3'],
-    ['path' => 'store/inventory', 'label' => 'Inventory', 'icon' => 'bi bi-box-seam'],
-    ['path' => 'store/reports', 'label' => 'Reports', 'icon' => 'bi bi-bar-chart-line'],
-    ['path' => 'store/history', 'label' => 'History', 'icon' => 'bi bi-clock-history'],
-    ['path' => 'store/staff-records', 'label' => 'Employee Accounts', 'icon' => 'bi bi-person-vcard'],
-    ['path' => 'store/settings', 'label' => 'Settings', 'icon' => 'bi bi-gear'],
-];
+$navigation = $isCashierPortal
+    ? [
+        ['path' => 'store/pos', 'label' => 'POS', 'icon' => 'bi bi-cart3'],
+    ]
+    : [
+        ['path' => 'store-admin/dashboard', 'label' => 'Dashboard', 'icon' => 'bi bi-speedometer2'],
+        ['path' => 'store-admin/stores', 'label' => 'Assigned Stores', 'icon' => 'bi bi-shop-window'],
+        ['path' => 'store/inventory', 'label' => 'Inventory', 'icon' => 'bi bi-box-seam'],
+        ['path' => 'store/reports', 'label' => 'Reports', 'icon' => 'bi bi-bar-chart-line'],
+        ['path' => 'store/history', 'label' => 'History', 'icon' => 'bi bi-clock-history'],
+        ['path' => 'store/staff-records', 'label' => 'Employee Accounts', 'icon' => 'bi bi-person-vcard'],
+        ['path' => 'store/settings', 'label' => 'Settings', 'icon' => 'bi bi-gear'],
+    ];
 
 include APPPATH . 'Views/components/portal_shell.php';

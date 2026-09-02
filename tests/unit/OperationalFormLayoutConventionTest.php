@@ -19,7 +19,7 @@ final class OperationalFormLayoutConventionTest extends CIUnitTestCase
 
     public function testProductCreationUsesSectionedResponsiveLayout(): void
     {
-        $view = (string) file_get_contents(APPPATH . 'Views/store/inventory.php');
+        $view = (string) file_get_contents(APPPATH . 'Views/store/inventory.php') . file_get_contents(APPPATH . 'Views/components/store_inventory_modals.php');
         $styles = (string) file_get_contents(FCPATH . 'assets/css/store-inventory.css');
 
         foreach (['section-product-info', 'section-media', 'section-pricing', 'section-inventory', 'section-review'] as $class) {

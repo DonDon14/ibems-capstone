@@ -27,7 +27,7 @@ if (! function_exists('ibems_role_landing_path')) {
         return match (ibems_normalize_role($role)) {
             'ADMIN' => '/admin/dashboard',
             'STORE_SUPERVISOR' => '/store-admin/dashboard',
-            'STORE_SYSTEM' => '/store/dashboard',
+            'STORE_SYSTEM' => '/store/pos',
             'ACCOUNTING_OFFICE' => '/accounting/dashboard',
             'USER' => '/user/dashboard',
             default => '/login',
@@ -182,5 +182,31 @@ if (! function_exists('ibems_datetime')) {
         } catch (\Throwable) {
             return '-';
         }
+    }
+}
+
+if (! function_exists('ibems_business_date')) {
+    /**
+     * Return the institution's operating date without changing the UTC storage timezone.
+     */
+    function ibems_business_date(): string
+    {
+        return (new \DateTimeImmutable('now', new \DateTimeZone('Asia/Manila')))->format('Y-m-d');
+    }
+}
+
+if (! function_exists('ibems_business_day_utc_bounds')) {
+    /** @return array{start: string, end: string} */
+    function ibems_business_day_utc_bounds(?string $businessDate = null): array
+    {
+        $date = trim((string) ($businessDate ?? ibems_business_date()));
+        $businessZone = new \DateTimeZone('Asia/Manila');
+        $storageZone = new \DateTimeZone('UTC');
+        $day = new \DateTimeImmutable($date . ' 00:00:00', $businessZone);
+
+        return [
+            'start' => $day->setTimezone($storageZone)->format('Y-m-d H:i:s'),
+            'end' => $day->setTime(23, 59, 59)->setTimezone($storageZone)->format('Y-m-d H:i:s'),
+        ];
     }
 }

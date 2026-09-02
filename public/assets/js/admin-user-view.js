@@ -40,6 +40,7 @@ function uvBindPhotoPreview(prefix) {
 }
 
 function formatRoleLabel(role) {
+    if (String(role || "").toUpperCase() === "STORE_SYSTEM") return "Store Cashier";
     return String(role || "")
         .toLowerCase()
         .split("_")
@@ -444,18 +445,12 @@ async function saveEditedUser() {
 }
 
 async function createUser() {
-    const roles = getRoleChecks("uv-a");
-    if (!roles.length) {
-        setUvResult("Select at least one role.", "error");
-        return;
-    }
-
     const payload = {
         employee_id: (document.getElementById("uv-a-employee-id").value || "").trim(),
         name: (document.getElementById("uv-a-name").value || "").trim(),
         email: (document.getElementById("uv-a-email").value || "").trim(),
         password: (document.getElementById("uv-a-password").value || "").trim(),
-        roles,
+        roles: ["USER"],
         user_type: document.getElementById("uv-a-type").value,
         is_active: 1,
     };
@@ -601,7 +596,6 @@ document.getElementById("uv-add-btn").addEventListener("click", async () => {
         setUvResult(error.message || "Salary schedules are unavailable.", "error");
         return;
     }
-    setRoleChecks("uv-a", ["USER"]);
     document.getElementById("uv-a-photo").value = "";
     document.getElementById("uv-a-photo-preview").src = window.IbemsAvatar.defaultUrl;
     document.getElementById("uv-a-type").value = "faculty";

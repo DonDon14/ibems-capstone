@@ -3,14 +3,14 @@
 
     const body = document.body;
     const menu = document.getElementById("account-menu");
-    const toggle = document.getElementById("account-menu-toggle");
+    const toggles = Array.from(document.querySelectorAll("[data-account-menu-toggle]"));
     const panel = menu?.querySelector(".account-menu-panel");
     const closeButtons = Array.from(document.querySelectorAll("[data-account-menu-close]"));
     const themeAction = document.querySelector("[data-account-theme]");
     const themeProxy = document.getElementById("theme-toggle");
     let trigger = null;
 
-    if (!menu || !toggle || !panel) return;
+    if (!menu || !toggles.length || !panel) return;
 
     const focusableSelector = [
         "a[href]",
@@ -38,7 +38,7 @@
     function setOpen(open, restoreFocus = true) {
         const shouldOpen = !!open;
         menu.hidden = !shouldOpen;
-        toggle.setAttribute("aria-expanded", shouldOpen ? "true" : "false");
+        toggles.forEach((toggle) => toggle.setAttribute("aria-expanded", shouldOpen ? "true" : "false"));
         body.classList.toggle("account-menu-open", shouldOpen);
 
         if (shouldOpen) {
@@ -51,7 +51,7 @@
         }
     }
 
-    toggle.addEventListener("click", () => setOpen(!isOpen()));
+    toggles.forEach((toggle) => toggle.addEventListener("click", () => setOpen(!isOpen())));
     closeButtons.forEach((button) => button.addEventListener("click", () => setOpen(false)));
 
     themeAction?.addEventListener("click", () => {
@@ -90,7 +90,7 @@
     document.addEventListener("click", (event) => {
         if (!isOpen() || window.matchMedia("(max-width: 760px)").matches) return;
         if (event.target === themeProxy) return;
-        if (!panel.contains(event.target) && !toggle.contains(event.target)) setOpen(false, false);
+        if (!panel.contains(event.target) && !toggles.some((toggle) => toggle.contains(event.target))) setOpen(false, false);
     });
 
     window.addEventListener("ibems:themechange", syncThemeAction);

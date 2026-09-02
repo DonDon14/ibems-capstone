@@ -8,18 +8,19 @@
         'description' => 'Employee debt, governed payroll deductions, and correction monitoring.',
         'icon' => 'bi bi-calculator',
     ]) ?>
+    <?= view('components/dashboard_period_filter') ?>
 
     <div class="dashboard-grid">
         <?= view('components/stat_card', ['title' => 'Total Accounts', 'value' => '-', 'valueId' => 'acd-total-accounts', 'icon' => 'bi bi-people', 'tone' => 'users']) ?>
         <?= view('components/stat_card', ['title' => 'With Debt', 'value' => '-', 'valueId' => 'acd-with-debt', 'icon' => 'bi bi-person-badge', 'tone' => 'warning']) ?>
         <?= view('components/stat_card', ['title' => 'Total Debt', 'value' => 'PHP 0.00', 'valueId' => 'acd-total-debt', 'icon' => 'bi bi-cash-coin', 'tone' => 'debt']) ?>
-        <?= view('components/stat_card', ['title' => 'Today Deducted', 'value' => 'PHP 0.00', 'valueId' => 'acd-today-deducted', 'icon' => 'bi bi-calendar-check', 'tone' => 'finance']) ?>
+        <?= view('components/stat_card', ['title' => 'Period Deducted', 'value' => 'PHP 0.00', 'valueId' => 'acd-today-deducted', 'icon' => 'bi bi-calendar-check', 'tone' => 'finance']) ?>
         <?= view('components/stat_card', ['title' => 'Over Limit', 'value' => '0', 'valueId' => 'acd-over-limit', 'icon' => 'bi bi-exclamation-triangle', 'tone' => 'warning']) ?>
     </div>
 
     <div class="dash-panels">
         <article class="dash-panel">
-            <h4><i class="bi bi-activity"></i> Debt Deduction Trend (7 Days)</h4>
+            <h4><i class="bi bi-activity"></i> Debt Deduction Trend</h4>
             <p>Daily amount from confirmed payroll deduction results.</p>
             <div class="dash-chart-wrap">
                 <canvas id="acd-trend-chart"></canvas>
@@ -97,5 +98,5 @@
 
 <?= $this->section('scripts') ?>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="<?= base_url('assets/js/accounting-dashboard.js') ?>?v=20260822d"></script>
+<script src="<?= base_url('assets/js/accounting-dashboard.js') ?>?v=20260902a"></script>
 <?= $this->endSection() ?>

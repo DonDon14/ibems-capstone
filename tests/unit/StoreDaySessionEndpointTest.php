@@ -237,7 +237,7 @@ final class StoreDaySessionEndpointTest extends CIUnitTestCase
         $now = date('Y-m-d H:i:s');
         Database::connect()->table('store_day_sessions')->insert([
             'store_id' => 1,
-            'business_date' => date('Y-m-d'),
+            'business_date' => ibems_business_date(),
             'status' => 'open',
             'opening_cash' => $openingCash,
             'opening_ecash' => $openingEcash,

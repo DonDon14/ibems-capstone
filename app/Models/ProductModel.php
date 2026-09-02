@@ -26,6 +26,9 @@ class ProductModel extends Model
         'stock_qty',
         'low_stock_threshold',
         'location_bin',
+        'item_type',
+        'stock_policy',
+        'unit_code',
         'is_active',
         'updated_at',
     ];
@@ -96,5 +99,10 @@ class ProductModel extends Model
         return $this->set('stock_qty', 'stock_qty + ' . $qty, false)
                     ->where('id', $productId)
                     ->update();
+    }
+
+    public function tracksStock(array $product): bool
+    {
+        return strtolower((string) ($product['stock_policy'] ?? 'tracked')) === 'tracked';
     }
 }

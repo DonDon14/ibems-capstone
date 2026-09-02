@@ -12,12 +12,13 @@
         'description' => 'Monitor assigned stores, close-day readiness, variance reviews, and operator accountability.',
         'icon' => 'bi bi-shop-window',
     ]) ?>
+    <?= view('components/dashboard_period_filter') ?>
 
     <div class="summary-grid store-admin-summary">
         <?= view('components/stat_card', ['title' => 'Assigned Stores', 'value' => '0', 'valueId' => 'sad-assigned-stores', 'icon' => 'bi bi-shop-window', 'tone' => 'users']) ?>
-        <?= view('components/stat_card', ['title' => 'Open Today', 'value' => '0', 'valueId' => 'sad-open-days', 'icon' => 'bi bi-door-open', 'tone' => 'sales']) ?>
+        <?= view('components/stat_card', ['title' => 'Store Days', 'value' => '0', 'valueId' => 'sad-open-days', 'icon' => 'bi bi-door-open', 'tone' => 'sales']) ?>
         <?= view('components/stat_card', ['title' => 'Pending Reviews', 'value' => '0', 'valueId' => 'sad-pending-reviews', 'icon' => 'bi bi-exclamation-triangle', 'tone' => 'warning']) ?>
-        <?= view('components/stat_card', ['title' => 'Today Sales', 'value' => 'PHP 0.00', 'valueId' => 'sad-today-sales', 'icon' => 'bi bi-graph-up-arrow', 'tone' => 'finance']) ?>
+        <?= view('components/stat_card', ['title' => 'Period Sales', 'value' => 'PHP 0.00', 'valueId' => 'sad-today-sales', 'icon' => 'bi bi-graph-up-arrow', 'tone' => 'finance']) ?>
     </div>
 
     <div class="overview-grid store-admin-grid">
@@ -40,7 +41,7 @@
             <header class="data-panel-head store-admin-section-head">
                 <div>
                     <h4><i class="bi bi-building-check" aria-hidden="true"></i> Assigned Store Status</h4>
-                    <p>Today&apos;s sales, activity, and close-day readiness.</p>
+                    <p>Sales, activity, and latest store-day status in the selected period.</p>
                 </div>
                 <a class="secondary-btn btn-sm" href="<?= site_url('store-admin/stores') ?>">View all stores <i class="bi bi-arrow-right"></i></a>
             </header>
@@ -55,5 +56,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/store-admin-dashboard.js') ?>?v=20260822b"></script>
+<script src="<?= base_url('assets/js/store-admin-dashboard.js') ?>?v=20260902a"></script>
 <?= $this->endSection() ?>

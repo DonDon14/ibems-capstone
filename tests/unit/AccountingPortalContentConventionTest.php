@@ -64,9 +64,9 @@ final class AccountingPortalContentConventionTest extends CIUnitTestCase
 
     public function testPayrollDeductionsRendersAsARegularPageInsteadOfAnEmbeddedModal(): void
     {
-        $view = (string) file_get_contents(APPPATH . 'Views/accounting/debts.php');
+        $view = (string) file_get_contents(APPPATH . 'Views/accounting/debts.php') . file_get_contents(APPPATH . 'Views/components/accounting_debt_modals.php');
         $styles = (string) file_get_contents(FCPATH . 'assets/css/accounting-debts.css');
-        $script = (string) file_get_contents(FCPATH . 'assets/js/accounting-debts.js');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/accounting-debts.js') . file_get_contents(FCPATH . 'assets/js/accounting-debts.part2.js') . file_get_contents(FCPATH . 'assets/js/accounting-debts.part3.js');
 
         $this->assertStringContainsString("role=\"<?= !empty(\$deductionsPage) ? 'region' : 'dialog' ?>\"", $view);
         $this->assertStringContainsString("? 'deductions-page-shell' : 'acct-modal is-hidden'", $view);
@@ -80,10 +80,10 @@ final class AccountingPortalContentConventionTest extends CIUnitTestCase
 
     public function testLegacyDeductionWarningsUseThemeAwareSurfaces(): void
     {
-        $view = (string) file_get_contents(APPPATH . 'Views/accounting/debts.php');
+        $view = (string) file_get_contents(APPPATH . 'Views/accounting/debts.php') . file_get_contents(APPPATH . 'Views/components/accounting_debt_modals.php');
         $styles = (string) file_get_contents(FCPATH . 'assets/css/accounting-debts.css');
 
-        $this->assertSame(3, substr_count($view, 'settlement-warning-panel'));
+        $this->assertSame(1, substr_count($view, 'settlement-warning-panel'));
         $this->assertStringNotContainsString('border-amber-200 bg-amber-50', $view);
         $this->assertStringContainsString('.settlement-warning-panel {', $styles);
         $this->assertStringContainsString('background: color-mix(in srgb, #f59e0b 12%, var(--surface));', $styles);
@@ -91,5 +91,31 @@ final class AccountingPortalContentConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('color: #fcd34d;', $styles);
         $this->assertStringContainsString('.ibems-modern .settlement-warning-panel strong', $styles);
         $this->assertStringContainsString('.app-container .settlement-warning-panel strong', $styles);
+    }
+
+    public function testRetiredDirectDeductionPathsStayRemoved(): void
+    {
+        $routes = (string) file_get_contents(APPPATH . 'Config/Routes.php');
+        $controller = (string) file_get_contents(APPPATH . 'Controllers/AccountingController.php');
+        $view = (string) file_get_contents(APPPATH . 'Views/accounting/debts.php') . file_get_contents(APPPATH . 'Views/components/accounting_debt_modals.php');
+        $script = (string) file_get_contents(FCPATH . 'assets/js/accounting-debts.js') . file_get_contents(FCPATH . 'assets/js/accounting-debts.part2.js') . file_get_contents(FCPATH . 'assets/js/accounting-debts.part3.js');
+
+        foreach (['accounting/settlement/apply', 'accounting/debts/deduct', 'accounting/debts/deduct-full'] as $path) {
+            $this->assertStringNotContainsString($path, $routes);
+            $this->assertStringNotContainsString('/' . $path, $script);
+        }
+
+        foreach (['applySettlementRun', 'deductDebt', 'deductFullDebt'] as $method) {
+            $this->assertStringNotContainsString('public function ' . $method . '(', $controller);
+        }
+
+        foreach (['deduction-mode-modal', 'settlement-confirm-modal', 'settlement-preview-btn', 'settlement-apply-btn'] as $controlId) {
+            $this->assertStringNotContainsString($controlId, $view);
+            $this->assertStringNotContainsString($controlId, $script);
+        }
+
+        $this->assertStringContainsString('accounting/deduction-batches', $routes);
+        $this->assertStringContainsString('open-deduction-workflow', $view);
+        $this->assertStringContainsString('/accounting/deduction-batches', $script);
     }
 }

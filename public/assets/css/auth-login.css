@@ -24,6 +24,10 @@ body {
     padding: 0;
 }
 
+html {
+    background-color: #f8fafc;
+}
+
 body {
     min-height: 100vh;
     font-family: "Poppins", "Nunito Sans", "Trebuchet MS", sans-serif;
@@ -669,6 +673,7 @@ body.auth-modern {
 }
 
 html[data-theme="dark"] {
+    background-color: #091425;
     color-scheme: dark;
 }
 
@@ -864,4 +869,55 @@ html[data-theme="dark"] .auth-modern .auth-role-arrow {
         border-radius: 9px;
         font-size: 0.95rem;
     }
+}
+html.theme-transitioning,
+html.theme-transitioning body,
+html.theme-transitioning body *,
+html.theme-transitioning body *::before,
+html.theme-transitioning body *::after {
+    transition: none !important;
+}
+
+html.theme-transitioning::view-transition-old(root),
+html.theme-transitioning::view-transition-new(root) {
+    animation-duration: 240ms;
+    animation-fill-mode: both;
+    animation-timing-function: cubic-bezier(.4, 0, .2, 1);
+    mix-blend-mode: normal;
+}
+
+html.theme-transitioning::view-transition-old(root) {
+    animation-name: ibems-theme-fade-out;
+}
+
+html.theme-transitioning::view-transition-new(root) {
+    animation-name: ibems-theme-fade-in;
+}
+
+html.theme-transitioning-fallback,
+html.theme-transitioning-fallback body,
+html.theme-transitioning-fallback body *,
+html.theme-transitioning-fallback body *::before,
+html.theme-transitioning-fallback body *::after {
+    transition: none !important;
+}
+
+html.theme-transitioning-fallback body {
+    animation: ibems-theme-fallback-fade 240ms cubic-bezier(.4, 0, .2, 1) both !important;
+}
+
+@keyframes ibems-theme-fade-out {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+
+@keyframes ibems-theme-fade-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes ibems-theme-fallback-fade {
+    0% { opacity: 1; }
+    45%, 55% { opacity: 0; }
+    100% { opacity: 1; }
 }
