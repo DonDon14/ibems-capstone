@@ -42,10 +42,24 @@ final class RenderDeploymentConventionTest extends CIUnitTestCase
         $routes = (string) file_get_contents(APPPATH . 'Config/Routes.php');
         $sessions = (string) file_get_contents(ROOTPATH . 'database/postgresql/011_render_hosted_sessions.sql');
 
-        $this->assertStringContainsString("['010_salary_grade_profiles.sql', '011_render_hosted_sessions.sql', '012_dynamic_salary_schedules.sql', '014_department_debt_accounts.sql']", $command);
+        $this->assertStringContainsString("['010_salary_grade_profiles.sql', '011_render_hosted_sessions.sql', '012_dynamic_salary_schedules.sql', '014_department_debt_accounts.sql', '016_configurable_store_operations.sql']", $command);
         $this->assertStringContainsString("\$routes->get('healthz', 'PageController::health')", $routes);
         $this->assertStringContainsString('create table if not exists public.ci_sessions', strtolower($sessions));
         $this->assertStringNotContainsString('truncate', strtolower($sessions));
         $this->assertStringNotContainsString('drop table', strtolower($sessions));
+    }
+
+    public function testHostedBootstrapRepairsConfigurableStoreOperationColumnsAdditively(): void
+    {
+        $sql = strtolower((string) file_get_contents(ROOTPATH . 'database/postgresql/016_configurable_store_operations.sql'));
+
+        $this->assertStringContainsString('create table if not exists public.store_capabilities', $sql);
+        $this->assertStringContainsString('add column if not exists item_type', $sql);
+        $this->assertStringContainsString('add column if not exists stock_policy', $sql);
+        $this->assertStringContainsString('add column if not exists unit_code', $sql);
+        $this->assertStringContainsString('add column if not exists item_name_snapshot', $sql);
+        $this->assertStringNotContainsString('truncate', $sql);
+        $this->assertStringNotContainsString('drop table', $sql);
+        $this->assertStringNotContainsString('drop column', $sql);
     }
 }
