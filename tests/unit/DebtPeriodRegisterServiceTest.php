@@ -36,4 +36,33 @@ final class DebtPeriodRegisterServiceTest extends CIUnitTestCase
         $this->assertSame(100.0, (float) $rows[0]['period_credits']);
         $this->assertSame(5000.0, (float) $rows[0]['salary_reference']);
     }
+
+    public function testUsesManilaBusinessDayBoundaryForPeriodAndLaterDebt(): void
+    {
+        $db = Database::connect();
+        $db->table('balances')->where('user_id', 501)->update(['current_debt' => 830]);
+        $db->table('debt_cashbook_entries')->insertBatch([
+            ['user_id' => 501, 'direction' => 'debit', 'amount' => 50, 'created_at' => '2026-08-15 15:59:59'],
+            ['user_id' => 501, 'direction' => 'credit', 'amount' => 20, 'created_at' => '2026-08-15 16:00:00'],
+        ]);
+
+        $rows = (new DebtPeriodRegisterService())->build(['date_start' => '2026-08-01', 'date_end' => '2026-08-15']);
+
+        $this->assertCount(1, $rows);
+        $this->assertSame(400.0, (float) $rows[0]['opening_debt']);
+        $this->assertSame(350.0, (float) $rows[0]['period_debits']);
+        $this->assertSame(100.0, (float) $rows[0]['period_credits']);
+        $this->assertSame(650.0, (float) $rows[0]['cutoff_debt']);
+    }
+
+    public function testMissingCashbookDoesNotClaimCompleteHistory(): void
+    {
+        $db = Database::connect();
+        $db->query('DROP TABLE ' . $db->getPrefix() . 'debt_cashbook_entries');
+
+        $rows = (new DebtPeriodRegisterService())->build(['date_start' => '2026-08-01', 'date_end' => '2026-08-15']);
+
+        $this->assertCount(1, $rows);
+        $this->assertFalse($rows[0]['history_complete']);
+    }
 }

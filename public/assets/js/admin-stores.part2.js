@@ -29,7 +29,7 @@ function renderStores(rows) {
                         <small>Created ${row.created_at ? sEscape(sDateOnly(row.created_at)) : "—"}</small>
                         <div class="store-card-actions">
                             <a href="${sEscape(storeDetailPrefix)}/${row.id}" class="store-card-action"><i class="bi bi-eye" aria-hidden="true"></i> View</a>
-                            ${canManageStores ? `<button class="store-card-action" type="button" data-edit-store="${row.id}" aria-label="Edit ${sEscape(row.store_name)}"><i class="bi bi-pencil" aria-hidden="true"></i> Edit</button>` : ""}
+                            ${canManageStores ? `<button class="store-card-action" type="button" data-edit-store="${row.id}" aria-label="Edit ${sEscape(row.store_name)}" ${storeStaffState === "ready" ? "" : "disabled"}><i class="bi bi-pencil" aria-hidden="true"></i> Edit</button>` : ""}
                         </div>
                     </div>
                 </div>
@@ -43,39 +43,140 @@ function renderStores(rows) {
     `;
 }
 
-async function loadOfficers() {
-    const response = await fetch("/admin/stores/officers");
-    const data = await response.json();
-    if (!data || data.status !== "success") {
-        throw new Error(data?.message || "Unable to load officers.");
+let storeStaffState = canManageStores ? "loading" : "ready";
+let storeStaffRequestSequence = 0;
+function setStoreStaffState(state, detail = "") {
+    storeStaffState = state;
+    const result = document.getElementById("store-staff-result");
+    if (result) {
+        result.hidden = state === "ready";
+        result.innerHTML = state === "ready" ? "" : renderStoresDataState(state === "loading" ? "loading" : "error",
+            state === "loading" ? "Loading store staff…" : "Store staff unavailable", detail, state === "error" ? "staff" : "");
+        if (state === "loading") result.setAttribute("aria-busy", "true");
+        else result.removeAttribute("aria-busy");
     }
-    officersData = Array.isArray(data.data) ? data.data : [];
+    const add = document.getElementById("open-store-modal");
+    if (add) add.disabled = state !== "ready";
+    document.querySelectorAll("[data-edit-store]").forEach(button => { button.disabled = state !== "ready"; });
 }
 
-async function loadStores() {
-    storePage = 1;
+async function loadOfficers() {
+    if (!canManageStores) return;
+    const requestId = ++storeStaffRequestSequence;
+    const signal = window.IbemsPortalNavigation?.currentSignal;
+    const isCurrent = () => requestId === storeStaffRequestSequence && !signal?.aborted;
+    const result = document.getElementById("store-staff-result");
+    const restoreFocus = result?.contains(document.activeElement);
+    officersData = [];
+    setStoreStaffState("loading");
+    if (restoreFocus && document.activeElement === document.body) result.querySelector(".data-state")?.focus();
+    let message = "Staff choices could not be loaded.";
+    try {
+        const response = await fetch("/admin/stores/officers", {signal});
+        const data = await response.json();
+        if (!isCurrent()) return;
+        if (!response.ok || !data || data.status !== "success") {
+            if (typeof data?.message === "string" && data.message.trim()) message = data.message;
+            throw new Error("Staff unavailable");
+        }
+        if (!Array.isArray(data.data)) throw new Error("Unreadable staff choices");
+        officersData = data.data;
+        setStoreStaffState("ready");
+        return true;
+    } catch (error) {
+        if (!isCurrent()) return;
+        setStoreStaffState("error", `${message} Store records remain available. Retry to enable Add and Edit.`);
+        return false;
+    } finally {
+        if (isCurrent() && restoreFocus && document.activeElement === document.body) {
+            (result.querySelector("[data-store-staff-retry]") || document.getElementById("open-store-modal"))?.focus();
+        }
+    }
+}
+
+let storesRequestSequence = 0;
+async function loadStores({resetPage = true, focusStoreId = null} = {}) {
+    const requestId = ++storesRequestSequence;
+    const signal = window.IbemsPortalNavigation?.currentSignal;
+    const isCurrent = () => requestId === storesRequestSequence && !signal?.aborted;
+    if (resetPage) storePage = 1;
     const q = (document.getElementById("store-search").value || "").trim();
     const status = document.getElementById("store-status-filter")?.value || "";
     const params = new URLSearchParams();
     if (q) params.set("q", q);
     if (status) params.set("status", status);
 
-    const response = await fetch(`${storesDataUrl}?${params.toString()}`);
-    const data = await response.json();
-    if (!data || data.status !== "success") {
-        storesData = [];
-        document.getElementById("stores-gallery").innerHTML = renderStoresDataState("error", data?.message || "Unable to load stores.");
-        setStoresResult(data?.message || "Unable to load stores.", "error");
-        return;
-    }
-
-    storesData = Array.isArray(data.data) ? data.data : [];
-    renderStores(storesData);
+    storesData = [];
+    const gallery = document.getElementById("stores-gallery");
+    const restoreFocus = gallery.contains(document.activeElement);
+    const sort = document.getElementById("store-sort");
+    const refresh = document.getElementById("store-refresh-btn");
+    if (sort) sort.disabled = true;
+    refresh.disabled = true;
+    refresh.textContent = "Refreshing…";
+    gallery.setAttribute("aria-busy", "true");
+    gallery.innerHTML = renderStoresDataState("loading", "Loading stores…");
+    if (restoreFocus && document.activeElement === document.body) gallery.querySelector(".data-state")?.focus();
     setStoresResult("", "ok");
+    let message = "The store list could not be loaded. Retry to refresh it.";
+    try {
+        const response = await fetch(`${storesDataUrl}?${params.toString()}`, {signal});
+        const data = await response.json();
+        if (!isCurrent()) return;
+        if (!response.ok || !data || data.status !== "success") {
+            if (typeof data?.message === "string" && data.message.trim()) message = data.message;
+            throw new Error("Stores unavailable");
+        }
+        if (!Array.isArray(data.data)) throw new Error("Unreadable store records");
+        storesData = data.data;
+        renderStores(storesData);
+        if (sort) sort.disabled = false;
+        setStoresResult("", "ok");
+        return true;
+    } catch (error) {
+        if (!isCurrent()) return;
+        storesData = [];
+        gallery.innerHTML = renderStoresDataState("error", "Stores unavailable", message, "stores");
+        setStoresResult("", "ok");
+        return false;
+    } finally {
+        if (isCurrent()) {
+            gallery.removeAttribute("aria-busy");
+            refresh.disabled = false;
+            refresh.textContent = "Refresh";
+            if (restoreFocus && document.activeElement === document.body) {
+                (gallery.querySelector("[data-stores-retry]") || (focusStoreId ? gallery.querySelector(`[data-edit-store="${Number(focusStoreId)}"]:not(:disabled)`) : null) || gallery.querySelector(".store-card-title") || gallery.querySelector(".data-state"))?.focus();
+            }
+        }
+    }
 }
 
+let storeModalOpener = null;
+let storeSaving = false;
+let storeSaveSequence = 0;
+function focusStoreFeedback() {
+    const result = document.getElementById("store-modal-result");
+    result.focus({preventScroll: true});
+    result.scrollIntoView({block: "nearest", inline: "nearest"});
+}
+function keepStoreListFocusVisible() {
+    const active = document.activeElement;
+    if (active?.closest?.("#stores-gallery")) active.scrollIntoView({block: "nearest", inline: "nearest"});
+}
+function freezeStoreEditor() {
+    const modal = document.getElementById("store-modal");
+    const controls = Array.from(modal.querySelectorAll("button, input, select, textarea"));
+    const previous = controls.map(control => [control, control.disabled]);
+    controls.forEach(control => { control.disabled = true; });
+    modal.setAttribute("aria-busy", "true");
+    return () => {
+        previous.forEach(([control, disabled]) => { control.disabled = disabled; });
+        modal.removeAttribute("aria-busy");
+    };
+}
 function openStoreModal(mode, store) {
-    if (!canManageStores) return;
+    if (!canManageStores || storeStaffState !== "ready" || storeSaving) return;
+    storeModalOpener = document.activeElement;
     setStoresResult("", "ok");
     editingStoreId = mode === "edit" ? Number(store.id) : null;
     document.getElementById("store-modal-title").textContent = mode === "edit" ? "Edit Store" : "Add Store";
@@ -120,10 +221,14 @@ function openStoreModal(mode, store) {
     document.body.classList.add("admin-stores-modal-open");
     const modalBody = document.querySelector("#store-modal .admin-stores-modal-body");
     if (modalBody) modalBody.scrollTop = 0;
-    requestAnimationFrame(() => document.getElementById("store-name")?.focus());
+    const signal = window.IbemsPortalNavigation?.currentSignal;
+    requestAnimationFrame(() => {
+        if (!signal?.aborted && !storeSaving && document.getElementById("store-modal").style.display === "grid") document.getElementById("store-name")?.focus();
+    });
 }
 
-function closeStoreModal() {
+function closeStoreModal(force = false) {
+    if (storeSaving && force !== true) return;
     editingStoreId = null;
     editingCurrentLogoUrl = "";
     selectedSupervisorIds = [];
@@ -137,24 +242,33 @@ function closeStoreModal() {
     setSuggestionBoxOpen("store-supervisor-search", "store-supervisor-suggestions", false);
     document.getElementById("store-modal").style.display = "none";
     document.body.classList.remove("admin-stores-modal-open");
+    if (storeModalOpener?.isConnected) storeModalOpener.focus({ preventScroll: true });
 }
 
 async function saveStore() {
-    if (!canManageStores) return;
+    const signal = window.IbemsPortalNavigation?.currentSignal;
+    const modal = document.getElementById("store-modal");
+    if (!canManageStores || storeSaving || signal?.aborted || !modal?.isConnected || modal.style.display !== "grid") return;
+    const button = document.getElementById("store-save-btn");
+    if (button.disabled) return;
+    const savedStoreId = editingStoreId;
     const name = (document.getElementById("store-name").value || "").trim();
     const officerId = Number(document.getElementById("store-officer-id").value || 0);
     const logoUrlInput = (document.getElementById("store-logo-url").value || "").trim();
     const logoFile = document.getElementById("store-logo-file").files?.[0] || null;
     const isActive = Number(document.getElementById("store-active").value || 1);
     const deactivationReason = (document.getElementById("store-deactivation-reason").value || "").trim();
-    const button = document.getElementById("store-save-btn");
 
     if (!name) {
         setStoresResult("Store name is required.", "error");
+        document.getElementById("store-name").focus();
         return;
     }
     if (isActive === 1 && (officerId <= 0 || selectedSupervisorIds.length === 0)) {
         setStoresResult("To activate this store, select a Store Cashier and at least one supervisor. Otherwise, keep it inactive and assign them later.", "error");
+        if (officerId <= 0) officerEditorOpen = true;
+        else supervisorEditorOpen = true;
+        updateAssignmentEditors();
         (officerId <= 0 ? document.getElementById("store-officer-search") : document.getElementById("store-supervisor-search")).focus();
         return;
     }
@@ -188,27 +302,51 @@ async function saveStore() {
         if (isDeactivating) formData.append("deactivation_reason", deactivationReason);
     }
 
-    button.disabled = true;
+    const requestId = ++storeSaveSequence;
+    const isPageCurrent = () => requestId === storeSaveSequence && !signal?.aborted && modal.isConnected && button.isConnected;
+    const isEditorCurrent = () => isPageCurrent() && modal.style.display === "grid" && editingStoreId === savedStoreId;
+    storeSaving = true;
+    const restoreControls = freezeStoreEditor();
+    let released = false;
+    const release = () => { if (!released) { released = true; restoreControls(); storeSaving = false; button.textContent = button.dataset.idleLabel || "Save Changes"; } };
+    setStoresResult("Saving store…", "pending");
     button.textContent = "Saving...";
+    focusStoreFeedback();
     try {
         const response = await fetch(endpoint, {
             method: "POST",
             body: formData,
+            signal,
         });
         const data = await response.json();
-        if (!data || data.status !== "success") {
-            setStoresResult(data?.message || "Failed to save store.", "error");
+        if (!isEditorCurrent()) return;
+        if (!response.ok || !data || data.status !== "success") {
+            if (data?.status === "error") setStoresResult(typeof data.message === "string" && data.message.trim() ? data.message : "The store could not be saved. Check the details and try again.", "error");
+            else setStoresResult("The store save could not be confirmed. Check the store list before trying again.", "warning");
+            if (modal.contains(document.activeElement) || document.activeElement === document.body) focusStoreFeedback();
             return;
         }
 
-        setStoresResult(editingStoreId ? "Store updated." : "Store created.", "ok");
-        closeStoreModal();
-        await loadStores();
+        const confirmation = savedStoreId ? "Store updated." : "Store created.";
+        release();
+        closeStoreModal(true);
+        try {
+            const refreshed = await loadStores({focusStoreId: savedStoreId});
+            if (!isPageCurrent()) return;
+            if (refreshed === false) throw new Error("Store list refresh failed.");
+            setStoresResult(confirmation, "ok", "page");
+            keepStoreListFocusVisible();
+        } catch (refreshError) {
+            if (!isPageCurrent()) return;
+            setStoresResult(`${confirmation} The store list could not be refreshed. Use Retry stores to load the latest stores.`, "warning", "page");
+            keepStoreListFocusVisible();
+        }
     } catch (error) {
-        setStoresResult("Store request failed.", "error");
+        if (!isEditorCurrent()) return;
+        setStoresResult("The store save could not be confirmed. Check the store list before trying again.", "warning");
+        if (modal.contains(document.activeElement) || document.activeElement === document.body) focusStoreFeedback();
     } finally {
-        button.disabled = false;
-        button.textContent = button.dataset.idleLabel || "Save Changes";
+        if (!released && isEditorCurrent()) release();
     }
 }
 
@@ -233,7 +371,7 @@ document.getElementById("store-status-filter").addEventListener("change", () => 
     if (!suppressStoreFilterEvents) loadStores();
 });
 document.getElementById("store-sort")?.addEventListener("change", () => {
-    if (suppressStoreFilterEvents) return;
+    if (suppressStoreFilterEvents || document.getElementById("store-sort").disabled) return;
     storePage = 1;
     renderStores(storesData);
 });
@@ -243,6 +381,19 @@ document.getElementById("close-store-modal")?.addEventListener("click", closeSto
 document.getElementById("cancel-store-modal")?.addEventListener("click", closeStoreModal);
 document.getElementById("store-modal")?.addEventListener("click", (event) => {
     if (event.target.id === "store-modal") closeStoreModal();
+});
+document.getElementById("store-modal")?.addEventListener("keydown", event => {
+    if (event.defaultPrevented) return;
+    if (storeSaving && event.key === "Tab") { event.preventDefault(); focusStoreFeedback(); return; }
+    if (event.key === "Escape") {
+        event.preventDefault(); closeStoreModal();
+    } else if (event.key === "Tab") {
+        const controls = Array.from(event.currentTarget.querySelectorAll('button, input, select, textarea, a[href], [tabindex]'))
+            .filter(control => !control.disabled && control.tabIndex >= 0 && control.getClientRects().length);
+        const first = controls[0], last = controls[controls.length - 1];
+        if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+        else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+    }
 });
 document.getElementById("store-save-btn")?.addEventListener("click", saveStore);
 function updateDeactivationReasonVisibility() {
@@ -352,12 +503,16 @@ document.querySelectorAll(".people-picker").forEach((picker) => {
 });
 
 document.getElementById("stores-gallery").addEventListener("click", async (event) => {
+    if (event.target.closest("[data-stores-retry]")) { await loadStores({resetPage: false}); return; }
     const pageButton = event.target.closest("[data-store-page]");
     if (pageButton && !pageButton.disabled) {
         const direction = pageButton.getAttribute("data-store-page");
         storePage += direction === "next" ? 1 : -1;
         renderStores(storesData);
-        document.getElementById("stores-gallery").scrollIntoView({ behavior: "smooth", block: "start" });
+        if (document.activeElement === document.body) {
+            const buttons = Array.from(document.querySelectorAll("[data-store-page]"));
+            (buttons.find(button => !button.disabled && button.getAttribute("data-store-page") === direction) || buttons.find(button => !button.disabled))?.focus();
+        }
         return;
     }
     const editBtn = event.target.closest("[data-edit-store]");
@@ -374,6 +529,12 @@ document.getElementById("stores-gallery").addEventListener("change", (event) => 
     storePageSize = Number(event.target.value || 10);
     storePage = 1;
     renderStores(storesData);
+    const signal = window.IbemsPortalNavigation?.currentSignal;
+    requestAnimationFrame(() => {
+        if (signal?.aborted || document.activeElement !== document.body) return;
+        const select = document.getElementById("store-page-size");
+        (select?.closest(".ui-select")?.querySelector(".ui-select-trigger") || select || document.querySelector("#stores-gallery .store-card-title"))?.focus();
+    });
 });
 
 document.addEventListener("click", (event) => {
@@ -387,14 +548,8 @@ document.addEventListener("click", (event) => {
     }
 });
 
-(async () => {
-    try {
-        if (canManageStores) {
-            await loadOfficers();
-        }
-        await loadStores();
-    } catch (error) {
-        document.getElementById("stores-gallery").innerHTML = renderStoresDataState("error", error.message || "Failed to initialize store management.");
-        setStoresResult(error.message || "Failed to initialize store management.", "error");
-    }
-})();
+document.getElementById("store-staff-result")?.addEventListener("click", event => {
+    if (event.target.closest("[data-store-staff-retry]")) loadOfficers();
+});
+if (canManageStores) loadOfficers();
+loadStores();

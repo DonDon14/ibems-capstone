@@ -40,8 +40,9 @@ final class ReceiptStandardUiTest extends CIUnitTestCase
 
         foreach ($views as $viewPath) {
             $view = (string) file_get_contents($viewPath);
-            $this->assertStringContainsString('receipt-standard.css\') ?>?v=20260825a', $view, $viewPath);
-            $this->assertStringContainsString('receipt-standard.js\') ?>?v=20260825a', $view, $viewPath);
+            $this->assertMatchesRegularExpression('~receipt-standard\.css.*\?v=[a-zA-Z0-9-]+~', $view, $viewPath);
+            $this->assertStringContainsString('qrcode-generator/qrcode.js', $view, $viewPath);
+            $this->assertMatchesRegularExpression('~receipt-standard\.js.*\?v=[a-zA-Z0-9-]+~', $view, $viewPath);
         }
     }
 

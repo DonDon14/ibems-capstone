@@ -59,14 +59,14 @@ class ContentSecurityPolicy extends BaseConfig
      *
      * @var list<string>|string
      */
-    public $scriptSrc = ['self', 'unsafe-inline', 'https://cdn.jsdelivr.net'];
+    public $scriptSrc = ['self', 'unsafe-inline'];
 
     /**
      * Specifies valid sources for JavaScript <script> elements.
      *
      * @var list<string>|string
      */
-    public array|string $scriptSrcElem = ['self', 'unsafe-inline', 'https://cdn.jsdelivr.net'];
+    public array|string $scriptSrcElem = ['self', 'unsafe-inline'];
 
     /**
      * Specifies valid sources for JavaScript inline event
@@ -81,14 +81,14 @@ class ContentSecurityPolicy extends BaseConfig
      *
      * @var list<string>|string
      */
-    public $styleSrc = ['self', 'unsafe-inline', 'https://cdn.jsdelivr.net', 'https://fonts.googleapis.com'];
+    public $styleSrc = ['self', 'unsafe-inline'];
 
     /**
      * Specifies valid sources for stylesheets <link> elements.
      *
      * @var list<string>|string
      */
-    public array|string $styleSrcElem = ['self', 'unsafe-inline', 'https://cdn.jsdelivr.net', 'https://fonts.googleapis.com'];
+    public array|string $styleSrcElem = ['self', 'unsafe-inline'];
 
     /**
      * Specifies valid sources for stylesheets inline
@@ -134,7 +134,7 @@ class ContentSecurityPolicy extends BaseConfig
      *
      * @var list<string>|string
      */
-    public $fontSrc = ['self', 'data:', 'https://cdn.jsdelivr.net', 'https://fonts.gstatic.com'];
+    public $fontSrc = ['self', 'data:'];
 
     /**
      * Lists valid endpoints for submission from `<form>` tags.

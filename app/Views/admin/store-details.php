@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/admin') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/admin-overview.css') ?>">
+<link rel="stylesheet" href="<?= base_url('assets/css/admin-overview.css') ?>?v=20261004-variance-feedback">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -13,17 +13,21 @@
         'description' => 'Loading store profile...',
         'descriptionId' => 'sd-store-meta',
         'icon' => 'bi bi-shop-window',
+        'actions' => '<button id="sd-refresh" type="button" class="secondary-btn" disabled>Refreshing store details…</button>',
     ]) ?>
 
+    <div id="sd-load-feedback"></div>
+    <p id="sd-action-feedback" class="sd-action-feedback" role="status" aria-live="polite" aria-atomic="true" tabindex="-1"></p>
+
     <div class="summary-grid">
-        <?= view('components/stat_card', ['title' => 'Total Transactions', 'value' => '0', 'valueId' => 'sd-txn-count', 'icon' => 'bi bi-receipt-cutoff', 'tone' => 'users']) ?>
-        <?= view('components/stat_card', ['title' => 'Total Sales', 'value' => 'PHP 0.00', 'valueId' => 'sd-sales-total', 'icon' => 'bi bi-graph-up-arrow', 'tone' => 'sales']) ?>
-        <?= view('components/stat_card', ['title' => 'Products', 'value' => '0', 'valueId' => 'sd-product-count', 'icon' => 'bi bi-box-seam', 'tone' => 'finance']) ?>
-        <?= view('components/stat_card', ['title' => 'Total Stock Units', 'value' => '0', 'valueId' => 'sd-stock-units', 'icon' => 'bi bi-boxes', 'tone' => 'warning']) ?>
-        <?= view('components/stat_card', ['title' => 'Today Sales', 'value' => 'PHP 0.00', 'valueId' => 'sd-today-sales', 'icon' => 'bi bi-calendar2-check', 'tone' => 'sales']) ?>
-        <?= view('components/stat_card', ['title' => 'Debt Transactions Today', 'value' => '0', 'valueId' => 'sd-debt-txns', 'icon' => 'bi bi-credit-card-2-front', 'tone' => 'debt']) ?>
-        <?= view('components/stat_card', ['title' => 'Active Products', 'value' => '0', 'valueId' => 'sd-active-products', 'icon' => 'bi bi-box-seam', 'tone' => 'users']) ?>
-        <?= view('components/stat_card', ['title' => 'Low Stock', 'value' => '0', 'valueId' => 'sd-low-stock', 'icon' => 'bi bi-exclamation-triangle', 'tone' => 'warning']) ?>
+        <?= view('components/stat_card', ['title' => 'Total Transactions', 'value' => 'Loading…', 'valueId' => 'sd-txn-count', 'icon' => 'bi bi-receipt-cutoff', 'tone' => 'users']) ?>
+        <?= view('components/stat_card', ['title' => 'Total Sales', 'value' => 'Loading…', 'valueId' => 'sd-sales-total', 'icon' => 'bi bi-graph-up-arrow', 'tone' => 'sales']) ?>
+        <?= view('components/stat_card', ['title' => 'Products', 'value' => 'Loading…', 'valueId' => 'sd-product-count', 'icon' => 'bi bi-box-seam', 'tone' => 'finance']) ?>
+        <?= view('components/stat_card', ['title' => 'Total Stock Units', 'value' => 'Loading…', 'valueId' => 'sd-stock-units', 'icon' => 'bi bi-boxes', 'tone' => 'warning']) ?>
+        <?= view('components/stat_card', ['title' => 'Today Sales', 'value' => 'Loading…', 'valueId' => 'sd-today-sales', 'icon' => 'bi bi-calendar2-check', 'tone' => 'sales']) ?>
+        <?= view('components/stat_card', ['title' => 'Debt Transactions Today', 'value' => 'Loading…', 'valueId' => 'sd-debt-txns', 'icon' => 'bi bi-credit-card-2-front', 'tone' => 'debt']) ?>
+        <?= view('components/stat_card', ['title' => 'Active Products', 'value' => 'Loading…', 'valueId' => 'sd-active-products', 'icon' => 'bi bi-box-seam', 'tone' => 'users']) ?>
+        <?= view('components/stat_card', ['title' => 'Low Stock', 'value' => 'Loading…', 'valueId' => 'sd-low-stock', 'icon' => 'bi bi-exclamation-triangle', 'tone' => 'warning']) ?>
     </div>
 
     <div class="overview-grid store-detail-overview-grid">
@@ -60,7 +64,7 @@
                 </select>
             </label><label class="store-day-history-filter store-detail-rows-filter"><span>Rows</span><select id="sd-session-page-size"><option value="10">10</option><option value="25">25</option><option value="50">50</option></select></label></div>
         </header>
-        <div class="data-panel-body table-standard-wrap">
+        <div id="sd-session-region" class="data-panel-body table-standard-wrap" role="region" aria-label="Store day history records" tabindex="0">
             <table class="table table-standard">
                 <thead><tr><th>Date</th><th>Day</th><th>Variance</th><th>Review</th><th>Closed By</th><th>Action</th></tr></thead>
                 <tbody id="sd-session-history-body">
@@ -73,7 +77,7 @@
 
     <section class="data-panel">
         <header class="data-panel-head store-detail-section-head"><div><h4>Inventory</h4><p id="sd-inventory-count">Loading products...</p></div><label class="store-day-history-filter store-detail-rows-filter"><span>Rows</span><select id="sd-inventory-page-size"><option value="10">10</option><option value="25">25</option><option value="50">50</option></select></label></header>
-        <div class="data-panel-body table-standard-wrap">
+        <div id="sd-inventory-region" class="data-panel-body table-standard-wrap" role="region" aria-label="Store inventory records" tabindex="0">
         <table class="table table-standard">
             <thead>
                 <tr>
@@ -92,7 +96,7 @@
 
     <section class="data-panel">
         <header class="data-panel-head store-detail-section-head"><div><h4>Recent Transactions</h4><p id="sd-transactions-count">Loading transactions...</p></div><label class="store-day-history-filter store-detail-rows-filter"><span>Rows</span><select id="sd-transactions-page-size"><option value="10">10</option><option value="20">20</option></select></label></header>
-        <div class="data-panel-body table-standard-wrap">
+        <div id="sd-transactions-region" class="data-panel-body table-standard-wrap" role="region" aria-label="Recent store transactions" tabindex="0">
         <table class="table table-standard">
             <thead>
                 <tr>
@@ -111,11 +115,27 @@
     </section>
 
     <div id="sd-stale-day-modal" class="admin-modal admin-overview-modal sd-stale-day-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="sd-stale-day-title" aria-describedby="sd-stale-day-description">
-        <div class="admin-modal-card sd-stale-day-card" tabindex="-1"><header class="admin-modal-head"><div><span class="modal-eyebrow">Store day reconciliation</span><h4 id="sd-stale-day-title">Resolve previous store day</h4><p id="sd-stale-day-description">Record independently counted balances for the original business date.</p></div><button id="sd-stale-day-close" type="button" class="admin-modal-close" aria-label="Close store day reconciliation">x</button></header><form id="sd-stale-day-form" class="stale-day-resolution-form" data-stale-session-id=""><div class="stale-day-expected" role="status"><div><span>System expected cash</span><strong id="sd-stale-expected-cash">PHP 0.00</strong></div><div><span>System expected e-cash</span><strong id="sd-stale-expected-ecash">PHP 0.00</strong></div><p>Count the physical and e-cash balances independently before comparing them with these system totals.</p></div><div id="sd-stale-payment-breakdown" class="stale-day-payment-breakdown" aria-label="Expected balance calculation"></div><div class="stale-day-fields"><label><span>Counted cash</span><input type="number" name="counted_cash" min="0" step="0.01" placeholder="PHP 0.00" required></label><label><span>Counted e-cash</span><input type="number" name="counted_ecash" min="0" step="0.01" placeholder="PHP 0.00" required></label><label class="stale-day-reason"><span>Resolution reason</span><textarea name="reason" rows="3" required placeholder="Explain why the day remained open and how the balances were counted"></textarea></label></div><p class="stale-day-guidance"><i class="bi bi-shield-check" aria-hidden="true"></i> Any difference creates a variance case for independent review.</p><div class="admin-modal-actions"><button id="sd-stale-day-cancel" type="button" class="secondary-btn">Cancel</button><button type="submit" class="danger-btn">Resolve previous day</button></div></form></div>
+        <div class="admin-modal-card sd-stale-day-card" tabindex="-1">
+            <header class="admin-modal-head">
+                <div><span class="modal-eyebrow">Store day reconciliation</span><h4 id="sd-stale-day-title">Resolve previous store day</h4><p>Review the original day and independently counted balances.</p></div>
+                <button id="sd-stale-day-close" type="button" class="admin-modal-close" aria-label="Close store day reconciliation">x</button>
+            </header>
+            <div class="sd-stale-day-scroll" role="region" aria-label="Reconciliation fields and feedback" tabindex="0">
+                <p id="sd-stale-day-description" class="sd-stale-day-context">Record independently counted balances for the original business date.</p>
+                <p id="sd-stale-result" class="sd-action-feedback" role="status" aria-live="polite" aria-atomic="true" tabindex="-1"></p>
+                <form id="sd-stale-day-form" class="stale-day-resolution-form" data-stale-session-id="">
+                    <div class="stale-day-expected" role="status"><div><span>System expected cash</span><strong id="sd-stale-expected-cash">PHP 0.00</strong></div><div><span>System expected e-cash</span><strong id="sd-stale-expected-ecash">PHP 0.00</strong></div><p>Count the physical and e-cash balances independently before comparing them with these system totals.</p></div>
+                    <div id="sd-stale-payment-breakdown" class="stale-day-payment-breakdown" aria-label="Expected balance calculation"></div>
+                    <div class="stale-day-fields"><label><span>Counted cash</span><input type="number" name="counted_cash" min="0" step="0.01" placeholder="PHP 0.00" required></label><label><span>Counted e-cash</span><input type="number" name="counted_ecash" min="0" step="0.01" placeholder="PHP 0.00" required></label><label class="stale-day-reason"><span>Resolution reason</span><textarea name="reason" rows="3" required placeholder="Explain why the day remained open and how the balances were counted"></textarea></label></div>
+                    <p class="stale-day-guidance"><i class="bi bi-shield-check" aria-hidden="true"></i> Any difference creates a variance case for independent review.</p>
+                </form>
+            </div>
+            <div class="admin-modal-actions"><button id="sd-stale-day-cancel" type="button" class="secondary-btn">Cancel</button><button type="submit" form="sd-stale-day-form" class="danger-btn">Resolve previous day</button></div>
+        </div>
     </div>
 </section>
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/admin-store-details.js') ?>?v=20260824a"></script>
+<script src="<?= base_url('assets/js/admin-store-details.js') ?>?v=20261004-variance-feedback"></script>
 <?= $this->endSection() ?>

@@ -15,13 +15,17 @@
     function normalizeDateValue(value) {
         if (!value) return new Date();
         if (value instanceof Date) return value;
-        return new Date(String(value).replace(" ", "T"));
+        let text = String(value).trim().replace(" ", "T");
+        // Database timestamps are UTC; an unzoned SQL/ISO timestamp must not be
+        // interpreted in the viewer's browser timezone.
+        if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(text)) text += "Z";
+        return new Date(text);
     }
 
     function dateTime(value, options = {}) {
         const date = normalizeDateValue(value);
         if (Number.isNaN(date.getTime())) return String(value || "-");
-        return date.toLocaleString("en-PH", options);
+        return date.toLocaleString("en-PH", { timeZone: "Asia/Manila", ...options });
     }
 
     function shortDateTime(value) {
@@ -36,7 +40,7 @@
     function date(value, options = {}) {
         const parsed = normalizeDateValue(value);
         if (Number.isNaN(parsed.getTime())) return String(value || "-");
-        return parsed.toLocaleDateString("en-PH", options);
+        return parsed.toLocaleDateString("en-PH", { timeZone: "Asia/Manila", ...options });
     }
 
     function identifierLabel(value) {

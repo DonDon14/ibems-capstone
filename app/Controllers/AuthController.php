@@ -111,14 +111,16 @@ class AuthController extends Controller
 
     public function me()
     {
+        if (session()->get('logged_in')) {
+            ibems_refresh_session_roles(true);
+        }
+
         if (!session()->get('logged_in')) {
             return $this->response->setStatusCode(401)->setJSON([
                 'status' => 'error',
                 'message' => 'Not authenticated'
             ]);
         }
-
-        ibems_refresh_session_roles(true);
 
         return $this->response->setJSON([
             'status' => 'success',

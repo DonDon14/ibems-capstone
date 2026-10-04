@@ -96,10 +96,10 @@ final class DataBrowsingHierarchyConventionTest extends CIUnitTestCase
         $document = (string) file_get_contents(ROOTPATH . 'docs/system-hierarchy.md');
         $layout = (string) file_get_contents(APPPATH . 'Views/layouts/admin.php');
 
-        foreach (['Administrator', 'Accounting Office', 'Store Supervisor', 'Store Officer / Cashier', 'Employee / User'] as $role) {
+        foreach (['System Administrator', 'Human Resources', 'School Cashier Head', 'Collecting Officer', 'Accounting Head / Bookkeeper', 'Payroll Clerk', 'Business Enterprise Director', 'Store Supervisor', 'Store Cashier'] as $role) {
             $this->assertStringContainsString($role, $document);
         }
-        $this->assertStringContainsString('Connected transaction flow', $document);
+        $this->assertStringContainsString('Connected transaction and report flow', $document);
         $this->assertStringNotContainsString("'path' => 'admin/hierarchy'", $layout);
         $this->assertFileDoesNotExist(APPPATH . 'Views/admin/hierarchy.php');
     }

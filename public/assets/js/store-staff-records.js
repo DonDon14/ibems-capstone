@@ -8,6 +8,7 @@ let srScannerLastDetected = "";
 let srScannerLastDetectedAt = 0;
 let srEmployeeTrigger = null;
 let srReceiptTrigger = null;
+let srReceiptSequence = 0;
 let srScannerTrigger = null;
 let srDebtRequestSequence = 0;
 let srTransactionRequestSequence = 0;
@@ -61,6 +62,9 @@ function srCategory(value) {
 
 function srSetResult(message, type) {
     const el = document.getElementById("staff-result");
+    el.setAttribute("role", type === "error" ? "alert" : "status");
+    el.setAttribute("aria-live", type === "error" ? "assertive" : "polite");
+    el.setAttribute("aria-atomic", "true");
     el.textContent = message || "";
     el.classList.toggle("is-error", Boolean(message) && type === "error");
 }
@@ -68,6 +72,9 @@ function srSetResult(message, type) {
 function srSetScannerStatus(message, isError = false) {
     const el = document.getElementById("staff-scanner-status");
     if (!el) return;
+    el.setAttribute("role", isError ? "alert" : "status");
+    el.setAttribute("aria-live", isError ? "assertive" : "polite");
+    el.setAttribute("aria-atomic", "true");
     el.textContent = message || "";
     el.classList.toggle("is-error", Boolean(message) && isError);
 }
@@ -227,7 +234,7 @@ async function srLoadStores() {
         throw new Error("No accessible store found.");
     }
     srStores = data.stores;
-    srStoreId = Number(data.default_store_id || data.stores[0].id);
+    srStoreId = window.IbemsStoreScope.resolve(data.stores, data.default_store_id);
 }
 
 function srRenderPager(targetId, pagination, pageAttribute) {
@@ -262,6 +269,8 @@ function srSetTransactionResult(message, type = "ok") {
     el.textContent = message || "";
     el.classList.toggle("is-error", type === "error");
     el.setAttribute("role", type === "error" ? "alert" : "status");
+    el.setAttribute("aria-live", type === "error" ? "assertive" : "polite");
+    el.setAttribute("aria-atomic", "true");
 }
 
 function srActiveStoreName() {

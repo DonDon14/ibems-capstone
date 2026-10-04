@@ -9,12 +9,15 @@
     let transitionTimer = 0;
     let transitionCommitTimer = 0;
     let transitionSequence = 0;
+    let activeTransition = null;
     let targetTheme = root.dataset.theme || "light";
 
     const commit = (theme, persist) => {
         const dark = theme === "dark";
         root.dataset.theme = dark ? "dark" : "light";
-        if (persist) localStorage.setItem("ibems-theme", dark ? "dark" : "light");
+        if (persist) {
+            try { localStorage.setItem("ibems-theme", dark ? "dark" : "light"); } catch (_) {}
+        }
         document.querySelector('meta[name="theme-color"]')?.setAttribute("content", dark ? "#091425" : "#ffffff");
         button.setAttribute("aria-pressed", dark ? "true" : "false");
         button.setAttribute("aria-label", dark ? "Use light mode" : "Use dark mode");
@@ -27,6 +30,11 @@
     const apply = (theme, persist, animate = false) => {
         targetTheme = theme === "dark" ? "dark" : "light";
         const sequence = ++transitionSequence;
+        window.clearTimeout(transitionTimer);
+        window.clearTimeout(transitionCommitTimer);
+        const previousTransition = activeTransition;
+        activeTransition = null;
+        previousTransition?.skipTransition();
         const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
         if (!animate || reduceMotion) {
             root.classList.remove(transitionClass);
@@ -35,16 +43,31 @@
             return;
         }
 
-        window.clearTimeout(transitionTimer);
-        window.clearTimeout(transitionCommitTimer);
         root.classList.remove(transitionClass, fallbackTransitionClass);
 
         if (typeof document.startViewTransition === "function") {
             root.classList.add(transitionClass);
-            const transition = document.startViewTransition(() => commit(theme, persist));
-            transition.finished.finally(() => {
-                if (sequence === transitionSequence) root.classList.remove(transitionClass);
-            });
+            let transition;
+            try {
+                transition = document.startViewTransition(() => {
+                    if (sequence === transitionSequence) commit(theme, persist);
+                });
+            } catch (_) {
+                root.classList.remove(transitionClass);
+                activeTransition = null;
+                commit(theme, persist);
+                return;
+            }
+            activeTransition = transition;
+            // Skipping a superseded animation rejects ready even when finished succeeds.
+            transition.ready?.catch(() => {});
+            const finish = () => {
+                if (sequence === transitionSequence) {
+                    root.classList.remove(transitionClass);
+                    activeTransition = null;
+                }
+            };
+            transition.finished.then(finish, finish);
             return;
         }
 
@@ -58,5 +81,8 @@
     };
 
     apply(root.dataset.theme || "light", false);
+    window.matchMedia("(prefers-reduced-motion: reduce)").addEventListener?.("change", (event) => {
+        if (event.matches) apply(targetTheme, true);
+    });
     button.addEventListener("click", () => apply(targetTheme === "dark" ? "light" : "dark", true, true));
 }());

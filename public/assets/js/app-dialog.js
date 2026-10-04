@@ -1,6 +1,7 @@
 (function () {
     let activeResolve = null;
     let previousFocus = null;
+    let dialogVersion = 0;
 
     const root = document.createElement("div");
     root.className = "app-dialog is-hidden";
@@ -44,6 +45,7 @@
 
     const finish = (result) => {
         if (root.classList.contains("is-hidden")) return;
+        dialogVersion++;
         root.classList.add("is-hidden");
         document.body.classList.remove("has-app-dialog");
         const resolve = activeResolve;
@@ -77,8 +79,10 @@
         confirmButton.textContent = options.confirmLabel || (mode === "alert" ? "OK" : "Continue");
         root.classList.remove("is-hidden");
         document.body.classList.add("has-app-dialog");
+        const version = ++dialogVersion;
 
         window.requestAnimationFrame(() => {
+            if (version !== dialogVersion || root.classList.contains("is-hidden")) return;
             (mode === "prompt" ? activeInput : confirmButton).focus();
             if (mode === "prompt") activeInput.select();
         });
@@ -116,7 +120,8 @@
             confirmButton.click();
         }
         if (event.key === "Tab") {
-            const controls = Array.from(root.querySelectorAll("button:not(.is-hidden), input:not(.is-hidden), textarea:not(.is-hidden)"));
+            const controls = Array.from(root.querySelectorAll("button, input, textarea"))
+                .filter(control => !control.disabled && control.tabIndex >= 0 && control.getClientRects().length);
             const first = controls[0];
             const last = controls[controls.length - 1];
             if (event.shiftKey && document.activeElement === first) {

@@ -41,10 +41,17 @@ function sBool(value) {
     return ["1", "t", "true", "yes", "on"].includes(String(value ?? "").trim().toLowerCase());
 }
 
-function setStoresResult(message, type) {
-    const el = document.getElementById("stores-result");
+function setStoresResult(message, type, target = "auto") {
+    const modal = document.getElementById("store-modal");
+    const modalResult = document.getElementById("store-modal-result");
+    if (!message && modalResult) modalResult.textContent = "";
+    const el = target !== "page" && modal?.style.display === "grid" && modalResult ? modalResult : document.getElementById("stores-result");
+    el.setAttribute("role", type === "error" ? "alert" : "status");
+    el.setAttribute("aria-live", type === "error" ? "assertive" : "polite");
+    el.setAttribute("aria-atomic", "true");
     el.textContent = message || "";
-    el.style.color = type === "error" ? "#b91c1c" : "#166534";
+    el.classList.add("store-feedback");
+    ["error", "warning", "pending", "ok"].forEach(state => el.classList.toggle(`is-${state}`, type === state));
 }
 
 function formatRoleLabel(role) {
@@ -164,8 +171,9 @@ function renderOfficerSuggestions(query) {
     const matches = getOfficerMatches(query);
     activeOfficerSuggestionIndex = -1;
     if (matches.length === 0) {
-        box.innerHTML = "";
-        setSuggestionBoxOpen("store-officer-search", "store-officer-suggestions", false);
+        const hasQuery = Boolean(String(query || "").trim());
+        box.innerHTML = hasQuery ? '<div class="data-state" role="status">No available Store Cashiers match that search.</div>' : "";
+        setSuggestionBoxOpen("store-officer-search", "store-officer-suggestions", hasQuery);
         return;
     }
 
@@ -218,8 +226,9 @@ function renderSupervisorSuggestions(query) {
     const matches = getSupervisorMatches(query);
     activeSupervisorSuggestionIndex = -1;
     if (matches.length === 0) {
-        box.innerHTML = "";
-        setSuggestionBoxOpen("store-supervisor-search", "store-supervisor-suggestions", false);
+        const hasQuery = Boolean(String(query || "").trim());
+        box.innerHTML = hasQuery ? '<div class="data-state" role="status">No additional supervisors match that search.</div>' : "";
+        setSuggestionBoxOpen("store-supervisor-search", "store-supervisor-suggestions", hasQuery);
         return;
     }
 
@@ -276,6 +285,7 @@ function handlePeoplePickerKeydown(kind, event) {
         return;
     }
     if (event.key === "Escape") {
+        if (input.getAttribute("aria-expanded") === "true") event.preventDefault();
         setSuggestionBoxOpen(input.id, box.id, false);
         return;
     }
@@ -297,7 +307,11 @@ function findOfficerById(officerId) {
 function toggleLogoSourceUI() {
     document.getElementById("store-logo-upload-wrap").classList.toggle("is-hidden", logoInputMode !== "upload");
     document.getElementById("store-logo-url-wrap").classList.toggle("is-hidden", logoInputMode !== "url");
-    document.getElementById("store-logo-source").value = logoInputMode;
+    const source = document.getElementById("store-logo-source");
+    if (source.value !== logoInputMode) {
+        source.value = logoInputMode;
+        source.dispatchEvent(new Event("change", { bubbles: true }));
+    }
     updateStoreLogoPreview();
 }
 
@@ -331,7 +345,7 @@ function updateStoreLogoPreview() {
     }
 }
 
-function renderStoresDataState(type, message) {
+function renderStoresDataState(type, message, detail = "", action = "") {
     const safeType = ["loading", "empty", "error", "success"].includes(type) ? type : "loading";
     const icons = {
         loading: "bi bi-arrow-repeat",
@@ -340,7 +354,9 @@ function renderStoresDataState(type, message) {
         success: "bi bi-check-circle",
     };
     const role = safeType === "error" ? "alert" : "status";
-    return `<div class="data-state data-state--${safeType}" role="${role}" aria-live="polite"><i class="${icons[safeType]}" aria-hidden="true"></i><div><strong>${sEscape(message)}</strong></div></div>`;
+    const retry = action === "stores" ? '<button type="button" class="secondary-btn" data-stores-retry>Retry stores</button>'
+        : action === "staff" ? '<button type="button" class="secondary-btn" data-store-staff-retry>Retry store staff</button>' : "";
+    return `<div class="data-state data-state--${safeType}" role="${role}" aria-live="${safeType === "error" ? "assertive" : "polite"}" aria-atomic="true" tabindex="-1"><i class="${icons[safeType]}" aria-hidden="true"></i><div><strong>${sEscape(message)}</strong>${detail ? `<small>${sEscape(detail)}</small>` : ""}</div>${retry}</div>`;
 }
 
 function storeNeedsAssignment(row) {

@@ -179,9 +179,16 @@ class UserController extends Controller
                 $query->where('p.category', $category);
             }
             if ($availability === 'available') {
-                $query->where('p.stock_qty >', 0);
+                $query->groupStart()
+                    ->where('p.stock_policy', 'untracked')
+                    ->orWhere('p.stock_qty >', 0)
+                    ->groupEnd();
             } elseif ($availability === 'out') {
-                $query->where('p.stock_qty <=', 0);
+                $query->where('p.stock_qty <=', 0)
+                    ->groupStart()
+                    ->where('p.stock_policy !=', 'untracked')
+                    ->orWhere('p.stock_policy', null)
+                    ->groupEnd();
             }
             if ($q !== '') {
                 $query->groupStart()
@@ -369,7 +376,7 @@ class UserController extends Controller
         $deductions = [];
         if ($selectedPeriodId > 0) {
             $rows = $db->table('deduction_batch_items dbi')
-                ->select('dbi.id, dbi.requested_amount, dbi.confirmed_amount, dbi.debt_snapshot, dbi.carryover_amount, dbi.result_status, dbi.confirmed_at, dp.period_code, dp.label, dp.date_start, dp.date_end')
+                ->select('dbi.id, dbi.requested_amount, dbi.confirmed_amount, dbi.carryover_amount, dbi.result_status, dbi.reason_code, dbi.result_reference, dbi.confirmed_at, dp.period_code, dp.label, dp.date_start, dp.date_end')
                 ->join('deduction_batches db', 'db.id = dbi.batch_id', 'inner')
                 ->join('deduction_periods dp', 'dp.id = db.period_id', 'inner')
                 ->where('dbi.user_id', $userId)
@@ -389,9 +396,14 @@ class UserController extends Controller
                 'date_end' => (string) ($row['date_end'] ?? ''),
                 'requested_amount' => (float) ($row['requested_amount'] ?? 0),
                 'deducted_amount' => (float) ($row['confirmed_amount'] ?? 0),
-                'debt_before' => (float) ($row['debt_snapshot'] ?? 0),
+                'undeducted_amount' => max(0, round((float) ($row['requested_amount'] ?? 0) - (float) ($row['confirmed_amount'] ?? 0), 2)),
+                // The preparation snapshot may predate other debt activity. Show the
+                // balance immediately before this confirmed result instead.
+                'debt_before' => round((float) ($row['carryover_amount'] ?? 0) + (float) ($row['confirmed_amount'] ?? 0), 2),
                 'debt_after' => (float) ($row['carryover_amount'] ?? 0),
                 'status' => (string) ($row['result_status'] ?? ''),
+                'reason_code' => (string) ($row['reason_code'] ?? ''),
+                'result_reference' => (string) ($row['result_reference'] ?? ''),
                 'applied_at' => (string) ($row['confirmed_at'] ?? ''),
             ], $rows);
         }
@@ -735,6 +747,19 @@ class UserController extends Controller
 
         $customerName = $txn['customer_name'] ?: (string) (session()->get('name') ?? 'User');
 
+        $payments = [];
+        if (in_array('transaction_payments', $db->listTables(), true)) {
+            $paymentRows = $db->table('transaction_payments')
+                ->select('payment_method, amount, cash_received, change_due')
+                ->where('transaction_id', $transactionId)->orderBy('id', 'ASC')->get()->getResultArray();
+            $payments = array_map(static fn(array $row): array => [
+                'payment_method' => (string) $row['payment_method'],
+                'amount' => (float) $row['amount'],
+                'cash_received' => $row['cash_received'] !== null ? (float) $row['cash_received'] : null,
+                'change_due' => $row['change_due'] !== null ? (float) $row['change_due'] : null,
+            ], $paymentRows);
+        }
+
         return $this->response->setJSON([
             'status' => 'success',
             'transaction' => [
@@ -746,6 +771,7 @@ class UserController extends Controller
                 'customer_name' => $customerName,
                 'store_name' => (string) ($txn['store_name'] ?: ('Store #' . (int) ($txn['store_id'] ?? 0))),
                 'items' => $items,
+                'payments' => $payments,
             ],
         ]);
     }

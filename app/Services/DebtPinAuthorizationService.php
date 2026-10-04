@@ -27,9 +27,16 @@ class DebtPinAuthorizationService
         $now = new DateTimeImmutable();
         $nowSql = $now->format('Y-m-d H:i:s');
 
-        $db->transBegin();
-
         try {
+            if (!$db->transBegin()) {
+                throw new \RuntimeException('Unable to start debt PIN authorization.');
+            }
+            // Serialize against an existing employee row before reading PIN state.
+            // This also covers simultaneous first attempts with no security row yet.
+            // SQLite acquires its writer lock before a read snapshot is established.
+            if (!$db->table('users')->where('id', $userId)->set('id', 'id', false)->update()) {
+                throw new \RuntimeException('Unable to lock debt PIN authorization.');
+            }
             $state = $securityModel->find($userId);
             if (!$state) {
                 $securityModel->insert([

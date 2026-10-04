@@ -127,7 +127,7 @@
 
 .account-menu-identity :is(span, small),
 .account-menu-actions small {
-    color: #64748b;
+    color: var(--text-soft, #64748b);
     font-size: 0.72rem;
 }
 
@@ -248,6 +248,7 @@ body.account-security-open {
 }
 
 .account-security-card {
+    min-width: 0;
     width: min(720px, 100%);
     max-height: calc(100dvh - 40px);
     overflow-y: auto;
@@ -281,9 +282,48 @@ body.account-security-open {
 .account-security-head h3 {
     margin: 2px 0 0;
     color: #0f172a;
+    font-size: 1.15rem;
+    font-weight: 650;
+}
+
+.profile-image-head h3 {
+    font-weight: 650;
+}
+
+html[data-theme="dark"] .ibems-modern .profile-image-head span {
+    color: #93c5fd;
+}
+
+.ibems-modern .profile-image-copy strong {
+    color: var(--text-main, #0f172a);
+}
+
+.ibems-modern .profile-image-result {
+    color: var(--text-soft, #64748b);
+}
+
+.ibems-modern .profile-image-result.is-error {
+    color: var(--feedback-error, #b91c1c) !important;
+}
+
+.ibems-modern .profile-image-result.is-success { color: var(--feedback-success, #166534) !important; }
+.ibems-modern .profile-image-result.is-warning { color: var(--feedback-warning, #92400e) !important; }
+.profile-image-copy { max-width: 100%; overflow-wrap: anywhere; }
+.profile-image-file-name { max-width: 100%; }
+.profile-image-result { min-width: 0; overflow-wrap: anywhere; }
+.profile-image-result:focus { outline: 2px solid #2563eb; outline-offset: -2px; }
+html[data-theme="dark"] .profile-image-result:focus { outline-color: #93c5fd; }
+.profile-image-actions { flex-wrap: wrap; }
+
+.ibems-modern .profile-image-card {
+    width: min(560px, 100%);
+    min-width: 0;
+    max-height: calc(100dvh - 40px);
+    overflow-y: auto;
 }
 
 .account-security-form {
+    min-width: 0;
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 12px;
@@ -298,9 +338,18 @@ body.account-security-open {
 }
 
 .account-security-copy,
-.account-security-result {
+.account-security-result,
+.account-security-status-actions {
     grid-column: 1 / -1;
+    min-width: 0;
+    overflow-wrap: anywhere;
 }
+
+.account-security-form[hidden],
+.account-security-form [hidden] { display: none !important; }
+.account-security-result:focus { outline: 2px solid #2563eb; outline-offset: 3px; }
+html[data-theme="dark"] .account-security-result:focus { outline-color: #93c5fd; }
+.account-security-status-actions button { max-width: 100%; white-space: normal; }
 
 .account-security-copy {
     gap: 10px;
@@ -317,11 +366,13 @@ body.account-security-open {
 }
 
 .account-security-copy div {
+    min-width: 0;
     display: grid;
     gap: 2px;
 }
 
 .account-security-form label {
+    min-width: 0;
     display: grid;
     gap: 6px;
     color: #334155;
@@ -330,6 +381,8 @@ body.account-security-open {
 }
 
 .account-security-form input {
+    min-width: 0;
+    width: 100%;
     min-height: 42px;
     border: 1px solid #cbd5e1;
     border-radius: 10px;
@@ -348,10 +401,11 @@ body.account-security-open {
     min-height: 20px;
     margin: 0;
     font-size: 0.8rem;
+    color: var(--text-soft, #64748b);
 }
 
-.account-security-result.is-error { color: #b42318; }
-.account-security-result.is-success { color: #047857; }
+.account-security-result.is-error { color: var(--feedback-error, #b42318); }
+.account-security-result.is-success { color: var(--feedback-success, #047857); }
 
 html[data-theme="dark"] .account-security-card,
 html[data-theme="dark"] .account-security-form {
@@ -360,10 +414,16 @@ html[data-theme="dark"] .account-security-form {
 }
 
 html[data-theme="dark"] .account-security-head { border-color: #26364d; }
+html[data-theme="dark"] .account-security-head span,
+html[data-theme="dark"] .account-security-copy small { color: #9eb0c5; }
+html[data-theme="dark"] .account-security-copy > i { background: #17345a; color: #93c5fd; }
+html[data-theme="dark"] .account-security-result.is-error { color: var(--feedback-error, #fda4af); }
+html[data-theme="dark"] .account-security-result.is-success { color: var(--feedback-success, #6ee7b7); }
 html[data-theme="dark"] .account-security-head h3,
 html[data-theme="dark"] .account-security-copy strong,
 html[data-theme="dark"] .account-security-form label { color: #e5edf7; }
 html[data-theme="dark"] .account-security-form input { border-color: #405672; background: #111c2e; color: #e5edf7; }
+.account-security-form .password-field-shell { min-width: 0; }
 
 @media (max-width: 760px) {
     .account-security-modal { align-items: end; padding: 0; }

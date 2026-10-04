@@ -31,7 +31,7 @@ final class StaffRecordsUiTest extends CIUnitTestCase
         $this->assertStringContainsString('data-current-debt', $script);
         $this->assertStringContainsString('staff-summary-finance', $script);
         $this->assertStringContainsString('srStores.some', $script);
-        $this->assertStringContainsString('cdn.jsdelivr.net/npm/html5-qrcode@2.3.8', $view);
+        $this->assertStringContainsString('assets/vendor/html5-qrcode/html5-qrcode.min.js', $view);
         $this->assertStringNotContainsString('unpkg.com/html5-qrcode', $view);
         $this->assertStringNotContainsString('.style.', $script);
         $this->assertMatchesRegularExpression('/\.staff-filter-panel\.compact-filter-bar \.compact-filter-actions \.search-scan-btn\s*\{[^}]*position:\s*static;[^}]*width:\s*44px;/s', $styles);

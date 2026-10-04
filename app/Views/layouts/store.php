@@ -20,6 +20,13 @@ $portalContext = [
 
 $isCashierPortal = strtoupper($role) === 'STORE_SYSTEM';
 $pageTitle = $isCashierPortal ? 'Store Cashier POS' : 'Store Supervisor Portal';
+if (str_starts_with(trim(service('uri')->getPath(), '/'), 'store/offerings')) {
+    $pageTitle = match (service('request')->getGet('section')) {
+        'food' => 'Daily Food · Store Operations',
+        'rental' => 'Rentals · Store Operations',
+        default => 'Store Operations · Food & Rentals',
+    };
+}
 $portalTitle = $isCashierPortal ? $storeName . ' POS' : $storeName;
 $portalSubtitle = $isCashierPortal ? 'Cashier Checkout' : 'Assigned Store Management';
 $footerText = $isCashierPortal ? 'USTP IBEMS Store Cashier' : 'USTP IBEMS Store Supervision';
@@ -29,15 +36,18 @@ $bodyClass = str_ends_with($requestPath, 'store/pos') ? 'pos-fullscreen' : '';
 $navigation = $isCashierPortal
     ? [
         ['path' => 'store/pos', 'label' => 'POS', 'icon' => 'bi bi-cart3'],
+        ['path' => 'store/offerings', 'label' => 'Daily Food & Rentals', 'icon' => 'bi bi-calendar-check'],
     ]
     : [
         ['path' => 'store-admin/dashboard', 'label' => 'Dashboard', 'icon' => 'bi bi-speedometer2'],
         ['path' => 'store-admin/stores', 'label' => 'Assigned Stores', 'icon' => 'bi bi-shop-window'],
         ['path' => 'store/inventory', 'label' => 'Inventory', 'icon' => 'bi bi-box-seam'],
+        ['path' => 'store/offerings', 'label' => 'Daily Food & Rentals', 'icon' => 'bi bi-calendar-check'],
         ['path' => 'store/reports', 'label' => 'Reports', 'icon' => 'bi bi-bar-chart-line'],
         ['path' => 'store/history', 'label' => 'History', 'icon' => 'bi bi-clock-history'],
         ['path' => 'store/staff-records', 'label' => 'Employee Accounts', 'icon' => 'bi bi-person-vcard'],
         ['path' => 'store/settings', 'label' => 'Settings', 'icon' => 'bi bi-gear'],
     ];
 
+include APPPATH . 'Views/components/store_navigation_scope.php';
 include APPPATH . 'Views/components/portal_shell.php';

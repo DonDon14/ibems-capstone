@@ -39,10 +39,16 @@ $bodyClass = trim((string) ($bodyClass ?? ''));
 $bodyClasses = trim('ibems-modern ' . $bodyClass);
 $roleLabels = [
     'ADMIN' => 'Administrator',
+    'HR' => 'Human Resources',
     'ACCOUNTING_OFFICE' => 'Accounting Office',
+    'ACCOUNTING_HEAD' => 'Accounting Head / Bookkeeper',
+    'PAYROLL_CLERK' => 'Payroll Clerk',
+    'CASHIER_HEAD' => 'Cashier Head',
+    'COLLECTING_OFFICER' => 'Collecting Officer',
+    'BE_DIRECTOR' => 'Business Enterprise Director',
     'STORE_SUPERVISOR' => 'Store Supervisor',
     'STORE_SYSTEM' => 'Store Cashier',
-    'USER' => 'Employee',
+    'USER' => 'User',
 ];
 $readableRole = $roleLabels[strtoupper($role)] ?? ucwords(strtolower(str_replace('_', ' ', $role)));
 $profileDetail = trim((string) ($profileDetail ?? $readableRole));
@@ -87,16 +93,17 @@ $ibemsLogoUrl = base_url('assets/images/ibems-logo.png');
     }());
     </script>
     <link rel="icon" type="image/png" href="<?= esc($ibemsLogoUrl) ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.css') ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/css/app.css') ?>?v=20260824e">
-    <link rel="stylesheet" href="<?= base_url('assets/css/modern-ui.css') ?>?v=20260825e">
-    <link rel="stylesheet" href="<?= base_url('assets/css/account-menu.css') ?>?v=20260902a">
-    <link rel="stylesheet" href="<?= base_url('assets/css/dashboard-period.css') ?>?v=20260902a">
-    <link rel="stylesheet" href="<?= base_url('assets/css/password-visibility.css') ?>?v=20260813b">
+    <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.css') ?>?v=20261003-ui-polish">
+    <link rel="stylesheet" href="<?= base_url('assets/css/app.css') ?>?v=20261004-shell-history">
+    <link rel="stylesheet" href="<?= base_url('assets/css/modern-ui.css') ?>?v=20261004-shell-history">
+    <link rel="stylesheet" href="<?= base_url('assets/css/account-menu.css') ?>?v=20261004-profile-layout">
+    <link rel="stylesheet" href="<?= base_url('assets/css/store-workspace.css') ?>?v=20261002-current-contrast">
+    <link rel="stylesheet" href="<?= base_url('assets/css/dashboard-period.css') ?>?v=20261002-period-selection">
+    <link rel="stylesheet" href="<?= base_url('assets/css/password-visibility.css') ?>?v=20261004-visibility-focus">
     <?php if ($userMobileExperience): ?>
-        <link rel="stylesheet" href="<?= base_url('assets/css/user-mobile.css') ?>?v=20260823d">
+        <link rel="stylesheet" href="<?= base_url('assets/css/user-mobile.css') ?>?v=20261003-record-label-contrast">
     <?php endif; ?>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="<?= base_url('assets/vendor/bootstrap-icons/bootstrap-icons.min.css') ?>">
     <?= $pageStyles ?>
 </head>
 <body class="<?= esc($bodyClasses) ?>" data-portal-page-classes="<?= esc($bodyClass) ?>">
@@ -169,7 +176,7 @@ $ibemsLogoUrl = base_url('assets/images/ibems-logo.png');
                             <div><strong>Notifications</strong><span id="notification-summary">Up to date</span></div>
                             <button id="notification-read-all" type="button">Mark all read</button>
                         </div>
-                        <div id="notification-list" class="notification-list" aria-live="polite">
+                        <div id="notification-list" class="notification-list" aria-label="Notification feed" aria-live="polite" aria-busy="false" tabindex="-1">
                             <div class="notification-empty"><i class="bi bi-bell"></i><span>Loading notifications...</span></div>
                         </div>
                     </section>
@@ -204,6 +211,10 @@ $ibemsLogoUrl = base_url('assets/images/ibems-logo.png');
                     <button type="button" class="account-menu-close" data-account-menu-close aria-label="Close account menu"><i class="bi bi-x-lg" aria-hidden="true"></i></button>
                 </div>
                 <div class="account-menu-actions">
+                    <button id="feedback-sound-toggle" type="button" aria-label="Enable transaction sounds" aria-pressed="false">
+                        <i class="bi bi-volume-mute" aria-hidden="true"></i>
+                        <span><strong>Transaction sounds</strong><small data-feedback-sound-status>Muted · enable success and error tones</small></span>
+                    </button>
                     <?php if ($userMobileExperience): ?>
                         <button id="user-mobile-install" type="button" hidden data-account-menu-action>
                             <i class="bi bi-phone" aria-hidden="true"></i>
@@ -243,6 +254,19 @@ $ibemsLogoUrl = base_url('assets/images/ibems-logo.png');
         </div>
 
         <main id="user-page-content" class="app-container" tabindex="-1" data-portal-page-content>
+            <?= view('components/simulation_notice') ?>
+            <?php if (!empty($storeWorkspaceLinks)): ?>
+                <section class="store-workspace-navigation" aria-label="Selected store workspace">
+                    <a href="<?= site_url('store-admin/stores') ?>">← All assigned stores</a>
+                    <h2><?= esc($portalTitle) ?></h2>
+                    <nav aria-label="Store functions">
+                        <?php foreach ($storeWorkspaceLinks as $workspaceLink): ?>
+                            <?php $workspaceCurrent = \App\Services\StoreWorkspaceService::isCurrent($workspaceLink['path'], service('uri')->getPath(), (array) service('request')->getGet()); ?>
+                            <a class="secondary-btn" href="<?= esc(site_url($workspaceLink['path'])) ?>" <?= $workspaceCurrent ? 'aria-current="page"' : '' ?>><?= esc($workspaceLink['label']) ?></a>
+                        <?php endforeach ?>
+                    </nav>
+                </section>
+            <?php endif ?>
             <?= $this->renderSection('content') ?>
         </main>
 
@@ -281,18 +305,19 @@ $ibemsLogoUrl = base_url('assets/images/ibems-logo.png');
         </div>
         <form id="account-password-form" class="account-security-form">
             <div class="account-security-copy"><i class="bi bi-key" aria-hidden="true"></i><div><strong>Change password</strong><small>Confirm your current password before setting a new one.</small></div></div>
-            <label>Current password<input id="account-current-password" type="password" autocomplete="current-password" required></label>
-            <label>New password<input id="account-new-password" type="password" autocomplete="new-password" minlength="8" required></label>
-            <label>Confirm new password<input id="account-new-password-confirm" type="password" autocomplete="new-password" minlength="8" required></label>
-            <p id="account-password-result" class="account-security-result" role="status" aria-live="polite"></p>
+            <label>Current password<input id="account-current-password" type="password" aria-label="Current password" autocomplete="current-password" required></label>
+            <label>New password<input id="account-new-password" type="password" aria-label="New password" autocomplete="new-password" minlength="8" required></label>
+            <label>Confirm new password<input id="account-new-password-confirm" type="password" aria-label="Confirm new password" autocomplete="new-password" minlength="8" required></label>
+            <p id="account-password-result" class="account-security-result" role="status" aria-live="polite" aria-atomic="true" tabindex="-1"></p>
+            <div id="account-security-status-actions" class="account-security-status-actions" hidden><button id="account-security-retry" type="button" class="secondary-btn">Retry account security</button></div>
             <button id="account-password-save" class="primary-btn" type="submit"><i class="bi bi-check2-circle" aria-hidden="true"></i> Update password</button>
         </form>
         <form id="account-pin-form" class="account-security-form" hidden>
             <div class="account-security-copy"><i class="bi bi-credit-card-2-front" aria-hidden="true"></i><div><strong>Personal purchase PIN</strong><small id="account-pin-help">Used to authorize purchases charged to your employee account.</small></div></div>
-            <label id="account-pin-current-wrap" hidden>Current password<input id="account-pin-current-password" type="password" autocomplete="current-password"></label>
-            <label>New PIN<input id="account-new-pin" type="password" inputmode="numeric" autocomplete="new-password" maxlength="6" pattern="[0-9]{4,6}" required></label>
-            <label>Confirm new PIN<input id="account-new-pin-confirm" type="password" inputmode="numeric" autocomplete="new-password" maxlength="6" pattern="[0-9]{4,6}" required></label>
-            <p id="account-pin-result" class="account-security-result" role="status" aria-live="polite"></p>
+            <label id="account-pin-current-wrap" hidden>Current password<input id="account-pin-current-password" type="password" aria-label="Current password for PIN" autocomplete="current-password"></label>
+            <label>New PIN<input id="account-new-pin" type="password" aria-label="New PIN" inputmode="numeric" autocomplete="new-password" maxlength="6" pattern="[0-9]{4,6}" required></label>
+            <label>Confirm new PIN<input id="account-new-pin-confirm" type="password" aria-label="Confirm new PIN" inputmode="numeric" autocomplete="new-password" maxlength="6" pattern="[0-9]{4,6}" required></label>
+            <p id="account-pin-result" class="account-security-result" role="status" aria-live="polite" aria-atomic="true" tabindex="-1"></p>
             <button id="account-pin-save" class="secondary-btn" type="submit"><i class="bi bi-shield-check" aria-hidden="true"></i> Save PIN</button>
         </form>
     </section>
@@ -312,36 +337,38 @@ $ibemsLogoUrl = base_url('assets/images/ibems-logo.png');
             <div class="profile-image-copy">
                 <strong><?= esc($name) ?></strong>
                 <p>Choose a clear square image. JPG, PNG, WebP, and GIF files up to 2 MB are accepted.</p>
-                <label class="secondary-btn profile-image-picker" for="profile-image-file"><i class="bi bi-image"></i> Choose image</label>
+                <button type="button" class="secondary-btn profile-image-picker" id="profile-image-picker"><i class="bi bi-image" aria-hidden="true"></i> Choose image</button>
                 <input id="profile-image-file" name="profile_image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden>
                 <span id="profile-image-file-name" class="profile-image-file-name">No new image selected</span>
             </div>
         </div>
-        <p id="profile-image-result" class="profile-image-result" aria-live="polite"></p>
+        <p id="profile-image-result" class="profile-image-result" role="status" aria-live="polite" aria-atomic="true" tabindex="-1"></p>
         <div class="profile-image-actions">
             <button type="button" class="secondary-btn" data-profile-image-close>Cancel</button>
-            <button type="submit" class="primary-btn" id="profile-image-save"><i class="bi bi-cloud-arrow-up"></i> Save picture</button>
+            <button type="submit" class="primary-btn" id="profile-image-save"><i class="bi bi-cloud-arrow-up" aria-hidden="true"></i> Save picture</button>
         </div>
     </form>
 </div>
 
-<script src="<?= base_url('assets/js/csrf.js') ?>"></script>
-<script src="<?= base_url('assets/js/theme.js') ?>?v=20260825c"></script>
+<script src="<?= base_url('assets/js/csrf.js') ?>?v=20261003-ui-polish"></script>
+<script src="<?= base_url('assets/js/store-scope.js') ?>?v=20261003-ui-polish"></script>
+<script src="<?= base_url('assets/js/theme.js') ?>?v=20261003-transition-ready"></script>
+<script src="<?= base_url('assets/js/feedback-sound.js') ?>?v=20261003-tone-cleanup"></script>
 <?php if ($notificationsEnabled): ?>
-    <script src="<?= base_url('assets/js/notifications.js') ?>?v=20260823a"></script>
+<script src="<?= base_url('assets/js/notifications.js') ?>?v=20261004-retry"></script>
 <?php endif; ?>
-<script src="<?= base_url('assets/js/ibems-format.js') ?>"></script>
-<script src="<?= base_url('assets/js/profile-avatar.js') ?>?v=20260822a"></script>
-<script src="<?= base_url('assets/js/account-menu.js') ?>?v=20260902a"></script>
-<script src="<?= base_url('assets/js/account-security.js') ?>?v=20260902a"></script>
+<script src="<?= base_url('assets/js/ibems-format.js') ?>?v=20261003-ui-polish"></script>
+<script src="<?= base_url('assets/js/profile-avatar.js') ?>?v=20261004-upload-feedback"></script>
+<script src="<?= base_url('assets/js/account-menu.js') ?>?v=20261003-focus-lifecycle"></script>
+<script src="<?= base_url('assets/js/account-security.js') ?>?v=20261004-save-feedback"></script>
 <script src="<?= base_url('assets/js/dashboard-period.js') ?>?v=20260902a"></script>
 <script {csp-script-nonce} id="portal-context-data" type="application/json"><?= json_encode($portalContext, JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT) ?></script>
 <template id="portal-page-scripts"><?= $pageScripts ?></template>
-<script src="<?= base_url('assets/js/user-navigation.js') ?>?v=20260825a"></script>
-<script src="<?= base_url('assets/js/app-layout.js') ?>?v=20260825b"></script>
-<script src="<?= base_url('assets/js/modern-controls.js') ?>?v=20260824a"></script>
-<script src="<?= base_url('assets/js/app-dialog.js') ?>"></script>
-<script src="<?= base_url('assets/js/password-visibility.js') ?>?v=20260813a"></script>
+<script src="<?= base_url('assets/js/user-navigation.js') ?>?v=20261003-header-sync"></script>
+<script src="<?= base_url('assets/js/app-layout.js') ?>?v=20261003-desktop-scroll-reset"></script>
+<script src="<?= base_url('assets/js/modern-controls.js') ?>?v=20261003-calendar-focus"></script>
+<script src="<?= base_url('assets/js/app-dialog.js') ?>?v=20261003-focus-lifecycle"></script>
+<script src="<?= base_url('assets/js/password-visibility.js') ?>?v=20261004-mask-reset"></script>
 <?php if ($userMobileExperience): ?>
     <script src="<?= base_url('assets/js/user-mobile.js') ?>?v=20260823a" data-service-worker-url="<?= esc(base_url('user/service-worker.js')) ?>"></script>
 <?php endif; ?>

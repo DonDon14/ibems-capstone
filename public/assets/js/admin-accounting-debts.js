@@ -32,9 +32,13 @@ function debtPercent(currentDebt, creditLimit) {
 
 function adDebtDateTime(value) {
     if (!value) return "-";
-    const date = new Date(String(value).replace(" ", "T"));
+    const options = {timeZone: "Asia/Manila", dateStyle: "medium", timeStyle: "short"};
+    if (window.IbemsFormat?.dateTime) return window.IbemsFormat.dateTime(value, options);
+    let normalized = String(value).trim().replace(" ", "T");
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?$/.test(normalized)) normalized += "Z";
+    const date = new Date(normalized);
     if (Number.isNaN(date.getTime())) return String(value);
-    return date.toLocaleString("en-PH", { dateStyle: "medium", timeStyle: "short" });
+    return date.toLocaleString("en-PH", options);
 }
 
 function adDebtLabel(value) {
@@ -49,6 +53,8 @@ function adDebtDetailItem(label, value) {
 
 let adAccountModalTrigger = null;
 let adAccountUserId = 0;
+let adAccountRequestId = 0;
+const adHistoryRequests = new WeakMap();
 
 function adSetAccountTab(tabName) {
     document.querySelectorAll("[data-ad-account-tab]").forEach((button) => {
@@ -74,7 +80,7 @@ function adDebtHistoryMarkup(debt, scope = "general", storeId = 0, storeName = "
     const from = total ? ((page - 1) * pageSize) + 1 : 0;
     const to = Math.min(page * pageSize, total);
     const table = history.length ? `
-        <div class="table-standard-wrap">
+        <div class="table-standard-wrap" role="region" aria-label="${aEscape(scope === 'store' ? `Debt activity table for ${storeName || 'selected store'}` : 'General debt activity table')}" tabindex="0">
             <table class="table table-standard">
                 <thead><tr><th>Date</th><th>Activity</th><th>Store</th><th>Change</th><th>Balance After</th><th>Recorded By</th></tr></thead>
                 <tbody>${history.map((row) => `
@@ -104,18 +110,32 @@ async function adLoadDebtHistory(page, storeId = 0, scope = "general", storeName
     const historyTarget = targetId || (scope === "store" ? `ad-store-history-${Number(storeId || 0)}` : "ad-general-history");
     const target = document.getElementById(historyTarget);
     if (!target || !adAccountUserId) return;
+    const accountRequestId = adAccountRequestId;
+    const requestId = (adHistoryRequests.get(target) || 0) + 1;
+    adHistoryRequests.set(target, requestId);
+    const signal = window.IbemsPortalNavigation?.currentSignal;
+    const current = () => !signal?.aborted && accountRequestId === adAccountRequestId && adHistoryRequests.get(target) === requestId && target.isConnected;
+    if (target.contains?.(document.activeElement)) {
+        target.tabIndex = -1;
+        target.focus();
+    }
+    target.setAttribute('aria-busy', 'true');
     target.innerHTML = `<div class="data-state data-state--loading"><i class="bi bi-arrow-repeat" aria-hidden="true"></i><div><strong>Loading debt activity...</strong></div></div>`;
     try {
         const params = new URLSearchParams({ page: String(Math.max(1, Number(page || 1))), page_size: "10" });
         if (storeId > 0) params.set("store_id", String(storeId));
         if (dateFrom) params.set("date_from", dateFrom);
         if (dateTo) params.set("date_to", dateTo);
-        const response = await fetch(`/admin/accounting-debts/user/${encodeURIComponent(String(adAccountUserId))}?${params}`);
+        const response = await fetch(`/admin/accounting-debts/user/${encodeURIComponent(String(adAccountUserId))}?${params}`, {signal});
         const data = await response.json();
+        if (!current()) return;
         if (!response.ok || data.status !== "success") throw new Error(data.message || "Unable to load debt activity.");
         target.innerHTML = adDebtHistoryMarkup(data.data?.debt || {}, scope, storeId, storeName, historyTarget, dateFrom, dateTo);
     } catch (error) {
+        if (!current()) return;
         target.innerHTML = `<div class="data-state data-state--error" role="alert"><i class="bi bi-exclamation-circle" aria-hidden="true"></i><div><strong>${aEscape(error.message || "Unable to load debt activity.")}</strong></div></div>`;
+    } finally {
+        if (current()) target.setAttribute('aria-busy', 'false');
     }
 }
 
@@ -143,7 +163,7 @@ function adRenderAccountDetail(payload) {
                     <button class="primary-btn btn-sm" type="button" data-ad-store-filter-apply><i class="bi bi-funnel" aria-hidden="true"></i> Apply</button>
                     <button class="secondary-btn btn-sm" type="button" data-ad-store-filter-clear>Clear</button>
                 </div>
-                <div id="ad-store-history-${storeId}" data-ad-store-history-target></div>
+                <div id="ad-store-history-${storeId}" data-ad-store-history-target role="region" aria-label="${aEscape(`Debt activity results for ${storeName}`)}"></div>
             </section>
         </article>`;
     }).join("")}</div>` : `<div class="data-state data-state--empty"><i class="bi bi-shop" aria-hidden="true"></i><div><strong>No store debt activity</strong><small>This employee has no debt entries linked to a store.</small></div></div>`;
@@ -154,10 +174,10 @@ function adRenderAccountDetail(payload) {
             <div><h5>${aEscape(general.name || "Employee")}</h5><p>${aEscape(identityMeta)}</p></div>
         </div>
         <div class="ad-account-tabs" role="tablist" aria-label="Debt total views">
-            <button class="ad-account-tab" type="button" role="tab" aria-selected="true" data-ad-account-tab="general"><i class="bi bi-cash-stack" aria-hidden="true"></i> General</button>
-            <button class="ad-account-tab" type="button" role="tab" aria-selected="false" tabindex="-1" data-ad-account-tab="stores"><i class="bi bi-shop" aria-hidden="true"></i> Per Store</button>
+            <button id="ad-general-tab" class="ad-account-tab" type="button" role="tab" aria-controls="ad-general-panel" aria-selected="true" data-ad-account-tab="general"><i class="bi bi-cash-stack" aria-hidden="true"></i> General</button>
+            <button id="ad-stores-tab" class="ad-account-tab" type="button" role="tab" aria-controls="ad-stores-panel" aria-selected="false" tabindex="-1" data-ad-account-tab="stores"><i class="bi bi-shop" aria-hidden="true"></i> Per Store</button>
         </div>
-        <section class="ad-account-panel" role="tabpanel" data-ad-account-panel="general">
+        <section id="ad-general-panel" class="ad-account-panel" role="tabpanel" aria-labelledby="ad-general-tab" data-ad-account-panel="general">
             <div class="ad-detail-section-head"><h6>General Debt Totals</h6><p>Combined totals across all stores and non-store debt adjustments.</p></div>
             <div class="ad-detail-grid ad-debt-summary">
                 ${adDebtDetailItem("Current Debt", aMoney(debt.current_debt || 0))}
@@ -168,9 +188,9 @@ function adRenderAccountDetail(payload) {
                 ${adDebtDetailItem("Debt Activities", Number(debt.activity_count || 0))}
             </div>
             <div class="ad-detail-section-head"><h6>All Debt Activity</h6><p>Purchases, repayments, deductions, and approved corrections from every store.</p></div>
-            <div id="ad-general-history">${adDebtHistoryMarkup(debt, "general")}</div>
+            <div id="ad-general-history" role="region" aria-label="General debt activity results">${adDebtHistoryMarkup(debt, "general")}</div>
         </section>
-        <section class="ad-account-panel" role="tabpanel" data-ad-account-panel="stores" hidden>
+        <section id="ad-stores-panel" class="ad-account-panel" role="tabpanel" aria-labelledby="ad-stores-tab" data-ad-account-panel="stores" hidden>
             <div class="ad-detail-section-head"><h6>Debt Totals Per Store</h6><p>Debt purchases and repayments are grouped by the store where they were recorded.</p></div>
             ${storesHtml}
         </section>`;
@@ -227,6 +247,8 @@ function adToggleStoreAccordion(button) {
 }
 
 async function adOpenAccountDetail(userId, trigger) {
+    const requestId = ++adAccountRequestId;
+    const signal = window.IbemsPortalNavigation?.currentSignal;
     const modal = document.getElementById("ad-account-modal");
     const content = document.getElementById("ad-account-modal-content");
     adAccountModalTrigger = trigger;
@@ -237,16 +259,20 @@ async function adOpenAccountDetail(userId, trigger) {
     content.innerHTML = `<div class="data-state data-state--loading"><i class="bi bi-arrow-repeat" aria-hidden="true"></i><div><strong>Loading account details...</strong></div></div>`;
     document.getElementById("ad-account-modal-close")?.focus();
     try {
-        const response = await fetch(`/admin/accounting-debts/user/${encodeURIComponent(String(userId))}`);
+        const response = await fetch(`/admin/accounting-debts/user/${encodeURIComponent(String(userId))}`, {signal});
         const data = await response.json();
+        if (signal?.aborted || requestId !== adAccountRequestId) return;
         if (!response.ok || data.status !== "success") throw new Error(data.message || "Unable to load account details.");
         adRenderAccountDetail(data.data || {});
     } catch (error) {
+        if (signal?.aborted || requestId !== adAccountRequestId) return;
         content.innerHTML = `<div class="data-state data-state--error" role="alert"><i class="bi bi-exclamation-circle" aria-hidden="true"></i><div><strong>${aEscape(error.message || "Unable to load account details.")}</strong></div></div>`;
     }
 }
 
 function adCloseAccountDetail() {
+    ++adAccountRequestId;
+    adAccountUserId = 0;
     const modal = document.getElementById("ad-account-modal");
     modal.classList.add("is-hidden");
     modal.setAttribute("aria-hidden", "true");
@@ -255,12 +281,14 @@ function adCloseAccountDetail() {
 }
 
 async function loadAdminDebtOverview() {
-    const response = await fetch("/admin/accounting-debts/data");
+    const signal = window.IbemsPortalNavigation?.currentSignal;
+    const metricIds = ["ad-account-count", "ad-debt-accounts", "ad-total-debt", "ad-today-deducted"];
+    metricIds.forEach(id => document.getElementById(id).textContent = "Loading…");
+    try {
+    const response = await fetch("/admin/accounting-debts/data", {signal});
     const data = await response.json();
-    if (!data || data.status !== "success") {
-        document.getElementById("ad-top-body").innerHTML = adDebtDataState("error", data?.message || "Unable to load debt records.");
-        return;
-    }
+    if (signal?.aborted) return;
+    if (!response.ok || !data || data.status !== "success") throw new Error(data?.message || "Unable to load debt records.");
 
     const summary = data.summary || {};
     document.getElementById("ad-account-count").textContent = String(summary.account_count || 0);
@@ -271,7 +299,7 @@ async function loadAdminDebtOverview() {
     const rows = Array.isArray(data.top_debts) ? data.top_debts : [];
     const body = document.getElementById("ad-top-body");
     if (rows.length === 0) {
-        body.innerHTML = adDebtDataState("empty", "No debt records.");
+        body.innerHTML = adDebtDataState("empty", "No outstanding debt accounts.");
         return;
     }
 
@@ -289,6 +317,11 @@ async function loadAdminDebtOverview() {
             <td>${aEscape(aMoney(row.credit_limit))}</td>
         </tr>
     `).join("");
+    } catch (error) {
+        if (signal?.aborted) return;
+        metricIds.forEach(id => document.getElementById(id).textContent = "Unavailable");
+        document.getElementById("ad-top-body").innerHTML = adDebtDataState("error", "Unable to load debt records. Reload this page to try again.");
+    }
 }
 
 document.getElementById("ad-top-body")?.addEventListener("click", (event) => {
@@ -337,7 +370,11 @@ document.getElementById("ad-account-modal")?.addEventListener("click", (event) =
         const dateTo = dateToInput?.value || "";
         const targetId = `ad-store-history-${storeId}`;
         if (dateFrom && dateTo && dateFrom > dateTo) {
-            document.getElementById(targetId).innerHTML = `<div class="data-state data-state--error" role="alert"><i class="bi bi-exclamation-circle" aria-hidden="true"></i><div><strong>The start date must be on or before the end date.</strong></div></div>`;
+            const historyTarget = document.getElementById(targetId);
+            if (!historyTarget) return;
+            adHistoryRequests.set(historyTarget, (adHistoryRequests.get(historyTarget) || 0) + 1);
+            historyTarget.setAttribute('aria-busy', 'false');
+            historyTarget.innerHTML = `<div class="data-state data-state--error" role="alert"><i class="bi bi-exclamation-circle" aria-hidden="true"></i><div><strong>The start date must be on or before the end date.</strong></div></div>`;
             dateFromInput?.focus();
             return;
         }

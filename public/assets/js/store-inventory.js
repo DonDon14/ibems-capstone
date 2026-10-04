@@ -1,21 +1,34 @@
 let invStores = [];
 let invActiveStoreId = null;
 let invProducts = [];
+let invProductLoadState = "loading";
 let invIsRestocking = false;
+let invStockSavePending = false;
+let invProductActionVersion = 0;
+let invProductCreateVersion = 0;
+let invCreateClosePending = false;
 let invIsCreatingProduct = false;
 let invIsUpdatingProduct = false;
 let invModalProductId = null;
 let invProductEditMode = false;
+let invProductActionOpener = null;
+let invProductCreateOpener = null;
 let invModalPanel = "adjust";
 let invCreatePreviewObjectUrl = null;
 let invModalPreviewObjectUrl = null;
 let invCategories = [];
+let invCategorySequence = 0;
 let invCreateSnapshot = null;
 let invMovements = [];
+let invMovementSequence = 0;
+let invProductSequence = 0;
 let invVariantSequence = 0;
 let invPage = 1;
 let invBarcodeCamera = null;
 let invBarcodeCameraTarget = null;
+let invBarcodeSession = null;
+let invBarcodeCleanupPromise = Promise.resolve();
+let invBarcodeVersion = 0;
 const invSelectedFamilyVariants = new Map();
 const invExpandedFamilies = new Set();
 
@@ -59,30 +72,152 @@ function invAddVariantRow() {
     const position = ++invVariantSequence + 1;
     const row = document.createElement("div");
     row.className = "variant-builder-row"; row.dataset.variantRow = String(position);
-    row.innerHTML = `<label>Variant/Size<input data-v="label" placeholder="e.g. 1L"></label><label>SKU<input data-v="sku" placeholder="Generated"></label><label>Barcode<div class="barcode-entry-row"><input data-v="barcode" inputmode="numeric" placeholder="Optional"><button class="secondary-btn barcode-camera-btn" type="button" data-variant-camera title="Scan barcode with camera"><i class="bi bi-camera"></i></button></div></label><label>Unit Cost<input data-v="cost" type="number" min="0" step=".01" value="0"></label><label>Sell Price<input data-v="price" type="number" min="0" step=".01" value="0"></label><label>Stock<input data-v="stock" type="number" min="0" step="1" value="0"></label><label>Low Stock<input data-v="low" type="number" min="0" step="1" value="0"></label><button class="secondary-btn variant-remove" type="button" aria-label="Remove variant"><i class="bi bi-trash"></i></button><label class="variant-image-override">Variant Image Override<input data-v="image" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label>`;
+    row.innerHTML = `<label>Variant/Size<input data-v="label" placeholder="e.g. 1L"></label><label>SKU<input data-v="sku" placeholder="Generated"></label><label>Barcode<div class="barcode-entry-row"><input data-v="barcode" inputmode="numeric" placeholder="Optional"><button class="secondary-btn barcode-camera-btn" type="button" data-variant-camera aria-label="Scan variant barcode with camera" title="Scan barcode with camera"><i class="bi bi-camera"></i></button></div></label><label>Unit Cost<input data-v="cost" type="number" min="0" step=".01" value="0"></label><label>Sell Price<input data-v="price" type="number" min="0" step=".01" value="0"></label><label>Stock<input data-v="stock" type="number" min="0" step="1" value="0"></label><label>Low Stock<input data-v="low" type="number" min="0" step="1" value="0"></label><button class="secondary-btn variant-remove" type="button" aria-label="Remove variant"><i class="bi bi-trash"></i></button><label class="variant-image-override">Variant Image Override<input data-v="image" type="file" accept="image/png,image/jpeg,image/webp,image/gif"></label>`;
     document.getElementById("new-product-variants").appendChild(row);
     const label = row.querySelector('[data-v="label"]'), sku = row.querySelector('[data-v="sku"]');
     label.addEventListener("input", () => { if (sku.dataset.manual !== "true") sku.value = invGeneratedSku(invGetElementValue("new-product-name"), label.value, position); invUpdateCreateProductProjection(); });
     sku.addEventListener("input", () => { sku.dataset.manual = "true"; invUpdateCreateProductProjection(); });
     row.querySelectorAll("input").forEach(input => input.addEventListener("input", invUpdateCreateProductProjection));
-    row.querySelector(".variant-remove").addEventListener("click", () => { row.remove(); invUpdateVariantCount(); invUpdateCreateProductProjection(); });
+    row.querySelector(".variant-remove").addEventListener("click", () => {
+        row.remove();
+        invUpdateVariantCount();
+        invUpdateCreateProductProjection();
+        document.getElementById("add-product-variant")?.focus();
+    });
     row.querySelector("[data-variant-camera]").addEventListener("click", () => invOpenBarcodeCamera(row.querySelector('[data-v="barcode"]')));
     invUpdateVariantCount();
-    row.scrollIntoView({block:"nearest",behavior:"smooth"});
+    label.focus({preventScroll: true});
+    row.scrollIntoView({block:"nearest",behavior:window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ? "instant" : "smooth"});
 }
 function invUpdateVariantCount() { const count=document.querySelectorAll("[data-variant-row]").length; const el=document.getElementById("product-variant-count"); if(el) el.textContent=`(${count})`; }
 
-async function invCloseBarcodeCamera() {
-    if (invBarcodeCamera) { try { await invBarcodeCamera.stop(); } catch (error) {} try { await invBarcodeCamera.clear(); } catch (error) {} }
-    invBarcodeCamera = null; invBarcodeCameraTarget = null; document.getElementById("inventory-barcode-camera-modal").style.display = "none";
+function invSetBarcodeCameraStatus(message, type = "progress", focus = false) {
+    const status = document.getElementById("inventory-barcode-camera-status");
+    status.textContent = message;
+    status.dataset.type = type;
+    status.setAttribute("role", type === "error" ? "alert" : "status");
+    status.setAttribute("aria-live", type === "error" ? "assertive" : "polite");
+    const modal = document.getElementById("inventory-barcode-camera-modal");
+    modal.dataset.state = type;
+    modal.setAttribute("aria-busy", type === "progress" ? "true" : "false");
+    document.getElementById("inventory-barcode-camera-retry").hidden = type !== "error";
+    if (focus) status.focus();
 }
-async function invOpenBarcodeCamera(target) {
-    if (!window.Html5Qrcode) { invSetResult("Camera scanner could not load. Type the barcode manually or use a USB scanner.", "error"); return; }
-    invBarcodeCameraTarget = target; document.getElementById("inventory-barcode-camera-modal").style.display = "grid";
-    document.getElementById("inventory-barcode-camera-status").textContent = "Starting camera...";
-    invBarcodeCamera = new Html5Qrcode("inventory-barcode-camera-reader");
-    try { await invBarcodeCamera.start({facingMode:"environment"},{fps:10,qrbox:{width:280,height:140}},async code => { if(invBarcodeCameraTarget){invBarcodeCameraTarget.value=code;invBarcodeCameraTarget.dispatchEvent(new Event("input",{bubbles:true}));} await invCloseBarcodeCamera(); invSetResult(`Barcode captured: ${code}`,"ok"); },()=>{}); document.getElementById("inventory-barcode-camera-status").textContent="Camera ready. Center the barcode inside the frame."; }
-    catch(error){ document.getElementById("inventory-barcode-camera-status").textContent="Camera unavailable. Allow camera access, type the barcode, or connect a USB scanner."; }
+
+async function invDisposeBarcodeSession(session) {
+    if (!session?.engine) return;
+    session.cleanup ||= (async () => {
+        try {await session.engine.stop();} catch (error) { /* Startup may have failed. */ }
+        try {await session.engine.clear();} catch (error) { /* Keep dismissal available. */ }
+    })();
+    await session.cleanup;
+}
+
+async function invCloseBarcodeCamera(focusTarget = false) {
+    const session = invBarcodeSession;
+    if (!session) return invBarcodeCleanupPromise;
+    session.cancelled = true;
+    ++invBarcodeVersion;
+    invBarcodeSession = null;
+    invBarcodeCamera = null;
+    invBarcodeCameraTarget = null;
+    session.modal.style.display = "none";
+    session.modal.setAttribute("aria-busy", "false");
+    if (session.parent?.isConnected) {
+        if (session.parentHidden === null) session.parent.removeAttribute("aria-hidden");
+        else session.parent.setAttribute("aria-hidden", session.parentHidden);
+    }
+    invSyncModalBodyLock();
+    if (!session.signal?.aborted && Number(invActiveStoreId) === session.storeId && (!session.parent || session.parent.style.display === "grid")) {
+        const destination = focusTarget === true ? session.target : session.opener;
+        if (destination?.isConnected && !destination.disabled) destination.focus();
+    }
+    invBarcodeCleanupPromise = Promise.resolve(session.startup).catch(() => {}).then(() => invDisposeBarcodeSession(session));
+    await invBarcodeCleanupPromise;
+}
+
+async function invOpenBarcodeCamera(target, retry = false) {
+    if (!target?.isConnected || target.disabled || invIsCreatingProduct || invIsUpdatingProduct || invStockSavePending) return;
+    const modal = document.getElementById("inventory-barcode-camera-modal");
+    if (!modal?.isConnected) return;
+    const parent = target.closest('.inv-modal');
+    if ((parent && parent.style.display !== "grid") || window.IbemsPortalNavigation?.currentSignal?.aborted) return;
+    const previous = invBarcodeSession;
+    const reusing = retry === true && previous && modal.style.display === "grid" && modal.dataset.state === "error";
+    if (modal.style.display === "grid" && !reusing) return;
+    if (reusing) {
+        previous.cancelled = true;
+        invBarcodeCleanupPromise = Promise.resolve(previous.startup).catch(() => {}).then(() => invDisposeBarcodeSession(previous));
+    }
+    const previousCleanup = invBarcodeCleanupPromise;
+    const session = {
+        modal, target, parent, opener: reusing ? previous.opener : document.activeElement,
+        parentHidden: reusing ? previous.parentHidden : parent?.getAttribute("aria-hidden") ?? null,
+        storeId: Number(invActiveStoreId), signal: window.IbemsPortalNavigation?.currentSignal,
+        version: ++invBarcodeVersion, cancelled: false, captured: false, engine: null,
+    };
+    const current = () => invBarcodeSession === session && !session.cancelled && !session.signal?.aborted &&
+        session.version === invBarcodeVersion && modal.isConnected && modal === document.getElementById(modal.id) &&
+        modal.style.display === "grid" && Number(invActiveStoreId) === session.storeId && target.isConnected && !target.disabled &&
+        (!parent || (parent.isConnected && parent.style.display === "grid" && target.closest('.inv-modal') === parent));
+    invBarcodeSession = session;
+    invBarcodeCameraTarget = target;
+    if (parent) parent.setAttribute("aria-hidden", "true");
+    modal.style.display = "grid";
+    invSyncModalBodyLock();
+    invSetBarcodeCameraStatus("Starting camera… You can close this dialog or use manual entry while it starts.");
+    document.getElementById("inventory-barcode-camera-close").focus();
+    session.startup = (async () => {
+        await previousCleanup;
+        if (!current()) return;
+        if (!window.Html5Qrcode || !navigator.mediaDevices?.getUserMedia) {
+            invSetBarcodeCameraStatus("Camera scanner unavailable. Retry after checking your browser, or use manual entry or a USB scanner.", "error", true);
+            return;
+        }
+        const reader = document.getElementById("inventory-barcode-camera-reader");
+        reader.innerHTML = "";
+        try {
+            session.engine = new window.Html5Qrcode(reader.id);
+            invBarcodeCamera = session.engine;
+            await session.engine.start({facingMode: "environment"}, {
+                fps: 10,
+                qrbox: (width, height) => ({width: Math.max(1, Math.min(280, width - 24)), height: Math.max(1, Math.min(140, height - 24))}),
+            }, code => {
+                if (!current() || session.captured) return;
+                const value = String(code || "").trim();
+                if (!value) return;
+                session.captured = true;
+                target.value = value;
+                target.dispatchEvent(new Event("input", {bubbles: true}));
+                if (!current()) return;
+                if (parent?.id === "inventory-product-modal") invSetProductResult("create", `Barcode captured: ${value}`, "ok");
+                else if (parent?.id === "inventory-product-action-modal") invSetProductResult("edit", `Barcode captured: ${value}`, "ok");
+                else invSetResult(`Barcode captured: ${value}`, "ok");
+                invCloseBarcodeCamera(true);
+            }, () => {});
+            if (!current()) {await invDisposeBarcodeSession(session); return;}
+            invSetBarcodeCameraStatus("Camera ready. Center the barcode inside the frame.", "ready");
+        } catch (error) {
+            await invDisposeBarcodeSession(session);
+            if (current()) {
+                invBarcodeCamera = null;
+                invSetBarcodeCameraStatus("Camera could not start. Check camera access and retry, or use manual entry or a USB scanner.", "error", true);
+            }
+        }
+    })();
+    await session.startup;
+}
+
+function invRetryBarcodeCamera() {
+    if (invBarcodeSession) return invOpenBarcodeCamera(invBarcodeSession.target, true);
+}
+function invProductNumbersValid(price, cost, stock, low) {
+    return [price, cost, stock, low].every(value => Number.isFinite(value) && value >= 0) &&
+        Number.isInteger(stock) && Number.isInteger(low);
+}
+function invVariantIsValid(variant) {
+    return !!variant.label && !!variant.sku && invProductNumbersValid(variant.price, variant.cost, variant.stock, variant.low) &&
+        (!variant.image || variant.image.size > 0);
 }
 function invAdditionalVariants() {
     return Array.from(document.querySelectorAll("[data-variant-row]")).map(row => ({row,label:row.querySelector('[data-v="label"]').value.trim(),sku:row.querySelector('[data-v="sku"]').value.trim(),barcode:row.querySelector('[data-v="barcode"]').value.trim(),cost:Number(row.querySelector('[data-v="cost"]').value||0),price:Number(row.querySelector('[data-v="price"]').value||0),stock:Number(row.querySelector('[data-v="stock"]').value||0),low:Number(row.querySelector('[data-v="low"]').value||0),image:row.querySelector('[data-v="image"]').files[0]||null}));
@@ -198,7 +333,10 @@ function invSyncBehaviorFields(prefix) {
     const itemType = document.getElementById(`${prefix}-item-type`);
     const stockPolicy = document.getElementById(`${prefix}-stock-policy`);
     if (!itemType || !stockPolicy) return;
-    if (["service", "deposit"].includes(itemType.value) && stockPolicy.value !== "untracked") {
+    if (!itemType.querySelector('option[value="rental"]')) itemType.add(new Option('Rental fee (per agreed period)', 'rental'));
+    Array.from(itemType.options).forEach((option) => { option.disabled = !invAllowedItemTypes.includes(option.value); });
+    if (prefix === 'new-product' && !invAllowedItemTypes.includes(itemType.value)) itemType.value = invAllowedItemTypes[0] || '';
+    if (["service", "deposit", "rental"].includes(itemType.value) && stockPolicy.value !== "untracked") {
         stockPolicy.value = "untracked";
         stockPolicy.dispatchEvent(new Event("change", {bubbles:true}));
     }
@@ -211,11 +349,13 @@ function invSyncBehaviorFields(prefix) {
         if (help) help.textContent = untracked ? "This item can be sold without an on-hand quantity and creates no inventory movement." : "Each POS sale atomically deducts stock and records an inventory movement.";
     }
 }
+let invAllowedItemTypes = [];
 
-function invSetResult(message, type) {
+function invSetResult(message, type, focus = false) {
     const el = document.getElementById("inventory-result");
     el.textContent = message || "";
-    el.style.color = type === "error" ? "#b91c1c" : "#166534";
+    el.style.color = type === "error" ? "var(--feedback-error, #b91c1c)" : type === "warning" ? "var(--feedback-warning, #92400e)" : "var(--feedback-success, #166534)";
+    if (focus) el.focus();
 }
 
 function invEnsureCategoryOption(selectEl, categoryName) {
@@ -263,6 +403,7 @@ function invRenderCategorySelects() {
 }
 
 function invRenderProductTable() {
+    if (["loading", "error"].includes(invProductLoadState)) return;
     const body = document.getElementById("inventory-product-body");
     const search = (document.getElementById("inventory-search").value || "").trim().toLowerCase();
     const categoryFilter = (document.getElementById("inventory-category-filter").value || "").trim().toLowerCase();
@@ -318,7 +459,9 @@ function invRenderProductTable() {
         <button class="secondary-btn btn-sm" type="button" data-page="${invPage + 1}" ${invPage >= totalPages ? "disabled" : ""}>Next <i class="bi bi-chevron-right"></i></button>`;
 
     if (allRows.length === 0) {
-        body.innerHTML = invDataState("empty", "No products match these filters. Clear a filter or try another search.", 5);
+        body.innerHTML = invDataState("empty", invProducts.length === 0
+            ? "No products have been added to this store yet."
+            : "No products match these filters. Clear a filter or try another search.", 5);
         return;
     }
 
@@ -463,7 +606,8 @@ function invRenderMovements() {
     if (!list) return;
 
     if (invMovements.length === 0) {
-        list.innerHTML = invDataState("empty", "No stock activity recorded yet.");
+        const filtered = invGetElementValue("inventory-movement-type").trim() !== "";
+        list.innerHTML = invDataState("empty", filtered ? "No stock activity matches this filter." : "No stock activity recorded yet.");
         return;
     }
 

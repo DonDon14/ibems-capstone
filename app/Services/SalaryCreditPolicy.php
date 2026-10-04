@@ -31,6 +31,31 @@ final class SalaryCreditPolicy
         return $percentage >= 0 && $percentage <= 100;
     }
 
+    public static function parseSalaryStep($value): ?int
+    {
+        $text = trim((string) $value);
+        return preg_match('/^[1-8]$/D', $text) === 1 ? (int) $text : null;
+    }
+
+    public static function parseCreditPercentage($value): ?float
+    {
+        $text = trim((string) $value);
+        if (preg_match('/^(?:0|[1-9][0-9]{0,2})(?:\.[0-9]{1,2})?$/D', $text) !== 1) {
+            return null;
+        }
+
+        $percentage = (float) $text;
+        return self::isValidCreditPercentage($percentage) ? $percentage : null;
+    }
+
+    public static function parseMonthlySalary($value): ?float
+    {
+        $text = trim((string) $value);
+        return preg_match('/^[1-9][0-9]{0,8}(?:\.[0-9]{1,2})?$/D', $text) === 1
+            ? (float) $text
+            : null;
+    }
+
     public static function normalizeEmploymentType(string $value): string
     {
         return strtolower(trim($value));
@@ -45,5 +70,11 @@ final class SalaryCreditPolicy
     {
         $date = \DateTimeImmutable::createFromFormat('!Y-m-d', $value);
         return $date !== false && $date->format('Y-m-d') === $value;
+    }
+
+    public static function isFutureEffectiveDate(string $value): bool
+    {
+        return self::isValidEffectiveDate($value)
+            && $value > ibems_business_date();
     }
 }

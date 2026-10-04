@@ -146,7 +146,13 @@ function uRenderTrend(rows) {
         return;
     }
 
-    const labels = rows.map((row) => String(row.date || "").slice(5));
+    const monthly = window.IbemsDashboardPeriod?.get() === "year";
+    const monthFormat = new Intl.DateTimeFormat("en", { month: "short", timeZone: "UTC" });
+    const labels = rows.map((row) => {
+        const value = String(row.date || "");
+        const date = new Date(`${value}T00:00:00Z`);
+        return monthly && !Number.isNaN(date.getTime()) ? monthFormat.format(date) : value.slice(5);
+    });
     const amounts = rows.map((row) => Number(row.amount || 0));
     const theme = uChartTheme();
     uShowTrendChart();
@@ -169,6 +175,7 @@ function uRenderTrend(rows) {
             }],
         },
         options: {
+            animation: !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
             responsive: true,
             maintainAspectRatio: false,
             plugins: {
@@ -247,14 +254,31 @@ function uRenderRecentTransactions(rows) {
     `).join("");
 }
 
+let uDashboardRequestId = 0;
+function uDashboardFiguresState(type) {
+    const label = type === "loading" ? "Loading…" : "Unavailable";
+    ["u-credit-limit", "u-current-debt", "u-available-credit", "u-debt-added-total", "u-debt-deducted-total", "u-total-spent", "u-txn-count", "u-credit-used-percent", "u-credit-used-amount", "u-credit-meter-status"].forEach(id => {
+        const element = document.getElementById(id);
+        if (element) element.textContent = label;
+    });
+    const fill = document.getElementById("u-credit-meter-fill");
+    if (fill) { fill.style.width = "0%"; fill.classList.remove("is-safe", "is-mid", "is-high"); }
+}
 async function loadUserDashboard() {
+    const requestId = ++uDashboardRequestId;
+    uTrendChart?.destroy();
+    uTrendChart = null;
+    uTrendRows = [];
+    uDashboardFiguresState("loading");
+    document.getElementById("u-recent-cashbook").innerHTML = uDataState("loading", "Loading debt cashbook…");
+    document.getElementById("u-recent-transactions-body").innerHTML = uDataState("loading", "Loading transactions…", 5);
     uSetTrendState("loading", "Loading spending trend...");
     try {
         const period = window.IbemsDashboardPeriod?.get() || "day";
         const response = await fetch(`/user/dashboard/data?period=${encodeURIComponent(period)}`, { signal: uPageSignal });
         const data = await response.json();
-        if ((window.IbemsDashboardPeriod?.get() || "day") !== period) return;
-        if (!data || data.status !== "success") {
+        if (uPageSignal.aborted || requestId !== uDashboardRequestId || (window.IbemsDashboardPeriod?.get() || "day") !== period) return;
+        if (!response.ok || !data || data.status !== "success") {
             throw new Error(data?.message || "Failed to load user dashboard.");
         }
 
@@ -275,13 +299,13 @@ async function loadUserDashboard() {
         uRenderRecentCashbook(data.recent_cashbook || []);
         uRenderRecentTransactions(data.recent_transactions || []);
     } catch (error) {
-        if (uPageSignal.aborted) return;
+        if (uPageSignal.aborted || requestId !== uDashboardRequestId) return;
+        uDashboardFiguresState("error");
         uApplyDebtStatus("u", {
             debt_status_tone: "danger",
             debt_status_label: "Unavailable",
             debt_status_message: "Unable to load your debt status right now.",
         });
-        uRenderCreditMeter({});
         uSetTrendState("error", error.message || "Unable to load the spending trend.");
         document.getElementById("u-recent-cashbook").innerHTML = uDataState("error", error.message || "Unable to load recent cashbook.");
         document.getElementById("u-recent-transactions-body").innerHTML = uDataState("error", error.message || "Unable to load recent transactions.", 5);
@@ -296,6 +320,15 @@ window.addEventListener("ibems:themechange", () => {
     if (!uTrendChart) return;
     uRenderTrend(uTrendRows);
 }, { signal: uPageSignal });
+const uMotionPreference = window.matchMedia("(prefers-reduced-motion: reduce)");
+const uUpdateChartMotion = event => {
+    if (!uTrendChart) return;
+    uTrendChart.stop();
+    uTrendChart.options.animation = !event.matches;
+    uTrendChart.update("none");
+};
+uMotionPreference.addEventListener("change", uUpdateChartMotion);
+uPageSignal.addEventListener("abort", () => uMotionPreference.removeEventListener("change", uUpdateChartMotion), { once: true });
 window.addEventListener("ibems:dashboard-period-change", loadUserDashboard, { signal: uPageSignal });
 loadUserDashboard();
 }());

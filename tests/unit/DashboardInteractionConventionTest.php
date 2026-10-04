@@ -52,6 +52,6 @@ final class DashboardInteractionConventionTest extends CIUnitTestCase
         $this->assertStringNotContainsString('Open last visited page', $layoutScript);
         $this->assertStringContainsString('class="app-brand-text" href="<?= esc(site_url($portalHomePath)) ?>"', $shell);
         $this->assertStringContainsString('data-portal-navigation-link aria-label="Open <?= esc($portalHomeLabel) ?>"', $shell);
-        $this->assertStringContainsString("assets/js/app-layout.js') ?>?v=20260825b", $shell);
+        $this->assertMatchesRegularExpression('~assets/js/app-layout\.js.*\?v=[a-zA-Z0-9-]+~', $shell);
     }
 }

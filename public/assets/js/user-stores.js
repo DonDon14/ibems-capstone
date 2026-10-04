@@ -23,6 +23,11 @@ let usSwipeLastX = null;
 let usSwipeStartTime = 0;
 let usSwipeMotionTimer = null;
 
+function usScrollIntoView(element, options) {
+    const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    element?.scrollIntoView({ ...options, behavior: reduceMotion ? "instant" : "smooth" });
+}
+
 function usHasActiveFilters() {
     return document.getElementById("us-search").value.trim() !== ""
         || document.getElementById("us-store").value !== ""
@@ -50,7 +55,7 @@ function usMoney(value) {
 
 function usState(type, message) {
     const icon = type === "error" ? "bi-exclamation-circle" : type === "empty" ? "bi-inbox" : "bi-arrow-repeat";
-    return `<div class="data-state data-state--${usEscape(type)}" role="status"><i class="bi ${icon}" aria-hidden="true"></i><div><strong>${usEscape(message)}</strong></div></div>`;
+    return `<div class="data-state data-state--${usEscape(type)}" role="${type === "error" ? "alert" : "status"}"><i class="bi ${icon}" aria-hidden="true"></i><div><strong>${usEscape(message)}</strong></div></div>`;
 }
 
 function usSetOptions(id, placeholder, rows, valueKey, labelKey) {
@@ -168,7 +173,7 @@ function usRenderVariantDetail(direction = 0) {
         return `<button class="user-product-variant-tab${isActive ? " is-active" : ""}" type="button" role="tab" aria-selected="${isActive ? "true" : "false"}" tabindex="${isActive ? "0" : "-1"}" data-variant-index="${index}"><span>${usEscape(label)}</span><strong>${usEscape(usMoney(item.price))}</strong></button>`;
     }).join("");
     rail.classList.toggle("is-single", !multiple);
-    rail.querySelector(".is-active")?.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "center" });
+    usScrollIntoView(rail.querySelector(".is-active"), { block: "nearest", inline: "center" });
     position.textContent = multiple ? `${usActiveVariantIndex + 1} / ${usActiveVariants.length}` : "";
     previous.classList.toggle("is-hidden", !multiple);
     next.classList.toggle("is-hidden", !multiple);
@@ -243,6 +248,10 @@ function usCloseProduct(immediate = false) {
     const modal = document.getElementById("us-product-modal");
     if (!modal || modal.classList.contains("is-hidden")) return;
     window.clearTimeout(usProductModalTimer);
+    window.clearTimeout(usSwipeMotionTimer);
+    usSwipeStartX = null;
+    usSwipeLastX = null;
+    usSwipeStartTime = 0;
     modal.classList.remove("is-open");
     modal.classList.add("is-closing");
     const finish = () => {
@@ -252,7 +261,7 @@ function usCloseProduct(immediate = false) {
         usProductModalTrigger?.focus?.();
         usProductModalTrigger = null;
     };
-    if (immediate) finish();
+    if (immediate || window.matchMedia("(prefers-reduced-motion: reduce)").matches) finish();
     else usProductModalTimer = window.setTimeout(finish, 220);
 }
 
@@ -261,13 +270,17 @@ function usRenderPager(meta) {
     const page = Number(meta.page || 1);
     const totalPages = Number(meta.total_pages || 1);
     pager.innerHTML = `
-        <button class="secondary-btn btn-sm" type="button" data-page="${page - 1}" ${page <= 1 ? "disabled" : ""}><i class="bi bi-chevron-left"></i> Previous</button>
+        <button class="secondary-btn btn-sm" type="button" aria-label="Previous product page" data-page="${page - 1}" ${page <= 1 ? "disabled" : ""}><i class="bi bi-chevron-left"></i> Previous</button>
         <span>Page ${page} of ${totalPages}</span>
-        <button class="secondary-btn btn-sm" type="button" data-page="${page + 1}" ${page >= totalPages ? "disabled" : ""}>Next <i class="bi bi-chevron-right"></i></button>`;
+        <button class="secondary-btn btn-sm" type="button" aria-label="Next product page" data-page="${page + 1}" ${page >= totalPages ? "disabled" : ""}>Next <i class="bi bi-chevron-right"></i></button>`;
 }
 
 async function usLoad() {
     const requestId = ++usRequestSequence;
+    const pager = document.getElementById("us-pager");
+    const focusedPager = pager.contains(document.activeElement) ? document.activeElement : null;
+    const focusedLabel = focusedPager?.getAttribute("aria-label");
+    pager.querySelectorAll("button").forEach((button) => { button.disabled = true; });
     usUpdateResetFilters();
     const params = new URLSearchParams({ page: String(usPage), page_size: "24" });
     params.set("include_options", usOptionsLoaded ? "0" : "1");
@@ -283,11 +296,14 @@ async function usLoad() {
     params.set("sort_dir", sortDir);
 
     const grid = document.getElementById("us-products");
+    grid.setAttribute("aria-busy", "true");
+    ["us-product-count", "us-available-count"].forEach((id) => { document.getElementById(id).textContent = "Loading…"; });
+    document.getElementById("us-context").textContent = "Loading products...";
     grid.innerHTML = usState("loading", "Loading store products...");
     try {
         const response = await fetch(`/user/stores/data?${params.toString()}`, { signal: usPageSignal });
         const data = await response.json();
-        if (requestId !== usRequestSequence) return;
+        if (usPageSignal.aborted || requestId !== usRequestSequence) return;
         if (!response.ok || data?.status !== "success") throw new Error(data?.message || "Unable to load store products.");
 
         if (data.options_included) {
@@ -307,9 +323,21 @@ async function usLoad() {
     } catch (error) {
         if (usPageSignal.aborted) return;
         if (requestId !== usRequestSequence) return;
+        usRows = [];
+        ["us-product-count", "us-available-count"].forEach((id) => { document.getElementById(id).textContent = "Unavailable"; });
         grid.innerHTML = usState("error", error.message || "Unable to load store products.");
         document.getElementById("us-context").textContent = "Products unavailable";
         document.getElementById("us-pager").innerHTML = "";
+    } finally {
+        if (!usPageSignal.aborted && requestId === usRequestSequence) {
+            grid.setAttribute("aria-busy", "false");
+            if (focusedLabel && (document.activeElement === document.body || document.activeElement === focusedPager)) {
+                const buttons = Array.from(pager.querySelectorAll("button:not(:disabled)"));
+                const target = buttons.find((button) => button.getAttribute("aria-label") === focusedLabel)
+                    || buttons[0] || document.getElementById("us-search");
+                target?.focus();
+            }
+        }
     }
 }
 
@@ -329,6 +357,9 @@ document.getElementById("us-search").addEventListener("search", () => {
 document.getElementById("us-reset-filters").addEventListener("click", () => {
     ["us-search", "us-store", "us-category", "us-availability"].forEach((id) => { document.getElementById(id).value = ""; });
     document.getElementById("us-sort").value = "store:asc";
+    ["us-store", "us-category", "us-availability", "us-sort"].forEach((id) => {
+        document.getElementById(id).dispatchEvent(new CustomEvent("ibems:control-sync", { bubbles: true }));
+    });
     usPage = 1;
     usUpdateResetFilters();
     usLoad();
@@ -339,7 +370,7 @@ document.getElementById("us-pager").addEventListener("click", (event) => {
     if (!button || button.disabled) return;
     usPage = Math.max(1, Number(button.dataset.page || 1));
     usLoad();
-    document.querySelector(".page-header")?.scrollIntoView({ behavior: "smooth", block: "start" });
+    usScrollIntoView(document.querySelector(".page-header"), { block: "start" });
 });
 document.getElementById("us-products").addEventListener("click", (event) => {
     const card = event.target.closest("[data-product-id]");
@@ -424,6 +455,12 @@ document.addEventListener("error", (event) => {
     const cardWrap = image.closest(".user-product-image-wrap");
     if (cardWrap) cardWrap.outerHTML = '<span class="user-product-image-fallback"><i class="bi bi-box-seam"></i></span>';
 }, { capture: true, signal: usPageSignal });
+window.matchMedia("(prefers-reduced-motion: reduce)").addEventListener("change", (event) => {
+    if (!event.matches || usPageSignal.aborted) return;
+    const modal = document.getElementById("us-product-modal");
+    if (modal?.classList.contains("is-closing")) usCloseProduct(true);
+}, { signal: usPageSignal });
+
 usPageSignal.addEventListener("abort", () => {
     usCloseProduct(true);
     usProductModalPortal?.remove();

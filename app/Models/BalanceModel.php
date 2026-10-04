@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\NumericFloatCast;
 use CodeIgniter\Model;
 
 class BalanceModel extends Model
@@ -29,6 +30,8 @@ class BalanceModel extends Model
         'credit_rate'   => 'float',
         'current_debt'  => 'float',
     ];
+
+    protected array $castHandlers = ['float' => NumericFloatCast::class];
 
     protected $useTimestamps = false;
 

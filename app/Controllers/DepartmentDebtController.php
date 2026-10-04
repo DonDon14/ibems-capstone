@@ -239,10 +239,12 @@ class DepartmentDebtController extends Controller
     public function setAllocation()
     {
         $payload = $this->payload();
+        $amount = $this->moneyInput($payload['allocation_amount'] ?? null);
+        if ($amount === null) return $this->jsonError('Allocation must be a nonnegative amount with at most two decimal places.');
         $result = (new DepartmentDebtService())->setAllocation(
             (int) ($payload['department_id'] ?? 0),
             (string) ($payload['period_month'] ?? ''),
-            (float) ($payload['allocation_amount'] ?? -1),
+            $amount,
             (string) ($payload['status'] ?? 'open'),
             trim((string) ($payload['reason'] ?? '')),
             (int) session()->get('user_id')
@@ -253,6 +255,8 @@ class DepartmentDebtController extends Controller
     public function setAllocations()
     {
         $payload = $this->payload();
+        $amount = $this->moneyInput($payload['allocation_amount'] ?? null);
+        if ($amount === null) return $this->jsonError('Allocation must be a nonnegative amount with at most two decimal places.');
         $departmentIds = $payload['department_ids'] ?? [];
         if (!is_array($departmentIds)) {
             return $this->result(['status' => 'error', 'code' => 400, 'message' => 'Select one or more departments.']);
@@ -260,7 +264,7 @@ class DepartmentDebtController extends Controller
         $result = (new DepartmentDebtService())->setAllocations(
             $departmentIds,
             (string) ($payload['period_month'] ?? ''),
-            (float) ($payload['allocation_amount'] ?? -1),
+            $amount,
             (string) ($payload['status'] ?? 'open'),
             trim((string) ($payload['reason'] ?? '')),
             (int) session()->get('user_id')
@@ -271,13 +275,16 @@ class DepartmentDebtController extends Controller
     public function recordSettlement()
     {
         $payload = $this->payload();
+        $amount = $this->moneyInput($payload['amount'] ?? null);
+        if ($amount === null) return $this->result(['status'=>'error','code'=>400,'message'=>'Settlement must be a positive amount with at most two decimal places.','retry_safe'=>true]);
         $result = (new DepartmentDebtService())->recordSettlement(
             (int) ($payload['department_id'] ?? 0),
             (int) ($payload['period_id'] ?? 0),
-            (float) ($payload['amount'] ?? 0),
+            $amount,
             (string) ($payload['reference_no'] ?? ''),
             (string) ($payload['remarks'] ?? ''),
-            (int) session()->get('user_id')
+            (int) session()->get('user_id'),
+            $payload['request_key'] ?? null
         );
         return $this->result($result);
     }
@@ -398,8 +405,17 @@ class DepartmentDebtController extends Controller
 
     private function payload(): array
     {
-        $payload = $this->request->getJSON(true) ?? $this->request->getPost() ?? [];
+        $payload = str_contains(strtolower($this->request->getHeaderLine('Content-Type')), 'application/json')
+            ? $this->request->getJSON(true) : $this->request->getPost();
         return is_array($payload) ? $payload : [];
+    }
+
+    private function moneyInput(mixed $value): ?float
+    {
+        if ((!is_string($value) && !is_int($value) && !is_float($value))
+            || preg_match('/^\d+(?:\.\d{1,2})?$/D', trim((string) $value)) !== 1) return null;
+        $amount = (float) $value;
+        return is_finite($amount) ? $amount : null;
     }
 
     private function hasDepartmentAccess(): bool

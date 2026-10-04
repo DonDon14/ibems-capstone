@@ -1,8 +1,8 @@
 <?= $this->extend('layouts/store') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/store-reports.css') ?>?v=20260824a">
-<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20260825a">
+<link rel="stylesheet" href="<?= base_url('assets/css/store-reports.css') ?>?v=20261002-table-containment">
+<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20261003-total-wrap">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -32,14 +32,14 @@
     ]) ?>
 
     <div class="dashboard-grid reports-summary-grid">
-        <?= view('components/stat_card', ['title' => 'Total Sales', 'value' => 'PHP 0.00', 'valueId' => 'sum-sales', 'icon' => 'bi bi-graph-up-arrow', 'tone' => 'sales']) ?>
-        <?= view('components/stat_card', ['title' => 'Estimated Cost', 'value' => 'PHP 0.00', 'valueId' => 'sum-cost', 'icon' => 'bi bi-bag', 'tone' => 'finance']) ?>
-        <?= view('components/stat_card', ['title' => 'Estimated Profit', 'value' => 'PHP 0.00', 'valueId' => 'sum-profit', 'icon' => 'bi bi-cash-coin', 'tone' => 'finance']) ?>
-        <?= view('components/stat_card', ['title' => 'Profit Margin', 'value' => '0.00%', 'valueId' => 'sum-margin', 'icon' => 'bi bi-percent', 'tone' => 'sales']) ?>
-        <?= view('components/stat_card', ['title' => 'Transactions', 'value' => '0', 'valueId' => 'sum-transactions', 'icon' => 'bi bi-receipt', 'tone' => 'users']) ?>
-        <?= view('components/stat_card', ['title' => 'Items Sold', 'value' => '0', 'valueId' => 'sum-items', 'icon' => 'bi bi-box-seam', 'tone' => 'users']) ?>
-        <?= view('components/stat_card', ['title' => 'Average Ticket', 'value' => 'PHP 0.00', 'valueId' => 'sum-ticket', 'icon' => 'bi bi-ticket-perforated', 'tone' => 'finance']) ?>
-        <?= view('components/stat_card', ['title' => 'Stock-in Cost', 'value' => 'PHP 0.00', 'valueId' => 'sum-stockin-cost', 'icon' => 'bi bi-cart-plus', 'tone' => 'warning']) ?>
+        <?= view('components/stat_card', ['title' => 'Total Sales', 'value' => 'Loading…', 'valueId' => 'sum-sales', 'icon' => 'bi bi-graph-up-arrow', 'tone' => 'sales']) ?>
+        <?= view('components/stat_card', ['title' => 'Estimated Cost', 'value' => 'Loading…', 'valueId' => 'sum-cost', 'icon' => 'bi bi-bag', 'tone' => 'finance']) ?>
+        <?= view('components/stat_card', ['title' => 'Estimated Profit', 'value' => 'Loading…', 'valueId' => 'sum-profit', 'icon' => 'bi bi-cash-coin', 'tone' => 'finance']) ?>
+        <?= view('components/stat_card', ['title' => 'Profit Margin', 'value' => 'Loading…', 'valueId' => 'sum-margin', 'icon' => 'bi bi-percent', 'tone' => 'sales']) ?>
+        <?= view('components/stat_card', ['title' => 'Transactions', 'value' => 'Loading…', 'valueId' => 'sum-transactions', 'icon' => 'bi bi-receipt', 'tone' => 'users']) ?>
+        <?= view('components/stat_card', ['title' => 'Items Sold', 'value' => 'Loading…', 'valueId' => 'sum-items', 'icon' => 'bi bi-box-seam', 'tone' => 'users']) ?>
+        <?= view('components/stat_card', ['title' => 'Average Ticket', 'value' => 'Loading…', 'valueId' => 'sum-ticket', 'icon' => 'bi bi-ticket-perforated', 'tone' => 'finance']) ?>
+        <?= view('components/stat_card', ['title' => 'Stock-in Cost', 'value' => 'Loading…', 'valueId' => 'sum-stockin-cost', 'icon' => 'bi bi-cart-plus', 'tone' => 'warning']) ?>
     </div>
 
     <div class="dash-panels reports-panels-top">
@@ -70,14 +70,14 @@
         <h4><i class="bi bi-cash-stack"></i> Payment Records</h4>
         <p class="reports-card-note">Split payments appear under every method used, so method transaction counts can overlap.</p>
         <div class="payment-records-grid">
-            <?= view('components/stat_card', ['title' => 'Cash Sales', 'value' => 'PHP 0.00', 'valueId' => 'pay-cash', 'icon' => 'bi bi-cash', 'tone' => 'sales', 'meta' => '0 transactions', 'metaId' => 'pay-cash-meta', 'class' => 'payment-record']) ?>
-            <?= view('components/stat_card', ['title' => 'GCash Sales', 'value' => 'PHP 0.00', 'valueId' => 'pay-gcash', 'icon' => 'bi bi-phone', 'tone' => 'finance', 'meta' => '0 transactions', 'metaId' => 'pay-gcash-meta', 'class' => 'payment-record']) ?>
-            <?= view('components/stat_card', ['title' => 'Other Payments', 'value' => 'PHP 0.00', 'valueId' => 'pay-others', 'icon' => 'bi bi-three-dots', 'tone' => 'finance', 'meta' => '0 transactions', 'metaId' => 'pay-others-meta', 'class' => 'payment-record']) ?>
-            <?= view('components/stat_card', ['title' => 'Debt Payments', 'value' => 'PHP 0.00', 'valueId' => 'pay-debt', 'icon' => 'bi bi-credit-card', 'tone' => 'debt', 'meta' => '0 transactions', 'metaId' => 'pay-debt-meta', 'class' => 'payment-record']) ?>
-            <?= view('components/stat_card', ['title' => 'Opening Cash', 'value' => 'PHP 0.00', 'valueId' => 'cash-opening', 'icon' => 'bi bi-calendar2-plus', 'tone' => 'warning', 'meta' => 'Business date: --', 'metaId' => 'cash-date', 'class' => 'payment-record']) ?>
-            <?= view('components/stat_card', ['title' => 'Expected Cash on Hand', 'value' => 'PHP 0.00', 'valueId' => 'cash-on-hand', 'icon' => 'bi bi-safe2', 'tone' => 'sales', 'meta' => 'Opening + cash sales', 'metaId' => 'cash-on-hand-meta', 'class' => 'payment-record']) ?>
-            <?= view('components/stat_card', ['title' => 'Expected E-Cash on Hand', 'value' => 'PHP 0.00', 'valueId' => 'ecash-on-hand', 'icon' => 'bi bi-wallet2', 'tone' => 'finance', 'meta' => 'E-cash sales + cash in/out', 'metaId' => 'ecash-on-hand-meta', 'class' => 'payment-record']) ?>
-            <?= view('components/stat_card', ['title' => 'Total Revenue', 'value' => 'PHP 0.00', 'valueId' => 'pay-total-revenue', 'icon' => 'bi bi-stars', 'tone' => 'sales', 'meta' => 'All payment methods combined', 'metaId' => 'pay-total-meta', 'class' => 'payment-record payment-record--highlight']) ?>
+            <?= view('components/stat_card', ['title' => 'Cash Sales', 'value' => 'Loading…', 'valueId' => 'pay-cash', 'icon' => 'bi bi-cash', 'tone' => 'sales', 'meta' => 'Loading transactions…', 'metaId' => 'pay-cash-meta', 'class' => 'payment-record']) ?>
+            <?= view('components/stat_card', ['title' => 'GCash Sales', 'value' => 'Loading…', 'valueId' => 'pay-gcash', 'icon' => 'bi bi-phone', 'tone' => 'finance', 'meta' => 'Loading transactions…', 'metaId' => 'pay-gcash-meta', 'class' => 'payment-record']) ?>
+            <?= view('components/stat_card', ['title' => 'Other Payments', 'value' => 'Loading…', 'valueId' => 'pay-others', 'icon' => 'bi bi-three-dots', 'tone' => 'finance', 'meta' => 'Loading transactions…', 'metaId' => 'pay-others-meta', 'class' => 'payment-record']) ?>
+            <?= view('components/stat_card', ['title' => 'Debt Payments', 'value' => 'Loading…', 'valueId' => 'pay-debt', 'icon' => 'bi bi-credit-card', 'tone' => 'debt', 'meta' => 'Loading transactions…', 'metaId' => 'pay-debt-meta', 'class' => 'payment-record']) ?>
+            <?= view('components/stat_card', ['title' => 'Opening Cash', 'value' => 'Loading…', 'valueId' => 'cash-opening', 'icon' => 'bi bi-calendar2-plus', 'tone' => 'warning', 'meta' => 'Loading business date…', 'metaId' => 'cash-date', 'class' => 'payment-record']) ?>
+            <?= view('components/stat_card', ['title' => 'Expected Cash on Hand', 'value' => 'Loading…', 'valueId' => 'cash-on-hand', 'icon' => 'bi bi-safe2', 'tone' => 'sales', 'meta' => 'Opening + cash sales', 'metaId' => 'cash-on-hand-meta', 'class' => 'payment-record']) ?>
+            <?= view('components/stat_card', ['title' => 'Expected E-Cash on Hand', 'value' => 'Loading…', 'valueId' => 'ecash-on-hand', 'icon' => 'bi bi-wallet2', 'tone' => 'finance', 'meta' => 'E-cash sales + cash in/out', 'metaId' => 'ecash-on-hand-meta', 'class' => 'payment-record']) ?>
+            <?= view('components/stat_card', ['title' => 'Total Revenue', 'value' => 'Loading…', 'valueId' => 'pay-total-revenue', 'icon' => 'bi bi-stars', 'tone' => 'sales', 'meta' => 'All payment methods combined', 'metaId' => 'pay-total-meta', 'class' => 'payment-record payment-record--highlight']) ?>
         </div>
     </article>
 
@@ -233,7 +233,8 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260825a"></script>
-<script src="<?= base_url('assets/js/store-reports.js') ?>?v=20260824b"></script>
+<script src="<?= base_url('assets/vendor/chart.js/chart.umd.js') ?>"></script>
+<script src="<?= base_url('assets/vendor/qrcode-generator/qrcode.js') ?>"></script>
+<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20261002-total-label"></script>
+<script src="<?= base_url('assets/js/store-reports.js') ?>?v=20261003-confirmed-http"></script>
 <?= $this->endSection() ?>

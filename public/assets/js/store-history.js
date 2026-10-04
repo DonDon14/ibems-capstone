@@ -1,7 +1,10 @@
 let historyStores = [];
 let historyActiveStoreId = null;
 let selectedReceipt = null;
+let historyReceiptSequence = 0;
+let historyReceiptTrigger = null;
 let historyPage = 1;
+let historyRequestSequence = 0;
 let historyFilters = {
     dateFrom: "",
     dateTo: "",
@@ -45,8 +48,11 @@ function hPaymentLabel(method) {
 
 function setHistoryResult(message, type) {
     const el = document.getElementById("history-result");
+    el.setAttribute("role", type === "error" ? "alert" : "status");
+    el.setAttribute("aria-live", type === "error" ? "assertive" : "polite");
+    el.setAttribute("aria-atomic", "true");
     el.textContent = message || "";
-    el.style.color = type === "error" ? "#b91c1c" : "#166534";
+    el.style.color = type === "error" ? "var(--feedback-error, #b91c1c)" : "var(--feedback-success, #166534)";
 }
 
 function syncHistoryFilters() {
@@ -67,11 +73,20 @@ function syncHistoryFilters() {
 async function applyHistoryFiltersAutomatically() {
     syncHistoryFilters();
     if (historyFilters.dateFrom && historyFilters.dateTo && historyFilters.dateFrom > historyFilters.dateTo) {
+        ++historyRequestSequence;
+        clearHistorySummary("Select valid dates");
+        document.getElementById("history-pager").innerHTML = "";
+        document.getElementById("history-body").innerHTML = hDataState("error", "From date cannot be later than To date.");
         setHistoryResult("From date cannot be later than To date.", "error");
         return;
     }
     historyPage = 1;
     await loadTransactions();
+}
+
+function clearHistorySummary(label) {
+    document.getElementById("history-summary-count").textContent = label;
+    document.getElementById("history-summary-total").textContent = label;
 }
 
 function renderSummary(transactions, summary = null) {
@@ -121,7 +136,7 @@ async function loadStores() {
     const context = window.IBEMS_PORTAL_CONTEXT || {};
     if (Array.isArray(context.stores) && context.stores.length > 0) {
         historyStores = context.stores;
-        historyActiveStoreId = Number(context.default_store_id || historyStores[0].id);
+        historyActiveStoreId = window.IbemsStoreScope.resolve(historyStores, context.default_store_id);
         return;
     }
 
@@ -133,12 +148,16 @@ async function loadStores() {
     }
 
     historyStores = data.stores;
-    historyActiveStoreId = Number(data.default_store_id || historyStores[0].id);
+    historyActiveStoreId = window.IbemsStoreScope.resolve(historyStores, data.default_store_id);
 }
 
 async function loadTransactions() {
+    const requestId = ++historyRequestSequence;
     const body = document.getElementById("history-body");
     body.innerHTML = hDataState("loading", "Loading transactions...");
+    clearHistorySummary("Loading…");
+    document.getElementById("history-pager").innerHTML = "";
+    setHistoryResult("", "ok");
 
     const params = new URLSearchParams({
         store_id: String(historyActiveStoreId),
@@ -159,16 +178,12 @@ async function loadTransactions() {
         params.set("payment_method", historyFilters.paymentMethod);
     }
 
+    try {
     const response = await fetch(`/store/transactions?${params.toString()}`);
     const data = await response.json();
+    if (requestId !== historyRequestSequence) return;
 
-    if (!data || data.status !== "success") {
-        const message = data?.message || "Unable to load transactions.";
-        body.innerHTML = hDataState("error", message);
-        renderSummary([]);
-        setHistoryResult(message, "error");
-        return;
-    }
+    if (!response.ok || !data || data.status !== "success") throw new Error(data?.message || "Unable to load transactions.");
 
     renderTransactions(data.transactions, data.summary || null);
     const meta = data.pagination || {};
@@ -179,15 +194,34 @@ async function loadTransactions() {
         <span>Page ${page} of ${totalPages} · ${Number(meta.total || 0)} records</span>
         <button class="secondary-btn btn-sm" type="button" data-page="${page + 1}" ${page >= totalPages ? "disabled" : ""}>Next <i class="bi bi-chevron-right"></i></button>`;
     setHistoryResult("", "ok");
+    } catch (error) {
+        if (requestId !== historyRequestSequence) return;
+        const message = error?.message || "Unable to load transactions.";
+        body.innerHTML = hDataState("error", message);
+        clearHistorySummary("Unavailable");
+        document.getElementById("history-pager").innerHTML = "";
+        setHistoryResult(message, "error");
+    }
 }
 
 async function openReceipt(transactionId) {
-    const response = await fetch(`/store/transactions/${transactionId}`);
+    const requestId = ++historyReceiptSequence;
+    const modal = document.getElementById("history-receipt-modal");
+    const content = document.getElementById("history-receipt-content");
+    const print = document.getElementById("history-receipt-print");
+    const view = document.getElementById("history-receipt-view");
+    historyReceiptTrigger = document.activeElement;
+    selectedReceipt = null;
+    print.disabled = view.disabled = true;
+    content.innerHTML = '<div class="receipt-loading" role="status">Loading receipt...</div>';
+    modal.style.display = "grid";
+    document.getElementById("history-receipt-close").focus();
+    try {
+    const response = await fetch(`/store/transactions/${encodeURIComponent(String(transactionId))}`);
     const data = await response.json();
-
-    if (!data || data.status !== "success" || !data.transaction) {
-        setHistoryResult(data?.message || "Unable to load receipt.", "error");
-        return;
+    if (requestId !== historyReceiptSequence) return false;
+    if (!response.ok || !data || data.status !== "success" || !data.transaction) {
+        throw new Error(data?.message || "Unable to load receipt.");
     }
 
     const tx = data.transaction;
@@ -201,18 +235,40 @@ async function openReceipt(transactionId) {
         payments: tx.payments,
         totalAmount: tx.amount,
         items: tx.items,
-        lookupUrl: `${window.location.origin}/store/receipt/${encodeURIComponent(String(tx.id))}`,
+        lookupUrl: `${window.location.origin}/store/receipt/${encodeURIComponent(String(tx.id))}?store_id=${encodeURIComponent(String(historyActiveStoreId))}`,
     };
-    const modal = document.getElementById("history-receipt-modal");
-    if (window.IbemsReceipt) {
-        window.IbemsReceipt.renderReceipt("history-receipt-content", selectedReceipt);
+    if (!window.IbemsReceipt) throw new Error("Receipt renderer is unavailable.");
+    window.IbemsReceipt.renderReceipt("history-receipt-content", selectedReceipt);
+    print.disabled = view.disabled = false;
+    return true;
+    } catch (error) {
+        if (requestId !== historyReceiptSequence) return false;
+        selectedReceipt = null;
+        content.innerHTML = `<div class="receipt-error" role="alert">${hEscape(error?.message || "Unable to load receipt.")} Close this dialog and try again.</div>`;
+        return false;
     }
-    modal.style.display = "grid";
 }
 
 function closeReceipt() {
+    ++historyReceiptSequence;
+    selectedReceipt = null;
     document.getElementById("history-receipt-modal").style.display = "none";
+    historyReceiptTrigger?.focus?.();
+    historyReceiptTrigger = null;
 }
+
+document.addEventListener("keydown", event => {
+    const modal = document.getElementById("history-receipt-modal");
+    if (modal.style.display !== "grid") return;
+    if (event.key === "Escape") { event.preventDefault(); closeReceipt(); return; }
+    if (event.key !== "Tab") return;
+    const controls = Array.from(modal.querySelectorAll('a[href],button,input,select,textarea,[tabindex]'))
+        .filter(element => !element.disabled && element.tabIndex >= 0 && element.getClientRects().length);
+    const first = controls[0], last = controls[controls.length - 1];
+    if (!first) { event.preventDefault(); return; }
+    if (event.shiftKey && (document.activeElement === first || !modal.contains(document.activeElement))) { event.preventDefault(); last.focus(); }
+    else if (!event.shiftKey && (document.activeElement === last || !modal.contains(document.activeElement))) { event.preventDefault(); first.focus(); }
+});
 
 function printReceipt() {
     if (!selectedReceipt) return;
@@ -222,8 +278,7 @@ function printReceipt() {
 }
 
 async function printReceiptById(transactionId) {
-    await openReceipt(transactionId);
-    printReceipt();
+    if (await openReceipt(transactionId)) printReceipt();
 }
 
 document.getElementById("history-clear-filters").addEventListener("click", async () => {
@@ -297,7 +352,8 @@ document.getElementById("history-receipt-modal").addEventListener("click", (even
     } catch (error) {
         const message = error.message || "Unable to load transaction history.";
         document.getElementById("history-body").innerHTML = hDataState("error", message);
-        renderSummary([]);
+        clearHistorySummary("Unavailable");
+        document.getElementById("history-pager").innerHTML = "";
         setHistoryResult(message, "error");
     }
 })();

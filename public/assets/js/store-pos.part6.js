@@ -187,10 +187,8 @@ document.getElementById("scanner-close").addEventListener("click", async () => {
     await closeScannerModal();
 });
 
-document.getElementById("scanner-stop").addEventListener("click", async () => {
-    await stopScanner();
-    setScannerStatus("Scanner stopped.");
-});
+document.getElementById('scanner-start').addEventListener('click', () => startScanner().catch(() => setScannerStatus('Unable to start scanner.', true)));
+document.getElementById('scanner-stop').addEventListener('click', stopScannerFromUi);
 
 document.getElementById("barcode-scanner-modal").addEventListener("click", async (event) => {
     if (event.target.id === "barcode-scanner-modal") {
@@ -240,12 +238,6 @@ document.getElementById("customer-qr-done")?.addEventListener("click", closeCust
 document.getElementById("customer-qr-modal")?.addEventListener("click", (event) => {
     if (event.target.id === "customer-qr-modal") closeCustomerQrModal();
 });
-document.addEventListener("keydown", (event) => {
-    if (event.key === "Escape" && !document.getElementById("customer-qr-modal")?.classList.contains("is-hidden")) {
-        closeCustomerQrModal();
-    }
-});
-
 document.getElementById("debt-customer-search").addEventListener("input", async (event) => {
     const query = event.target.value || "";
     selectedDebtCustomerId = null;
@@ -338,11 +330,7 @@ document.getElementById("debt-payment-channel").addEventListener("change", rende
 
 document.getElementById("debt-pin-input").addEventListener("input", (event) => {
     event.target.value = String(event.target.value || "").replace(/\D/g, "").slice(0, 6);
-    const result = document.getElementById("debt-pin-modal-result");
-    if (result) {
-        result.textContent = "";
-        result.className = "result-msg";
-    }
+    setDebtPinModalResult();
 });
 
 document.getElementById("debt-pin-input").addEventListener("keydown", (event) => {
@@ -385,6 +373,7 @@ document.getElementById("confirm-proceed").addEventListener("click", async () =>
     await processConfirmedTransaction(pendingTransaction);
 });
 document.getElementById("confirm-cancel").addEventListener("click", closeConfirmTransactionModal);
+bindPosCheckoutDialogKeys();
 document.getElementById("confirm-close").addEventListener("click", closeConfirmTransactionModal);
 document.getElementById("confirm-transaction-modal").addEventListener("click", (event) => {
     if (event.target.id === "confirm-transaction-modal") {
@@ -537,6 +526,7 @@ window.IbemsPortalNavigation?.onCleanup(async () => {
         setScannerUiState(false);
         setPosTransactionEnabled(false);
         await loadMyStores();
+        await loadStoreCapabilities();
         await loadProducts();
         await loadPaymentMethods();
         await loadOpeningBalanceStatus();

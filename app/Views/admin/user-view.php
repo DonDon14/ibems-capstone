@@ -36,7 +36,13 @@
                 <select id="uv-role-filter" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm text-slate-700 outline-none transition focus:border-blue-300">
                     <option value="">All Roles</option>
                     <option value="ADMIN">Admin</option>
+                    <option value="HR">Human Resources</option>
                     <option value="ACCOUNTING_OFFICE">Accounting Office</option>
+                    <option value="ACCOUNTING_HEAD">Accounting Head</option>
+                    <option value="PAYROLL_CLERK">Payroll Clerk</option>
+                    <option value="CASHIER_HEAD">Cashier Head</option>
+                    <option value="COLLECTING_OFFICER">Collecting Officer</option>
+                    <option value="BE_DIRECTOR">BE Director</option>
                     <option value="STORE_SUPERVISOR">Store Supervisor</option>
                     <option value="STORE_SYSTEM">Store Cashier</option>
                     <option value="USER">User</option>
@@ -80,8 +86,8 @@
         </div>
     </div>
 
-    <p id="uv-result" class="stores-result text-sm font-semibold"></p>
-    <p id="uv-count-text" class="uv-count-text text-sm text-slate-500">Showing 0 of 0 records</p>
+    <p id="uv-result" class="stores-result text-sm font-semibold" role="status" aria-live="polite"></p>
+    <p id="uv-count-text" class="uv-count-text text-sm text-slate-500" role="status">Loading records…</p>
 
     <section class="record-panel uv-list-wrap">
         <div id="uv-body" class="record-list uv-record-list">
@@ -101,6 +107,7 @@
             <button id="uv-edit-close" type="button" class="admin-modal-close" aria-label="Close edit user dialog">x</button>
         </div>
         <div class="uv-modal-scroll">
+        <p class="uv-modal-result stores-result text-sm font-semibold" role="status" aria-live="polite" aria-atomic="true"></p>
         <div class="form-grid grid gap-3 md:grid-cols-2">
             <div class="uv-user-photo-field md:col-span-2">
                 <img id="uv-e-photo-preview" src="<?= esc(ibems_profile_image_url(null)) ?>" alt="Profile picture preview" data-profile-avatar>
@@ -116,6 +123,12 @@
                     <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-e-roles" value="STORE_SYSTEM" disabled> Store Cashier (from store assignment)</label>
                     <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-e-roles" value="STORE_SUPERVISOR" disabled> Store Supervisor (from store assignment)</label>
                     <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-e-roles" value="ACCOUNTING_OFFICE"> Accounting Office</label>
+                    <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-e-roles" value="ACCOUNTING_HEAD"> Accounting Head / Bookkeeper</label>
+                    <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-e-roles" value="PAYROLL_CLERK"> Payroll Clerk</label>
+                    <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-e-roles" value="CASHIER_HEAD"> Cashier Head</label>
+                    <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-e-roles" value="COLLECTING_OFFICER"> Collecting Officer</label>
+                    <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-e-roles" value="BE_DIRECTOR"> Business Enterprise Director</label>
+                    <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-e-roles" value="HR"> Human Resources</label>
                     <label class="inline-flex items-center gap-2"><input class="h-4 w-4" type="checkbox" name="uv-e-roles" value="ADMIN"> Admin</label>
                 </div>
             </div>
@@ -132,15 +145,16 @@
                     <option value="0">Inactive</option>
                 </select>
             </div>
-            <div id="uv-e-financial-fields" class="grid gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 md:col-span-2 md:grid-cols-3">
-                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-e-employment-type">Employment Type</label><select id="uv-e-employment-type" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"><option value="plantilla">Plantilla</option><option value="cos">COS</option><option value="part_time">Part-time</option></select></div>
-                <div class="field space-y-1 md:col-span-2"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-e-schedule">Salary Schedule</label><select id="uv-e-schedule" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"></select></div>
-                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-e-grade">Salary Grade</label><select id="uv-e-grade" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"></select></div>
-                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-e-step">Step</label><select id="uv-e-step" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"></select></div>
-                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-e-effective">Effective Date</label><input id="uv-e-effective" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="date"></div>
-                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-e-credit-percent">Credit Percentage</label><div class="relative"><input id="uv-e-credit-percent" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 pr-9 text-sm" type="number" min="0" max="100" step="0.01"><span class="pointer-events-none absolute right-3 top-3 text-sm text-slate-500">%</span></div></div>
-                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-e-salary-preview">Monthly Salary</label><input id="uv-e-salary-preview" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="text" readonly></div>
-                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-e-limit-preview">Credit Limit</label><input id="uv-e-limit-preview" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="text" readonly></div>
+            <p class="text-sm text-slate-600 md:col-span-2">Accounting manages existing employee salary profiles, credit percentages and credit limits.</p>
+            <div id="uv-e-financial-fields" hidden aria-hidden="true" class="hidden grid gap-3 rounded-xl border border-blue-200 bg-blue-50 p-4 md:col-span-2 md:grid-cols-3">
+                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-e-employment-type">Employment Type</label><select disabled id="uv-e-employment-type" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"><option value="plantilla">Plantilla</option><option value="cos">COS</option><option value="part_time">Part-time</option></select></div>
+                <div class="field space-y-1 md:col-span-2"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-e-schedule">Salary Schedule</label><select disabled id="uv-e-schedule" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"></select></div>
+                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-e-grade">Salary Grade</label><select disabled id="uv-e-grade" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"></select></div>
+                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-e-step">Step</label><select disabled id="uv-e-step" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm"></select></div>
+                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-e-effective">Effective Date</label><input disabled id="uv-e-effective" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="date"></div>
+                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-e-credit-percent">Credit Percentage</label><div class="relative"><input disabled id="uv-e-credit-percent" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 pr-9 text-sm" type="number" min="0" max="100" step="0.01"><span class="pointer-events-none absolute right-3 top-3 text-sm text-slate-500">%</span></div></div>
+                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-e-salary-preview">Monthly Salary</label><input disabled id="uv-e-salary-preview" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="text" readonly></div>
+                <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-e-limit-preview">Credit Limit</label><input disabled id="uv-e-limit-preview" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="text" readonly></div>
                 <p class="text-xs text-slate-600 md:col-span-3">Salary comes from the selected schedule. Changing the percentage recalculates future available credit without changing existing debt.</p>
             </div>
         </div>
@@ -191,6 +205,7 @@
             <button id="uv-add-close" type="button" class="admin-modal-close" aria-label="Close add user dialog">x</button>
         </div>
         <div class="uv-modal-scroll">
+        <p class="uv-modal-result stores-result text-sm font-semibold" role="status" aria-live="polite" aria-atomic="true"></p>
         <div class="form-grid grid gap-3 md:grid-cols-2">
             <div class="uv-user-photo-field md:col-span-2">
                 <img id="uv-a-photo-preview" src="<?= esc(ibems_profile_image_url(null)) ?>" alt="Profile picture preview" data-profile-avatar>
@@ -220,7 +235,7 @@
                 <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-a-credit-percent">Credit Percentage</label><div class="relative"><input id="uv-a-credit-percent" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 pr-9 text-sm" type="number" min="0" max="100" step="0.01" value="25"><span class="pointer-events-none absolute right-3 top-3 text-sm text-slate-500">%</span></div></div>
                 <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-a-salary-preview">Monthly Salary</label><input id="uv-a-salary-preview" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="text" readonly></div>
                 <div class="field space-y-1"><label class="text-xs font-semibold uppercase tracking-wide text-slate-600" for="uv-a-limit-preview">Credit Limit</label><input id="uv-a-limit-preview" class="h-11 w-full rounded-xl border border-slate-200 bg-white px-3 text-sm" type="text" readonly></div>
-                <p class="text-xs text-slate-600 md:col-span-3">New employees default to the standard SG 11, Step 1 profile and 25% credit. Both remain editable by Admin or Accounting.</p>
+                <p class="text-xs text-slate-600 md:col-span-3">New employees default to the standard SG 11, Step 1 profile and 25% credit. Existing employee credit and financial profile changes are handled by Accounting.</p>
             </div>
         </div>
         <div class="admin-modal-actions">
@@ -252,5 +267,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/admin-user-view.js') ?>?v=20260822c"></script>
+<script src="<?= base_url('assets/js/admin-user-view.js') ?>?v=20261003-add-lifecycle"></script>
 <?= $this->endSection() ?>

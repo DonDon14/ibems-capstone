@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/admin') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/department-debt.css') ?>?v=20260824g">
+<link rel="stylesheet" href="<?= base_url('assets/css/department-debt.css') ?>?v=20261004-admin-save-feedback">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -11,13 +11,13 @@
         'title' => 'Department management',
         'description' => 'Create departments and assign one accountable department head who may approve department purchases.',
         'icon' => 'bi bi-diagram-3',
-        'actions' => '<button id="department-add" class="primary-btn" type="button"><i class="bi bi-plus-lg"></i> Add Department</button>',
+        'actions' => '<button id="department-add" class="primary-btn" type="button" disabled><i class="bi bi-plus-lg"></i> Add Department</button>',
     ]) ?>
 
     <div class="department-summary-grid">
-        <article><span>Total departments</span><strong id="department-total">0</strong></article>
-        <article><span>Active</span><strong id="department-active">0</strong></article>
-        <article><span>With department head</span><strong id="department-with-head">0</strong></article>
+        <article><span>Total departments</span><strong id="department-total">Loading…</strong></article>
+        <article><span>Active</span><strong id="department-active">Loading…</strong></article>
+        <article><span>With department head</span><strong id="department-with-head">Loading…</strong></article>
     </div>
 
     <div class="department-toolbar" data-compact-filters>
@@ -26,7 +26,7 @@
         <button id="department-refresh" class="secondary-btn" type="button"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
     </div>
 
-    <div class="department-table-wrap">
+    <div id="department-admin-table-region" class="department-table-wrap" tabindex="0" role="region" aria-label="Department records">
         <table class="table table-standard">
             <thead><tr><th>Department</th><th>Department head</th><th>Status</th><th>Action</th></tr></thead>
             <tbody id="department-admin-body"><tr><td colspan="4">Loading departments...</td></tr></tbody>
@@ -39,6 +39,7 @@
     <form id="department-form" class="department-modal-card app-inset-modal-scroll">
         <header><div><span>Department setup</span><h3 id="department-modal-title">Add department</h3></div><button id="department-close" class="app-modal-close" type="button" aria-label="Close department form">&times;</button></header>
         <input id="department-id" type="hidden">
+        <div class="department-modal-scroll" role="region" aria-label="Department form fields and feedback" tabindex="0">
         <div class="department-form-grid">
             <label><span>Department code</span><input id="department-code" maxlength="40" required placeholder="e.g. CEA"></label>
             <label><span>Department name</span><input id="department-name" maxlength="160" required placeholder="College of Engineering and Architecture"></label>
@@ -56,12 +57,13 @@
             <label><span>Status</span><select id="department-active-input"><option value="1">Active</option><option value="0">Inactive</option></select></label>
             <label><span>Status reason</span><input id="department-status-reason" maxlength="500" placeholder="Required when inactive"></label>
         </div>
-        <p id="department-modal-result" class="department-result" role="status" aria-live="polite"></p>
+        <p id="department-modal-result" class="department-result" role="status" aria-live="polite" aria-atomic="true" tabindex="-1"></p>
+        </div>
         <footer><button id="department-cancel" class="secondary-btn" type="button">Cancel</button><button id="department-save" class="primary-btn" type="submit"><i class="bi bi-check2-circle"></i> Save Department</button></footer>
     </form>
 </div>
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/department-debt-pages.js') ?>?v=20260824f"></script>
+<script src="<?= base_url('assets/js/department-debt-pages.js') ?>?v=20261004-admin-save-feedback"></script>
 <?= $this->endSection() ?>

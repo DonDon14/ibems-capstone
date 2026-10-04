@@ -43,7 +43,7 @@ final class PosPaymentSelectorTest extends TestCase
         $this->assertStringContainsString('data-show-payment-qr=', $js);
         $this->assertStringContainsString('function openCustomerQrModal', $js);
         $this->assertStringContainsString('function closeCustomerQrModal', $js);
-        $this->assertStringContainsString('customerQrTrigger?.focus()', $js);
+        // QR focus restoration and keyboard behavior are executed in pos-selection-dialog.test.cjs.
         $this->assertStringContainsString('.customer-qr-content>img', $css);
         $this->assertStringContainsString('id="debt-credit-meter"', $view);
         $this->assertStringContainsString('function getCheckoutDebtAmount', $js);

@@ -61,7 +61,7 @@ class StorePaymentMethodModel extends Model
                 continue;
             }
 
-            $this->insert([
+            $data = [
                 'store_id' => $storeId,
                 'code' => $row['code'],
                 'label' => $row['label'],
@@ -69,9 +69,19 @@ class StorePaymentMethodModel extends Model
                 'sort_order' => $row['sort_order'],
                 'is_active' => true,
                 'is_system_reserved' => $row['is_system_reserved'],
-                'created_at' => date('Y-m-d H:i:s'),
-                'updated_at' => date('Y-m-d H:i:s'),
-            ]);
+                'created_at' => ibems_now()->format('Y-m-d H:i:s'),
+                'updated_at' => ibems_now()->format('Y-m-d H:i:s'),
+            ];
+            if ($this->db->DBDriver === 'MySQLi') {
+                // Two first visits may both observe a missing method. Keep the winner's
+                // complete settings (including a disabled method) on a duplicate key.
+                $sql = $this->db->table($this->table)->set($data)->getCompiledInsert();
+                if ($this->db->query($sql . ' ON DUPLICATE KEY UPDATE id = id') === false) {
+                    throw new \RuntimeException('Default payment method could not be initialized.');
+                }
+            } elseif ($this->insert($data) === false) {
+                throw new \RuntimeException('Default payment method could not be initialized.');
+            }
         }
     }
 

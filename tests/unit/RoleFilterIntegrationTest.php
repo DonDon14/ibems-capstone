@@ -28,12 +28,36 @@ final class RoleFilterIntegrationTest extends CIUnitTestCase
             ['GET', 'test/store-admin-only', static fn () => service('response')->setJSON([
                 'status' => 'success',
             ]), ['filter' => 'access:store.review_assigned']],
+            ['GET', 'test/store-report-submit', static fn () => service('response')->setJSON([
+                'status' => 'success',
+            ]), ['filter' => 'access:store.report_submit']],
             ['GET', 'test/store-checkout', static fn () => service('response')->setJSON([
                 'status' => 'success',
             ]), ['filter' => 'access:store.checkout']],
             ['GET', 'test/store-manage', static fn () => service('response')->setJSON([
                 'status' => 'success',
             ]), ['filter' => 'access:store.manage_assigned']],
+            ['GET', 'test/hr-staff-create', static fn () => service('response')->setJSON([
+                'status' => 'success',
+            ]), ['filter' => 'access:hr.staff.create']],
+            ['GET', 'test/shared-deduction', static fn () => service('response')->setJSON([
+                'status' => 'success',
+            ]), ['filter' => 'access:deduction.workflow']],
+            ['GET', 'test/accounting-debt-manage', static fn () => service('response')->setJSON([
+                'status' => 'success',
+            ]), ['filter' => 'access:accounting.debt_manage']],
+            ['GET', 'test/cashier-office', static fn () => service('response')->setJSON([
+                'status' => 'success',
+            ]), ['filter' => 'access:cashier.office']],
+            ['GET', 'test/be-review', static fn () => service('response')->setJSON([
+                'status' => 'success',
+            ]), ['filter' => 'access:be.review']],
+            ['GET', 'test/accounting-copy', static fn () => service('response')->setJSON([
+                'status' => 'success',
+            ]), ['filter' => 'access:report.accounting_copy']],
+            ['GET', 'test/finance-reports', static fn () => service('response')->setJSON([
+                'status' => 'success',
+            ]), ['filter' => 'access:finance.reports']],
             ['GET', 'test/unknown-policy', static fn () => service('response')->setJSON([
                 'status' => 'success',
             ]), ['filter' => 'access:not.a.policy']],
@@ -122,6 +146,24 @@ final class RoleFilterIntegrationTest extends CIUnitTestCase
             ->assertStatus(403);
     }
 
+    public function testHrCanOnlyReachTheStaffCreationPolicy(): void
+    {
+        $this->seedUser(20, 'HR');
+        $session = [
+            'logged_in' => true,
+            'user_id' => 20,
+            'role' => 'HR',
+            'available_roles' => ['HR'],
+        ];
+
+        $this->withSession($session)->withHeaders(['Accept' => 'application/json'])
+            ->get('test/hr-staff-create')->assertOK();
+        $this->withSession($session)->withHeaders(['Accept' => 'application/json'])
+            ->get('test/admin-only')->assertStatus(403);
+        $this->withSession($session)->withHeaders(['Accept' => 'application/json'])
+            ->get('test/store-manage')->assertStatus(403);
+    }
+
     public function testCashierAndSupervisorPermissionsStaySeparated(): void
     {
         $this->seedUser(18, 'STORE_SYSTEM');
@@ -147,6 +189,102 @@ final class RoleFilterIntegrationTest extends CIUnitTestCase
             ->get('test/store-manage')->assertOK();
         $this->withSession($supervisor)->withHeaders(['Accept' => 'application/json'])
             ->get('test/store-checkout')->assertStatus(403);
+    }
+
+    public function testNewOfficeRolesDoNotCrossThePayrollBoundary(): void
+    {
+        $this->seedUser(30, 'PAYROLL_CLERK');
+        $payroll = [
+            'logged_in' => true,
+            'user_id' => 30,
+            'role' => 'PAYROLL_CLERK',
+            'available_roles' => ['PAYROLL_CLERK'],
+        ];
+        $this->withSession($payroll)->withHeaders(['Accept' => 'application/json'])
+            ->get('test/shared-deduction')->assertOK();
+        $this->withSession($payroll)->withHeaders(['Accept' => 'application/json'])
+            ->get('test/accounting-debt-manage')->assertStatus(403);
+
+        $this->seedUser(31, 'COLLECTING_OFFICER');
+        $collector = [
+            'logged_in' => true,
+            'user_id' => 31,
+            'role' => 'COLLECTING_OFFICER',
+            'available_roles' => ['COLLECTING_OFFICER'],
+        ];
+        $this->withSession($collector)->withHeaders(['Accept' => 'application/json'])
+            ->get('test/cashier-office')->assertOK();
+        $this->withSession($collector)->withHeaders(['Accept' => 'application/json'])
+            ->get('test/shared-deduction')->assertOK();
+    }
+
+    public function testCashierHeadInheritsCollectorPortalWithoutStoreOrAccountingManagement(): void
+    {
+        $this->seedUser(32, 'CASHIER_HEAD');
+        $head = [
+            'logged_in' => true,
+            'user_id' => 32,
+            'role' => 'CASHIER_HEAD',
+            'available_roles' => ['CASHIER_HEAD'],
+        ];
+
+        $this->withSession($head)->withHeaders(['Accept' => 'application/json'])
+            ->get('test/cashier-office')->assertOK();
+        $this->withSession($head)->withHeaders(['Accept' => 'application/json'])
+            ->get('test/shared-deduction')->assertOK();
+        $this->withSession($head)->withHeaders(['Accept' => 'application/json'])
+            ->get('test/store-checkout')->assertStatus(403);
+        $this->withSession($head)->withHeaders(['Accept' => 'application/json'])
+            ->get('test/store-manage')->assertStatus(403);
+        $this->withSession($head)->withHeaders(['Accept' => 'application/json'])
+            ->get('test/accounting-debt-manage')->assertStatus(403);
+    }
+
+    public function testSharedDeductionPolicyExcludesStoreAndSystemRoles(): void
+    {
+        $roles = (new \Config\Authorization())->rolesFor('deduction.workflow');
+        $this->assertContains('CASHIER_HEAD', $roles);
+        $this->assertContains('COLLECTING_OFFICER', $roles);
+        $this->assertContains('PAYROLL_CLERK', $roles);
+        $this->assertNotContains('STORE_SYSTEM', $roles);
+        $this->assertNotContains('STORE_SUPERVISOR', $roles);
+        $this->assertNotContains('ADMIN', $roles);
+    }
+
+    public function testOnlySupervisorRoleCanReachStoreReportSubmission(): void
+    {
+        foreach (['STORE_SUPERVISOR' => 51, 'STORE_SYSTEM' => 52, 'ADMIN' => 53] as $role => $id) {
+            $this->seedUser($id, $role);
+            $result = $this->withSession([
+                'logged_in' => true, 'user_id' => $id, 'role' => $role, 'available_roles' => [$role],
+            ])->withHeaders(['Accept' => 'application/json'])->get('test/store-report-submit');
+            $result->assertStatus($role === 'STORE_SUPERVISOR' ? 200 : 403);
+        }
+    }
+
+    public function testDailyReportInboxesAreDepartmentScoped(): void
+    {
+        foreach ([
+            ['id' => 41, 'role' => 'BE_DIRECTOR', 'allowed' => 'test/be-review', 'denied' => 'test/cashier-office'],
+            ['id' => 42, 'role' => 'CASHIER_HEAD', 'allowed' => 'test/cashier-office', 'denied' => 'test/be-review'],
+            ['id' => 43, 'role' => 'ACCOUNTING_HEAD', 'allowed' => 'test/accounting-copy', 'denied' => 'test/be-review'],
+        ] as $case) {
+            $this->seedUser($case['id'], $case['role']);
+            $session = [
+                'logged_in' => true,
+                'user_id' => $case['id'],
+                'role' => $case['role'],
+                'available_roles' => [$case['role']],
+            ];
+            $this->withSession($session)->withHeaders(['Accept' => 'application/json'])
+                ->get($case['allowed'])->assertOK();
+            $this->withSession($session)->withHeaders(['Accept' => 'application/json'])
+                ->get('test/finance-reports')->assertOK();
+            $this->withSession($session)->withHeaders(['Accept' => 'application/json'])
+                ->get($case['denied'])->assertStatus(403);
+        }
+        $this->assertNotContains('PAYROLL_CLERK', (new \Config\Authorization())->rolesFor('report.accounting_copy'));
+        $this->assertNotContains('PAYROLL_CLERK', (new \Config\Authorization())->rolesFor('finance.reports'));
     }
 
     public function testSystemAdministratorDoesNotEnterStoreAdministratorPortalImplicitly(): void
@@ -247,6 +385,25 @@ final class RoleFilterIntegrationTest extends CIUnitTestCase
                 ->assertStatus(403);
         } finally {
             putenv('IBEMS_ROLE_REFRESH_INTERVAL');
+        }
+    }
+
+    public function testEveryNamedPolicyHonorsEveryActiveRoleForReadsAndWrites(): void
+    {
+        $policies = config(\Config\Authorization::class)->policies;
+        $roles = array_values(array_unique(array_merge(...array_values($policies))));
+        foreach ($roles as $index => $role) {
+            $id = 10000 + $index;
+            $this->seedUser($id, $role);
+            foreach ($policies as $policy => $allowed) {
+                foreach (['GET', 'POST'] as $method) {
+                    $uri = 'test/policy-' . $index . '-' . str_replace('.', '-', $policy) . '-' . strtolower($method);
+                    $this->withRoutes([[$method, $uri, static fn () => service('response')->setJSON(['status' => 'success']), ['filter' => 'access:' . $policy]]]);
+                    $response = $this->withSession(['logged_in' => true, 'user_id' => $id, 'role' => $role, 'available_roles' => [$role]])
+                        ->withHeaders(['Accept' => 'application/json', config('Security')->headerName => service('security')->getHash()])->call(strtolower($method), $uri);
+                    $response->assertStatus(in_array($role, $allowed, true) ? 200 : 403);
+                }
+            }
         }
     }
 

@@ -13,10 +13,35 @@ final class StoreCatalogQueryService
     /** @return array<string, mixed> */
     public function products(int $storeId): array
     {
+        $products = (new ProductModel())->getActiveProductsByStore($storeId);
+        $db = \Config\Database::connect();
+        if ($db->tableExists('rental_bookings')) {
+            $bookingProducts = array_map('intval', array_column($db->table('rental_bookings')->select('product_id')->where('store_id',$storeId)->get()->getResultArray(),'product_id'));
+            // Booking fees are paid from the booking workflow, not reusable catalog cards.
+            $products = array_values(array_filter($products, static fn(array $product): bool => !in_array((int)$product['id'],$bookingProducts,true)));
+        }
+        foreach ($products as &$product) {
+            $product['available_for_sale'] = ($product['item_type'] ?? '') !== 'rental';
+            if (($product['item_type'] ?? '') === 'prepared_item' && \Config\Database::connect()->tableExists('daily_food_offerings')) {
+                $food = StoreOfferingService::foodForSale($storeId, (int) $product['id']);
+                $product['available_for_sale'] = $food && (int) $food['capacity'] > (int) $food['sold'];
+                if ($food) {
+                    if (!empty($food['snapshot_json'])) {
+                        $saved=json_decode($food['snapshot_json'],true);
+                        foreach (['name','variant_label','unit_code','image_url','category'] as $field) if (isset($saved[$field])) $product[$field]=$saved[$field];
+                        $product['food_details']=$saved['food_details']??null;
+                    }
+                    $product['daily_price'] = (int) $food['price_cents'] / 100;
+                    $product['daily_remaining'] = max(0, (int) $food['capacity'] - (int) $food['sold']);
+                }
+            }
+        }
+        unset($product);
         return [
             'status' => 'success',
             'store_id' => $storeId,
-            'products' => (new ProductModel())->getActiveProductsByStore($storeId),
+            'products' => $products,
+            'allowed_item_types' => ProductBehaviorService::allowedTypes((new StoreCapabilityModel())->getForStore($storeId)),
         ];
     }
 
@@ -143,7 +168,7 @@ final class StoreCatalogQueryService
     }
 
     /** @return array<string, mixed> */
-    public function debtCustomers(BaseConnection $db, string $search, int $page, int $pageSize, string $sortBy, string $sortDirection): array
+    public function debtCustomers(BaseConnection $db, string $search, int $page, int $pageSize, string $sortBy, string $sortDirection, bool $includeStudents = false): array
     {
         $page = max(1, $page);
         $pageSize = max(10, min(100, $pageSize));
@@ -153,9 +178,9 @@ final class StoreCatalogQueryService
         $purchaseCardsAvailable = $db->tableExists($db->getPrefix() . 'user_purchase_cards', false);
         $builder = $db->table('users u')
             ->select('u.id, u.employee_id, u.qr_token, u.name, u.email, u.profile_image_url, u.user_type, u.is_active, u.debt_pin_hash, b.credit_limit, b.current_debt')
-            ->join('balances b', 'b.user_id = u.id', 'inner')
+            ->join('balances b', 'b.user_id = u.id', $includeStudents ? 'left' : 'inner')
             ->where('u.is_active', true)
-            ->whereIn('u.user_type', ['faculty', 'staff']);
+            ->whereIn('u.user_type', $includeStudents ? ['faculty', 'staff', 'student'] : ['faculty', 'staff']);
         if ($purchaseCardsAvailable) {
             $builder->select('pc.is_locked AS purchase_card_is_locked, pc.unlocked_until AS purchase_card_unlocked_until')
                 ->join('user_purchase_cards pc', 'pc.user_id = u.id', 'left');

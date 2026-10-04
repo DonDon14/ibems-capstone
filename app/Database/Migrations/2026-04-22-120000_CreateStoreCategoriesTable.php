@@ -51,17 +51,23 @@ class CreateStoreCategoriesTable extends Migration
             $this->forge->createTable('store_categories');
         }
 
+        $insert = match ($this->db->DBDriver) {
+            'SQLite3' => 'INSERT OR IGNORE INTO',
+            'Postgre' => 'INSERT INTO',
+            default => 'INSERT IGNORE INTO',
+        };
+        $onConflict = $this->db->DBDriver === 'Postgre' ? ' ON CONFLICT DO NOTHING' : '';
         $this->db->query(
-            "INSERT IGNORE INTO store_categories (store_id, name, sort_order, is_active, created_at, updated_at)
-             SELECT s.id, 'General', 0, 1, NOW(), NOW()
-             FROM stores s"
+            "{$insert} store_categories (store_id, name, sort_order, is_active, created_at, updated_at)
+             SELECT s.id, 'General', 0, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+             FROM stores s{$onConflict}"
         );
 
         $this->db->query(
-            "INSERT IGNORE INTO store_categories (store_id, name, sort_order, is_active, created_at, updated_at)
-             SELECT p.store_id, p.category, 10, 1, NOW(), NOW()
+            "{$insert} store_categories (store_id, name, sort_order, is_active, created_at, updated_at)
+             SELECT p.store_id, p.category, 10, 1, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
              FROM products p
-             WHERE p.category IS NOT NULL AND p.category <> ''"
+             WHERE p.category IS NOT NULL AND p.category <> ''{$onConflict}"
         );
     }
 

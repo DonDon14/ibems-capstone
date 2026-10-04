@@ -21,8 +21,10 @@
 .dashboard-period-options button[aria-pressed="true"] { background: #2563eb; color: #fff; box-shadow: 0 4px 10px rgba(37, 99, 235, .22); }
 html[data-theme="dark"] .dashboard-period-bar { border-color: #26364d; background: #0f1a2c; }
 html[data-theme="dark"] .dashboard-period-copy strong { color: #e5edf7; }
+html[data-theme="dark"] .dashboard-period-copy span { color: #9eb0c5; }
 html[data-theme="dark"] .dashboard-period-options { background: #111c2e; }
 html[data-theme="dark"] .dashboard-period-options button { color: #aebed1; }
+html[data-theme="dark"] .dashboard-period-options button:not([aria-pressed="true"]):is(:hover, :focus-visible) { background: #19375a; color: #e5edf7; }
 html[data-theme="dark"] .dashboard-period-options button[aria-pressed="true"] { color: #fff; }
 @media (max-width: 640px) {
     .dashboard-period-bar { align-items: stretch; flex-direction: column; }

@@ -97,6 +97,6 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
-<script src="<?= base_url('assets/js/accounting-dashboard.js') ?>?v=20260902a"></script>
+<script src="<?= base_url('assets/vendor/chart.js/chart.umd.js') ?>"></script>
+<script src="<?= base_url('assets/js/accounting-dashboard.js') ?>?v=20261002-reduced-motion"></script>
 <?= $this->endSection() ?>

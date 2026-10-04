@@ -16,7 +16,8 @@ class PosController extends ResourceController
             ]);
         }
 
-        $payload = $this->request->getJSON(true) ?? $this->request->getPost() ?? [];
+        $payload = str_contains(strtolower($this->request->getHeaderLine('Content-Type')), 'application/json')
+            ? $this->request->getJSON(true) : $this->request->getPost();
         $service = new TransactionService();
         $result = $service->createTransaction(
             is_array($payload) ? $payload : [],

@@ -29,7 +29,7 @@
         )}px`;
         popup.style.top = openAbove ? "auto" : `${rect.bottom + 6}px`;
         popup.style.bottom = openAbove ? `${window.innerHeight - rect.top + 6}px` : "auto";
-        popup.style.maxHeight = `${Math.max(180, Math.min(heightLimit, openAbove ? rect.top - 18 : spaceBelow - 18))}px`;
+        popup.style.maxHeight = `${Math.max(0, Math.min(heightLimit, openAbove ? rect.top - 18 : spaceBelow - 18))}px`;
     };
 
     const emitChange = (control) => {
@@ -51,6 +51,23 @@
         return Math.min(420, measured);
     };
 
+    const controlLabel = (control) => {
+        const explicit = control.getAttribute("aria-label");
+        if (explicit) return explicit;
+        return Array.from(control.labels || []).map((label) => {
+            const copy = label.cloneNode(true);
+            copy.querySelectorAll("input, select, textarea, button, .ui-select, .ui-date").forEach((node) => node.remove());
+            return copy.textContent.trim();
+        }).filter(Boolean).join(" ");
+    };
+
+    const syncAvailability = (control, wrapper, trigger, close) => {
+        wrapper.hidden = control.hidden;
+        trigger.disabled = Boolean(control.disabled || control.readOnly);
+        trigger.setAttribute("aria-description", control.required ? "Required field" : "");
+        if (control.hidden || trigger.disabled) close(false);
+    };
+
     const enhanceSelect = (select) => {
         if (enhanced.has(select) || select.closest(".ui-select")) return;
         enhanced.add(select);
@@ -60,6 +77,8 @@
         select.parentNode.insertBefore(wrapper, select);
         wrapper.appendChild(select);
         select.classList.add("ui-native-control");
+        select.tabIndex = -1;
+        select.setAttribute("aria-hidden", "true");
 
         const trigger = document.createElement("button");
         trigger.type = "button";
@@ -76,10 +95,9 @@
         document.body.appendChild(listbox);
 
         trigger.setAttribute("aria-controls", listbox.id);
-        const explicitLabel = select.id ? document.querySelector(`label[for="${CSS.escape(select.id)}"]`) : null;
-        const ariaLabel = select.getAttribute("aria-label") || explicitLabel?.textContent?.trim();
+        const ariaLabel = controlLabel(select);
         if (ariaLabel) trigger.setAttribute("aria-label", ariaLabel);
-        if (select.required) trigger.setAttribute("aria-required", "true");
+
 
         let activeIndex = -1;
 
@@ -87,7 +105,7 @@
         const sync = () => {
             const selected = select.selectedOptions[0];
             trigger.querySelector(".ui-select-value").textContent = selected?.textContent?.trim() || "Select an option";
-            trigger.disabled = select.disabled;
+            syncAvailability(select, wrapper, trigger, api.close);
             trigger.toggleAttribute("aria-invalid", select.getAttribute("aria-invalid") === "true");
             trigger.setAttribute("aria-expanded", listbox.hidden ? "false" : "true");
         };
@@ -159,8 +177,8 @@
             trigger.classList.add("is-open");
             trigger.setAttribute("aria-expanded", "true");
             activeIndex = Math.max(0, select.selectedIndex);
-            setActive(activeIndex);
             positionPopup(trigger, listbox, preferredMenuWidth(trigger, selectableOptions()));
+            setActive(activeIndex);
             openControl = api;
         };
 
@@ -194,6 +212,7 @@
         });
 
         select.addEventListener("change", sync);
+        select.addEventListener("ibems:control-sync", sync);
         select.addEventListener("focus", () => trigger.focus());
         select.addEventListener("invalid", () => {
             trigger.setAttribute("aria-invalid", "true");
@@ -225,6 +244,8 @@
         input.parentNode.insertBefore(wrapper, input);
         wrapper.appendChild(input);
         input.classList.add("ui-native-control");
+        input.tabIndex = -1;
+        input.setAttribute("aria-hidden", "true");
 
         const trigger = document.createElement("button");
         trigger.type = "button";
@@ -232,8 +253,7 @@
         trigger.setAttribute("aria-haspopup", "dialog");
         trigger.innerHTML = '<span class="ui-date-value"></span><span class="ui-control-icon" aria-hidden="true"><i class="bi bi-calendar3"></i></span>';
         wrapper.appendChild(trigger);
-        const explicitLabel = input.id ? document.querySelector(`label[for="${CSS.escape(input.id)}"]`) : null;
-        const ariaLabel = input.getAttribute("aria-label") || explicitLabel?.textContent?.trim();
+        const ariaLabel = controlLabel(input);
         if (ariaLabel) trigger.setAttribute("aria-label", ariaLabel);
         if (input.required) trigger.setAttribute("aria-required", "true");
 
@@ -254,7 +274,7 @@
         const sync = () => {
             trigger.querySelector(".ui-date-value").textContent = displayDate(input.value) || input.placeholder || "Select date";
             trigger.querySelector(".ui-date-value").classList.toggle("is-placeholder", !input.value);
-            trigger.disabled = input.disabled;
+            syncAvailability(input, wrapper, trigger, api.close);
             trigger.toggleAttribute("aria-invalid", input.getAttribute("aria-invalid") === "true");
         };
 
@@ -300,8 +320,10 @@
             }
 
             popup.querySelectorAll("[data-month]").forEach((button) => button.addEventListener("click", () => {
-                viewDate = new Date(year, month + Number(button.dataset.month), 1);
+                const direction = button.dataset.month;
+                viewDate = new Date(year, month + Number(direction), 1);
                 render();
+                popup.querySelector(`[data-month="${direction}"]`)?.focus();
             }));
             popup.querySelector("[data-date-clear]").addEventListener("click", () => {
                 input.value = "";
@@ -337,8 +359,26 @@
             trigger.setAttribute("aria-expanded", "true");
             positionPopup(trigger, popup, 320);
             openControl = api;
+            (popup.querySelector('.ui-date-day.is-selected:not(:disabled)') || popup.querySelector('button:not(:disabled)'))?.focus();
         };
 
+        popup.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") {
+                event.preventDefault();
+                api.close(true);
+            } else if (event.key === "Tab") {
+                const controls = Array.from(popup.querySelectorAll('button:not(:disabled)'));
+                const first = controls[0];
+                const last = controls[controls.length - 1];
+                if (event.shiftKey && document.activeElement === first) {
+                    event.preventDefault();
+                    last?.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                    event.preventDefault();
+                    first?.focus();
+                }
+            }
+        });
         trigger.addEventListener("click", () => popup.hidden ? open() : api.close(false));
         trigger.addEventListener("keydown", (event) => {
             if (event.key === "Escape" && !popup.hidden) {
@@ -346,7 +386,9 @@
                 api.close(true);
             }
         });
+        new MutationObserver(sync).observe(input, { attributes: true, attributeFilter: ["hidden", "disabled", "readonly", "required"] });
         input.addEventListener("change", sync);
+        input.addEventListener("ibems:control-sync", sync);
         input.addEventListener("focus", () => trigger.focus());
         input.addEventListener("invalid", () => {
             trigger.setAttribute("aria-invalid", "true");
@@ -372,6 +414,8 @@
         input.parentNode.insertBefore(wrapper, input);
         wrapper.appendChild(input);
         input.classList.add("ui-native-control");
+        input.tabIndex = -1;
+        input.setAttribute("aria-hidden", "true");
 
         const trigger = document.createElement("button");
         trigger.type = "button";
@@ -380,8 +424,7 @@
         trigger.innerHTML = '<span class="ui-date-value"></span><span class="ui-control-icon" aria-hidden="true"><i class="bi bi-calendar3"></i></span>';
         wrapper.appendChild(trigger);
 
-        const explicitLabel = input.id ? document.querySelector(`label[for="${CSS.escape(input.id)}"]`) : null;
-        const ariaLabel = input.getAttribute("aria-label") || explicitLabel?.textContent?.trim();
+        const ariaLabel = controlLabel(input);
         if (ariaLabel) trigger.setAttribute("aria-label", ariaLabel);
         if (input.required) trigger.setAttribute("aria-required", "true");
 
@@ -402,7 +445,7 @@
             const value = trigger.querySelector(".ui-date-value");
             value.textContent = displayMonth(input.value) || input.placeholder || "Select month";
             value.classList.toggle("is-placeholder", !input.value);
-            trigger.disabled = input.disabled;
+            syncAvailability(input, wrapper, trigger, api.close);
             trigger.toggleAttribute("aria-invalid", input.getAttribute("aria-invalid") === "true");
         };
 
@@ -440,8 +483,10 @@
                 grid.appendChild(button);
             });
             popup.querySelectorAll("[data-year]").forEach((button) => button.addEventListener("click", () => {
-                viewYear += Number(button.dataset.year);
+                const direction = button.dataset.year;
+                viewYear += Number(direction);
                 render();
+                popup.querySelector(`[data-year="${direction}"]`)?.focus();
             }));
             popup.querySelector("[data-month-clear]").addEventListener("click", () => {
                 input.value = "";
@@ -477,8 +522,26 @@
             trigger.setAttribute("aria-expanded", "true");
             positionPopup(trigger, popup, 320);
             openControl = api;
+            (popup.querySelector('.is-selected:not(:disabled)') || popup.querySelector('button:not(:disabled)'))?.focus();
         };
 
+        popup.addEventListener("keydown", (event) => {
+            if (event.key === "Escape") {
+                event.preventDefault();
+                api.close(true);
+            } else if (event.key === "Tab") {
+                const controls = Array.from(popup.querySelectorAll('button:not(:disabled)'));
+                const first = controls[0];
+                const last = controls[controls.length - 1];
+                if (event.shiftKey && document.activeElement === first) {
+                    event.preventDefault();
+                    last?.focus();
+                } else if (!event.shiftKey && document.activeElement === last) {
+                    event.preventDefault();
+                    first?.focus();
+                }
+            }
+        });
         trigger.addEventListener("click", () => popup.hidden ? open() : api.close(false));
         trigger.addEventListener("keydown", (event) => {
             if (event.key === "Escape" && !popup.hidden) {
@@ -486,6 +549,7 @@
                 api.close(true);
             }
         });
+        new MutationObserver(sync).observe(input, { attributes: true, attributeFilter: ["hidden", "disabled", "readonly", "required"] });
         input.addEventListener("change", sync);
         input.addEventListener("focus", () => trigger.focus());
         input.addEventListener("invalid", () => {

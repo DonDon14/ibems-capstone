@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - production
   pull_request:
 
 permissions:
@@ -63,6 +64,9 @@ jobs:
 
       - name: Run PHPUnit suite
         run: npm test
+
+      - name: Run JavaScript behavioral tests
+        run: node --test tests/*.test.cjs
 
       - name: Verify generated Tailwind asset
         run: |

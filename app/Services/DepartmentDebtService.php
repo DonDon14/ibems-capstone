@@ -46,7 +46,11 @@ class DepartmentDebtService
             throw new RuntimeException('The selected department approver is no longer authorized.');
         }
 
-        $period = $this->currentPeriod($departmentId, $createdAt);
+        // Transaction timestamps are stored in UTC; allocations use Manila business months.
+        $businessDate = $createdAt === null ? ibems_business_date()
+            : (new \DateTimeImmutable($createdAt, new \DateTimeZone('UTC')))
+                ->setTimezone(new \DateTimeZone('Asia/Manila'))->format('Y-m-d');
+        $period = $this->currentPeriod($departmentId, $businessDate);
         if (!$period || (string) ($period['status'] ?? '') !== 'open') {
             throw new RuntimeException('This department has no open debt allocation for the current month.');
         }
@@ -55,7 +59,7 @@ class DepartmentDebtService
         $updated = $this->db->table('department_debt_periods')
             ->set('used_amount', 'used_amount + ' . $amountSql, false)
             ->set('outstanding_amount', 'outstanding_amount + ' . $amountSql, false)
-            ->set('updated_at', date('Y-m-d H:i:s'))
+            ->set('updated_at', ibems_now()->format('Y-m-d H:i:s'))
             ->where('id', (int) $period['id'])
             ->where('status', 'open')
             ->where('used_amount + ' . $amountSql . ' <= allocation_amount', null, false)
@@ -65,7 +69,7 @@ class DepartmentDebtService
         }
 
         $after = $this->db->table('department_debt_periods')->where('id', (int) $period['id'])->get()->getRowArray();
-        $createdAt ??= date('Y-m-d H:i:s');
+        $createdAt ??= ibems_now()->format('Y-m-d H:i:s');
         $entryPayload = [
             'department_id' => $departmentId,
             'period_id' => (int) $period['id'],
@@ -204,7 +208,7 @@ class DepartmentDebtService
             throw new RuntimeException('A reason is required when changing an existing allocation.', 400);
         }
 
-        $now = date('Y-m-d H:i:s');
+        $now = ibems_now()->format('Y-m-d H:i:s');
         if ($existing) {
             $updated = $this->db->table('department_debt_periods')
                 ->where('id', (int) $existing['id'])
@@ -291,31 +295,44 @@ class DepartmentDebtService
         return in_array((int) $e->getCode(), [400, 404, 409], true) ? (int) $e->getCode() : 500;
     }
 
-    public function recordSettlement(int $departmentId, int $periodId, float $amount, string $referenceNo, string $remarks, int $actorId): array
+    public function recordSettlement(int $departmentId, int $periodId, float $amount, string $referenceNo, string $remarks, int $actorId, mixed $requestKey = null): array
     {
         $amount = round($amount, 2);
         if ($departmentId <= 0 || $periodId <= 0 || !is_finite($amount) || $amount <= 0 || trim($referenceNo) === '' || trim($remarks) === '') {
-            return $this->error('Department, period, positive amount, reference number, and remarks are required.');
+            return $this->error('Department, period, positive amount, reference number, and remarks are required.') + ['retry_safe' => true];
         }
+        if (!is_string($requestKey) || !preg_match('/^[A-Za-z0-9_-]{16,100}$/D', $requestKey)) {
+            return $this->error('A settlement request key is required. Reload the page before submitting.') + ['retry_safe' => true];
+        }
+        if (!$this->db->tableExists('department_settlement_receipts')) return $this->error('Settlement retry protection is unavailable. Apply the pending migration before recording payments.', 503) + ['retry_safe' => true];
+        $key = hash('sha256', $actorId . ':' . $requestKey);
+        $requestHash = hash('sha256', json_encode([$actorId, $departmentId, $periodId, number_format($amount, 2, '.', ''), trim($referenceNo), trim($remarks)], JSON_THROW_ON_ERROR));
         $this->db->transBegin();
         try {
+            // A write claim precedes any snapshot reads, including on SQLite.
+            if (!$this->db->table('department_debt_periods')->set('outstanding_amount', 'outstanding_amount', false)->where('id', $periodId)->where('department_id', $departmentId)->update()) throw new RuntimeException('Unable to lock the department period.');
+            $replay = $this->settlementReplay($key, $requestHash);
+            if ($replay !== null) {
+                $this->db->transRollback();
+                return $replay;
+            }
             $period = $this->db->table('department_debt_periods')->where('id', $periodId)->where('department_id', $departmentId)->get()->getRowArray();
             if (!$period) {
-                throw new RuntimeException('Department debt period not found.');
+                throw new RuntimeException('Department debt period not found.', 404);
             }
             $amountSql = number_format($amount, 2, '.', '');
             $ok = $this->db->table('department_debt_periods')
                 ->set('outstanding_amount', 'outstanding_amount - ' . $amountSql, false)
-                ->set('updated_at', date('Y-m-d H:i:s'))
+                ->set('updated_at', ibems_now()->format('Y-m-d H:i:s'))
                 ->where('id', $periodId)
                 ->where('outstanding_amount >= ' . $amountSql, null, false)
                 ->update();
             if (!$ok || $this->db->affectedRows() !== 1) {
-                throw new RuntimeException('Settlement exceeds the outstanding department debt.');
+                throw new RuntimeException('Settlement exceeds the outstanding department debt.', 409);
             }
             $after = $this->db->table('department_debt_periods')->where('id', $periodId)->get()->getRowArray();
-            $now = date('Y-m-d H:i:s');
-            $this->db->table('department_debt_entries')->insert([
+            $now = ibems_now()->format('Y-m-d H:i:s');
+            if (!$this->db->table('department_debt_entries')->insert([
                 'department_id' => $departmentId,
                 'period_id' => $periodId,
                 'entry_type' => 'settlement',
@@ -331,22 +348,42 @@ class DepartmentDebtService
                 'reference_no' => trim($referenceNo),
                 'remarks' => trim($remarks),
                 'created_at' => $now,
-            ]);
+            ])) throw new RuntimeException('Unable to record the settlement ledger entry.');
+            $entryId = (int) $this->db->insertID();
             $this->audit('ACCOUNTING_RECORD_DEPARTMENT_SETTLEMENT', $departmentId, $actorId, [
                 'period_id' => $periodId,
                 'amount' => $amount,
                 'reference_no' => trim($referenceNo),
                 'remarks' => trim($remarks),
             ]);
+            $response = ['status' => 'success', 'code' => 200, 'settlement_entry_id' => $entryId];
+            if (!$this->db->table('department_settlement_receipts')->insert([
+                'request_key' => $key, 'request_hash' => $requestHash, 'settlement_entry_id' => $entryId,
+                'response_json' => json_encode($response, JSON_THROW_ON_ERROR), 'created_at' => $now,
+            ])) throw new RuntimeException('Unable to record the settlement receipt.');
             if (!$this->db->transStatus()) {
                 throw new RuntimeException('Settlement failed.');
             }
-            $this->db->transCommit();
-            return ['status' => 'success', 'code' => 200];
+            if (!$this->db->transCommit()) throw new RuntimeException('Settlement commit failed.');
+            return $response;
         } catch (Throwable $e) {
             $this->db->transRollback();
-            return $this->error($e->getMessage() ?: 'Unable to record the department settlement.', 409);
+            // Unique-key races must be read only after rollback (PostgreSQL aborts the failed transaction).
+            try {
+                $replay = $this->settlementReplay($key, $requestHash);
+                if ($replay !== null) return $replay;
+            } catch (Throwable) { /* Return the safe retry response below. */ }
+            $safeRejection = in_array((int) $e->getCode(), [404, 409], true);
+            return $this->error($safeRejection ? $e->getMessage() : 'Unable to confirm the department settlement. Retry its original details safely.', 409) + ['retry_safe' => $safeRejection];
         }
+    }
+
+    private function settlementReplay(string $key, string $requestHash): ?array
+    {
+        $receipt = $this->db->table('department_settlement_receipts')->where('request_key', $key)->get()->getRowArray();
+        if (!$receipt) return null;
+        if (!hash_equals((string) $receipt['request_hash'], $requestHash)) return $this->error('This settlement request key was already used with different details.', 409);
+        return json_decode((string) $receipt['response_json'], true, 512, JSON_THROW_ON_ERROR);
     }
 
     private function audit(string $action, int $departmentId, int $actorId, array $payload): void
@@ -357,7 +394,7 @@ class DepartmentDebtService
             'entity' => 'departments',
             'entity_id' => $departmentId,
             'payload_json' => json_encode($payload),
-            'created_at' => date('Y-m-d H:i:s'),
+            'created_at' => ibems_now()->format('Y-m-d H:i:s'),
         ])) {
             throw new RuntimeException('Failed to write department debt audit.');
         }

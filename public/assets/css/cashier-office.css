@@ -1,0 +1,200 @@
+.cashier-office-page,
+.cashier-sales-panel {
+    min-width: 0;
+}
+
+.cashier-office-notice {
+    overflow-wrap: anywhere;
+    padding: 14px 18px;
+    border: 1px solid #bfdbfe;
+    border-radius: 14px;
+    background: #eff6ff;
+    color: #1e3a5f;
+    line-height: 1.5;
+}
+
+.cashier-sales-panel {
+    overflow: hidden;
+    border-radius: 18px;
+}
+
+.cashier-sales-head {
+    align-items: end;
+    flex-wrap: wrap;
+    padding: 20px 24px;
+}
+
+.cashier-sales-head > div,
+.cashier-date-filter,
+.cashier-sales-body {
+    min-width: 0;
+}
+
+.cashier-sales-head h3 {
+    margin: 0 0 4px;
+    font-size: 1.05rem;
+    font-weight: 700;
+}
+
+.cashier-sales-head p {
+    margin: 0;
+}
+
+.cashier-date-filter {
+    display: flex;
+    align-items: end;
+    gap: 8px;
+}
+
+.cashier-date-filter label {
+    align-self: center;
+    font-size: .8rem;
+    font-weight: 700;
+}
+
+.cashier-date-filter input {
+    min-width: 0;
+    max-width: 100%;
+    height: 40px;
+    padding: 7px 10px;
+    border: 1px solid #cbd5e1;
+    border-radius: 10px;
+    background: #fff;
+    color: #0f172a;
+}
+
+.cashier-sales-body {
+    container-type: inline-size;
+    overflow: visible;
+    padding: 22px 24px 24px;
+}
+
+.cashier-date-error {
+    margin: 0 0 16px;
+    overflow-wrap: anywhere;
+    color: #b91c1c;
+}
+
+.ibems-modern .cashier-date-error {
+    color: var(--feedback-error, #b91c1c) !important;
+}
+
+.cashier-rollup {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.cashier-rollup > div {
+    min-width: 0;
+    padding: 14px 16px;
+    border: 1px solid #dbeafe;
+    border-radius: 12px;
+    background: #f8fbff;
+}
+
+.cashier-rollup span,
+.cashier-rollup strong {
+    overflow-wrap: anywhere;
+    display: block;
+}
+
+.cashier-rollup span {
+    margin-bottom: 6px;
+    color: #475569;
+    font-size: .78rem;
+}
+
+.cashier-rollup strong {
+    color: #0f2745;
+    font-size: 1.18rem;
+}
+
+.cashier-sales-table-wrap {
+    overflow-x: auto;
+    border: 1px solid #e2e8f0;
+    border-radius: 12px;
+}
+
+.ibems-modern .cashier-sales-table-wrap:focus-visible {
+    outline: 2px solid var(--primary, #2563eb);
+    outline-offset: -2px;
+}
+
+.cashier-sales-table {
+    width: 100%;
+    min-width: 730px;
+    border-collapse: collapse;
+    background: #fff;
+    font-size: .85rem;
+}
+
+.cashier-sales-table :is(th, td) {
+    padding: 12px 14px;
+    border-bottom: 1px solid #e2e8f0;
+    text-align: right;
+    white-space: nowrap;
+}
+
+.cashier-sales-table :is(th, td):first-child {
+    text-align: left;
+}
+
+.cashier-sales-table tbody th {
+    width: 16rem;
+    min-width: 12rem;
+    max-width: 24rem;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.cashier-sales-table thead th {
+    background: #f1f5f9;
+    color: #334155;
+    font-size: .75rem;
+    text-transform: uppercase;
+}
+
+.cashier-sales-table tbody tr:last-child :is(th, td) {
+    border-bottom: 0;
+}
+
+html[data-theme="dark"] .ibems-modern .cashier-office-notice {
+    border-color: #315b88;
+    background: #102c52;
+    color: #dbeafe;
+}
+
+html[data-theme="dark"] .ibems-modern .cashier-rollup > div {
+    border-color: #334155;
+    background: #182940;
+}
+
+html[data-theme="dark"] .ibems-modern .cashier-rollup span { color: #aebdd0; }
+html[data-theme="dark"] .ibems-modern .cashier-rollup strong { color: #f1f5f9; }
+html[data-theme="dark"] .ibems-modern .cashier-sales-table-wrap { border-color: #334155; }
+html[data-theme="dark"] .ibems-modern .cashier-sales-table-wrap:focus-visible { outline-color: #93c5fd; }
+html[data-theme="dark"] .ibems-modern .cashier-sales-table { background: #111c2e; color: #dbe7f5; }
+html[data-theme="dark"] .ibems-modern .cashier-sales-table :is(th, td) { border-color: #334155; }
+html[data-theme="dark"] .ibems-modern .cashier-sales-table thead th { background: #182940 !important; color: #c6d2e1 !important; }
+html[data-theme="dark"] .ibems-modern .cashier-sales-table tbody th { color: #f1f5f9; }
+
+@media (max-width: 900px) {
+    .cashier-rollup { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 640px) {
+    .cashier-sales-head, .cashier-sales-body { padding: 18px; }
+    .cashier-date-filter { width: 100%; flex-wrap: wrap; }
+    .cashier-date-filter label { width: 100%; }
+    .cashier-rollup { grid-template-columns: 1fr; }
+}
+
+@container (max-width: 900px) {
+    .cashier-rollup { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@container (max-width: 500px) {
+    .cashier-rollup { grid-template-columns: 1fr; }
+}

@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/store_admin') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/admin-overview.css') ?>?v=20260813c">
+<link rel="stylesheet" href="<?= base_url('assets/css/admin-overview.css') ?>?v=20261004-variance-feedback">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -56,5 +56,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/store-admin-dashboard.js') ?>?v=20260902a"></script>
+<script src="<?= base_url('assets/js/store-admin-dashboard.js') ?>?v=20261002-dashboard-announcements"></script>
 <?= $this->endSection() ?>

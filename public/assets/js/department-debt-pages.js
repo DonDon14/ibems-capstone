@@ -24,6 +24,8 @@ async function api(url, options = {}) {
     if (!response.ok || data.status !== "success") {
         const error = new Error(data.message || "Unable to complete the request.");
         error.status = response.status;
+        error.hasServerMessage = data.status === "error" && typeof data.message === "string" && Boolean(data.message.trim());
+        error.confirmedRejection = !response.ok && data.status === "error" && data.retry_safe === true;
         throw error;
     }
     return data;
@@ -36,6 +38,9 @@ function jsonOptions(payload) {
 function setResult(id, message = "", type = "") {
     const element = document.getElementById(id);
     if (!element) return;
+    element.setAttribute("role", type === "error" ? "alert" : "status");
+    element.setAttribute("aria-live", type === "error" ? "assertive" : "polite");
+    element.setAttribute("aria-atomic", "true");
     element.textContent = message;
     element.className = `department-result${type ? ` is-${type}` : ""}`;
 }
@@ -47,10 +52,23 @@ function dataState(type, message) {
     return `<div class="data-state data-state--${safeType}" role="${role}" aria-live="polite"><i class="bi ${icon}" aria-hidden="true"></i><div><strong>${escapeHtml(message)}</strong></div></div>`;
 }
 
+const departmentModalOpeners = new WeakMap();
 function mountDepartmentModal(id) {
     const modal = document.getElementById(id);
     if (!modal) return null;
     if (modal.parentElement !== document.body) document.body.appendChild(modal);
+    if (id !== "department-modal") modal.addEventListener("keydown", event => {
+        if (event.defaultPrevented) return;
+        if (event.key === "Escape") {
+            event.preventDefault(); modal.querySelector(".app-modal-close")?.click();
+        } else if (event.key === "Tab") {
+            const controls = Array.from(modal.querySelectorAll('button, input, select, textarea, a[href], [tabindex]'))
+                .filter(control => !control.disabled && control.tabIndex >= 0 && control.getClientRects().length);
+            const first = controls[0], last = controls[controls.length - 1];
+            if (event.shiftKey && document.activeElement === first) { event.preventDefault(); last?.focus(); }
+            else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
+        }
+    });
     window.IbemsPortalNavigation?.onCleanup(() => {
         document.body.classList.remove("department-modal-open");
         modal.remove();
@@ -60,8 +78,14 @@ function mountDepartmentModal(id) {
 
 function setDepartmentModalOpen(modal, isOpen) {
     if (!modal) return;
+    if (isOpen) departmentModalOpeners.set(modal, document.activeElement);
     modal.classList.toggle("is-hidden", !isOpen);
     document.body.classList.toggle("department-modal-open", isOpen);
+    if (isOpen) modal.querySelector(".app-modal-close")?.focus();
+    else {
+        const opener = departmentModalOpeners.get(modal);
+        if (opener?.isConnected) opener.focus({ preventScroll: true });
+    }
 }
 
 function initAdmin() {
@@ -72,6 +96,10 @@ function initAdmin() {
     let people = [];
     let headEditorOpen = false;
     let activeHeadSuggestionIndex = -1;
+    let modalOpener = null;
+    let loadRequestId = 0;
+    let departmentLoadState = "loading";
+    let departmentSaving = false;
 
     function headMatches(query) {
         const normalized = String(query || "").trim().toLowerCase();
@@ -103,11 +131,11 @@ function initAdmin() {
             return;
         }
         if (!matches.length) {
-            suggestions.innerHTML = '<p class="department-head-search-hint">No active employees match that search.</p>';
+            suggestions.innerHTML = '<p class="department-head-search-hint" role="status">No active employees match that search.</p>';
             setHeadSuggestionsOpen(true);
             return;
         }
-        suggestions.innerHTML = matches.map((person, index) => `<button id="department-head-option-${index}" type="button" class="department-head-option" role="option" aria-selected="false" data-department-head-id="${Number(person.id)}">
+        suggestions.innerHTML = matches.map((person, index) => `<button id="department-head-option-${index}" type="button" tabindex="-1" class="department-head-option" role="option" aria-selected="false" data-department-head-id="${Number(person.id)}">
             ${window.IbemsAvatar.html(person.name, person.profile_image_url, "table-person-avatar")}
             <span><strong>${escapeHtml(person.name)}</strong><small>${escapeHtml(person.employee_id || person.email || "Active employee")}</small></span>
         </button>`).join("");
@@ -119,7 +147,11 @@ function initAdmin() {
         const options = Array.from(document.querySelectorAll("#department-head-suggestions .department-head-option"));
         if (!options.length) return;
         activeHeadSuggestionIndex = (nextIndex + options.length) % options.length;
-        options.forEach((option, index) => option.classList.toggle("is-active", index === activeHeadSuggestionIndex));
+        options.forEach((option, index) => {
+            const selected = index === activeHeadSuggestionIndex;
+            option.classList.toggle("is-active", selected);
+            option.setAttribute("aria-selected", String(selected));
+        });
         const active = options[activeHeadSuggestionIndex];
         input.setAttribute("aria-activedescendant", active.id);
         active.scrollIntoView({ block: "nearest" });
@@ -133,6 +165,7 @@ function initAdmin() {
         headEditorOpen = false;
         setHeadSuggestionsOpen(false);
         renderHeadSummary();
+        document.querySelector("#department-head-summary [data-change-department-head]")?.focus();
     }
 
     function renderHeadSummary() {
@@ -158,16 +191,30 @@ function initAdmin() {
             .some((value) => String(value || "").toLowerCase().includes(query));
     }
 
+    function setAdminListState(type, message = "", detail = "") {
+        const region = document.getElementById("department-admin-table-region");
+        const isState = type !== "rows";
+        region.classList.toggle("is-department-list-state", isState);
+        if (isState) region.removeAttribute("tabindex");
+        else region.setAttribute("tabindex", "0");
+        if (!isState) return;
+        const error = type === "error";
+        const icon = error ? "bi-exclamation-circle" : type === "loading" ? "bi-arrow-repeat" : "bi-inbox";
+        document.getElementById("department-admin-body").innerHTML = `<tr><td colspan="4"><div class="data-state data-state--${type}" role="${error ? "alert" : "status"}" aria-live="${error ? "assertive" : "polite"}" aria-atomic="true" tabindex="-1"><i class="bi ${icon}" aria-hidden="true"></i><div><strong>${escapeHtml(message)}</strong>${detail ? `<small>${escapeHtml(detail)}</small>` : ""}</div>${error ? '<button type="button" class="secondary-btn" data-department-retry>Retry departments</button>' : ""}</div></td></tr>`;
+    }
+
     function render() {
+        if (departmentLoadState !== "ready") return;
         const body = document.getElementById("department-admin-body");
         const visible = departments.filter(matches);
         document.getElementById("department-total").textContent = String(departments.length);
         document.getElementById("department-active").textContent = String(departments.filter((department) => department.is_active).length);
         document.getElementById("department-with-head").textContent = String(departments.filter((department) => Number(department.head_user_id) > 0).length);
         if (!visible.length) {
-            body.innerHTML = '<tr><td colspan="4">No departments match the current filters.</td></tr>';
+            setAdminListState("empty", departments.length ? "No departments match the current filters." : "No departments have been created.");
             return;
         }
+        setAdminListState("rows");
         body.innerHTML = visible.map((department) => {
             return `<tr>
                 <td><div class="department-identity"><strong>${escapeHtml(department.name)}</strong><small>${escapeHtml(department.code)}</small></div></td>
@@ -179,21 +226,63 @@ function initAdmin() {
     }
 
     async function load() {
-        setResult("department-admin-result", "Loading departments...");
+        const requestId = ++loadRequestId;
+        const body = document.getElementById("department-admin-body");
+        const refresh = document.getElementById("department-refresh");
+        const restoreListFocus = body.contains(document.activeElement);
+        departmentLoadState = "loading";
+        departments = [];
+        people = [];
+        refresh.disabled = true;
+        refresh.textContent = "Refreshing…";
+        document.getElementById("department-add").disabled = true;
+        body.setAttribute("aria-busy", "true");
+        setAdminListState("loading", "Loading departments…");
+        if (restoreListFocus && document.activeElement === document.body) body.querySelector(".data-state")?.focus({preventScroll: true});
+        for (const id of ["department-total", "department-active", "department-with-head"]) document.getElementById(id).textContent = "Loading…";
+        setResult("department-admin-result", "");
         try {
             const data = await api("/admin/departments/data");
-            departments = Array.isArray(data.departments) ? data.departments : [];
-            people = Array.isArray(data.people) ? data.people : [];
+            if (pageSignal.aborted || requestId !== loadRequestId) return;
+            if (!Array.isArray(data.departments) || !Array.isArray(data.people)) throw new Error("Unreadable department list");
+            departmentLoadState = "ready";
+            departments = data.departments;
+            people = data.people;
             render();
             setResult("department-admin-result", `${departments.length} department${departments.length === 1 ? "" : "s"} loaded.`);
+            return true;
         } catch (error) {
-            if (pageSignal.aborted) return;
-            document.getElementById("department-admin-body").innerHTML = `<tr><td colspan="4">${escapeHtml(error.message)}</td></tr>`;
-            setResult("department-admin-result", error.message, "error");
+            if (pageSignal.aborted || requestId !== loadRequestId) return;
+            departmentLoadState = "error";
+            for (const id of ["department-total", "department-active", "department-with-head"]) document.getElementById(id).textContent = "Unavailable";
+            const detail = error.status >= 400 && typeof error.message === "string" ? error.message : "The department list could not be loaded. Retry to refresh it.";
+            setAdminListState("error", "Departments unavailable", detail);
+            setResult("department-admin-result", "");
+            return false;
+        } finally {
+            if (!pageSignal.aborted && requestId === loadRequestId) {
+                body.removeAttribute("aria-busy");
+                refresh.disabled = false;
+                document.getElementById("department-add").disabled = departmentLoadState !== "ready";
+                refresh.textContent = departmentLoadState === "error" ? "Retry departments" : "Refresh";
+                if (restoreListFocus && document.activeElement === document.body) {
+                    const edit = body.querySelector("[data-edit-department]");
+                    const target = body.querySelector("[data-department-retry]") || edit || body.querySelector(".data-state") || refresh;
+                    target.focus({preventScroll: target !== edit});
+                }
+            }
         }
     }
 
+    function syncDepartmentReason() {
+        const reason = document.getElementById("department-status-reason");
+        reason.required = document.getElementById("department-active-input").value === "0";
+        reason.setCustomValidity("");
+    }
+
     function openModal(department = null) {
+        if (departmentSaving || pageSignal.aborted || departmentLoadState !== "ready") return;
+        modalOpener = document.activeElement;
         document.getElementById("department-modal-title").textContent = department ? "Edit department" : "Add department";
         document.getElementById("department-id").value = department?.id || "";
         document.getElementById("department-code").value = department?.code || "";
@@ -204,20 +293,52 @@ function initAdmin() {
         headEditorOpen = false;
         renderHeadSummary();
         document.getElementById("department-active-input").value = department?.is_active === false ? "0" : "1";
+        document.getElementById("department-active-input").dispatchEvent(new Event("change", { bubbles: true }));
         document.getElementById("department-status-reason").value = department?.status_reason || "";
+        syncDepartmentReason();
         setResult("department-modal-result");
         setDepartmentModalOpen(departmentModal, true);
         document.getElementById("department-code").focus();
     }
 
-    function closeModal() { setDepartmentModalOpen(departmentModal, false); }
+    function closeModal(force = false) {
+        if (departmentSaving && force !== true) return;
+        setDepartmentModalOpen(departmentModal, false);
+        if (modalOpener?.isConnected) modalOpener.focus();
+    }
+
+    departmentModal.addEventListener("keydown", (event) => {
+        if (event.defaultPrevented) return;
+        if (departmentSaving && event.key === "Tab") {
+            event.preventDefault();
+            document.getElementById("department-modal-result").focus();
+            return;
+        }
+        if (event.key === "Escape") {
+            event.preventDefault();
+            closeModal();
+        } else if (event.key === "Tab") {
+            const controls = Array.from(departmentModal.querySelectorAll('button, input, select, textarea, a[href], [tabindex]'))
+                .filter(el => !el.disabled && el.tabIndex >= 0 && el.getClientRects().length);
+            const first = controls[0], last = controls[controls.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault(); last?.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault(); first?.focus();
+            }
+        }
+    });
 
     document.getElementById("department-add").addEventListener("click", () => openModal());
-    document.getElementById("department-refresh").addEventListener("click", load);
+    document.getElementById("department-refresh").addEventListener("click", () => {
+        if (departmentLoadState !== "loading") load();
+    });
     document.getElementById("department-search").addEventListener("input", render);
     document.getElementById("department-status").addEventListener("change", render);
     document.getElementById("department-close").addEventListener("click", closeModal);
     document.getElementById("department-cancel").addEventListener("click", closeModal);
+    document.getElementById("department-active-input").addEventListener("change", syncDepartmentReason);
+    document.getElementById("department-status-reason").addEventListener("input", syncDepartmentReason);
     document.getElementById("department-head-summary").addEventListener("click", (event) => {
         if (!event.target.closest("[data-change-department-head]")) return;
         headEditorOpen = true;
@@ -259,6 +380,7 @@ function initAdmin() {
         if (!event.target.closest("#department-head-editor, #department-head-summary")) setHeadSuggestionsOpen(false);
     });
     document.getElementById("department-admin-body").addEventListener("click", (event) => {
+        if (event.target.closest("[data-department-retry]")) { load(); return; }
         const button = event.target.closest("[data-edit-department]");
         if (!button) return;
         openModal(departments.find((department) => Number(department.id) === Number(button.dataset.editDepartment)) || null);
@@ -266,6 +388,15 @@ function initAdmin() {
     document.getElementById("department-form").addEventListener("submit", async (event) => {
         event.preventDefault();
         const save = document.getElementById("department-save");
+        if (departmentSaving || save.disabled || pageSignal.aborted || departmentModal.classList.contains("is-hidden")) return;
+        const reason = document.getElementById("department-status-reason");
+        syncDepartmentReason();
+        if (reason.required && !reason.value.trim()) {
+            reason.setCustomValidity("Enter a reason before deactivating this department.");
+            reason.reportValidity();
+            reason.focus();
+            return;
+        }
         if (Number(document.getElementById("department-head").value || 0) <= 0) {
             headEditorOpen = true;
             renderHeadSummary();
@@ -273,7 +404,18 @@ function initAdmin() {
             requestAnimationFrame(() => document.getElementById("department-head-search").focus());
             return;
         }
-        save.disabled = true;
+        const form = document.getElementById("department-form");
+        const result = document.getElementById("department-modal-result");
+        const disabledStates = Array.from(form.querySelectorAll("input, select, textarea, button"), control => [control, control.disabled]);
+        const saveMarkup = save.innerHTML;
+        departmentSaving = true;
+        setHeadSuggestionsOpen(false);
+        disabledStates.forEach(([control]) => { control.disabled = true; });
+        save.textContent = "Saving…";
+        form.setAttribute("aria-busy", "true");
+        departmentModal.classList.add("is-saving");
+        setResult("department-modal-result", "Saving department…");
+        result.focus();
         try {
             await api("/admin/departments/save", jsonOptions({
                 id: Number(document.getElementById("department-id").value || 0) || null,
@@ -283,12 +425,38 @@ function initAdmin() {
                 is_active: document.getElementById("department-active-input").value === "1",
                 status_reason: document.getElementById("department-status-reason").value,
             }));
+            if (pageSignal.aborted) return;
             setResult("department-modal-result", "Department saved.", "success");
-            await load();
-            closeModal();
+            closeModal(true);
+            try {
+                const refreshed = await load();
+                if (pageSignal.aborted) return;
+                setResult("department-admin-result", refreshed === false
+                    ? "Department saved. The department list could not be refreshed. Retry departments to load the latest records."
+                    : "Department saved.", refreshed === false ? "warning" : "success");
+            } catch (refreshError) {
+                if (!pageSignal.aborted) setResult("department-admin-result", "Department saved. The department list could not be refreshed. Retry departments to load the latest records.", "warning");
+            }
+            if (!pageSignal.aborted && document.activeElement === document.body) document.getElementById("department-refresh")?.focus({ preventScroll: true });
         } catch (error) {
-            if (!pageSignal.aborted) setResult("department-modal-result", error.message, "error");
-        } finally { save.disabled = false; }
+            if (!pageSignal.aborted) {
+                setResult("department-modal-result", error.hasServerMessage
+                    ? error.message
+                    : "The save could not be confirmed. Your changes are still here. Check the department list before trying again.", error.hasServerMessage ? "error" : "warning");
+                if (document.activeElement === result || document.activeElement === document.body) {
+                    result.focus();
+                    result.scrollIntoView({block: "nearest", inline: "nearest"});
+                }
+            }
+        } finally {
+            departmentSaving = false;
+            if (!pageSignal.aborted) {
+                disabledStates.forEach(([control, disabled]) => { control.disabled = disabled; });
+                save.innerHTML = saveMarkup;
+                form.removeAttribute("aria-busy");
+                departmentModal.classList.remove("is-saving");
+            }
+        }
     });
     load();
 }
@@ -299,6 +467,23 @@ function initAccounting() {
     const financeModal = mountDepartmentModal("department-finance-modal");
     const batchModal = mountDepartmentModal("department-batch-allocation-modal");
     const canOperate = page.dataset.canOperate === "true";
+    const settlementStorage = {
+        getItem: (key) => window.localStorage.getItem(key),
+        setItem: (key, value) => window.localStorage.setItem(key, value),
+        removeItem: (key) => window.localStorage.removeItem(key),
+    };
+    const settlementRetry = canOperate ? window.IbemsDepartmentSettlementRetry.create(settlementStorage, page.dataset.actorId, () => {
+        const bytes = new Uint8Array(16);
+        window.crypto.getRandomValues(bytes);
+        return Array.from(bytes, (value) => value.toString(16).padStart(2, "0")).join("");
+    }, (task) => {
+        if (!window.navigator?.locks) return Promise.reject(new Error("Payment recovery is unavailable in this browser. Use a supported browser to record settlements safely."));
+        return window.navigator.locks.request(`ibems.department-settlement.${page.dataset.actorId}`, { ifAvailable: true }, (lock) => {
+            if (!lock) throw new Error("A settlement request is already in progress in another tab.");
+            return task();
+        });
+    }) : null;
+    let settlementForm = null;
     let departments = [];
     let entries = [];
     const batchSelected = new Set();
@@ -356,6 +541,18 @@ function initAccounting() {
     }
 
     function openFinance(department, mode) {
+        let openedSettlementForm = null;
+        let pendingSettlement = null;
+        try {
+            openedSettlementForm = mode === "settlement" ? settlementRetry.openForm() : null;
+            pendingSettlement = openedSettlementForm?.pending || null;
+        }
+        catch (error) { window.alert(error.message); return; }
+        if (pendingSettlement && Number(pendingSettlement.payload.department_id) !== Number(department.id)) {
+            window.alert("Retry the pending settlement for its original department before recording another payment.");
+            return;
+        }
+        settlementForm = openedSettlementForm;
         document.getElementById("department-finance-mode").value = mode;
         document.getElementById("department-finance-id").value = department.id;
         document.getElementById("department-finance-period-id").value = department.period_id || "";
@@ -380,12 +577,25 @@ function initAccounting() {
         document.getElementById("department-settlement-amount").max = Number(department.outstanding_amount || 0).toFixed(2);
         document.getElementById("department-settlement-reference").value = "";
         document.getElementById("department-settlement-remarks").value = "";
+        if (pendingSettlement) {
+            const original = pendingSettlement.payload;
+            document.getElementById("department-finance-period-id").value = original.period_id;
+            document.getElementById("department-settlement-amount").value = original.amount;
+            document.getElementById("department-settlement-amount").removeAttribute("max");
+            document.getElementById("department-settlement-reference").value = original.reference_no;
+            document.getElementById("department-settlement-remarks").value = original.remarks;
+        }
+        document.querySelectorAll("#department-settlement-fields input, #department-settlement-fields textarea").forEach((control) => { control.readOnly = Boolean(pendingSettlement); });
         document.querySelector("#department-finance-save span").textContent = mode === "settlement" ? "Record settlement" : "Save allocation";
         setResult("department-finance-result");
+        if (pendingSettlement) setResult("department-finance-result", "A previous request has no confirmed response. Retry its original details safely.");
         setDepartmentModalOpen(financeModal, true);
     }
 
-    function closeFinance() { setDepartmentModalOpen(financeModal, false); }
+    function closeFinance() {
+        settlementForm = null;
+        setDepartmentModalOpen(financeModal, false);
+    }
 
     function updateBatchSummary() {
         const count = batchSelected.size;
@@ -450,16 +660,18 @@ function initAccounting() {
         event.preventDefault();
         const mode = document.getElementById("department-finance-mode").value;
         const save = document.getElementById("department-finance-save");
+        if (save.disabled) return;
         save.disabled = true;
         try {
             if (mode === "settlement") {
-                await api("/accounting/department-debts/settlement", jsonOptions({
+                if (!settlementForm) throw new Error("Close and reopen the settlement form before submitting.");
+                await settlementForm.submit({
                     department_id: Number(document.getElementById("department-finance-id").value),
                     period_id: Number(document.getElementById("department-finance-period-id").value),
                     amount: Number(document.getElementById("department-settlement-amount").value),
                     reference_no: document.getElementById("department-settlement-reference").value,
                     remarks: document.getElementById("department-settlement-remarks").value,
-                }));
+                }, (payload) => api("/accounting/department-debts/settlement", jsonOptions(payload)));
             } else {
                 await api("/accounting/department-debts/allocation", jsonOptions({
                     department_id: Number(document.getElementById("department-finance-id").value),
@@ -470,8 +682,8 @@ function initAccounting() {
                 }));
             }
             setResult("department-finance-result", mode === "settlement" ? "Settlement recorded." : "Allocation saved.", "success");
-            await load();
             closeFinance();
+            await load().catch(() => { setResult("department-finance-result", "Saved successfully. Refresh the department list to see the updated figures.", "success"); });
         } catch (error) {
             if (!pageSignal.aborted) setResult("department-finance-result", error.message, "error");
         } finally { save.disabled = false; }
@@ -528,61 +740,114 @@ function initUser() {
     const page = document.getElementById("department-user-page");
     if (!page) return;
     let pinIsSet = false;
+    let canApprove = false;
+    let checking = false;
+    let saving = false;
+    let saveConfirmed = false;
+    const form = document.getElementById("department-pin-form");
+    const button = form.querySelector('button[type="submit"]');
+    const retry = document.getElementById("department-pin-retry");
+    const result = document.getElementById("department-pin-result");
+    result.tabIndex = -1;
+    function feedback(message = "", type = "", focus = false) {
+        setResult("department-pin-result", message, type);
+        if (focus) result.focus();
+    }
+    function syncControls() {
+        const blocked = checking || saving || !canApprove;
+        ["department-pin", "department-pin-confirmation"].forEach(id => { document.getElementById(id).disabled = blocked; });
+        const currentPassword = document.getElementById("department-current-password");
+        currentPassword.disabled = blocked || !pinIsSet;
+        currentPassword.required = pinIsSet;
+        document.getElementById("department-current-password-wrap").hidden = !pinIsSet;
+        button.disabled = blocked;
+        retry.disabled = checking || saving;
+        form.setAttribute("aria-busy", String(checking || saving));
+        document.getElementById("department-pin-save-label").textContent = saving ? "Saving…" : checking ? "Checking…" : "Save Department PIN";
+    }
     async function load() {
+        if (checking || pageSignal.aborted) return false;
+        checking = true;
+        canApprove = false;
+        retry.hidden = true;
+        syncControls();
+        document.getElementById("department-pin-status").textContent = "Checking PIN status...";
         document.getElementById("department-user-assignments").innerHTML = dataState("loading", "Loading department assignments...");
         try {
             const data = await api("/department/authorizations/data");
+            if (pageSignal.aborted) return false;
             const assignments = Array.isArray(data.assignments) ? data.assignments : [];
-            const canApprove = assignments.length > 0;
+            canApprove = assignments.length > 0;
             document.getElementById("department-user-assignments").innerHTML = assignments.length
                 ? assignments.map((assignment) => `<article class="department-assignment-card"><strong>${escapeHtml(assignment.name)}</strong><span>${escapeHtml(assignment.code)}</span><small>Department head</small></article>`).join("")
                 : dataState("empty", "You do not currently have an active department approval assignment.");
             pinIsSet = Boolean(data.pin?.is_set);
             document.getElementById("department-pin-heading").textContent = pinIsSet ? "Replace approval PIN" : "Set approval PIN";
-            const currentPasswordWrap = document.getElementById("department-current-password-wrap");
-            const currentPassword = document.getElementById("department-current-password");
-            currentPasswordWrap.hidden = !pinIsSet;
-            currentPassword.required = pinIsSet;
-            ["department-pin", "department-pin-confirmation"].forEach((id) => { document.getElementById(id).disabled = !canApprove; });
-            document.querySelector('#department-pin-form button[type="submit"]').disabled = !canApprove;
             document.getElementById("department-pin-status").textContent = data.pin?.is_set
                 ? `PIN is set${data.pin.updated_at ? ` · last changed ${formatDate(data.pin.updated_at)}` : ""}${data.pin.last_success_at ? ` · last used ${formatDate(data.pin.last_success_at)}` : ""}`
                 : (canApprove ? "No department approval PIN is set." : "A department head assignment is required before a PIN can be set.");
+            feedback(saveConfirmed ? "Department approval PIN saved securely." : "", saveConfirmed ? "success" : "");
+            return true;
         } catch (error) {
             if (!pageSignal.aborted) {
                 document.getElementById("department-user-assignments").innerHTML = dataState("error", error.message || "Unable to load department assignments.");
-                setResult("department-pin-result", "PIN status is unavailable until assignments can be loaded.", "error");
+                feedback(saveConfirmed ? "Department approval PIN saved securely. Assignments could not be refreshed. Reload assignments before making another change." : "PIN status is unavailable until assignments can be loaded.", saveConfirmed ? "warning" : "error");
+                document.getElementById("department-pin-status").textContent = "PIN status unavailable. Reload assignments to try again.";
+                retry.hidden = false;
             }
+            return false;
+        } finally {
+            checking = false;
+            if (!pageSignal.aborted) syncControls();
         }
     }
+    retry.addEventListener("click", async () => {
+        if (saving || checking) return;
+        feedback("Reloading department assignments...");
+        const loaded = await load();
+        if (!pageSignal.aborted) {
+            if (loaded && !saveConfirmed) feedback("Department assignments refreshed.");
+            result.focus();
+        }
+    });
     ["department-pin", "department-pin-confirmation"].forEach((id) => document.getElementById(id).addEventListener("input", (event) => {
         event.target.value = String(event.target.value || "").replace(/\D/g, "").slice(0, 6);
     }));
-    document.getElementById("department-pin-form").addEventListener("submit", async (event) => {
+    form.addEventListener("submit", async (event) => {
         event.preventDefault();
+        if (saving || checking || !canApprove || pageSignal.aborted) return;
         const pin = document.getElementById("department-pin").value;
         const confirmation = document.getElementById("department-pin-confirmation").value;
         const currentPassword = document.getElementById("department-current-password").value;
         if (!/^[0-9]{4,6}$/.test(pin) || pin !== confirmation) {
-            setResult("department-pin-result", "Enter matching 4–6 digit PINs.", "error");
+            feedback("Enter matching 4–6 digit PINs.", "error", true);
             return;
         }
-        const button = event.currentTarget.querySelector('button[type="submit"]');
-        button.disabled = true;
+        if (pinIsSet && currentPassword === "") {
+            feedback("Enter your current account password to replace the PIN.", "error", true);
+            return;
+        }
+        saving = true;
+        saveConfirmed = false;
+        syncControls();
+        feedback("Saving the department approval PIN. Wait for confirmation before trying again.", "", true);
         try {
-            if (pinIsSet && currentPassword === "") {
-                setResult("department-pin-result", "Enter your current account password to replace the PIN.", "error");
-                return;
-            }
             await api("/department/authorizations/pin", jsonOptions({ pin, pin_confirmation: confirmation, current_password: currentPassword }));
+            if (pageSignal.aborted) return;
             document.getElementById("department-current-password").value = "";
             document.getElementById("department-pin").value = "";
             document.getElementById("department-pin-confirmation").value = "";
-            setResult("department-pin-result", "Department approval PIN saved securely.", "success");
+            window.IbemsPasswordVisibility?.mask(form);
+            pinIsSet = true;
+            saveConfirmed = true;
+            feedback("Department approval PIN saved securely.", "success");
             await load();
         } catch (error) {
-            if (!pageSignal.aborted) setResult("department-pin-result", error.message, "error");
-        } finally { button.disabled = false; }
+            if (!pageSignal.aborted) feedback(error.message || "Unable to save the department approval PIN.", "error", true);
+        } finally {
+            saving = false;
+            if (!pageSignal.aborted) { syncControls(); result.focus(); }
+        }
     });
     load();
 }

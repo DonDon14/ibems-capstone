@@ -8,6 +8,9 @@ class RepairMissingProductFamilies extends Migration
 {
     public function up()
     {
+        // Earlier migrations may have populated CI's table/field metadata cache
+        // before adding these objects in the same fresh migration run.
+        $this->db->resetDataCache();
         if (!$this->db->tableExists('product_families')) {
             $this->forge->addField([
                 'id' => ['type' => 'INT', 'unsigned' => true, 'auto_increment' => true],

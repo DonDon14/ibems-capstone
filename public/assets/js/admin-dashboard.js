@@ -1,4 +1,10 @@
 let adSalesTrendChart = null;
+window.matchMedia("(prefers-reduced-motion: reduce)").addEventListener("change", event => {
+    if (!adSalesTrendChart) return;
+    adSalesTrendChart.stop();
+    adSalesTrendChart.options.animation = event.matches ? false : { duration: 450 };
+    adSalesTrendChart.update("none");
+});
 let adSalesTrendRows = [];
 let adAlertPage = 1;
 let adAlertsLoading = false;
@@ -103,7 +109,7 @@ function adRenderSalesTrendChart(rows) {
             responsive: true,
             maintainAspectRatio: false,
             interaction: { mode: "index", intersect: false },
-            animation: { duration: 450 },
+            animation: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? false : { duration: 450 },
             layout: { padding: { top: 8, right: 8 } },
             plugins: {
                 legend: { display: false },
@@ -352,6 +358,10 @@ async function adLoadAlertPage(page) {
     if (adAlertsLoading || page < 1 || page === adAlertPage) return;
     const container = document.getElementById("ad-alerts-list");
     const pager = document.getElementById("ad-alerts-pager");
+    const focusedButton = pager?.contains(document.activeElement) ? document.activeElement : null;
+    const focusLabel = focusedButton?.getAttribute("aria-label");
+    const previousButtons = Array.from(pager?.querySelectorAll("button") || [], button => ({ button, disabled: button.disabled }));
+    let loaded = false;
     adAlertsLoading = true;
     pager?.querySelectorAll("button").forEach((button) => { button.disabled = true; });
     container?.setAttribute("aria-busy", "true");
@@ -360,11 +370,19 @@ async function adLoadAlertPage(page) {
         const data = await adFetchDashboard(page);
         adRenderAlerts(data.alerts || []);
         adRenderAlertPagination(data.alerts_pagination || {});
+        loaded = true;
     } catch (error) {
         if (container) container.innerHTML = adDataState("error", "Unable to load this alert page.");
     } finally {
         adAlertsLoading = false;
         container?.removeAttribute("aria-busy");
+        if (!loaded) previousButtons.forEach(({ button, disabled }) => { button.disabled = disabled; });
+        if (focusLabel && (document.activeElement === document.body || document.activeElement === focusedButton)) {
+            const buttons = Array.from(pager?.querySelectorAll("button") || []);
+            const target = buttons.find(button => button.getAttribute("aria-label") === focusLabel && !button.disabled)
+                || buttons.find(button => !button.disabled);
+            target?.focus({ preventScroll: true });
+        }
     }
 }
 

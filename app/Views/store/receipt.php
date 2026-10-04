@@ -1,25 +1,29 @@
 <?= $this->extend('layouts/store') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20260825a">
+<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20261003-total-wrap">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
 <section class="history-shell">
-    <div class="history-toolbar">
-        <div>
-            <h3>Receipt Details</h3>
-            <p>Transaction reference view.</p>
-        </div>
-    </div>
+    <?= view('components/page_header', [
+        'eyebrow' => 'Store records',
+        'title' => 'Receipt details',
+        'description' => 'Review this transaction record.',
+        'icon' => 'bi bi-receipt',
+    ]) ?>
 
-    <div id="receipt-page-content"></div>
-    <p id="receipt-page-result" class="history-result"></p>
+    <div id="receipt-page-content" aria-live="polite">
+        <?= view('components/data_state', ['type' => 'loading', 'message' => 'Loading receipt...']) ?>
+    </div>
+    <div id="receipt-page-result" aria-live="assertive"></div>
+    <a href="<?= site_url('store/history') ?><?= (int) request()->getGet('store_id') > 0 ? '?store_id=' . (int) request()->getGet('store_id') : '' ?>" class="secondary-btn">Back to History</a>
 </section>
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260825a"></script>
+<script src="<?= base_url('assets/vendor/qrcode-generator/qrcode.js') ?>"></script>
+<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20261002-total-label"></script>
 <script {csp-script-nonce}>
     (async function () {
         const transactionId = <?= (int) ($transaction_id ?? 0) ?>;
@@ -42,11 +46,14 @@
                 payments: tx.payments,
                 totalAmount: tx.amount,
                 items: tx.items,
+                lookupUrl: `${window.location.origin}/store/receipt/${encodeURIComponent(String(tx.id))}<?= (int) request()->getGet('store_id') > 0 ? '?store_id=' . (int) request()->getGet('store_id') : '' ?>`,
             };
             window.IbemsReceipt.renderReceipt("receipt-page-content", receipt);
         } catch (error) {
-            resultEl.textContent = error.message || "Unable to load receipt.";
-            resultEl.style.color = "#b91c1c";
+            document.getElementById("receipt-page-content").innerHTML = '';
+            resultEl.className = "data-state data-state--error";
+            resultEl.innerHTML = '<i class="bi bi-exclamation-circle" aria-hidden="true"></i><div><strong></strong><small>Return to History and try opening the receipt again.</small></div>';
+            resultEl.querySelector('strong').textContent = error.message || "Unable to load receipt.";
         }
     })();
 </script>

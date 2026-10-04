@@ -1,11 +1,12 @@
 <?= $this->extend('layouts/admin') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/admin-overview.css') ?>?v=20260824b">
+<link rel="stylesheet" href="<?= base_url('assets/css/admin-overview.css') ?>?v=20261004-variance-feedback">
+<link rel="stylesheet" href="<?= base_url('assets/css/admin-products.css') ?>?v=20261004-list-states">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
-<section class="admin-overview-shell">
+<section class="admin-overview-shell admin-products-page">
     <?= view('components/page_header', [
         'eyebrow' => 'Catalog intelligence',
         'title' => 'Product oversight',
@@ -86,10 +87,10 @@
         </div>
     </div>
 
-    <p id="ap-result" class="stores-result text-sm font-semibold"></p>
-    <p id="ap-count-text" class="uv-count-text text-sm text-slate-500">Showing 0 products</p>
+    <p id="ap-result" class="stores-result text-sm font-semibold" role="status" aria-live="polite"></p>
+    <p id="ap-count-text" class="uv-count-text text-sm text-slate-500" role="status">Loading products…</p>
 
-    <div class="overview-table-wrap rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+    <div id="ap-table-region" class="overview-table-wrap rounded-2xl border border-slate-200 bg-white p-2 shadow-sm" tabindex="0" role="region" aria-label="Product oversight records">
         <table class="table ap-table">
             <thead>
                 <tr>
@@ -100,7 +101,7 @@
                     <th>Price</th>
                     <th>Stock</th>
                     <th>Status</th>
-                    <th>Updated</th>
+                    <th>Updated (Manila)</th>
                 </tr>
             </thead>
             <tbody id="ap-body">
@@ -122,7 +123,7 @@
             <h4 id="ap-view-title" class="text-lg font-bold text-slate-900">Product Snapshot</h4>
             <button id="ap-view-close" type="button" class="admin-modal-close" aria-label="Close product snapshot">x</button>
         </div>
-        <div class="app-inset-modal-scroll ap-view-modal-scroll">
+        <div class="app-inset-modal-scroll ap-view-modal-scroll" tabindex="0" role="region" aria-label="Product snapshot details">
             <div id="ap-view-content" class="ap-detail-grid"></div>
         </div>
         <div class="admin-modal-actions">
@@ -133,5 +134,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/admin-products.js') ?>?v=20260824a"></script>
+<script src="<?= base_url('assets/js/admin-products.js') ?>?v=20261004-list-feedback"></script>
 <?= $this->endSection() ?>

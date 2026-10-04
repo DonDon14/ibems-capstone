@@ -1,0 +1,21 @@
+.admin-audit-page :is(.summary-grid, .metric-card, .metric-card-head) { min-width: 0; }
+.admin-audit-page :is(.metric-card strong, .metric-card-label, .stores-result) { overflow-wrap: anywhere; }
+.admin-audit-page .summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.admin-audit-page .is-audit-list-state { overflow: visible; }
+.admin-audit-page .is-audit-list-state .audit-table { min-width: 0; width: 100%; }
+.admin-audit-page .is-audit-list-state thead { display: none; }
+.admin-audit-page .is-audit-list-state td { white-space: normal; border: 0; }
+.admin-audit-page .is-audit-list-state tbody tr { cursor: default; }
+.admin-audit-page .data-state { flex-wrap: wrap; }
+.admin-audit-page .data-state > div { flex: 1 1 200px; min-width: 0; }
+.admin-audit-page .data-state :is(strong, small) { overflow-wrap: anywhere; }
+.admin-audit-page .data-state:focus { outline: 2px solid #2563eb; outline-offset: -2px; }
+html[data-theme="dark"] .admin-audit-page .data-state:focus { outline-color: #93c5fd; }
+.admin-audit-page .audit-table tbody td:first-child { white-space: nowrap; }
+.admin-audit-page .audit-table tbody :is(td:nth-child(2), td:nth-child(3), td:nth-child(4), td:nth-child(5)) { min-width: 10rem; max-width: 24rem; white-space: normal; overflow-wrap: anywhere; }
+.admin-audit-page .audit-table .table-person-cell > span { min-width: 0; overflow-wrap: anywhere; }
+.admin-audit-page .is-audit-list-state .audit-table tbody td:first-child { white-space: normal; }
+.audit-view-card :is(.audit-detail-grid, .audit-detail-items, .audit-detail-item, .table-person-cell, .table-person-cell > strong, .audit-payload-block) { min-width: 0; }
+.audit-view-card :is(.audit-detail-item strong, .audit-detail-item small) { overflow-wrap: anywhere; }
+@media (max-width: 900px) { .admin-audit-page .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) { .admin-audit-page .summary-grid { grid-template-columns: minmax(0, 1fr); } }

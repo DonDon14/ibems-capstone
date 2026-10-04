@@ -1,4 +1,4 @@
-const USER_SHELL_CACHE = "ibems-user-shell-v7";
+const USER_SHELL_CACHE = "ibems-user-shell-v8";
 const USER_OFFLINE_URL = "/user/offline.html";
 const USER_SHELL_ASSETS = new Set([
     USER_OFFLINE_URL,

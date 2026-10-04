@@ -34,7 +34,6 @@ where not exists (
     select 1
     from public.store_capabilities sc
     where sc.store_id = s.id
-      and sc.capability = 'retail'
 );
 
 commit;

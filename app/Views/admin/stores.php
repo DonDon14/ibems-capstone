@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/admin') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/admin-stores.css') ?>?v=20260824a">
+<link rel="stylesheet" href="<?= base_url('assets/css/admin-stores.css') ?>?v=20261004-editor-feedback">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -15,9 +15,13 @@
             : 'Review store-day variances for stores assigned to you.',
         'icon' => 'bi bi-shop',
         'actions' => $canManageStores
-            ? '<button id="open-store-modal" class="primary-btn" type="button">+ Add Store</button>'
+            ? '<button id="open-store-modal" class="primary-btn" type="button" disabled>+ Add Store</button>'
             : null,
     ]) ?>
+
+    <?php if ($canManageStores): ?>
+    <div id="store-staff-result"><?= view('components/data_state', ['type' => 'loading', 'message' => 'Loading store staff...']) ?></div>
+    <?php endif; ?>
 
     <div class="admin-stores-filters" data-compact-filters>
         <div class="field">
@@ -47,6 +51,8 @@
         <button id="store-refresh-btn" class="secondary-btn" type="button">Refresh</button>
     </div>
 
+    <p id="stores-result" class="stores-result"></p>
+
     <div id="stores-gallery" class="stores-gallery">
         <?= view('components/data_state', [
             'type' => 'loading',
@@ -54,7 +60,6 @@
         ]) ?>
     </div>
 
-    <p id="stores-result" class="stores-result"></p>
 </section>
 
 <div id="store-modal" class="admin-modal admin-stores-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="store-modal-title" aria-describedby="store-modal-description">
@@ -67,7 +72,8 @@
             <button id="close-store-modal" type="button" class="admin-modal-close" aria-label="Close store form">x</button>
         </div>
 
-        <div class="admin-stores-modal-body">
+        <div class="admin-stores-modal-body" role="region" aria-label="Store fields and feedback" tabindex="0">
+            <p id="store-modal-result" class="store-feedback" role="status" aria-live="polite" aria-atomic="true" tabindex="-1"></p>
             <section class="store-form-section">
                 <div class="store-form-section-head">
                     <span><i class="bi bi-shop" aria-hidden="true"></i></span>
@@ -170,6 +176,6 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/admin-stores.js') ?>?v=20260824b"></script>
-<script src="<?= base_url('assets/js/admin-stores.part2.js') ?>?v=20260824b"></script>
+<script src="<?= base_url('assets/js/admin-stores.js') ?>?v=20261004-editor-feedback"></script>
+<script src="<?= base_url('assets/js/admin-stores.part2.js') ?>?v=20261004-editor-feedback"></script>
 <?= $this->endSection() ?>

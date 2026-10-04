@@ -1,8 +1,8 @@
 <?= $this->extend('layouts/user') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/user-portal.css') ?>?v=20260824a" data-user-page-style>
-<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20260825a" data-user-page-style>
+<link rel="stylesheet" href="<?= base_url('assets/css/user-portal.css') ?>?v=20261004-history-totals" data-user-page-style>
+<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20261003-total-wrap" data-user-page-style>
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -15,10 +15,10 @@
     ]) ?>
 
     <div class="dashboard-grid">
-        <?= view('components/stat_card', ['title' => 'Credit Limit', 'value' => 'PHP 0.00', 'valueId' => 'uh-credit-limit', 'icon' => 'bi bi-wallet2', 'tone' => 'finance']) ?>
-        <?= view('components/stat_card', ['title' => 'Current Debt', 'value' => 'PHP 0.00', 'valueId' => 'uh-current-debt', 'icon' => 'bi bi-credit-card-2-front', 'tone' => 'debt']) ?>
-        <?= view('components/stat_card', ['title' => 'Available Credit', 'value' => 'PHP 0.00', 'valueId' => 'uh-available-credit', 'icon' => 'bi bi-cash-coin', 'tone' => 'sales']) ?>
-        <?= view('components/stat_card', ['title' => 'Total Purchases', 'value' => 'PHP 0.00', 'valueId' => 'uh-total-spent', 'icon' => 'bi bi-bag-check', 'tone' => 'finance']) ?>
+        <?= view('components/stat_card', ['title' => 'Credit Limit', 'value' => 'Loading…', 'valueId' => 'uh-credit-limit', 'icon' => 'bi bi-wallet2', 'tone' => 'finance']) ?>
+        <?= view('components/stat_card', ['title' => 'Current Debt', 'value' => 'Loading…', 'valueId' => 'uh-current-debt', 'icon' => 'bi bi-credit-card-2-front', 'tone' => 'debt']) ?>
+        <?= view('components/stat_card', ['title' => 'Available Credit', 'value' => 'Loading…', 'valueId' => 'uh-available-credit', 'icon' => 'bi bi-cash-coin', 'tone' => 'sales']) ?>
+        <?= view('components/stat_card', ['title' => 'Total Purchases', 'value' => 'Loading…', 'valueId' => 'uh-total-spent', 'icon' => 'bi bi-bag-check', 'tone' => 'finance']) ?>
     </div>
 
     <article id="uh-debt-status-card" class="user-status-card user-status-card--info">
@@ -105,7 +105,7 @@
 
     <div class="user-subfilters">
         <label for="uh-cashbook-sort">Sort cashbook
-            <select id="uh-cashbook-sort">
+            <select id="uh-cashbook-sort" aria-label="Sort cashbook">
                 <option value="date:desc">Newest first</option>
                 <option value="date:asc">Oldest first</option>
                 <option value="amount:desc">Highest amount</option>
@@ -154,6 +154,7 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260825a" data-user-page-script data-user-page-once></script>
-<script src="<?= base_url('assets/js/user-history.js') ?>?v=20260823a" data-user-page-script></script>
+<script src="<?= base_url('assets/vendor/qrcode-generator/qrcode.js') ?>" data-user-page-script data-user-page-once></script>
+<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20261002-total-label" data-user-page-script data-user-page-once></script>
+<script src="<?= base_url('assets/js/user-history.js') ?>?v=20261003-receipt-labels" data-user-page-script></script>
 <?= $this->endSection() ?>

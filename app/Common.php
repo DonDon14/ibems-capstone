@@ -26,9 +26,14 @@ if (! function_exists('ibems_role_landing_path')) {
     {
         return match (ibems_normalize_role($role)) {
             'ADMIN' => '/admin/dashboard',
+            'HR' => '/hr/staff',
             'STORE_SUPERVISOR' => '/store-admin/dashboard',
             'STORE_SYSTEM' => '/store/pos',
             'ACCOUNTING_OFFICE' => '/accounting/dashboard',
+            'ACCOUNTING_HEAD' => '/accounting/dashboard',
+            'PAYROLL_CLERK' => '/accounting/payroll',
+            'CASHIER_HEAD', 'COLLECTING_OFFICER' => '/cashier/dashboard',
+            'BE_DIRECTOR' => '/be/dashboard',
             'USER' => '/user/dashboard',
             default => '/login',
         };
@@ -54,7 +59,9 @@ if (! function_exists('ibems_refresh_session_roles')) {
 
         $userId = (int) (session()->get('user_id') ?? 0);
         if ($userId <= 0) {
-            return ibems_available_roles();
+            session()->remove(['logged_in', 'user_id', 'role', 'available_roles', 'roles_refreshed_at']);
+            session()->destroy();
+            return [];
         }
 
         $configuredInterval = getenv('IBEMS_ROLE_REFRESH_INTERVAL');
@@ -70,6 +77,7 @@ if (! function_exists('ibems_refresh_session_roles')) {
             $userModel = new \App\Models\UserModel();
             $user = $userModel->getActiveUserWithRolesById($userId);
             if (! $user) {
+                session()->remove(['logged_in', 'user_id', 'role', 'available_roles', 'roles_refreshed_at']);
                 session()->destroy();
                 return [];
             }
@@ -94,11 +102,14 @@ if (! function_exists('ibems_refresh_session_roles')) {
 
             return $roles;
         } catch (\Throwable $exception) {
+            // Cached permissions cannot authorize a session we could not revalidate.
+            session()->remove(['logged_in', 'user_id', 'role', 'available_roles', 'roles_refreshed_at']);
+            session()->destroy();
             log_message('error', 'Unable to refresh session roles: {message}', [
                 'message' => $exception->getMessage(),
             ]);
 
-            return ibems_available_roles();
+            return [];
         }
     }
 }
@@ -185,13 +196,20 @@ if (! function_exists('ibems_datetime')) {
     }
 }
 
+if (! function_exists('ibems_now')) {
+    function ibems_now(): \DateTimeImmutable
+    {
+        return \App\Services\SimulationClock::now();
+    }
+}
+
 if (! function_exists('ibems_business_date')) {
     /**
      * Return the institution's operating date without changing the UTC storage timezone.
      */
     function ibems_business_date(): string
     {
-        return (new \DateTimeImmutable('now', new \DateTimeZone('Asia/Manila')))->format('Y-m-d');
+        return ibems_now()->setTimezone(new \DateTimeZone('Asia/Manila'))->format('Y-m-d');
     }
 }
 

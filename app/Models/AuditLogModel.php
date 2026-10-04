@@ -33,7 +33,7 @@ class AuditLogModel extends Model
         }
 
         try {
-            (new \App\Services\NotificationService())->publishFromAudit($auditId, $data);
+            (new \App\Services\NotificationService($this->db))->publishFromAudit($auditId, $data);
         } catch (\Throwable $exception) {
             log_message('error', 'Notification publication failed for audit event {id}: {message}', [
                 'id' => $auditId,

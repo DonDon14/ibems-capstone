@@ -57,25 +57,25 @@ final class AccountingPortalContentConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('required disabled', $view);
         $this->assertStringContainsString('overflow: hidden;', $styles);
         $this->assertStringContainsString('.department-modal-scroll', $styles);
-        $this->assertStringContainsString('background: transparent; color: #dc2626;', $styles);
+        $this->assertStringContainsString('background: transparent; color: var(--text-soft);', $styles);
+        $this->assertStringContainsString('button:focus-visible { outline: 2px solid var(--text-main); outline-offset: 2px;', $styles);
         $this->assertStringContainsString('Outstanding liability:', $script);
         $this->assertStringContainsString('Record settlement', $script);
     }
 
-    public function testPayrollDeductionsRendersAsARegularPageInsteadOfAnEmbeddedModal(): void
+    public function testDebtCenterLinksToTheSharedDeductionWorkspace(): void
     {
-        $view = (string) file_get_contents(APPPATH . 'Views/accounting/debts.php') . file_get_contents(APPPATH . 'Views/components/accounting_debt_modals.php');
-        $styles = (string) file_get_contents(FCPATH . 'assets/css/accounting-debts.css');
+        $view = (string) file_get_contents(APPPATH . 'Views/accounting/debts.php');
+        $modals = (string) file_get_contents(APPPATH . 'Views/components/accounting_debt_modals.php');
+        $controller = (string) file_get_contents(APPPATH . 'Controllers/AccountingController.php');
         $script = (string) file_get_contents(FCPATH . 'assets/js/accounting-debts.js') . file_get_contents(FCPATH . 'assets/js/accounting-debts.part2.js') . file_get_contents(FCPATH . 'assets/js/accounting-debts.part3.js');
 
-        $this->assertStringContainsString("role=\"<?= !empty(\$deductionsPage) ? 'region' : 'dialog' ?>\"", $view);
-        $this->assertStringContainsString("? 'deductions-page-shell' : 'acct-modal is-hidden'", $view);
-        $this->assertStringContainsString('deductions-workflow-layout', $view);
-        $this->assertStringContainsString('deductions-workflow-card', $view);
-        $this->assertStringContainsString('deductions-summary-card', $view);
-        $this->assertStringContainsString('padding: 0 !important;', $styles);
-        $this->assertStringContainsString('grid-template-columns: minmax(18rem, 22rem) minmax(0, 1fr)', $styles);
-        $this->assertStringContainsString('!event.currentTarget.classList.contains("deductions-page-shell")', $script);
+        $this->assertStringContainsString("site_url('deductions/workspace')", $view);
+        $this->assertStringContainsString("return redirect()->to(site_url('deductions/workspace'));", $controller);
+        $this->assertStringNotContainsString('deduction-workflow-modal', $script);
+        $this->assertStringNotContainsString('deduction-workflow-modal', $modals);
+        $this->assertStringNotContainsString('workflow-create-period', $modals);
+        $this->assertStringNotContainsString('/accounting/deduction-', $script);
     }
 
     public function testLegacyDeductionWarningsUseThemeAwareSurfaces(): void
@@ -114,8 +114,13 @@ final class AccountingPortalContentConventionTest extends CIUnitTestCase
             $this->assertStringNotContainsString($controlId, $script);
         }
 
-        $this->assertStringContainsString('accounting/deduction-batches', $routes);
-        $this->assertStringContainsString('open-deduction-workflow', $view);
-        $this->assertStringContainsString('/accounting/deduction-batches', $script);
+        $this->assertStringContainsString("site_url('deductions/workspace')", $view);
+        $this->assertStringNotContainsString('open-deduction-workflow', $view);
+        $this->assertStringNotContainsString('accounting/deduction-batches', $routes);
+        $this->assertStringNotContainsString('accounting/deduction-workflow', $routes);
+        $this->assertStringNotContainsString('/accounting/deduction-batches', $script);
+        $this->assertStringNotContainsString('public function prepareDeductionBatch(', $controller);
+        $this->assertStringNotContainsString('public function reconcileDeductionBatch(', $controller);
+        $this->assertStringContainsString("deductions/workspace/batches', 'DeductionWorkspaceController::prepareBatch'", $routes);
     }
 }

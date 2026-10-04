@@ -1,14 +1,14 @@
 <?= $this->extend('layouts/store') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/store-inventory.css') ?>?v=20260824e">
+<link rel="stylesheet" href="<?= base_url('assets/css/store-inventory.css') ?>?v=20261003-inventory-retry">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
 <section class="inventory-shell">
     <?php ob_start(); ?>
         <div class="inventory-top-actions">
-            <a href="/store/settings" class="secondary-btn link-reset"><i class="bi bi-tags"></i> Manage Categories</a>
+            <a href="<?= esc(site_url('store/settings') . ((int) service('request')->getGet('store_id') > 0 ? '?store_id=' . (int) service('request')->getGet('store_id') : '')) ?>" class="secondary-btn link-reset"><i class="bi bi-tags"></i> Manage Categories</a>
             <button id="open-product-modal-top" class="primary-btn inventory-add-btn" type="button"><i class="bi bi-plus-circle"></i> Add New Product</button>
         </div>
     <?php $inventoryHeaderActions = ob_get_clean(); ?>
@@ -74,8 +74,9 @@
         <div class="inventory-results-toolbar">
             <p id="inventory-results-count" aria-live="polite">Preparing inventory results...</p>
             <button id="inventory-toggle-families" class="secondary-btn btn-sm is-hidden" type="button"><i class="bi bi-arrows-expand"></i> Expand all variants</button>
+            <button id="refresh-inventory-products" class="secondary-btn btn-sm" type="button" disabled>Refresh products</button>
         </div>
-        <div class="inventory-table-wrap">
+        <div id="inventory-products-region" class="inventory-table-wrap" role="region" aria-label="Inventory products" aria-busy="true" tabindex="0">
             <table class="table">
                 <thead>
                     <tr>
@@ -116,15 +117,15 @@
         </div>
     </article>
 
-    <p id="inventory-result" class="inventory-result"></p>
+    <p id="inventory-result" class="inventory-result" role="status" aria-live="polite" aria-atomic="true" tabindex="-1"></p>
 </section>
 
 <?= view('components/store_inventory_modals') ?>
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js" data-portal-page-once></script>
-<script src="<?= base_url('assets/js/store-inventory.js') ?>?v=20260824e"></script>
-<script src="<?= base_url('assets/js/store-inventory.part2.js') ?>?v=20260824e"></script>
-<script src="<?= base_url('assets/js/store-inventory.part3.js') ?>?v=20260824e"></script>
+<script src="<?= base_url('assets/vendor/html5-qrcode/html5-qrcode.min.js') ?>" data-portal-page-once></script>
+<script src="<?= base_url('assets/js/store-inventory.js') ?>?v=20261003-inventory-retry"></script>
+<script src="<?= base_url('assets/js/store-inventory.part2.js') ?>?v=20261003-inventory-retry"></script>
+<script src="<?= base_url('assets/js/store-inventory.part3.js') ?>?v=20261003-inventory-retry"></script>
 <?= $this->endSection() ?>

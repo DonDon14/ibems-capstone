@@ -31,6 +31,8 @@ async function srLoadDebtRecords() {
     const countText = document.getElementById("staff-count-text");
     const searchButton = document.getElementById("debt-search-btn");
     body.innerHTML = srDebtDataState("loading", "Loading debt records...");
+    document.getElementById("debt-pager").innerHTML = "";
+    document.getElementById("staff-count-badge").textContent = "Loading…";
     if (countText) countText.textContent = q ? "Searching employee records..." : "Loading employee records...";
     searchButton.disabled = true;
 
@@ -38,12 +40,14 @@ async function srLoadDebtRecords() {
     try {
         const response = await fetch(`/store/debt-customers?${params.toString()}`);
         data = await response.json();
+        if (!response.ok) throw new Error(data?.message || "Unable to load debt records.");
     } catch (error) {
         if (requestId !== srDebtRequestSequence) return;
         const message = error?.message || "Unable to load debt records.";
         body.innerHTML = srDebtDataState("error", message);
         document.getElementById("debt-pager").innerHTML = "";
-        if (countText) countText.textContent = "Showing 0 records";
+        if (countText) countText.textContent = "Employee records unavailable";
+        document.getElementById("staff-count-badge").textContent = "Unavailable";
         srSetResult(message, "error");
         searchButton.disabled = false;
         return;
@@ -53,7 +57,8 @@ async function srLoadDebtRecords() {
         const message = data?.message || "Unable to load debt records.";
         body.innerHTML = srDebtDataState("error", message);
         document.getElementById("debt-pager").innerHTML = "";
-        if (countText) countText.textContent = "Showing 0 records";
+        if (countText) countText.textContent = "Employee records unavailable";
+        document.getElementById("staff-count-badge").textContent = "Unavailable";
         srSetResult(message, "error");
         searchButton.disabled = false;
         return;
@@ -94,6 +99,9 @@ async function srLoadStaffTransactions() {
     dateToInput.removeAttribute("aria-invalid");
 
     if (dateFrom && dateTo && dateFrom > dateTo) {
+        ++srTransactionRequestSequence;
+        document.getElementById("txn-body").innerHTML = srTransactionDataState("error", "Choose a valid date range to view employee transactions.");
+        document.getElementById("txn-pager").innerHTML = "";
         srSetTransactionResult("From date cannot be later than To date.", "error");
         dateFromInput.setAttribute("aria-invalid", "true");
         dateToInput.setAttribute("aria-invalid", "true");
@@ -108,12 +116,14 @@ async function srLoadStaffTransactions() {
 
     const body = document.getElementById("txn-body");
     body.innerHTML = srTransactionDataState("loading", "Loading employee transactions...");
+    document.getElementById("txn-pager").innerHTML = "";
     srSetTransactionResult("");
 
     let data;
     try {
         const response = await fetch(`/store/staff-transactions?${params.toString()}`);
         data = await response.json();
+        if (!response.ok) throw new Error(data?.message || "Unable to load employee transactions.");
     } catch (error) {
         if (requestId !== srTransactionRequestSequence) return;
         const message = error?.message || "Unable to load employee transactions.";
@@ -222,33 +232,45 @@ function srBuildReceiptHtml(receipt) {
 }
 
 async function srOpenReceipt(transactionId) {
+    const requestId = ++srReceiptSequence;
     srReceiptTrigger = document.activeElement;
-    let data;
+    srSelectedReceipt = null;
+    const content = document.getElementById("staff-receipt-content");
+    const view = document.getElementById("staff-receipt-view");
+    const print = document.getElementById("staff-receipt-print");
+    content.innerHTML = '<div class="receipt-loading" role="status">Loading receipt...</div>';
+    view.classList.add("is-hidden");
+    print.disabled = true;
+    document.getElementById("staff-receipt-modal").classList.remove("is-hidden");
+    document.body.classList.add("app-modal-open");
+    document.getElementById("staff-receipt-close").focus();
     try {
-        const response = await fetch(`/store/transactions/${transactionId}`);
-        data = await response.json();
-    } catch (error) {
-        srSetTransactionResult(error?.message || "Unable to load receipt.", "error");
-        return;
-    }
-    if (!data || data.status !== "success" || !data.transaction) {
-        srSetTransactionResult(data?.message || "Unable to load receipt.", "error");
-        return;
+        const response = await fetch(`/store/transactions/${encodeURIComponent(String(transactionId))}`);
+        const data = await response.json();
+        if (requestId !== srReceiptSequence) return;
+    if (!response.ok || !data || data.status !== "success" || !data.transaction) {
+        throw new Error(data?.message || "Unable to load receipt.");
     }
 
     const tx = data.transaction;
-    srSelectedReceipt = {transactionId:tx.id,clientTxnId:tx.client_txn_id,createdAt:tx.created_at,storeName:tx.store_name,customerName:tx.customer_name,paymentMethod:tx.payment_method,payments:tx.payments,totalAmount:tx.amount,items:tx.items,lookupUrl:`${window.location.origin}/store/receipt/${encodeURIComponent(String(tx.id))}`};
+    srSelectedReceipt = {transactionId:tx.id,clientTxnId:tx.client_txn_id,createdAt:tx.created_at,storeName:tx.store_name,customerName:tx.customer_name,paymentMethod:tx.payment_method,payments:tx.payments,totalAmount:tx.amount,items:tx.items,lookupUrl:`${window.location.origin}/store/receipt/${encodeURIComponent(String(tx.id))}?store_id=${encodeURIComponent(String(srStoreId))}`};
     if (!window.IbemsReceipt) throw new Error("Standard receipt renderer is unavailable.");
     window.IbemsReceipt.renderReceipt("staff-receipt-content", srSelectedReceipt);
     document.getElementById("staff-receipt-view").href = srSelectedReceipt.lookupUrl;
-    document.getElementById("staff-receipt-modal").classList.remove("is-hidden");
-    document.body.classList.add("app-modal-open");
-    window.requestAnimationFrame(() => document.getElementById("staff-receipt-close").focus());
+    view.classList.remove("is-hidden");
+    print.disabled = false;
+    } catch (error) {
+        if (requestId !== srReceiptSequence) return;
+        srSelectedReceipt = null;
+        content.innerHTML = `<div class="receipt-error" role="alert">${srEscape(error?.message || "Unable to load receipt.")} Close this dialog and try again.</div>`;
+    }
 }
 
 function srCloseReceipt() {
+    ++srReceiptSequence;
+    srSelectedReceipt = null;
     document.getElementById("staff-receipt-modal").classList.add("is-hidden");
-    document.body.classList.remove("app-modal-open");
+    if (["staff-employee-modal", "staff-scanner-modal"].every(id => document.getElementById(id).classList.contains("is-hidden"))) document.body.classList.remove("app-modal-open");
     srReceiptTrigger?.focus?.();
     srReceiptTrigger = null;
 }
@@ -426,6 +448,16 @@ window.addEventListener("beforeunload", srCleanupScanner);
 window.IbemsPortalNavigation?.onCleanup(srCleanupScanner);
 
 document.addEventListener("keydown", (event) => {
+    if (event.key === "Tab") {
+        const modal = ["staff-receipt-modal", "staff-scanner-modal", "staff-employee-modal"].map(id => document.getElementById(id)).find(element => !element.classList.contains("is-hidden"));
+        if (!modal) return;
+        const controls = Array.from(modal.querySelectorAll('a[href],button,input,select,textarea,[tabindex]')).filter(element => !element.disabled && element.tabIndex >= 0 && element.getClientRects().length);
+        const first = controls[0], last = controls[controls.length - 1];
+        if (!first) { event.preventDefault(); return; }
+        if (event.shiftKey && (document.activeElement === first || !modal.contains(document.activeElement))) { event.preventDefault(); last.focus(); }
+        else if (!event.shiftKey && (document.activeElement === last || !modal.contains(document.activeElement))) { event.preventDefault(); first.focus(); }
+        return;
+    }
     if (event.key !== "Escape") return;
     if (!document.getElementById("staff-receipt-modal").classList.contains("is-hidden")) {
         event.preventDefault();
@@ -450,7 +482,9 @@ document.addEventListener("keydown", (event) => {
     } catch (error) {
         const message = error.message || "Unable to load staff records.";
         document.getElementById("debt-body").innerHTML = srDebtDataState("error", message);
-        document.getElementById("staff-count-text").textContent = "Showing 0 records";
+        document.getElementById("staff-count-text").textContent = "Employee records unavailable";
+        document.getElementById("staff-count-badge").textContent = "Unavailable";
+        document.getElementById("debt-pager").innerHTML = "";
         srSetResult(message, "error");
     }
 })();

@@ -1,8 +1,8 @@
 <?= $this->extend('layouts/store') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/store-staff-records.css') ?>?v=20260824f">
-<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20260825a">
+<link rel="stylesheet" href="<?= base_url('assets/css/store-staff-records.css') ?>?v=20261003-result-colors">
+<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20261003-total-wrap">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -177,8 +177,9 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js" data-portal-page-once></script>
-<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260825a"></script>
-<script src="<?= base_url('assets/js/store-staff-records.js') ?>?v=20260824c"></script>
-<script src="<?= base_url('assets/js/store-staff-records.part2.js') ?>?v=20260824c"></script>
+<script src="<?= base_url('assets/vendor/html5-qrcode/html5-qrcode.min.js') ?>" data-portal-page-once></script>
+<script src="<?= base_url('assets/vendor/qrcode-generator/qrcode.js') ?>"></script>
+<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20261002-total-label"></script>
+<script src="<?= base_url('assets/js/store-staff-records.js') ?>?v=20261002-list-feedback"></script>
+<script src="<?= base_url('assets/js/store-staff-records.part2.js') ?>?v=20261002-receipt-visibility"></script>
 <?= $this->endSection() ?>

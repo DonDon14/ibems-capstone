@@ -144,10 +144,10 @@ final class StoreDayOperationService
                 $amount = max(0, round((float) ($opening['opening_balance'] ?? 0), 2));
                 $payload = ['store_day_session_id' => (int) $session['id'], 'destination_account_id' => $accountId,
                     'account_name_snapshot' => (string) $account['account_name'], 'account_number_snapshot' => (string) $account['account_number'],
-                    'opening_balance' => $amount, 'updated_at' => date('Y-m-d H:i:s')];
+                    'opening_balance' => $amount, 'updated_at' => ibems_now()->format('Y-m-d H:i:s')];
                 $existingBalance = $db->table('store_day_payment_account_balances')->where('store_day_session_id', (int) $session['id'])->where('destination_account_id', $accountId)->get()->getRowArray();
                 if ($existingBalance) $db->table('store_day_payment_account_balances')->where('id', (int) $existingBalance['id'])->update($payload);
-                else { $payload['created_at'] = date('Y-m-d H:i:s'); $db->table('store_day_payment_account_balances')->insert($payload); }
+                else { $payload['created_at'] = ibems_now()->format('Y-m-d H:i:s'); $db->table('store_day_payment_account_balances')->insert($payload); }
             }
         }
         $expected = (new StoreDayExpectedService())->calculate((int) $store['id'], $session);
@@ -167,7 +167,7 @@ final class StoreDayOperationService
                 'previous_close' => $previousClose,
                 'original_opening_balances_preserved' => $isReopen,
             ]),
-            'created_at' => date('Y-m-d H:i:s'),
+            'created_at' => ibems_now()->format('Y-m-d H:i:s'),
         ]);
 
         return $this->result(200, [
@@ -179,6 +179,37 @@ final class StoreDayOperationService
     public function close(array $request, int $actorId, string $role): array
     {
         $storeId = (int) ($request['store_id'] ?? 0);
+        $store = (new StoreAccessService())->resolve($actorId, $role, $storeId);
+        if (!$store) {
+            return $this->result(403, ['status' => 'error', 'message' => 'You cannot access this store.']);
+        }
+        $storeId = (int) $store['id'];
+        $request['store_id'] = $storeId;
+        $db = Database::connect();
+        $db->transBegin();
+        try {
+            // Calculate and freeze close figures only after earlier sale commits finish.
+            if ($db->DBDriver === 'SQLite3') $db->table('stores')->set('is_active', 'is_active', false)->where('id', $storeId)->update();
+            ProductBehaviorService::lockStore($db, $storeId);
+            $result = $this->closeLocked($request, $actorId, $role);
+            if (($result['payload']['status'] ?? '') !== 'success') {
+                $db->transRollback();
+                return $result;
+            }
+            if (!$db->transStatus()) {
+                throw new \RuntimeException('Store-day closing transaction failed.');
+            }
+            $db->transCommit();
+            return $result;
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            return $this->result(409, ['status' => 'error', 'message' => 'The store day could not be closed. Reload and retry.']);
+        }
+    }
+
+    private function closeLocked(array $request, int $actorId, string $role): array
+    {
+        $storeId = (int) ($request['store_id'] ?? 0);
         $countedCash = (float) ($request['counted_cash'] ?? 0);
         $countedEcash = (float) ($request['counted_ecash'] ?? 0);
         $legacyCountedEcash = $countedEcash;
@@ -187,11 +218,14 @@ final class StoreDayOperationService
         $hasStructuredElectronicCounts = array_key_exists('payment_account_counts', $request) || array_key_exists('unassigned_payment_counts', $request);
         $note = trim((string) ($request['note'] ?? ''));
 
-        if ($countedCash < 0) {
+        if (!is_finite($countedCash) || !is_finite($countedEcash) || $countedCash < 0 || $countedEcash < 0) {
             return $this->result(400, [
                 'status' => 'error',
                 'message' => 'Counted cash must be 0 or greater.',
             ]);
+        }
+        foreach (['payment_account_counts', 'unassigned_payment_counts'] as $field) {
+            if (array_key_exists($field, $request) && !is_array($request[$field])) return $this->result(400, ['status' => 'error', 'message' => 'Electronic counts must be lists.']);
         }
 
         $store = (new StoreAccessService())->resolve($actorId, $role, $storeId);
@@ -226,35 +260,37 @@ final class StoreDayOperationService
         $validatedAccountCounts = [];
         $countedEcash = 0.0;
         foreach ($paymentAccountCounts as $count) {
-            $accountId = (int) ($count['destination_account_id'] ?? 0);
+            if (!is_array($count) || !isset($count['destination_account_id'], $count['counted_balance']) || !is_numeric($count['counted_balance'])) return $this->result(400, ['status' => 'error', 'message' => 'Invalid receiving-account count.']);
+            $accountId = filter_var($count['destination_account_id'], FILTER_VALIDATE_INT) ?: 0;
             $counted = round((float) ($count['counted_balance'] ?? 0), 2);
-            if (!isset($expectedAccounts[$accountId]) || $counted < 0) {
+            if (!isset($expectedAccounts[$accountId]) || isset($validatedAccountCounts[$accountId]) || !is_finite($counted) || $counted < 0) {
                 return $this->result(400, ['status' => 'error', 'message' => 'Every receiving-account ending balance must be valid and 0 or greater.']);
             }
-            $validatedAccountCounts[] = ['destination_account_id' => $accountId, 'counted_balance' => $counted];
+            $validatedAccountCounts[$accountId] = ['destination_account_id' => $accountId, 'counted_balance' => $counted];
             $countedEcash += $counted;
         }
         $expectedUnassigned = [];
         foreach (($expected['unassigned_payment_balances'] ?? []) as $row) $expectedUnassigned[(string) $row['key']] = $row;
         $validatedUnassignedCounts = [];
         foreach ($unassignedPaymentCounts as $count) {
+            if (!is_array($count) || !isset($count['key'], $count['counted_balance']) || !is_string($count['key']) || !is_numeric($count['counted_balance'])) return $this->result(400, ['status' => 'error', 'message' => 'Invalid legacy payment count.']);
             $key = (string) ($count['key'] ?? '');
             $counted = round((float) ($count['counted_balance'] ?? 0), 2);
-            if (!isset($expectedUnassigned[$key]) || $counted < 0) {
+            if (!isset($expectedUnassigned[$key]) || isset($validatedUnassignedCounts[$key]) || !is_finite($counted) || $counted < 0) {
                 return $this->result(400, ['status' => 'error', 'message' => 'Every legacy payment ending balance must be valid and 0 or greater.']);
             }
-            $validatedUnassignedCounts[] = ['key' => $key, 'counted_balance' => $counted];
+            $validatedUnassignedCounts[$key] = ['key' => $key, 'counted_balance' => $counted];
             $countedEcash += $counted;
         }
         if ($hasStructuredElectronicCounts && count($validatedUnassignedCounts) !== count($expectedUnassigned)) {
             return $this->result(400, ['status' => 'error', 'message' => 'Count every legacy payment bucket before closing the store day.']);
         }
-        $unassignedPaymentCounts = $validatedUnassignedCounts;
-        if (!$hasStructuredElectronicCounts || ($expectedAccounts === [] && $expectedUnassigned === [])) $countedEcash = max(0, $legacyCountedEcash);
+        $unassignedPaymentCounts = array_values($validatedUnassignedCounts);
+        if (!$hasStructuredElectronicCounts) $countedEcash = $legacyCountedEcash;
         if ($hasStructuredElectronicCounts && count($validatedAccountCounts) !== count($expectedAccounts)) {
             return $this->result(400, ['status' => 'error', 'message' => 'Count every receiving account before closing the store day.']);
         }
-        $paymentAccountCounts = $validatedAccountCounts;
+        $paymentAccountCounts = array_values($validatedAccountCounts);
         $varianceCash = round($countedCash - $expectedCash, 2);
         $varianceEcash = round($countedEcash - $expectedEcash, 2);
         $totalVariance = round($varianceCash + $varianceEcash, 2);
@@ -273,7 +309,7 @@ final class StoreDayOperationService
             ]);
         }
 
-        $now = date('Y-m-d H:i:s');
+        $now = ibems_now()->format('Y-m-d H:i:s');
 
         $model->update((int) $session['id'], [
             'status' => 'closed',
@@ -301,7 +337,7 @@ final class StoreDayOperationService
                 $expectedBalance = round((float) ($account['expected_balance'] ?? 0), 2);
                 $payload = ['store_day_session_id' => (int) $session['id'], 'destination_account_id' => $accountId,
                     'account_name_snapshot' => (string) $account['account_name'], 'account_number_snapshot' => (string) $account['account_number'],
-                    'opening_balance' => 0, 'expected_balance' => $expectedBalance, 'counted_balance' => $counted,
+                    'opening_balance' => (float) $account['opening_balance'], 'expected_balance' => $expectedBalance, 'counted_balance' => $counted,
                     'variance' => round($counted - $expectedBalance, 2), 'updated_at' => $now];
                 $existingAccountBalance = $db->table('store_day_payment_account_balances')->where('store_day_session_id', (int) $session['id'])->where('destination_account_id', $accountId)->get()->getRowArray();
                 if ($existingAccountBalance) $db->table('store_day_payment_account_balances')->where('id', (int) $existingAccountBalance['id'])->update($payload);

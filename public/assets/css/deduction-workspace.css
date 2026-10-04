@@ -1,0 +1,58 @@
+.deduction-workspace { max-width: 1600px; min-width: 0; overflow-wrap: anywhere; }
+.deduction-workspace :is(.data-panel, .data-panel-body, .deduction-form, .deduction-form label, .deduction-register-tools, .deduction-rows, .deduction-breakdown, .deduction-breakdown dl > div) { min-width: 0; }
+.deduction-workspace .deduction-form :is(input:not([type="checkbox"]), select) { min-width: 0; box-sizing: border-box; }
+.deduction-workspace :is(.primary-btn, .secondary-btn) { max-width: 100%; white-space: normal; }
+.deduction-row legend { max-width: 100%; white-space: normal; }
+.deduction-grid { display: grid; grid-template-columns: minmax(240px, 340px) minmax(0, 1fr); gap: 1.25rem; align-items: start; }
+.deduction-grid .data-panel-body { padding: 1.25rem; }
+.deduction-notice, .deduction-feedback { border: 1px solid #bfdbfe; border-radius: 12px; background: #eff6ff; color: #1e3a5f; padding: .8rem 1rem; }
+.deduction-feedback.is-success { border-color: #a7f3d0; background: #ecfdf5; color: #065f46; }
+.deduction-feedback.is-error { border-color: #fecaca; background: #fef2f2; color: #991b1b; }
+.deduction-form { display: grid; gap: .85rem; }
+.deduction-form label { display: grid; gap: .35rem; font-size: .88rem; }
+.deduction-form input:not([type="checkbox"]), .deduction-form select { width: 100%; min-height: 40px; border: 1px solid #cbd5e1; border-radius: 9px; background: #fff; color: #0f172a; padding: .45rem .65rem; }
+.deduction-form input[type="checkbox"] { margin-right: .35rem; }
+.deduction-form label.deduction-include { display: flex; align-items: center; gap: .5rem; }
+.deduction-form .deduction-include input[type="checkbox"] { margin: 0; flex: 0 0 auto; }
+.deduction-register-tools { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: .75rem; align-items: end; }
+.deduction-register-actions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.deduction-register-tools #deduction-match-count { grid-column: 1 / -1; margin: 0; font-size: .85rem; color: var(--text-soft, #475569); }
+.deduction-selection-summary { margin: 0; padding: .6rem 0; font-size: .88rem; font-weight: 600; }
+.deduction-workspace .deduction-selection-summary.is-warning { color: #92400e; }
+html[data-theme="dark"] .ibems-modern .deduction-workspace .deduction-selection-summary.is-warning { color: #fcd34d; }
+.deduction-workspace .deduction-form :is(input:not([type="checkbox"]), select):disabled,
+.deduction-workspace .deduction-request-amount:read-only { opacity: 1; border-style: dashed; }
+html[data-theme="dark"] .ibems-modern .deduction-workspace .deduction-form :is(input:not([type="checkbox"]), select):disabled { color: #cbd5e1 !important; }
+.deduction-workspace .deduction-form .ui-select-trigger:disabled { opacity: 1; border-style: dashed; }
+html[data-theme="dark"] .ibems-modern .deduction-workspace .deduction-form .ui-select-trigger:disabled { color: #cbd5e1 !important; }
+.deduction-workspace .deduction-feedback:focus-visible { outline: 2px solid #2563eb; outline-offset: 3px; }
+html[data-theme="dark"] .ibems-modern .deduction-workspace .deduction-feedback:focus-visible { outline-color: #93c5fd; }
+.deduction-row[hidden] { display: none; }
+body.ibems-modern .deduction-rows:focus-visible { outline: 2px solid var(--text-main, #0f172a); outline-offset: 4px; border-radius: 10px; }
+.deduction-period-list, .deduction-rows { display: grid; gap: .7rem; margin-top: 1rem; max-height: 65vh; overflow: auto; }
+.deduction-period-pagination { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .6rem; margin-top: .75rem; font-size: .88rem; }
+.deduction-period-context { margin: 0; color: var(--text-soft, #475569); font-size: .84rem; }
+.deduction-period { display: grid; gap: .1rem; color: inherit; text-decoration: none; border: 1px solid #cbd5e1; border-radius: 10px; padding: .7rem; }
+.deduction-period.is-selected { border-color: #60a5fa; background: #eff6ff; }
+.deduction-period span, .deduction-row p { color: var(--text-soft, #475569); font-size: .88rem; }
+.deduction-row { min-width: 0; border: 1px solid #cbd5e1; border-radius: 10px; padding: .85rem; }
+.deduction-row legend { padding: 0 .25rem; font-weight: 700; }
+.deduction-row h4 { margin: 0 0 .25rem; font-weight: 700; }
+.deduction-breakdown { margin: .65rem 0; padding: .65rem; border-radius: 9px; background: #f1f5f9; font-size: .82rem; }
+.deduction-breakdown > strong { display: block; margin-bottom: .4rem; }
+.deduction-breakdown dl { display: grid; grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: .4rem .8rem; margin: 0; }
+.deduction-breakdown dt { color: #475569; }
+.deduction-breakdown dd { margin: .1rem 0 0; font-weight: 700; }
+.deduction-action-form { margin-top: 1rem; }
+.deduction-row .deduction-form { margin-top: .75rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.deduction-row .deduction-form button { justify-self: start; }
+html[data-theme="dark"] .ibems-modern .deduction-workspace :is(.deduction-notice, .deduction-feedback) { border-color: #41648d; background: #173252; color: #e5efff; }
+html[data-theme="dark"] .ibems-modern .deduction-feedback.is-success { border-color: #397e6a; background: #153f35; color: #d1fae5; }
+html[data-theme="dark"] .ibems-modern .deduction-feedback.is-error { border-color: #b86363; background: #512929; color: #fee2e2; }
+html[data-theme="dark"] .ibems-modern .deduction-form input:not([type="checkbox"]), html[data-theme="dark"] .ibems-modern .deduction-form select { border-color: #48617e; background: #192a3f; color: #fff; }
+html[data-theme="dark"] .ibems-modern .deduction-period, html[data-theme="dark"] .ibems-modern .deduction-row { border-color: #41526b; }
+html[data-theme="dark"] .ibems-modern .deduction-period.is-selected { border-color: #68a4eb; background: #1b395e; }
+html[data-theme="dark"] .ibems-modern .deduction-breakdown { background: #192a3f; }
+html[data-theme="dark"] .ibems-modern .deduction-breakdown dt { color: #cbd5e1; }
+@media (max-width: 900px) { .deduction-grid { grid-template-columns: 1fr; } .deduction-row .deduction-form { grid-template-columns: 1fr; } .deduction-rows { max-height: none; overflow: visible; } }
+.deduction-grid .data-panel-head h3 { font-size: 1rem; font-weight: 650; line-height: 1.4; }

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\NumericFloatCast;
 use CodeIgniter\Model;
 
 class UserModel extends Model
@@ -42,6 +43,8 @@ class UserModel extends Model
         'salary_schedule_id' => '?integer',
         'is_active'   => 'boolean',
     ];
+
+    protected array $castHandlers = ['float' => NumericFloatCast::class];
 
     protected $useTimestamps = false;
 

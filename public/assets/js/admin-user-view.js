@@ -6,6 +6,8 @@ let uvPage = 1;
 let uvSalarySchedules = [];
 let uvDefaultCreditPercentage = 25;
 let uvSalarySchedulesPromise = null;
+let uvListRequestId = 0;
+let uvListState = "loading";
 
 function aMoney(value) {
     return window.IbemsFormat?.money(value) || `PHP ${Number(value || 0).toFixed(2)}`;
@@ -40,7 +42,9 @@ function uvBindPhotoPreview(prefix) {
 }
 
 function formatRoleLabel(role) {
-    if (String(role || "").toUpperCase() === "STORE_SYSTEM") return "Store Cashier";
+    const labels = { STORE_SYSTEM: "Store Cashier", HR: "HR", BE_DIRECTOR: "BE Director" };
+    const knownLabel = labels[String(role || "").toUpperCase()];
+    if (knownLabel) return knownLabel;
     return String(role || "")
         .toLowerCase()
         .split("_")
@@ -51,13 +55,18 @@ function formatRoleLabel(role) {
 function formatTypeLabel(type) {
     const value = String(type || "");
     if (!value) return "-";
+    if (value.toUpperCase() === "COS") return "COS";
     return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
 }
 
 async function loadUvSalarySchedules() {
     if (uvSalarySchedulesPromise) return uvSalarySchedulesPromise;
     uvSalarySchedulesPromise = fetch("/admin/salary-schedules")
-        .then((response) => response.json())
+        .then(async (response) => {
+            const data = await response.json();
+            if (!response.ok) throw new Error(data?.message || "Unable to load salary schedules. Try opening the form again.");
+            return data;
+        })
         .then((data) => {
             if (!data || data.status !== "success" || !Array.isArray(data.data) || !data.data.length) {
                 throw new Error(data?.message || "Salary schedules are unavailable. Apply the latest development database migration, then refresh this page.");
@@ -65,6 +74,10 @@ async function loadUvSalarySchedules() {
             uvSalarySchedules = data.data;
             uvDefaultCreditPercentage = Number(data.default_credit_percentage ?? 25);
             return uvSalarySchedules;
+        })
+        .catch((error) => {
+            uvSalarySchedulesPromise = null;
+            throw error;
         });
     return uvSalarySchedulesPromise;
 }
@@ -130,7 +143,7 @@ function uvFinancialPayload(prefix) {
 }
 
 function toggleUvFinancialFields(prefix) {
-    const isEmployee = ["faculty", "staff"].includes(document.getElementById(`${prefix}-type`).value);
+    const isEmployee = prefix !== "uv-e" && ["faculty", "staff"].includes(document.getElementById(`${prefix}-type`).value);
     document.getElementById(`${prefix}-financial-fields`).classList.toggle("hidden", !isEmployee);
 }
 
@@ -162,9 +175,14 @@ function getRoleChecks(prefix) {
 }
 
 function setUvResult(message, type) {
-    const el = document.getElementById("uv-result");
+    const el = document.querySelector('#uv-edit-modal:not(.is-hidden) .uv-modal-result, #uv-add-modal:not(.is-hidden) .uv-modal-result') || document.getElementById("uv-result");
+    el.setAttribute("role", type === "error" ? "alert" : "status");
+    el.setAttribute("aria-live", type === "error" ? "assertive" : "polite");
+    el.setAttribute("aria-atomic", "true");
     el.textContent = message || "";
-    el.style.color = type === "error" ? "#b91c1c" : "#166534";
+    el.style.color = type === "error" ? "var(--feedback-error, #b91c1c)"
+        : type === "warning" ? "var(--feedback-warning, #92400e)" : "var(--feedback-success, #166534)";
+    if (message && el.classList.contains("uv-modal-result")) el.scrollIntoView({ block: "nearest", behavior: "instant" });
 }
 
 function getFilteredRows() {
@@ -204,16 +222,32 @@ function renderTopSummary(rows) {
     document.getElementById("uv-store-officers").textContent = String(storeOfficers);
 }
 
+const uvModalOpeners = new Map();
+let uvDetailRequestId = 0;
+
 function openModal(id) {
     const modal = document.getElementById(id);
     if (!modal) return;
+    uvDetailRequestId++;
+    uvModalOpeners.set(id, document.activeElement);
+    if (id === "uv-import-modal") setUvImportResult("");
+    const result = modal.querySelector(".uv-modal-result");
+    if (result) { result.textContent = ""; result.setAttribute("role", "status"); result.setAttribute("aria-live", "polite"); }
+    modal.querySelectorAll('select, input[type="date"]').forEach(control => {
+        control.dispatchEvent(new Event("ibems:control-sync"));
+    });
     modal.classList.remove("is-hidden");
+    modal.querySelector(".uv-modal-scroll")?.scrollTo({ top: 0, behavior: "instant" });
+    modal.querySelector(".admin-modal-close")?.focus();
 }
 
 function closeModal(id) {
     const modal = document.getElementById(id);
     if (!modal) return;
+    uvDetailRequestId++;
     modal.classList.add("is-hidden");
+    const opener = uvModalOpeners.get(id);
+    if (opener?.isConnected) opener.focus({ preventScroll: true });
 }
 
 function setQuickChipState(chip, active) {
@@ -291,6 +325,9 @@ function renderUserTable(rows) {
 }
 
 function applyUserFiltersAndRender() {
+    if (uvListState !== "ready") return;
+    const pager = document.getElementById("uv-pager");
+    const focusLabel = pager.contains(document.activeElement) ? document.activeElement.getAttribute("aria-label") : null;
     const filtered = getFilteredRows();
     const [sortBy, sortDir] = (document.getElementById("uv-sort").value || "name:asc").split(":");
     const direction = sortDir === "desc" ? -1 : 1;
@@ -321,44 +358,71 @@ function applyUserFiltersAndRender() {
     renderTopSummary(filtered);
     renderUserTable(pageRows);
     document.getElementById("uv-pager").innerHTML = `
-        <button class="secondary-btn btn-sm" type="button" data-page="${uvPage - 1}" ${uvPage <= 1 ? "disabled" : ""}><i class="bi bi-chevron-left"></i> Previous</button>
+        <button class="secondary-btn btn-sm" type="button" aria-label="Previous employee page" data-page="${uvPage - 1}" ${uvPage <= 1 ? "disabled" : ""}><i class="bi bi-chevron-left"></i> Previous</button>
         <span>Page ${uvPage} of ${totalPages}</span>
-        <button class="secondary-btn btn-sm" type="button" data-page="${uvPage + 1}" ${uvPage >= totalPages ? "disabled" : ""}>Next <i class="bi bi-chevron-right"></i></button>`;
+        <button class="secondary-btn btn-sm" type="button" aria-label="Next employee page" data-page="${uvPage + 1}" ${uvPage >= totalPages ? "disabled" : ""}>Next <i class="bi bi-chevron-right"></i></button>`;
+    if (focusLabel) {
+        const buttons = Array.from(pager.querySelectorAll("button"));
+        const target = buttons.find(button => !button.disabled && button.getAttribute("aria-label") === focusLabel)
+            || buttons.find(button => !button.disabled);
+        target?.focus({ preventScroll: true });
+    }
 }
 
 async function loadUserView() {
+    const requestId = ++uvListRequestId;
+    const signal = window.IbemsPortalNavigation?.currentSignal;
+    const isCurrent = () => requestId === uvListRequestId && !signal?.aborted;
     const q = (document.getElementById("uv-search").value || "").trim();
     const params = new URLSearchParams();
     if (q) params.set("q", q);
 
-    const response = await fetch(`/admin/user-view/data?${params.toString()}`);
-    const data = await response.json();
     const body = document.getElementById("uv-body");
-    if (!data || data.status !== "success") {
-        body.innerHTML = renderUvDataState("error", data?.message || "Unable to load users.");
-        const countText = document.getElementById("uv-count-text");
-        if (countText) countText.textContent = "Showing 0 of 0 records";
-        renderTopSummary([]);
-        return;
+    uvListState = "loading";
+    body.setAttribute("aria-busy", "true");
+    body.innerHTML = renderUvDataState("loading", "Loading employee records…");
+    document.getElementById("uv-count-text").textContent = "Loading records…";
+    document.getElementById("uv-pager").innerHTML = "";
+    try {
+        const response = await fetch(`/admin/user-view/data?${params.toString()}`, { signal });
+        const data = await response.json();
+        if (!isCurrent()) return;
+        if (!response.ok || !data || data.status !== "success") throw new Error(data?.message || "Unable to load employee records.");
+        uvRows = Array.isArray(data.data) ? data.data : [];
+        uvListState = "ready";
+        applyUserFiltersAndRender();
+        return true;
+    } catch (error) {
+        if (!isCurrent()) return;
+        uvRows = [];
+        uvListState = "error";
+        body.innerHTML = renderUvDataState("error", `${error.message || "Unable to load employee records."} Use Refresh to try again.`);
+        document.getElementById("uv-count-text").textContent = "Records unavailable";
+        ["uv-total-users", "uv-total-debt", "uv-active-faculty", "uv-store-officers"].forEach(id => {
+            document.getElementById(id).textContent = "Unavailable";
+        });
+        return false;
+    } finally {
+        if (isCurrent()) body.removeAttribute("aria-busy");
     }
-
-    uvRows = Array.isArray(data.data) ? data.data : [];
-    applyUserFiltersAndRender();
 }
 
 async function openEditUser(userId) {
+    const requestId = ++uvDetailRequestId;
+    const signal = window.IbemsPortalNavigation?.currentSignal;
+    const isCurrent = () => requestId === uvDetailRequestId && !signal?.aborted;
     let data;
     try {
-        const response = await fetch(`/admin/user-view/${userId}`);
+        const response = await fetch(`/admin/user-view/${userId}`, { signal });
         data = await response.json();
-        if (!data || data.status !== "success") {
+        if (!isCurrent()) return;
+        if (!response.ok || !data || data.status !== "success") {
             throw new Error(data?.message || "Unable to load user detail.");
         }
-        if (["faculty", "staff"].includes(String(data.data?.user_type || "").toLowerCase())) {
-            await loadUvSalarySchedules();
-        }
+        if (!isCurrent()) return;
     } catch (error) {
-        setUvResult(error.message || "Unable to load employee salary schedules. Apply the latest development database migration and try again.", "error");
+        if (!isCurrent()) return;
+        setUvResult(error.message || "Unable to load employee details.", "error");
         return;
     }
 
@@ -372,16 +436,25 @@ async function openEditUser(userId) {
     setRoleChecks("uv-e", row.roles, row.role);
     document.getElementById("uv-e-type").value = row.user_type || "staff";
     document.getElementById("uv-e-active").value = row.is_active ? "1" : "0";
-    if (["faculty", "staff"].includes(String(row.user_type || "").toLowerCase())) {
-        populateUvSalaryProfile("uv-e", row);
-    }
-    toggleUvFinancialFields("uv-e");
+    document.querySelectorAll("#uv-e-financial-fields input, #uv-e-financial-fields select").forEach(control => { control.disabled = true; });
+    document.getElementById("uv-e-financial-fields").classList.add("hidden");
     openModal("uv-edit-modal");
 }
 
 async function openViewUser(userId) {
-    const response = await fetch(`/admin/user-view/${userId}`);
-    const data = await response.json();
+    const requestId = ++uvDetailRequestId;
+    const signal = window.IbemsPortalNavigation?.currentSignal;
+    let data;
+    try {
+        const response = await fetch(`/admin/user-view/${userId}`, { signal });
+        data = await response.json();
+        if (requestId !== uvDetailRequestId || signal?.aborted) return;
+        if (!response.ok || !data || data.status !== "success") throw new Error(data?.message || "Unable to load employee details.");
+    } catch (error) {
+        if (requestId !== uvDetailRequestId || signal?.aborted) return;
+        setUvResult(error.message || "Unable to load employee details.", "error");
+        return;
+    }
     if (!data || data.status !== "success") {
         setUvResult(data?.message || "Unable to load user detail.", "error");
         return;
@@ -398,7 +471,7 @@ async function openViewUser(userId) {
     document.getElementById("uv-v-status").value = row.is_active ? "Active" : "Inactive";
     const profileConfigured = Boolean(row.financial_profile_configured);
     document.getElementById("uv-v-salary").value = profileConfigured ? aMoney(row.base_salary || 0) : "Not configured by Accounting";
-    document.getElementById("uv-v-employment").value = profileConfigured ? aCategory(row.employment_type || "-") : "Not configured by Accounting";
+    document.getElementById("uv-v-employment").value = profileConfigured ? formatTypeLabel(row.employment_type || "-") : "Not configured by Accounting";
     document.getElementById("uv-v-grade").value = profileConfigured ? `${row.salary_grade || "-"}${row.salary_step ? ` Step ${row.salary_step}` : ""}` : "Not configured by Accounting";
     document.getElementById("uv-v-effective").value = profileConfigured ? (row.salary_effective_date || "-") : "Not configured by Accounting";
     document.getElementById("uv-v-credit-limit").value = profileConfigured ? aMoney(row.credit_limit || 0) : "Not configured by Accounting";
@@ -410,6 +483,8 @@ async function openViewUser(userId) {
 
 async function saveEditedUser() {
     if (!uvEditingUserId) return;
+    const button = document.getElementById("uv-edit-save");
+    if (button.disabled) return;
 
     const roles = getRoleChecks("uv-e");
     if (!roles.length) {
@@ -426,25 +501,37 @@ async function saveEditedUser() {
         user_type: document.getElementById("uv-e-type").value,
         is_active: Number(document.getElementById("uv-e-active").value || 1),
     };
-    if (["faculty", "staff"].includes(payload.user_type)) Object.assign(payload, uvFinancialPayload("uv-e"));
+    // Existing employee credit and salary edits use the Accounting workflow.
 
     const body = uvUserFormData(payload, document.getElementById("uv-e-photo").files?.[0]);
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
+    try {
     const response = await fetch("/admin/user-view/update", {
         method: "POST",
         body,
     });
     const data = await response.json();
-    if (!data || data.status !== "success") {
+    if (!response.ok || !data || data.status !== "success") {
         setUvResult(data?.message || "Failed to update user.", "error");
         return;
     }
 
     closeModal("uv-edit-modal");
     setUvResult("User updated.", "ok");
-    await loadUserView();
+    const refreshed = await loadUserView();
+    if (refreshed === false) setUvResult("User updated. The employee list could not be refreshed. Use Refresh to load the latest records.", "warning");
+    } catch (error) {
+        setUvResult(error.message || "Unable to update user. Please try again.", "error");
+    } finally {
+        button.disabled = false;
+        button.removeAttribute("aria-busy");
+    }
 }
 
 async function createUser() {
+    const button = document.getElementById("uv-add-save");
+    if (button.disabled) return;
     const payload = {
         employee_id: (document.getElementById("uv-a-employee-id").value || "").trim(),
         name: (document.getElementById("uv-a-name").value || "").trim(),
@@ -457,12 +544,15 @@ async function createUser() {
     if (["faculty", "staff"].includes(payload.user_type)) Object.assign(payload, uvFinancialPayload("uv-a"));
 
     const body = uvUserFormData(payload, document.getElementById("uv-a-photo").files?.[0]);
+    button.disabled = true;
+    button.setAttribute("aria-busy", "true");
+    try {
     const response = await fetch("/admin/user-view/create", {
         method: "POST",
         body,
     });
     const data = await response.json();
-    if (!data || data.status !== "success") {
+    if (!response.ok || !data || data.status !== "success") {
         setUvResult(data?.message || "Failed to create user.", "error");
         return;
     }
@@ -470,17 +560,34 @@ async function createUser() {
     closeModal("uv-add-modal");
     const initialCredit = Number(data.initial_credit_limit || 0);
     setUvResult(`User created${initialCredit > 0 ? ` with ${aMoney(initialCredit)} base credit` : ""}.`, "ok");
-    await loadUserView();
+    const refreshed = await loadUserView();
+    if (refreshed === false) setUvResult("User created. The employee list could not be refreshed. Use Refresh to load the latest records.", "warning");
+    } catch (error) {
+        setUvResult(error.message || "Unable to create user. Please try again.", "error");
+    } finally {
+        button.disabled = false;
+        button.removeAttribute("aria-busy");
+    }
+}
+
+function setUvImportResult(message, type = "normal") {
+    const result = document.getElementById("uv-import-result");
+    result.setAttribute("role", type === "error" ? "alert" : "status");
+    result.setAttribute("aria-live", type === "error" ? "assertive" : "polite");
+    result.setAttribute("aria-atomic", "true");
+    result.textContent = message;
+    result.style.color = type === "error" ? "var(--feedback-error, #b91c1c)"
+        : type === "warning" ? "var(--feedback-warning, #92400e)"
+        : type === "success" ? "var(--feedback-success, #166534)" : "inherit";
 }
 
 async function importUsersCsv() {
     const button = document.getElementById("uv-import-submit");
-    const result = document.getElementById("uv-import-result");
     if (button.disabled) return;
     const file = document.getElementById("uv-import-file").files?.[0];
     if (!file) {
-        result.textContent = "Please choose a CSV file.";
-        result.style.color = "#b91c1c";
+        setUvImportResult("Please choose a CSV file.", "error");
+        document.getElementById("uv-import-file").focus();
         return;
     }
 
@@ -490,8 +597,7 @@ async function importUsersCsv() {
     button.disabled = true;
     button.setAttribute("aria-busy", "true");
     button.innerHTML = '<i class="bi bi-arrow-repeat" style="display:inline-block;animation:data-state-spin .9s linear infinite" aria-hidden="true"></i> Importing...';
-    result.textContent = "Uploading and validating employee records...";
-    result.style.color = "#475569";
+    setUvImportResult("Uploading and validating employee records...");
 
     try {
         const response = await fetch("/admin/user-view/import-csv", {
@@ -503,15 +609,20 @@ async function importUsersCsv() {
             throw new Error(data?.message || "Import failed. Please check the server log and CSV values.");
         }
 
-        result.textContent = `Import complete. Created: ${data.created}, updated: ${data.updated}.`;
-        result.style.color = "#166534";
+        setUvImportResult(`Import complete. Created: ${data.created}, updated: ${data.updated}.`, "success");
         const invalidNote = Number(data.invalid || 0) > 0 ? ` ${data.invalid} row(s) skipped.` : "";
+        const confirmation = `Import complete. Created: ${data.created}, updated: ${data.updated}.${invalidNote}`;
+        const outcomeType = Number(data.invalid || 0) > 0 ? "warning" : "ok";
         closeModal("uv-import-modal");
-        setUvResult(`Import done. Created: ${data.created}, updated: ${data.updated}.${invalidNote}`, Number(data.invalid || 0) > 0 ? "error" : "ok");
-        await loadUserView();
+        setUvResult(confirmation, outcomeType);
+        try {
+            const refreshed = await loadUserView();
+            setUvResult(refreshed === false ? `${confirmation} The employee list could not be refreshed. Use Refresh to load the latest records.` : confirmation, refreshed === false ? "warning" : outcomeType);
+        } catch (refreshError) {
+            setUvResult(`${confirmation} The employee list could not be refreshed. Use Refresh to load the latest records.`, "warning");
+        }
     } catch (error) {
-        result.textContent = error.message || "Import failed.";
-        result.style.color = "#b91c1c";
+        setUvImportResult(error.message || "Import failed.", "error");
     } finally {
         button.disabled = false;
         button.removeAttribute("aria-busy");
@@ -563,6 +674,9 @@ document.getElementById("uv-refresh-btn").addEventListener("click", () => {
     document.getElementById("uv-type-filter").value = "";
     document.getElementById("uv-sort").value = "name:asc";
     document.getElementById("uv-page-size").value = "25";
+    ["uv-role-filter", "uv-type-filter", "uv-sort", "uv-page-size"].forEach(id => {
+        document.getElementById(id).dispatchEvent(new Event("ibems:control-sync"));
+    });
     uvPage = 1;
     uvQuickFilter = "all";
     document.querySelectorAll("[data-uv-quick]").forEach((chip) => {
@@ -589,20 +703,26 @@ document.querySelectorAll("[data-uv-quick]").forEach((chip) => {
     setQuickChipState(chip, chip.classList.contains("is-active"));
 });
 
-document.getElementById("uv-add-btn").addEventListener("click", async () => {
+async function openAddUser() {
+    const requestId = ++uvDetailRequestId;
+    const signal = window.IbemsPortalNavigation?.currentSignal;
+    const isCurrent = () => requestId === uvDetailRequestId && !signal?.aborted;
     try {
         await loadUvSalarySchedules();
     } catch (error) {
+        if (!isCurrent()) return;
         setUvResult(error.message || "Salary schedules are unavailable.", "error");
         return;
     }
+    if (!isCurrent()) return;
     document.getElementById("uv-a-photo").value = "";
     document.getElementById("uv-a-photo-preview").src = window.IbemsAvatar.defaultUrl;
     document.getElementById("uv-a-type").value = "faculty";
     populateUvSalaryProfile("uv-a", {});
     toggleUvFinancialFields("uv-a");
     openModal("uv-add-modal");
-});
+}
+document.getElementById("uv-add-btn").addEventListener("click", openAddUser);
 document.getElementById("uv-import-btn").addEventListener("click", () => openModal("uv-import-modal"));
 document.getElementById("uv-export-btn").addEventListener("click", exportFilteredRowsToCsv);
 document.getElementById("uv-add-close").addEventListener("click", () => closeModal("uv-add-modal"));
@@ -642,6 +762,22 @@ document.getElementById("uv-pager").addEventListener("click", (event) => {
 ["uv-add-modal", "uv-edit-modal", "uv-import-modal", "uv-view-modal"].forEach((id) => {
     document.getElementById(id).addEventListener("click", (event) => {
         if (event.target.id === id) closeModal(id);
+    });
+    document.getElementById(id).addEventListener("keydown", (event) => {
+        if (event.defaultPrevented) return;
+        const modal = event.currentTarget;
+        if (event.key === "Escape") {
+            event.preventDefault(); closeModal(id);
+        } else if (event.key === "Tab") {
+            const controls = Array.from(modal.querySelectorAll('button, input, select, textarea, a[href], [tabindex]'))
+                .filter(control => !control.disabled && control.tabIndex >= 0 && control.getClientRects().length);
+            const first = controls[0], last = controls[controls.length - 1];
+            if (event.shiftKey && document.activeElement === first) {
+                event.preventDefault(); last?.focus();
+            } else if (!event.shiftKey && document.activeElement === last) {
+                event.preventDefault(); first?.focus();
+            }
+        }
     });
 });
 

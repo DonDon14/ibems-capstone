@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/user') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/user-portal.css') ?>?v=20260824a" data-user-page-style>
+<link rel="stylesheet" href="<?= base_url('assets/css/user-portal.css') ?>?v=20261004-history-totals" data-user-page-style>
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -20,14 +20,14 @@
                 <option value="">Loading pay periods...</option>
             </select>
         </div>
-        <p id="ud-period-help"><i class="bi bi-info-circle" aria-hidden="true"></i> Only deductions already applied by Accounting are shown.</p>
+        <p id="ud-period-help"><i class="bi bi-info-circle" aria-hidden="true"></i> Only confirmed results from the Cashier or Accounting Office are shown. A partial or failed result may leave debt to carry forward.</p>
     </div>
 
     <div class="dashboard-grid user-deduction-summary">
-        <?= view('components/stat_card', ['title' => 'Amount Deducted', 'value' => 'PHP 0.00', 'valueId' => 'ud-total', 'icon' => 'bi bi-cash-coin', 'tone' => 'sales']) ?>
-        <?= view('components/stat_card', ['title' => 'Debt Before', 'value' => 'PHP 0.00', 'valueId' => 'ud-before', 'icon' => 'bi bi-arrow-up-right-circle', 'tone' => 'warning']) ?>
-        <?= view('components/stat_card', ['title' => 'Debt After', 'value' => 'PHP 0.00', 'valueId' => 'ud-after', 'icon' => 'bi bi-arrow-down-right-circle', 'tone' => 'finance']) ?>
-        <?= view('components/stat_card', ['title' => 'Entries', 'value' => '0', 'valueId' => 'ud-count', 'icon' => 'bi bi-list-check', 'tone' => 'debt']) ?>
+        <?= view('components/stat_card', ['title' => 'Amount Deducted', 'value' => 'Loading…', 'valueId' => 'ud-total', 'icon' => 'bi bi-cash-coin', 'tone' => 'sales']) ?>
+        <?= view('components/stat_card', ['title' => 'Debt Before', 'value' => 'Loading…', 'valueId' => 'ud-before', 'icon' => 'bi bi-arrow-up-right-circle', 'tone' => 'warning']) ?>
+        <?= view('components/stat_card', ['title' => 'Debt After', 'value' => 'Loading…', 'valueId' => 'ud-after', 'icon' => 'bi bi-arrow-down-right-circle', 'tone' => 'finance']) ?>
+        <?= view('components/stat_card', ['title' => 'Entries', 'value' => 'Loading…', 'valueId' => 'ud-count', 'icon' => 'bi bi-list-check', 'tone' => 'debt']) ?>
     </div>
 
     <div class="table-standard-wrap user-mobile-card-table">
@@ -38,13 +38,14 @@
                     <th>Applied Date</th>
                     <th>Requested</th>
                     <th>Deducted</th>
+                    <th>Not deducted</th>
                     <th>Debt Before</th>
                     <th>Debt After</th>
-                    <th>Status</th>
+                    <th>Result details</th>
                 </tr>
             </thead>
             <tbody id="ud-body">
-                <?= view('components/data_state', ['tag' => 'tr', 'colspan' => 7, 'type' => 'loading', 'message' => 'Loading deductions...']) ?>
+                <?= view('components/data_state', ['tag' => 'tr', 'colspan' => 8, 'type' => 'loading', 'message' => 'Loading deductions...']) ?>
             </tbody>
         </table>
     </div>
@@ -52,5 +53,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/user-deductions.js') ?>?v=20260824a" data-user-page-script></script>
+<script src="<?= base_url('assets/js/user-deductions.js') ?>?v=20261003-period-busy" data-user-page-script></script>
 <?= $this->endSection() ?>

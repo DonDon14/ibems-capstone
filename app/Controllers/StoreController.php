@@ -52,22 +52,22 @@ class StoreController extends BaseController
 
     public function history()
     {
-        return view('store/history');
+        return $this->workspacePage('history');
     }
 
     public function inventory()
     {
-        return view('store/inventory');
+        return $this->workspacePage('inventory');
     }
 
     public function staffRecords()
     {
-        return view('store/staff-records');
+        return $this->workspacePage('staff-records');
     }
 
     public function reports()
     {
-        return view('store/reports');
+        return $this->workspacePage('reports');
     }
 
     public function receiptPage(int $transactionId)
@@ -79,7 +79,14 @@ class StoreController extends BaseController
 
     public function settings()
     {
-        return view('store/settings');
+        return $this->workspacePage('settings');
+    }
+
+    private function workspacePage(string $page)
+    {
+        $id = (int) $this->request->getGet('store_id');
+        if ((string) session()->get('role') === 'STORE_SUPERVISOR' && ($id <= 0 || !(new StoreAccessService())->resolve((int) session()->get('user_id'), 'STORE_SUPERVISOR', $id))) return redirect()->to('/store-admin/stores');
+        return view('store/' . $page);
     }
 
     public function reportSummary()
@@ -106,7 +113,8 @@ class StoreController extends BaseController
 
     public function openDaySession()
     {
-        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $request = str_contains(strtolower($this->request->getHeaderLine('Content-Type')), 'application/json')
+            ? $this->request->getJSON(true) : $this->request->getPost();
         $result = (new StoreDayOperationService())->open(
             is_array($request) ? $request : [],
             (int) session()->get('user_id'),
@@ -118,7 +126,8 @@ class StoreController extends BaseController
 
     public function closeDaySession()
     {
-        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $request = str_contains(strtolower($this->request->getHeaderLine('Content-Type')), 'application/json')
+            ? $this->request->getJSON(true) : $this->request->getPost();
         $result = (new StoreDayOperationService())->close(
             is_array($request) ? $request : [],
             (int) session()->get('user_id'),
@@ -361,6 +370,20 @@ class StoreController extends BaseController
 
     public function debtCustomers()
     {
+        $includeStudents = (string) $this->request->getGet('include_students') === '1';
+        $requiresAssignment = in_array(ibems_current_role(), ['STORE_SYSTEM', 'STORE_SUPERVISOR'], true);
+        $store = null;
+        if ($requiresAssignment || $includeStudents) {
+            $store = $this->resolveAccessibleStore((int) ($this->request->getGet('store_id') ?? 0));
+        }
+        if ($requiresAssignment && !$store) {
+            return $this->response->setStatusCode(403)->setJSON(['status' => 'error', 'message' => 'An active assigned store is required to search employee financial records.']);
+        }
+        if ($includeStudents) {
+            if (!$store || !ProductBehaviorService::requiresInternalCustomer((int) $store['id'])) {
+                return $this->response->setStatusCode(403)->setJSON(['status' => 'error', 'message' => 'University customer search is unavailable for this store.']);
+            }
+        }
         $query = new StoreCatalogQueryService();
 
         return $this->response->setJSON($query->debtCustomers(
@@ -369,7 +392,8 @@ class StoreController extends BaseController
             (int) ($this->request->getGet('page') ?? 1),
             (int) ($this->request->getGet('page_size') ?? 20),
             (string) ($this->request->getGet('sort_by') ?? 'name'),
-            (string) ($this->request->getGet('sort_dir') ?? 'asc')
+            (string) ($this->request->getGet('sort_dir') ?? 'asc'),
+            $includeStudents
         ));
     }
 
@@ -494,6 +518,14 @@ class StoreController extends BaseController
         }
 
         $db = Database::connect();
+        try {
+            ProductBehaviorService::assertStoreAllows($storeId, $behavior);
+        } catch (\InvalidArgumentException $e) {
+            return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => $e->getMessage()]);
+        }
+        if (($product['stock_policy'] ?? 'tracked') !== $behavior['stock_policy'] && (int) ($product['stock_qty'] ?? 0) !== 0) {
+            return $this->response->setStatusCode(409)->setJSON(['status' => 'error', 'message' => 'Adjust stock to zero before changing the stock policy.']);
+        }
         $sameSku = $db->table('products')
             ->where('store_id', $storeId)
             ->where('sku', $sku)
@@ -635,6 +667,11 @@ class StoreController extends BaseController
             return $this->response->setStatusCode(403)->setJSON(['status' => 'error', 'message' => 'You cannot add products to this store.']);
         }
 
+        try {
+            ProductBehaviorService::assertStoreAllows($storeId, $behavior);
+        } catch (\InvalidArgumentException $e) {
+            return $this->response->setStatusCode(400)->setJSON(['status' => 'error', 'message' => $e->getMessage()]);
+        }
         $skus = []; $barcodes = [];
         foreach ($variants as $index => $variant) {
             $sku = trim((string) ($variant['sku'] ?? '')); $label = trim((string) ($variant['label'] ?? ''));
@@ -702,7 +739,8 @@ class StoreController extends BaseController
     /** @return array<string, mixed> */
     private function requestPayload(): array
     {
-        $payload = $this->request->getJSON(true) ?? $this->request->getPost();
+        $payload = str_contains(strtolower($this->request->getHeaderLine('Content-Type')), 'application/json')
+            ? $this->request->getJSON(true) : $this->request->getPost();
 
         return is_array($payload) ? $payload : [];
     }

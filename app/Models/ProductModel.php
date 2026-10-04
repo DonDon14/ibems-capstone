@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Casts\NumericFloatCast;
 use CodeIgniter\Model;
 
 class ProductModel extends Model
@@ -44,6 +45,8 @@ class ProductModel extends Model
         'low_stock_threshold' => 'integer',
         'is_active' => 'boolean',
     ];
+
+    protected array $castHandlers = ['float' => NumericFloatCast::class];
 
     protected $useTimestamps = false;
 

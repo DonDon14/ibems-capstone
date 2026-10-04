@@ -1,12 +1,12 @@
 <?= $this->extend('layouts/accounting') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/department-debt.css') ?>?v=20260824g">
+<link rel="stylesheet" href="<?= base_url('assets/css/department-debt.css') ?>?v=20261004-admin-save-feedback">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
-<?php $canOperateDepartmentDebt = ibems_current_role() === 'ACCOUNTING_OFFICE'; ?>
-<section id="department-accounting-page" class="department-page" data-can-operate="<?= $canOperateDepartmentDebt ? 'true' : 'false' ?>">
+<?php $canOperateDepartmentDebt = in_array(ibems_current_role(), config(\Config\Authorization::class)->rolesFor('accounting.settle') ?? [], true); ?>
+<section id="department-accounting-page" class="department-page" data-actor-id="<?= (int) session()->get('user_id') ?>" data-can-operate="<?= $canOperateDepartmentDebt ? 'true' : 'false' ?>">
     <?= view('components/page_header', [
         'eyebrow' => 'Department financial controls',
         'title' => 'Department debt allocations',
@@ -30,7 +30,7 @@
         <article><span>Outstanding liability</span><strong id="department-sum-outstanding">PHP 0.00</strong></article>
     </div>
 
-    <div class="department-table-wrap">
+    <div class="department-table-wrap" role="region" aria-label="Department account allocations" tabindex="0">
         <table class="table table-standard">
             <thead><tr><th>Department</th><th>Monthly allocation</th><th>Used / remaining</th><th>Outstanding</th><th>Status</th><th><?= $canOperateDepartmentDebt ? 'Actions' : 'Access' ?></th></tr></thead>
             <tbody id="department-accounting-body"><tr><td colspan="6">Loading department accounts...</td></tr></tbody>
@@ -39,7 +39,7 @@
 
     <article class="department-ledger-panel">
         <header><div><span>Audit-ready history</span><h3>Department account ledger</h3></div></header>
-        <div class="department-table-wrap"><table class="table table-standard"><thead><tr><th>Date</th><th>Department</th><th>Entry</th><th>Reference</th><th>Amount</th><th>Outstanding after</th><th>Details</th></tr></thead><tbody id="department-ledger-body"><tr><td colspan="7">Loading ledger...</td></tr></tbody></table></div>
+        <div class="department-table-wrap" role="region" aria-label="Department account ledger" tabindex="0"><table class="table table-standard"><thead><tr><th>Date</th><th>Department</th><th>Entry</th><th>Reference</th><th>Amount</th><th>Outstanding after</th><th>Details</th></tr></thead><tbody id="department-ledger-body"><tr><td colspan="7">Loading ledger...</td></tr></tbody></table></div>
     </article>
     <p id="department-accounting-result" class="department-result" role="status" aria-live="polite"></p>
 </section>
@@ -97,5 +97,6 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/department-debt-pages.js') ?>?v=20260824f"></script>
+<script src="<?= base_url('assets/js/department-settlement-retry.js') ?>?v=20261003-bound-form"></script>
+<script src="<?= base_url('assets/js/department-debt-pages.js') ?>?v=20261004-admin-save-feedback"></script>
 <?= $this->endSection() ?>

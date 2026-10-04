@@ -35,7 +35,14 @@ class CreatePaymentDestinationAccounts extends Migration
                 'destination_account_name' => ['type' => 'VARCHAR', 'constraint' => 120, 'null' => true, 'after' => 'destination_account_id'],
                 'destination_account_number' => ['type' => 'VARCHAR', 'constraint' => 120, 'null' => true, 'after' => 'destination_account_name'],
             ]);
-            $this->forge->addForeignKey('destination_account_id', 'payment_destination_accounts', 'id', 'SET NULL', 'CASCADE');
+            // addColumn() does not apply Forge foreign keys. Registering one here
+            // leaks it into the next createTable(), producing a duplicate FK and
+            // a MariaDB constraint name over the 64-character identifier limit.
+            if (in_array($this->db->DBDriver, ['MySQLi', 'Postgre'], true)) {
+                $payments = $this->db->escapeIdentifiers($this->db->DBPrefix . 'transaction_payments');
+                $accounts = $this->db->escapeIdentifiers($this->db->DBPrefix . 'payment_destination_accounts');
+                $this->db->query("ALTER TABLE {$payments} ADD CONSTRAINT fk_txn_payment_destination FOREIGN KEY (destination_account_id) REFERENCES {$accounts}(id) ON DELETE SET NULL ON UPDATE CASCADE");
+            }
         }
 
         if (!$this->db->tableExists('store_day_payment_account_balances')) {
@@ -55,7 +62,8 @@ class CreatePaymentDestinationAccounts extends Migration
             $this->forge->addKey('id', true);
             $this->forge->addUniqueKey(['store_day_session_id', 'destination_account_id']);
             $this->forge->addForeignKey('store_day_session_id', 'store_day_sessions', 'id', 'CASCADE', 'CASCADE');
-            $this->forge->addForeignKey('destination_account_id', 'payment_destination_accounts', 'id', 'RESTRICT', 'CASCADE', 'fk_day_balance_destination');
+            $foreignKeyName = $this->db->DBDriver === 'SQLite3' ? '' : 'fk_day_balance_destination';
+            $this->forge->addForeignKey('destination_account_id', 'payment_destination_accounts', 'id', 'RESTRICT', 'CASCADE', $foreignKeyName);
             $this->forge->createTable('store_day_payment_account_balances');
         }
     }

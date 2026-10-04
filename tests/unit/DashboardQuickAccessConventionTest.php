@@ -29,7 +29,7 @@ final class DashboardQuickAccessConventionTest extends CIUnitTestCase
         $view = (string) file_get_contents(APPPATH . 'Views/admin/products.php');
         $styles = (string) file_get_contents(FCPATH . 'assets/css/admin-overview.css');
 
-        $this->assertStringContainsString('<section class="admin-overview-shell">', $view);
+        $this->assertMatchesRegularExpression('/<section class="admin-overview-shell(?: [^"]+)?">/', $view);
         $this->assertStringNotContainsString('admin-overview-shell space-y-5', $view);
         $this->assertStringContainsString('.stores-result:empty', $styles);
     }

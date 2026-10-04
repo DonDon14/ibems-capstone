@@ -24,15 +24,23 @@ class IbemsHostedBootstrap extends BaseCommand
             return EXIT_ERROR;
         }
 
+        $locked = false;
         try {
-            foreach (['010_salary_grade_profiles.sql', '011_render_hosted_sessions.sql', '012_dynamic_salary_schedules.sql', '014_department_debt_accounts.sql', '016_configurable_store_operations.sql'] as $file) {
+            if ($db->query("SELECT pg_advisory_lock(hashtext('ibems-hosted-bootstrap-v1'))") === false) {
+                throw new \RuntimeException('Hosted startup lock could not be acquired.');
+            }
+            $locked = true;
+            foreach (['010_salary_grade_profiles.sql', '011_render_hosted_sessions.sql', '012_dynamic_salary_schedules.sql', '013_portal_notifications.sql', '014_department_debt_accounts.sql', '015_user_purchase_cards.sql', '016_configurable_store_operations.sql'] as $file) {
                 $path = ROOTPATH . 'database/postgresql/' . $file;
                 $sql = file_get_contents($path);
                 if ($sql === false) {
                     throw new \RuntimeException('Hosted migration SQL file not found: ' . $file);
                 }
-                $db->query($sql);
+                if ($db->query($sql) === false) {
+                    throw new \RuntimeException('Hosted migration SQL failed: ' . $file);
+                }
             }
+            (new \App\Services\HostedWorkflowSchemaService())->apply($db);
             CLI::write('Hosted PostgreSQL additions verified.', 'green');
             return EXIT_SUCCESS;
         } catch (\Throwable $exception) {
@@ -42,6 +50,10 @@ class IbemsHostedBootstrap extends BaseCommand
             }
             CLI::error('Hosted bootstrap failed: ' . $exception->getMessage());
             return EXIT_ERROR;
+        } finally {
+            if ($locked) {
+                $db->query("SELECT pg_advisory_unlock(hashtext('ibems-hosted-bootstrap-v1'))");
+            }
         }
     }
 }

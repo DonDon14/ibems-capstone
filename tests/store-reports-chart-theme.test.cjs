@@ -1,0 +1,24 @@
+const {test}=require('node:test');
+const assert=require('node:assert/strict');
+const fs=require('node:fs');
+const vm=require('node:vm');
+const source=fs.readFileSync('public/assets/js/store-reports.js','utf8');
+const fn=source.slice(source.indexOf('function rApplyChartTheme('),source.indexOf('window.addEventListener("ibems:themechange"'));
+test('chart theme updates preserve axes callbacks and data while honoring reduced motion',()=>{
+ let reduced=false,palette={ '--text-soft':'#64748b','--border':'#e2e8f0' };
+ const updates=[],callback=()=> 'PHP 1',canvas={};
+ let stopped=0;
+ const chart={canvas,stop:()=>stopped++,config:{type:'bar'},data:{datasets:[{data:[160,50,20]}]},options:{plugins:{legend:{labels:{boxWidth:20}}},scales:{y:{ticks:{callback},grid:{drawOnChartArea:false}}}},update:mode=>updates.push(mode)};
+ const context=vm.createContext({window:{matchMedia:()=>({matches:reduced})},getComputedStyle:element=>{assert.equal(element,canvas);return {getPropertyValue:key=>palette[key]};}});
+ vm.runInContext(fn,context); context.chart=chart;
+ vm.runInContext('rApplyChartTheme(chart)',context);
+ assert.equal(chart.options.plugins.legend.labels.color,'#64748b');
+ palette={'--text-soft':'#9fb0c4','--border':'#334155'};reduced=true;
+ vm.runInContext('rApplyChartTheme(chart)',context);
+ assert.equal(chart.options.plugins.legend.labels.color,'#9fb0c4');assert.equal(chart.options.plugins.legend.labels.boxWidth,20);
+ assert.equal(chart.options.scales.y.ticks.callback,callback);assert.equal(chart.options.scales.y.ticks.color,'#9fb0c4');
+ assert.equal(chart.options.scales.y.grid.drawOnChartArea,false);assert.equal(chart.options.scales.y.grid.color,'#334155');
+ assert.equal(chart.options.animation,false);assert.deepEqual(chart.data.datasets[0].data,[160,50,20]);assert.deepEqual(updates,['none','none']);
+ assert.equal(stopped,2);
+ chart.config.type='doughnut';vm.runInContext('rApplyChartTheme(chart)',context);assert.equal(chart.data.datasets[0].borderColor,'#334155');
+});

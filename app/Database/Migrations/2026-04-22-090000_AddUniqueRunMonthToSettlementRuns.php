@@ -21,7 +21,11 @@ class AddUniqueRunMonthToSettlementRuns extends Migration
         }
 
         if (!$hasUnique) {
-            $this->db->query('ALTER TABLE settlement_runs ADD UNIQUE KEY uq_settlement_runs_run_month (run_month)');
+            if ($this->db->DBDriver === 'SQLite3' || $this->db->DBDriver === 'Postgre') {
+                $this->db->query('CREATE UNIQUE INDEX uq_settlement_runs_run_month ON settlement_runs (run_month)');
+            } else {
+                $this->db->query('ALTER TABLE settlement_runs ADD UNIQUE KEY uq_settlement_runs_run_month (run_month)');
+            }
         }
     }
 
@@ -29,7 +33,11 @@ class AddUniqueRunMonthToSettlementRuns extends Migration
     {
         $indexes = $this->db->getIndexData('settlement_runs');
         if (array_key_exists('uq_settlement_runs_run_month', $indexes)) {
-            $this->db->query('ALTER TABLE settlement_runs DROP INDEX uq_settlement_runs_run_month');
+            if ($this->db->DBDriver === 'SQLite3' || $this->db->DBDriver === 'Postgre') {
+                $this->db->query('DROP INDEX uq_settlement_runs_run_month');
+            } else {
+                $this->db->query('ALTER TABLE settlement_runs DROP INDEX uq_settlement_runs_run_month');
+            }
         }
     }
 }

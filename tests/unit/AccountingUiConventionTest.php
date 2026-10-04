@@ -18,8 +18,8 @@ class AccountingUiConventionTest extends TestCase
         $this->assertStringContainsString("view('components/data_state'", $dashboard);
         $this->assertStringContainsString("view('components/data_state'", $debts);
         $this->assertStringContainsString('assets/css/accounting-debts.css', $debts);
-        $this->assertStringContainsString("'eyebrow' => 'Payroll controls'", $debts);
-        $this->assertStringContainsString("'titleId' => 'deduction-workflow-title'", $debts);
+        $this->assertStringContainsString("site_url('deductions/workspace')", $debts);
+        $this->assertStringNotContainsString('deduction-workflow-modal', $debts);
     }
 
     public function testDebtPagerUsesTheSharedPaginationConvention(): void
@@ -50,7 +50,8 @@ class AccountingUiConventionTest extends TestCase
         $this->assertIsString($dashboardScript);
         $this->assertIsString($layoutScript);
         $this->assertIsString($styles);
-        $this->assertSame(5, substr_count($view, 'data-inset-modal-scroll'));
+        $this->assertSame(4, substr_count($view, 'data-inset-modal-scroll'));
+        $this->assertStringContainsString('class="app-inset-modal-scroll employee-details-scroll" role="region" aria-label="Employee profile fields and feedback" tabindex="0"', $view);
         $this->assertStringContainsString('function aDataState', $debtScript);
         $this->assertStringContainsString('function buildEmployeeProfileHtml', $debtScript);
         $this->assertStringContainsString('function acdDataState', $dashboardScript);

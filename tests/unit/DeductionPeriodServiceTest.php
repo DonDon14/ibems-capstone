@@ -135,4 +135,25 @@ final class DeductionPeriodServiceTest extends CIUnitTestCase
         ], 900);
         $this->assertSame('Frequency must be semi-monthly, monthly, or custom.', $invalidFrequency['message'] ?? null);
     }
+
+    public function testRejectsInvalidOptionalDatesInsteadOfDroppingThem(): void
+    {
+        $service = new DeductionPeriodService();
+        $base = [
+            'frequency' => 'semi_monthly',
+            'date_start' => '2026-09-01',
+            'date_end' => '2026-09-15',
+        ];
+        $invalidPayDate = $service->create($base + ['expected_processing_date' => '2026-09-31'], 900);
+        $this->assertSame('error', $invalidPayDate['status']);
+        $this->assertSame('Expected processing date must use YYYY-MM-DD format.', $invalidPayDate['message']);
+
+        $invalidDeadline = $service->create($base + ['preparation_deadline' => 'not-a-date'], 900);
+        $this->assertSame('error', $invalidDeadline['status']);
+        $this->assertSame('Preparation deadline must use YYYY-MM-DD format.', $invalidDeadline['message']);
+
+        $unpaddedDate = $service->create($base + ['expected_processing_date' => '2026-9-20'], 900);
+        $this->assertSame('error', $unpaddedDate['status']);
+        $this->assertSame(0, Database::connect()->table('deduction_periods')->countAllResults());
+    }
 }

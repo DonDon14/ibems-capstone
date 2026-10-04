@@ -1,11 +1,11 @@
 <?= $this->extend('layouts/accounting') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/accounting-debts.css') ?>?v=20260824d">
+<link rel="stylesheet" href="<?= base_url('assets/css/accounting-debts.css') ?>?v=20261004-import-feedback">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
-<section class="accounting-debt-overview acct-shell space-y-5<?= !empty($deductionsPage) ? ' is-hidden' : '' ?>"<?= !empty($deductionsPage) ? ' aria-hidden="true"' : '' ?>>
+<section class="accounting-debt-overview acct-shell space-y-5">
     <?= view('components/page_header', [
         'eyebrow' => 'Financial controls',
         'title' => 'Accounting debt center',
@@ -19,6 +19,18 @@
         <?= view('components/stat_card', ['title' => 'Today Payroll Deductions', 'value' => '0', 'valueId' => 'acct-today-count', 'icon' => 'bi bi-calendar-check', 'tone' => 'warning']) ?>
         <?= view('components/stat_card', ['title' => 'Deducted Today', 'value' => 'PHP 0.00', 'valueId' => 'acct-today-amount', 'icon' => 'bi bi-coin', 'tone' => 'finance']) ?>
     </div>
+
+    <article class="dash-panel salary-queue-panel rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" aria-labelledby="acct-salary-queue-heading">
+        <div class="acct-section-head">
+            <div>
+                <h4 id="acct-salary-queue-heading">Scheduled salary changes</h4>
+                <p>Accounting must review and explicitly activate each due change. The current salary and credit remain in force until then.</p>
+            </div>
+            <div class="salary-queue-tools"><span id="acct-salary-due-count" class="text-sm font-semibold text-amber-700">Loading…</span><button id="acct-salary-refresh" type="button" class="secondary-btn btn-sm" disabled>Refresh scheduled salaries</button></div>
+        </div>
+        <div id="acct-salary-queue-feedback" class="salary-queue-feedback is-pending" role="status" aria-live="polite" aria-atomic="true" tabindex="-1">Loading scheduled changes…</div>
+        <div id="acct-salary-queue" class="mt-3 grid gap-2" role="region" aria-label="Scheduled salary records" tabindex="-1" aria-busy="true"></div>
+    </article>
 
     <article class="dash-panel acct-flow-panel rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" aria-label="Accounting debt workflow">
         <div class="acct-section-head">
@@ -89,9 +101,7 @@
                 <button id="acct-refresh-btn" class="secondary-btn" type="button"><i class="bi bi-arrow-clockwise"></i> Refresh</button>
             </div>
             <div class="action-group action-group-tools flex flex-wrap gap-2">
-                <?php if (!empty($deductionsPage)): ?>
-                    <button id="open-deduction-workflow" class="primary-btn" type="button"><i class="bi bi-diagram-3"></i> Deduction Workflow</button>
-                <?php endif; ?>
+                <a class="primary-btn" href="<?= site_url('deductions/workspace') ?>"><i class="bi bi-diagram-3"></i> Shared Deduction Workflow</a>
                 <button id="open-debt-investigations" class="secondary-btn" type="button"><i class="bi bi-shield-check"></i> Investigations</button>
                 <button id="open-settlement-run" class="secondary-btn" type="button"><i class="bi bi-clock-history"></i> Legacy History</button>
                 <button id="open-import-csv" class="secondary-btn" type="button"><i class="bi bi-file-earmark-arrow-up"></i> Import HR CSV</button>
@@ -102,12 +112,12 @@
 
     <article class="dash-panel rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
     <div class="acct-tabs" role="tablist" aria-label="Accounting debt sections">
-        <button class="acct-tab is-active" type="button" data-acct-tab="employee-debts" role="tab" aria-selected="true"><i class="bi bi-bag-check"></i> Employee Accounts <span id="acct-tab-employee-count">0</span></button>
-        <button class="acct-tab" type="button" data-acct-tab="advance-payments" role="tab" aria-selected="false"><i class="bi bi-wallet2"></i> Direct Payments Received <span id="acct-tab-advance-count">0</span></button>
-        <button class="acct-tab" type="button" data-acct-tab="operator-accountabilities" role="tab" aria-selected="false"><i class="bi bi-exclamation-octagon"></i> Store Operator Shortages <span id="acct-tab-operator-count">0</span></button>
+        <button class="acct-tab is-active" type="button" id="acct-tab-employee-debts" aria-controls="acct-record-panel" data-acct-tab="employee-debts" role="tab" tabindex="0" aria-selected="true"><i class="bi bi-bag-check"></i> Employee Accounts <span id="acct-tab-employee-count">0</span></button>
+        <button class="acct-tab" type="button" id="acct-tab-advance-payments" aria-controls="acct-record-panel" data-acct-tab="advance-payments" role="tab" tabindex="-1" aria-selected="false"><i class="bi bi-wallet2"></i> Direct Payments Received <span id="acct-tab-advance-count">0</span></button>
+        <button class="acct-tab" type="button" id="acct-tab-operator-accountabilities" aria-controls="acct-record-panel" data-acct-tab="operator-accountabilities" role="tab" tabindex="-1" aria-selected="false"><i class="bi bi-exclamation-octagon"></i> Store Operator Shortages <span id="acct-tab-operator-count">0</span></button>
     </div>
-    <div class="acct-table-wrap table-standard-wrap">
-        <p id="acct-count-text" class="acct-count-text text-sm text-slate-500">Showing 0 records</p>
+    <div id="acct-record-panel" class="acct-table-wrap table-standard-wrap" role="tabpanel" aria-labelledby="acct-tab-employee-debts" tabindex="0">
+        <p id="acct-count-text" class="acct-count-text text-sm text-slate-500" role="status" aria-live="polite" aria-atomic="true">Showing 0 records</p>
         <div id="acct-body" class="acct-record-list grid gap-2">
             <?= view('components/data_state', ['type' => 'loading', 'message' => 'Loading accounting records...']) ?>
         </div>
@@ -118,11 +128,16 @@
     <div id="acct-pager" class="overview-pager" aria-label="Accounting record pages"></div>
 </section>
 
-<?= view('components/accounting_debt_modals', ['deductionsPage' => $deductionsPage ?? false]) ?>
+<?= view('components/accounting_debt_modals') ?>
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/accounting-debts.js') ?>?v=20260824i"></script>
-<script src="<?= base_url('assets/js/accounting-debts.part2.js') ?>?v=20260824i"></script>
-<script src="<?= base_url('assets/js/accounting-debts.part3.js') ?>?v=20260824i"></script>
+<script src="<?= base_url('assets/js/accounting-debts.js') ?>?v=20261004-import-feedback"></script>
+<script src="<?= base_url('assets/js/accounting-debts.part2.js') ?>?v=20261004-import-feedback"></script>
+<script src="<?= base_url('assets/js/accounting-import.js') ?>?v=20261004-import-feedback"></script>
+<script src="<?= base_url('assets/js/accounting-legacy-history.js') ?>?v=20261004-import-feedback"></script>
+<script src="<?= base_url('assets/js/accounting-employee-actions.js') ?>?v=20261004-import-feedback"></script>
+<script src="<?= base_url('assets/js/accounting-investigation-reads.js') ?>?v=20261004-import-feedback"></script>
+<script src="<?= base_url('assets/js/accounting-investigation-actions.js') ?>?v=20261004-import-feedback"></script>
+<script src="<?= base_url('assets/js/accounting-debts.part3.js') ?>?v=20261004-import-feedback"></script>
 <?= $this->endSection() ?>

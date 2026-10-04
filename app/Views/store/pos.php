@@ -1,9 +1,9 @@
 <?= $this->extend('layouts/store') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/store-pos.css') ?>?v=20260824f">
-<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20260825a">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+<link rel="stylesheet" href="<?= base_url('assets/css/store-pos.css') ?>?v=20261003-repayment-dialog-wrap">
+<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20261003-total-wrap">
+<link rel="stylesheet" href="<?= base_url('assets/vendor/bootstrap-icons/bootstrap-icons.min.css') ?>">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -14,14 +14,14 @@ $posAccountAction = '<button class="pos-account-trigger" type="button" data-acco
     . '<span class="pos-account-label"><strong>' . esc((string) session()->get('name')) . '</strong><small>Store Cashier</small></span>'
     . '</button>';
 ?>
-<section class="pos-shell" data-user-role="<?= esc((string) session()->get('role')) ?>">
+<section class="pos-shell" data-user-role="<?= esc((string) session()->get('role')) ?>" data-user-id="<?= (int) session()->get('user_id') ?>">
     <div class="pos-page-header">
         <?= view('components/page_header', [
             'eyebrow' => 'Point of sale',
             'title' => 'Store checkout',
             'description' => 'Search products, manage the current order, and complete store transactions.',
             'icon' => 'bi bi-cart-check',
-            'actions' => $posAccountAction,
+            'actions' => '<div class="pos-header-actions"><a href="/store/offerings" class="secondary-btn pos-operations-link">Food and rentals</a>' . $posAccountAction . '</div>',
         ]) ?>
         <div class="pos-context-bar" role="status" aria-live="polite">
             <span class="pos-context-label"><i class="bi bi-shop-window" aria-hidden="true"></i> Active store</span>
@@ -93,8 +93,8 @@ $posAccountAction = '<button class="pos-account-trigger" type="button" data-acco
                     <label for="scan-code-input"><i class="bi bi-upc-scan"></i> Scan QR/Barcode</label>
                     <div class="scan-code-wrap">
                         <input id="scan-code-input" type="text" placeholder="Scan or type SKU/barcode then press Enter">
-                        <button id="open-scanner-btn" type="button" class="scan-inline-btn" title="Scan product QR/barcode">
-                            <i class="bi bi-qr-code-scan"></i>
+                        <button id="open-scanner-btn" type="button" class="scan-inline-btn" aria-label="Scan product QR or barcode" title="Scan product QR/barcode">
+                            <i class="bi bi-qr-code-scan" aria-hidden="true"></i>
                         </button>
                         <div id="scan-product-suggestions" class="scan-suggestions is-hidden"></div>
                     </div>
@@ -192,13 +192,14 @@ $posAccountAction = '<button class="pos-account-trigger" type="button" data-acco
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="https://cdn.jsdelivr.net/npm/html5-qrcode@2.3.8/html5-qrcode.min.js" data-portal-page-once></script>
-<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260825a"></script>
-<script src="<?= base_url('assets/js/store-pos.js') ?>?v=20260825a"></script>
-<script src="<?= base_url('assets/js/store-pos.part2.js') ?>?v=20260825c"></script>
-<script src="<?= base_url('assets/js/store-pos.part3.js') ?>?v=20260825c"></script>
-<script src="<?= base_url('assets/js/store-pos.part4.js') ?>?v=20260825c"></script>
-<script src="<?= base_url('assets/js/store-pos.part5.js') ?>?v=20260825c"></script>
-<script src="<?= base_url('assets/js/store-pos.part6.js') ?>?v=20260825c"></script>
+<script src="<?= base_url('assets/vendor/html5-qrcode/html5-qrcode.min.js') ?>" data-portal-page-once></script>
+<script src="<?= base_url('assets/vendor/qrcode-generator/qrcode.js') ?>"></script>
+<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20261002-total-label"></script>
+<script src="<?= base_url('assets/js/store-pos.js') ?>?v=20261003-store-day-entry"></script>
+<script src="<?= base_url('assets/js/store-pos.part2.js') ?>?v=20261003-store-day-submit-focus"></script>
+<script src="<?= base_url('assets/js/store-pos.part3.js') ?>?v=20261003-repayment-dialog-keys"></script>
+<script src="<?= base_url('assets/js/store-pos.part4.js') ?>?v=20261003-repayment-recovery-feedback"></script>
+<script src="<?= base_url('assets/js/store-pos.part5.js') ?>?v=20261003-receipt-return-focus"></script>
+<script src="<?= base_url('assets/js/store-pos.part6.js') ?>?v=20261003-pin-dialog-keys"></script>
 <?= $this->endSection() ?>
 

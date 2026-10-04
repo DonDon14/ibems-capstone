@@ -11,15 +11,16 @@
     <title>Select Role</title>
     <script {csp-script-nonce}>
     (function () {
-        var saved = localStorage.getItem('ibems-theme');
+        var saved = null;
+        try { saved = localStorage.getItem('ibems-theme'); } catch (_) {}
         var theme = saved === 'dark' || saved === 'light' ? saved : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
         document.documentElement.dataset.theme = theme;
     }());
     </script>
     <link rel="icon" type="image/png" href="<?= base_url('assets/images/ibems-logo.png') ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.css') ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/css/auth-login.css') ?>?v=20260825c">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.css') ?>?v=20261003-ui-polish">
+    <link rel="stylesheet" href="<?= base_url('assets/css/auth-login.css') ?>?v=20261003-role-feedback">
+    <link rel="stylesheet" href="<?= base_url('assets/vendor/bootstrap-icons/bootstrap-icons.min.css') ?>">
 </head>
 <body class="auth-modern auth-role-selection">
 <?php $ibemsLogoUrl = base_url('assets/images/ibems-logo.png'); ?>
@@ -41,6 +42,11 @@
                     'description' => 'Manage school-wide operations, users, stores, and audit activity.',
                     'icon' => 'bi-shield-check',
                 ],
+                'HR' => [
+                    'label' => 'Human Resources',
+                    'description' => 'Add staff accounts individually or import them from CSV.',
+                    'icon' => 'bi-person-plus',
+                ],
                 'STORE_SYSTEM' => [
                     'label' => 'Store Cashier',
                     'description' => 'Open the assigned store POS and process checkout transactions.',
@@ -56,6 +62,31 @@
                     'description' => 'Monitor employee debt, deductions, and payroll records.',
                     'icon' => 'bi-calculator',
                 ],
+                'ACCOUNTING_HEAD' => [
+                    'label' => 'Accounting Head / Bookkeeper',
+                    'description' => 'Oversee Accounting records and workflows.',
+                    'icon' => 'bi-calculator',
+                ],
+                'PAYROLL_CLERK' => [
+                    'label' => 'Payroll Clerk',
+                    'description' => 'Work with salary deductions within Accounting.',
+                    'icon' => 'bi-file-earmark-spreadsheet',
+                ],
+                'CASHIER_HEAD' => [
+                    'label' => 'Cashier Head',
+                    'description' => 'Open the Cashier Office portal.',
+                    'icon' => 'bi-cash-coin',
+                ],
+                'COLLECTING_OFFICER' => [
+                    'label' => 'Collecting Officer',
+                    'description' => 'Open the collection portal; salary deductions remain with Accounting.',
+                    'icon' => 'bi-receipt',
+                ],
+                'BE_DIRECTOR' => [
+                    'label' => 'Business Enterprise Director',
+                    'description' => 'Open business oversight and report review.',
+                    'icon' => 'bi-buildings',
+                ],
                 'USER' => [
                     'label' => 'User',
                     'description' => 'Shop products, review purchases, and manage your account.',
@@ -63,6 +94,7 @@
                 ],
             ];
             ?>
+            <div id="status" role="status" aria-live="polite" aria-atomic="true" tabindex="-1"></div>
             <div id="role-options" class="auth-role-list" role="group" aria-label="Available portals">
                 <?php foreach (($availableRoles ?? ibems_available_roles()) as $availableRole): ?>
                     <?php
@@ -107,7 +139,6 @@
                     </form>
                 <?php endforeach; ?>
             </div>
-            <div id="status"></div>
         </section>
 
         <section class="auth-panel auth-panel-art" aria-hidden="true">
@@ -120,6 +151,8 @@
         </section>
     </main>
 
-    <script src="<?= base_url('assets/js/theme.js') ?>?v=20260825c"></script>
+    <script src="<?= base_url('assets/js/csrf.js') ?>?v=20261003-ui-polish"></script>
+    <script src="<?= base_url('assets/js/auth-role-selection.js') ?>?v=20261003-inline-feedback"></script>
+    <script src="<?= base_url('assets/js/theme.js') ?>?v=20261003-transition-ready"></script>
 </body>
 </html>

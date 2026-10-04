@@ -16,33 +16,32 @@ function ensurePaymentAccountSelection(methodCode) {
     }
 }
 
-let customerQrTrigger = null;
-
 function openCustomerQrModal(methodCode, accountId, trigger) {
     const method = getPaymentMethod(methodCode);
     const account = method?.destination_accounts?.find((row) => Number(row.id) === Number(accountId));
     if (!method || !account?.image_url) return;
 
-    customerQrTrigger = trigger || null;
     document.getElementById("customer-qr-title").textContent = `Scan to pay with ${method.label}`;
     document.getElementById("customer-qr-image").src = String(account.image_url);
     document.getElementById("customer-qr-image").alt = `Payment QR for ${account.account_name}`;
     document.getElementById("customer-qr-method").textContent = String(method.label || "Payment");
     document.getElementById("customer-qr-account").textContent = String(account.account_name || "Receiving account");
     document.getElementById("customer-qr-number").textContent = String(account.masked_number || "");
-    document.getElementById("customer-qr-modal").classList.remove("is-hidden");
+    const modal = document.getElementById("customer-qr-modal");
+    modal.classList.remove("is-hidden");
+    modal.style.display = "grid";
     document.body.classList.add("modal-open");
-    document.getElementById("customer-qr-close").focus();
+    focusPosCheckoutDialog(modal, document.getElementById("customer-qr-close"), trigger || document.activeElement);
 }
 
 function closeCustomerQrModal() {
     const modal = document.getElementById("customer-qr-modal");
     if (!modal || modal.classList.contains("is-hidden")) return;
     modal.classList.add("is-hidden");
+    modal.style.display = "none";
     document.body.classList.remove("modal-open");
     document.getElementById("customer-qr-image").removeAttribute("src");
-    customerQrTrigger?.focus();
-    customerQrTrigger = null;
+    releasePosCheckoutDialogFocus(modal);
 }
 
 function renderPaymentAccountPicker() {
@@ -125,7 +124,84 @@ function setSplitTenderEnabled(enabled) {
     updateCheckoutState();
 }
 
-function openReceiptModal(receipt) {
+const posCheckoutDialogStates = new Map();
+const posStoreDayControlStates = new Map();
+
+function setPosStoreDayDialogBusy(modal, busy) {
+    modal.setAttribute('aria-busy', String(busy));
+    if (busy) {
+        const controls = Array.from(modal.querySelectorAll('input, select, textarea, button'))
+            .filter(control => !control.classList.contains('receipt-close'));
+        posStoreDayControlStates.set(modal, controls.map(control => ({ control, disabled: control.disabled })));
+        controls.forEach(control => { control.disabled = true; });
+        modal.querySelector('.receipt-close')?.focus();
+    } else {
+        (posStoreDayControlStates.get(modal) || []).forEach(({ control, disabled }) => { control.disabled = disabled; });
+        posStoreDayControlStates.delete(modal);
+    }
+}
+
+function focusPosCheckoutDialog(modal, preferredControl, returnFocus = document.activeElement) {
+    const state = { returnFocus: posCheckoutDialogStates.get(modal)?.returnFocus || returnFocus };
+    posCheckoutDialogStates.set(modal, state);
+    const card = modal.querySelector('.receipt-card');
+    if (card) card.scrollTop = 0;
+    const content = modal.querySelector('#confirm-transaction-content, #receipt-content, #product-variant-options, .customer-qr-content, .opening-balance-body, .store-day-close-body, .debt-payment-body');
+    if (content) content.scrollTop = 0;
+    window.requestAnimationFrame(() => {
+        if (posCheckoutDialogStates.get(modal) !== state || modal.style.display === 'none' || !modal.isConnected) return;
+        const control = preferredControl?.isConnected && !preferredControl.disabled
+            ? preferredControl : modal.querySelector('.receipt-close');
+        control?.focus();
+    });
+}
+
+function releasePosCheckoutDialogFocus(modal, restoreFocus = true) {
+    if (!posCheckoutDialogStates.has(modal)) return;
+    const returnFocus = posCheckoutDialogStates.get(modal)?.returnFocus;
+    posCheckoutDialogStates.delete(modal);
+    if (restoreFocus) {
+        const target = returnFocus?.isConnected && !returnFocus.disabled && returnFocus.getClientRects().length
+            ? returnFocus : document.getElementById('product-search');
+        if (target?.isConnected && !target.disabled) target.focus({ preventScroll: true });
+    }
+    return returnFocus;
+}
+
+function handlePosCheckoutDialogKeydown(event, closeDialog) {
+    if (event.defaultPrevented) return;
+    if (event.key === 'Escape') {
+        event.preventDefault();
+        event.stopPropagation();
+        closeDialog();
+        return;
+    }
+    if (event.key !== 'Tab') return;
+    const modal = event.currentTarget;
+    const controls = Array.from(modal.querySelectorAll('button, a[href], input, select, textarea, [tabindex]'))
+        .filter(control => !control.disabled && control.tabIndex >= 0 && control.getClientRects().length);
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    const outsideControls = !controls.includes(document.activeElement);
+    if (outsideControls || (event.shiftKey && document.activeElement === first) || (!event.shiftKey && document.activeElement === last)) {
+        event.preventDefault();
+        (event.shiftKey ? last : first)?.focus();
+    }
+}
+
+function bindPosCheckoutDialogKeys() {
+    document.getElementById('confirm-transaction-modal').addEventListener('keydown', event => handlePosCheckoutDialogKeydown(event, closeConfirmTransactionModal));
+    document.getElementById('receipt-modal').addEventListener('keydown', event => handlePosCheckoutDialogKeydown(event, closeReceiptModal));
+    document.getElementById('barcode-scanner-modal').addEventListener('keydown', event => handlePosCheckoutDialogKeydown(event, closeScannerModal));
+    document.getElementById('customer-qr-modal')?.addEventListener('keydown', event => handlePosCheckoutDialogKeydown(event, closeCustomerQrModal));
+    document.getElementById('product-variant-modal')?.addEventListener('keydown', event => handlePosCheckoutDialogKeydown(event, closeProductVariantPicker));
+    document.getElementById('debt-pin-modal')?.addEventListener('keydown', event => handlePosCheckoutDialogKeydown(event, () => closeDebtPinModal(true)));
+    document.getElementById('opening-balance-modal')?.addEventListener('keydown', event => handlePosCheckoutDialogKeydown(event, closeOpeningBalanceModal));
+    document.getElementById('store-day-close-modal')?.addEventListener('keydown', event => handlePosCheckoutDialogKeydown(event, closeStoreDayCloseModal));
+    document.getElementById('debt-payment-modal')?.addEventListener('keydown', event => handlePosCheckoutDialogKeydown(event, closeDebtPaymentModal));
+}
+
+function openReceiptModal(receipt, returnFocus = document.activeElement) {
     lastReceipt = receipt;
     const modal = document.getElementById("receipt-modal");
     const viewBtn = document.getElementById("receipt-view");
@@ -136,16 +212,19 @@ function openReceiptModal(receipt) {
         viewBtn.disabled = !receipt.lookupUrl;
     }
     modal.style.display = "grid";
+    focusPosCheckoutDialog(modal, document.getElementById('receipt-close'), returnFocus);
 }
 
 function closeReceiptModal() {
     const modal = document.getElementById("receipt-modal");
     modal.style.display = "none";
+    releasePosCheckoutDialogFocus(modal);
 }
 
 function renderSuccessStrip(receipt) {
     const strip = document.getElementById("pos-success-strip");
     if (!strip || !receipt) return;
+    window.IbemsFeedbackSound?.play('success');
 
     strip.classList.remove("is-hidden");
     strip.innerHTML = `
@@ -155,8 +234,8 @@ function renderSuccessStrip(receipt) {
             <small>${escapeHtml(formatPaymentLabel(receipt.paymentMethod))} | ${escapeHtml(receipt.customerName || "Walk-in")}</small>
         </div>
         <div class="pos-success-actions">
-            <button type="button" class="secondary-btn" data-pos-success-action="view"><i class="bi bi-box-arrow-up-right"></i> View</button>
-            <button type="button" class="primary-btn" data-pos-success-action="print"><i class="bi bi-printer"></i> Print</button>
+            <button type="button" class="secondary-btn" data-pos-success-action="view"><i class="bi bi-box-arrow-up-right" aria-hidden="true"></i> View</button>
+            <button type="button" class="primary-btn" data-pos-success-action="print"><i class="bi bi-printer" aria-hidden="true"></i> Print</button>
         </div>
     `;
 }
@@ -335,16 +414,19 @@ function openConfirmTransactionModal(data) {
             document.getElementById("confirm-proceed")?.click();
         });
         updateConfirmCashTender();
-        setTimeout(() => input?.focus(), 30);
+        focusPosCheckoutDialog(document.getElementById('confirm-transaction-modal'), input);
     } else {
         document.getElementById("confirm-proceed").disabled = false;
+        focusPosCheckoutDialog(document.getElementById('confirm-transaction-modal'), document.getElementById('confirm-close'));
     }
 }
 
 function closeConfirmTransactionModal(force = false) {
-    if (isSubmitting && !force) return;
+    if (isSubmitting && force !== true) return;
     pendingTransaction = null;
-    document.getElementById("confirm-transaction-modal").style.display = "none";
+    const modal = document.getElementById('confirm-transaction-modal');
+    modal.style.display = "none";
+    return releasePosCheckoutDialogFocus(modal, force !== true);
 }
 
 function printReceipt() {
@@ -515,11 +597,24 @@ function updateDebtPinUi() {
     help.classList.remove("is-error");
 }
 
-function openDebtPinModal() {
+function setDebtPinModalResult(message = "", tone = "") {
+    const result = document.getElementById("debt-pin-modal-result");
+    const input = document.getElementById("debt-pin-input");
+    if (!result) return;
+    const error = tone === "error";
+    result.className = `result-msg${error ? " error" : ""}`;
+    result.setAttribute("role", error ? "alert" : "status");
+    result.setAttribute("aria-live", error ? "assertive" : "polite");
+    result.setAttribute("aria-atomic", "true");
+    if (result.textContent !== message) result.textContent = message;
+    if (error && !input?.disabled) input?.setAttribute("aria-invalid", "true");
+    else input?.removeAttribute("aria-invalid");
+}
+
+function openDebtPinModal(returnFocus = document.activeElement) {
     const modal = document.getElementById("debt-pin-modal");
     const input = document.getElementById("debt-pin-input");
     const summary = document.getElementById("debt-pin-modal-summary");
-    const result = document.getElementById("debt-pin-modal-result");
     if (!modal || !input) return;
 
     const departmentMode = getDebtAccountType() === "department";
@@ -545,16 +640,13 @@ function openDebtPinModal() {
             : `Ask ${selectedDebtCustomer?.name || "the debtor"} to enter their debt authorization PIN.`;
     }
     const title = document.getElementById("debt-pin-modal-title");
-    if (title) title.innerHTML = `<i class="bi bi-shield-lock"></i> ${departmentMode ? "Department Approval PIN" : "Debt Authorization PIN"}`;
-    if (result) {
-        result.textContent = "";
-        result.className = "result-msg";
-    }
+    if (title) title.innerHTML = `<i class="bi bi-shield-lock" aria-hidden="true"></i> ${departmentMode ? "Department Approval PIN" : "Debt Authorization PIN"}`;
+    setDebtPinModalResult();
 
     input.value = selectedDebtPin;
     renderDebtPinAuthorizationState();
     modal.style.display = "grid";
-    setTimeout(() => input.focus(), 30);
+    focusPosCheckoutDialog(modal, input.disabled ? document.getElementById("debt-pin-close") : input, returnFocus);
 }
 
 function clearDebtPinLockoutTimer() {
@@ -568,6 +660,7 @@ function renderDebtPinAuthorizationState(message = "") {
     const input = document.getElementById("debt-pin-input");
     const saveButton = document.getElementById("debt-pin-save");
     const result = document.getElementById("debt-pin-modal-result");
+    const countdown = document.getElementById("debt-pin-lockout-countdown");
     if (!input || !saveButton || !result) return;
 
     const lockoutKey = getDebtAccountType() === "department"
@@ -584,12 +677,17 @@ function renderDebtPinAuthorizationState(message = "") {
         const employeeName = getDebtAccountType() === "department" ? (getSelectedDepartmentApprover()?.name || "This approver") : (selectedDebtCustomer?.name || "This employee");
         input.disabled = true;
         saveButton.disabled = true;
-        saveButton.innerHTML = '<i class="bi bi-lock"></i> PIN Locked';
-        result.className = "result-msg error";
+        saveButton.innerHTML = '<i class="bi bi-lock" aria-hidden="true"></i> PIN Locked';
         const alternatives = getDebtAccountType() === "department"
             ? "Other accounts and payment methods remain available."
             : "Other customers and payment methods remain available.";
-        result.textContent = `${employeeName}'s ${getDebtAccountType() === "department" ? "department approval" : "debt"} PIN is locked after too many incorrect attempts. Try again in ${minutes}:${String(seconds).padStart(2, "0")}. ${alternatives}`;
+        setDebtPinModalResult(`${employeeName}'s ${getDebtAccountType() === "department" ? "department approval" : "debt"} PIN is locked after too many incorrect attempts. Try again after the lockout expires. ${alternatives}`, "error");
+        if (countdown) {
+            countdown.hidden = false;
+            countdown.setAttribute("role", "timer");
+            countdown.setAttribute("aria-live", "off");
+            countdown.textContent = `Try again in ${minutes}:${String(seconds).padStart(2, "0")}.`;
+        }
         return;
     }
 
@@ -599,11 +697,10 @@ function renderDebtPinAuthorizationState(message = "") {
     }
     input.disabled = false;
     saveButton.disabled = false;
-    saveButton.innerHTML = '<i class="bi bi-check2-circle"></i> Use PIN';
-    if (message) {
-        result.className = "result-msg error";
-        result.textContent = message;
-    }
+    saveButton.innerHTML = '<i class="bi bi-check2-circle" aria-hidden="true"></i> Use PIN';
+    if (countdown) { countdown.hidden = true; countdown.textContent = ""; }
+    if (message) setDebtPinModalResult(message, "error");
+    else if (lockout) setDebtPinModalResult("Lockout ended. Enter your PIN to try again.");
 }
 
 function showDebtPinAuthorizationFailure(data = {}) {
@@ -611,15 +708,15 @@ function showDebtPinAuthorizationFailure(data = {}) {
     const input = document.getElementById("debt-pin-input");
     if (input) input.value = "";
     updateDebtPinUi();
-    closeConfirmTransactionModal(true);
-    openDebtPinModal();
+    const returnFocus = closeConfirmTransactionModal(true);
+    openDebtPinModal(returnFocus || document.activeElement);
 
-    if (data.locked_until) {
+    if (data.locked_until || Number(data.locked_until_epoch) > 0) {
         const lockoutKey = getDebtAccountType() === "department"
             ? `department-${Number(getSelectedDepartmentDebtAccount()?.id || 0)}-${Number(getSelectedDepartmentApprover()?.id || 0)}`
             : `employee-${Number(selectedDebtCustomerId || 0)}`;
         debtPinLockouts.set(lockoutKey, {
-            until: String(data.locked_until),
+            until: String(data.locked_until || ""),
             epoch: Number(data.locked_until_epoch || 0) || null,
         });
         clearDebtPinLockoutTimer();
@@ -638,13 +735,12 @@ function showDebtPinAuthorizationFailure(data = {}) {
 function closeDebtPinModal(clearDraft = false) {
     const modal = document.getElementById("debt-pin-modal");
     const input = document.getElementById("debt-pin-input");
-    const result = document.getElementById("debt-pin-modal-result");
     if (clearDraft && input) {
         input.value = selectedDebtPin;
     }
-    if (result) {
-        result.textContent = "";
-        result.className = "result-msg";
+    setDebtPinModalResult();
+    if (modal) {
+        modal.style.display = "none";
+        releasePosCheckoutDialogFocus(modal);
     }
-    if (modal) modal.style.display = "none";
 }

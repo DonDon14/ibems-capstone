@@ -3,16 +3,21 @@
 use App\Services\TransactionService;
 use CodeIgniter\Test\CIUnitTestCase;
 use Config\Database;
+require_once __DIR__ . '/StoreOfferingIntegrationCases.php';
+require_once __DIR__ . '/StoreTypeScenarioCases.php';
 
 /**
  * @internal
  */
 final class TransactionServiceTest extends CIUnitTestCase
 {
+    use StoreOfferingIntegrationCases;
+    use StoreTypeScenarioCases;
     protected function setUp(): void
     {
         parent::setUp();
         $this->resetSchema();
+        Database::connect()->resetDataCache();
     }
 
     public function testCreateTransactionWritesAuditAndDeductsStock(): void
@@ -64,12 +69,15 @@ final class TransactionServiceTest extends CIUnitTestCase
         $this->seedOpenStoreDay($now);
         $this->seedPaymentMethod('cash', true, $now);
         $this->seedProduct(101, 0, 35, $now, 'service', 'untracked', 'gallon');
+        $this->seedDebtCustomer(501, 'staff', 0, 0, '1234', $now);
+        (new \App\Models\StoreCapabilityModel())->syncForStore(1, ['refill_service']);
 
         $result = (new TransactionService())->createTransaction([
             'store_id' => 1,
             'payment_method' => 'cash',
             'cash_received' => 100,
-            'customer_type' => 'walk_in',
+            'customer_type' => 'staff',
+            'customer_user_id' => 501,
             'items' => [['product_id' => 101, 'qty' => 2]],
         ], 7, 'STORE_SYSTEM');
 
@@ -81,6 +89,167 @@ final class TransactionServiceTest extends CIUnitTestCase
         $this->assertSame('SKU-101', $item['sku_snapshot'] ?? null);
         $this->assertSame('gallon', $item['unit_code_snapshot'] ?? null);
         $this->assertSame('service', $item['item_type_snapshot'] ?? null);
+    }
+
+    public function testWaterStationRejectsWalkInAndForgedInternalTypeForEveryProductType(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+        $this->seedStore($now);
+        $this->seedOpenStoreDay($now);
+        $this->seedPaymentMethod('cash', true, $now);
+        $this->seedProduct(101, 3, 50, $now, 'stock_item', 'tracked', 'bottle');
+        $this->seedProduct(102, 0, 25, $now, 'deposit', 'untracked', 'container');
+        (new \App\Models\StoreCapabilityModel())->syncForStore(1, ['retail', 'refill_service', 'container_deposits']);
+
+        $payload = [
+            'store_id' => 1,
+            'payment_method' => 'cash',
+            'cash_received' => 50,
+            'customer_type' => 'walk_in',
+            'items' => [['product_id' => 101, 'qty' => 1]],
+        ];
+        $service = new TransactionService();
+        $walkIn = $service->createTransaction($payload, 7, 'STORE_SYSTEM');
+        $this->assertSame('error', $walkIn['status']);
+        $this->assertStringContainsString('selected university customer', $walkIn['message']);
+
+        $payload['items'] = [['product_id' => 102, 'qty' => 1]];
+        $depositWalkIn = $service->createTransaction($payload, 7, 'STORE_SYSTEM');
+        $this->assertSame('error', $depositWalkIn['status']);
+        $payload['items'] = [['product_id' => 101, 'qty' => 1]];
+
+        $payload['customer_type'] = 'staff';
+        $forged = $service->createTransaction($payload, 7, 'STORE_SYSTEM');
+        $this->assertSame('error', $forged['status']);
+        $this->assertSame(0, $db->table('transactions')->countAllResults());
+        $this->assertSame(3, (int) $db->table('products')->where('id', 101)->get()->getRowArray()['stock_qty']);
+
+        $this->seedDebtCustomer(501, 'staff', 0, 0, '1234', $now);
+        $payload['customer_user_id'] = 501;
+        $accepted = $service->createTransaction($payload, 7, 'STORE_SYSTEM');
+        $this->assertSame('success', $accepted['status'], json_encode($accepted));
+        $this->assertSame(2, (int) $db->table('products')->where('id', 101)->get()->getRowArray()['stock_qty']);
+    }
+
+    public function testWaterStationAcceptsRegisteredStudentCashSaleWithoutDebtBalance(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+        $this->seedStore($now);
+        $this->seedOpenStoreDay($now);
+        $this->seedPaymentMethod('cash', true, $now);
+        $this->seedProduct(101, 2, 25, $now, 'stock_item', 'tracked', 'bottle');
+        (new \App\Models\StoreCapabilityModel())->syncForStore(1, ['retail', 'refill_service']);
+        $db->table('users')->insert([
+            'id' => 502, 'employee_id' => 'STU-502', 'name' => 'Student Example',
+            'email' => 'student@example.test', 'role' => 'USER', 'user_type' => 'student',
+            'base_salary' => 0, 'is_active' => 1, 'created_at' => $now,
+        ]);
+
+        $result = (new TransactionService())->createTransaction([
+            'store_id' => 1, 'payment_method' => 'cash', 'cash_received' => 25,
+            'customer_type' => 'walk_in', 'customer_user_id' => 502,
+            'items' => [['product_id' => 101, 'qty' => 1]],
+        ], 7, 'STORE_SYSTEM');
+
+        $this->assertSame('success', $result['status'], json_encode($result));
+        $transaction = $db->table('transactions')->get()->getRowArray();
+        $this->assertSame('student', $transaction['customer_type']);
+        $this->assertSame(502, (int) $transaction['user_id']);
+    }
+
+    public function testWaterStationDepartmentChargeRequiresHeadPinAndRecordsInternalPurchase(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+        $this->seedStore($now);
+        $this->seedOpenStoreDay($now);
+        $this->seedPaymentMethod('debt', true, $now);
+        $this->seedProduct(101, 2, 50, $now, 'stock_item', 'tracked', 'bottle');
+        (new \App\Models\StoreCapabilityModel())->syncForStore(1, ['retail', 'refill_service']);
+        $tn = static fn (string $name): string => $db->getPrefix() . $name;
+        $db->query('CREATE TABLE ' . $tn('departments') . ' (id INTEGER PRIMARY KEY, name TEXT, head_user_id INTEGER, is_active INTEGER)');
+        $db->query('CREATE TABLE ' . $tn('department_authorization_pins') . ' (user_id INTEGER PRIMARY KEY, pin_hash TEXT, failed_attempts INTEGER, window_started_at TEXT, locked_until TEXT, last_failed_at TEXT, last_success_at TEXT, updated_at TEXT)');
+        $db->query('CREATE TABLE ' . $tn('department_debt_periods') . ' (id INTEGER PRIMARY KEY, department_id INTEGER, period_month TEXT, allocation_amount REAL, used_amount REAL, outstanding_amount REAL, status TEXT, updated_at TEXT)');
+        $db->query('CREATE TABLE ' . $tn('department_debt_entries') . ' (id INTEGER PRIMARY KEY AUTOINCREMENT, department_id INTEGER, period_id INTEGER, entry_type TEXT, direction TEXT, amount REAL, allocation_before REAL, allocation_after REAL, used_before REAL, used_after REAL, outstanding_before REAL, outstanding_after REAL, transaction_id INTEGER, requester_user_id INTEGER, requester_name TEXT, approved_by_user_id INTEGER, actor_id INTEGER, remarks TEXT, meta_json TEXT, created_at TEXT)');
+        $db->query('CREATE TABLE ' . $tn('department_debt_transactions') . ' (transaction_id INTEGER PRIMARY KEY, department_id INTEGER, period_id INTEGER, entry_id INTEGER, debt_amount REAL, requester_user_id INTEGER, requester_name TEXT, approved_by_user_id INTEGER, created_at TEXT)');
+        $db->table('users')->insert(['id' => 600, 'employee_id' => 'HEAD-600', 'name' => 'Department Head', 'email' => 'head@example.test', 'role' => 'USER', 'user_type' => 'staff', 'base_salary' => 0, 'is_active' => 1]);
+        $db->table('departments')->insert(['id' => 10, 'name' => 'Library', 'head_user_id' => 600, 'is_active' => 1]);
+        $db->table('department_authorization_pins')->insert(['user_id' => 600, 'pin_hash' => password_hash('2468', PASSWORD_DEFAULT), 'failed_attempts' => 0]);
+        $db->table('department_debt_periods')->insert(['id' => 10, 'department_id' => 10, 'period_month' => substr(ibems_business_date(), 0, 7) . '-01', 'allocation_amount' => 500, 'used_amount' => 0, 'outstanding_amount' => 0, 'status' => 'open']);
+
+        $payload = [
+            'store_id' => 1, 'payment_method' => 'debt', 'debt_account_type' => 'department',
+            'department_id' => 10, 'department_requester_name' => 'Library Staff',
+            'department_approver_user_id' => 600, 'department_pin' => '0000',
+            'customer_type' => 'walk_in', 'items' => [['product_id' => 101, 'qty' => 1]],
+        ];
+        $service = new TransactionService();
+        $denied = $service->createTransaction($payload, 7, 'STORE_SYSTEM');
+        $this->assertSame('error', $denied['status']);
+        $this->assertSame(0, $db->table('transactions')->countAllResults());
+
+        $payload['department_pin'] = '2468';
+        $accepted = $service->createTransaction($payload, 7, 'STORE_SYSTEM');
+        $this->assertSame('success', $accepted['status'], json_encode($accepted));
+        $this->assertSame(1, $db->table('department_debt_transactions')->countAllResults());
+        $this->assertSame(50.0, (float) $db->table('department_debt_periods')->where('id', 10)->get()->getRowArray()['used_amount']);
+        $this->assertSame(1, (int) $db->table('products')->where('id', 101)->get()->getRowArray()['stock_qty']);
+    }
+
+    public static function departmentPurchaseMonthBoundaries(): array
+    {
+        return ['before month'=>['2026-09-30 15:59:59','2026-09-01','2026-10-01'],
+            'at month'=>['2026-09-30 16:00:00','2026-10-01','2026-09-01'],
+            'before year'=>['2026-12-31 15:59:59','2026-12-01','2027-01-01'],
+            'at year'=>['2026-12-31 16:00:00','2027-01-01','2026-12-01']];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('departmentPurchaseMonthBoundaries')]
+    public function testDepartmentPurchaseSelectsManilaMonthAndPreservesUtcTimestamp(string $utc,string $month,string $otherMonth): void
+    {
+        $db=Database::connect(); $tn=static fn(string $name):string=>$db->getPrefix().$name;
+        $db->query('CREATE TABLE '.$tn('departments').' (id INTEGER PRIMARY KEY,name TEXT,head_user_id INTEGER,is_active INTEGER)');
+        $db->query('CREATE TABLE '.$tn('department_debt_periods').' (id INTEGER PRIMARY KEY,department_id INTEGER,period_month TEXT,allocation_amount REAL,used_amount REAL,outstanding_amount REAL,status TEXT,updated_at TEXT)');
+        $db->query('CREATE TABLE '.$tn('department_debt_entries').' (id INTEGER PRIMARY KEY AUTOINCREMENT,department_id INTEGER,period_id INTEGER,entry_type TEXT,direction TEXT,amount REAL,allocation_before REAL,allocation_after REAL,used_before REAL,used_after REAL,outstanding_before REAL,outstanding_after REAL,transaction_id INTEGER,requester_user_id INTEGER,requester_name TEXT,approved_by_user_id INTEGER,actor_id INTEGER,remarks TEXT,meta_json TEXT,created_at TEXT)');
+        $db->query('CREATE TABLE '.$tn('department_debt_transactions').' (transaction_id INTEGER PRIMARY KEY,department_id INTEGER,period_id INTEGER,entry_id INTEGER,debt_amount REAL,requester_user_id INTEGER,requester_name TEXT,approved_by_user_id INTEGER,created_at TEXT)');
+        $db->table('users')->insert(['id'=>600,'employee_id'=>'QA-HEAD','name'=>'Synthetic Head','email'=>'head@example.test','role'=>'USER','user_type'=>'staff','is_active'=>1]);
+        $db->table('departments')->insert(['id'=>10,'name'=>'Synthetic Library','head_user_id'=>600,'is_active'=>1]);
+        foreach([1=>$month,2=>$otherMonth] as $id=>$periodMonth) $db->table('department_debt_periods')->insert(['id'=>$id,'department_id'=>10,'period_month'=>$periodMonth,'allocation_amount'=>500,'used_amount'=>0,'outstanding_amount'=>0,'status'=>'open']);
+        $id=(new \App\Services\DepartmentDebtService($db))->recordPurchase(10,999,50,null,'Synthetic requester',600,7,1,$utc);
+        $entry=$db->table('department_debt_entries')->where('id',$id)->get()->getRowArray();
+        $this->assertSame(1,(int)$entry['period_id']);
+        $this->assertSame($utc,$entry['created_at']);
+        $this->assertSame(50.0,(float)$db->table('department_debt_periods')->where('id',1)->get()->getRow('used_amount'));
+        $this->assertSame(50.0,(float)$db->table('department_debt_periods')->where('id',1)->get()->getRow('outstanding_amount'));
+        $this->assertSame(0.0,(float)$db->table('department_debt_periods')->where('id',2)->get()->getRow('used_amount'));
+        $this->assertSame(0.0,(float)$db->table('department_debt_periods')->where('id',2)->get()->getRow('outstanding_amount'));
+        $link=$db->table('department_debt_transactions')->where('transaction_id',999)->get()->getRowArray();
+        $this->assertSame(1,(int)$link['period_id']);
+        $this->assertSame($utc,$link['created_at']);
+    }
+
+    public function testCapabilityChangesAreStoreScopedAndBlockStaleCheckoutWithoutLosingStock(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+        $this->seedStore($now);
+        $this->seedOpenStoreDay($now);
+        $this->seedPaymentMethod('cash', true, $now);
+        $this->seedProduct(101, 3, 35, $now);
+        $caps = new \App\Models\StoreCapabilityModel();
+        $caps->syncForStore(1, ['food_service']);
+        $caps->syncForStore(2, ['retail']);
+        $payload = ['store_id' => 1, 'payment_method' => 'cash', 'cash_received' => 100, 'customer_type' => 'walk_in', 'items' => [['product_id' => 101, 'qty' => 1]]];
+        $service = new TransactionService();
+        $result = $service->createTransaction($payload, 7, 'STORE_SYSTEM');
+        $this->assertSame('error', $result['status']);
+        $this->assertSame(0, $db->table('transactions')->countAllResults());
+        $this->assertSame(3, (int) $db->table('products')->where('id', 101)->get()->getRowArray()['stock_qty']);
+        $caps->syncForStore(1, ['retail']);
+        $this->assertSame(['retail'], $caps->getForStore(2));
+        $this->assertSame('success', $service->createTransaction($payload, 7, 'STORE_SYSTEM')['status']);
     }
 
     public function testInsufficientStockRollsBackTransactionAndAudit(): void
@@ -738,6 +907,41 @@ final class TransactionServiceTest extends CIUnitTestCase
         $this->assertSame(50.0, (float) $db->table('balances')->where('user_id', 501)->get()->getRowArray()['current_debt']);
     }
 
+    public function testPurchaseCardStorageFailureRollsBackAndCanRetry(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+        $this->seedStore($now);
+        $this->seedOpenStoreDay($now);
+        $this->seedPaymentMethod('debt', true, $now);
+        $this->seedDebtCustomer(501, 'staff', 500, 0, '1234', $now);
+        $this->seedProduct(101, 3, 50, $now);
+        $this->createPurchaseCardTable();
+        $db->table('user_purchase_cards')->insert(['user_id' => 501, 'is_locked' => 0,
+            'unlocked_until' => date('Y-m-d H:i:s', time() + 300), 'created_at' => $now, 'updated_at' => $now]);
+        $request = ['store_id' => 1, 'payment_method' => 'debt', 'customer_user_id' => 501,
+            'customer_type' => 'staff', 'items' => [['product_id' => 101, 'qty' => 1]]];
+        $before = $db->table('user_purchase_cards')->get()->getResultArray();
+        $db->query('CREATE TRIGGER qa_card_fault BEFORE UPDATE ON ' . $db->prefixTable('user_purchase_cards')
+            . " BEGIN SELECT RAISE(ABORT, 'Synthetic card storage failure'); END");
+        try {
+            $failure = (new TransactionService())->createTransaction($request, 7, 'STORE_SYSTEM');
+            $this->assertSame('error', $failure['status']);
+            $this->assertSame(500, $failure['code']);
+            $this->assertSame($before, $db->table('user_purchase_cards')->get()->getResultArray());
+            $this->assertSame(0, $db->table('transactions')->countAllResults());
+            $this->assertSame(0.0, (float) $db->table('balances')->where('user_id', 501)->get()->getRow('current_debt'));
+            $this->assertSame(3, (int) $db->table('products')->where('id', 101)->get()->getRow('stock_qty'));
+        } finally {
+            $db->query('DROP TRIGGER qa_card_fault');
+            $db->resetTransStatus();
+        }
+        $retry = (new TransactionService())->createTransaction($request, 7, 'STORE_SYSTEM');
+        $this->assertSame('success', $retry['status'], json_encode($retry));
+        $this->assertSame(1, $db->table('transactions')->countAllResults());
+        $this->assertSame(50.0, (float) $db->table('balances')->where('user_id', 501)->get()->getRow('current_debt'));
+    }
+
     public function testFailedDebtPurchaseDoesNotConsumePurchaseCardUnlock(): void
     {
         $db = Database::connect();
@@ -766,6 +970,57 @@ final class TransactionServiceTest extends CIUnitTestCase
         $this->assertSame(0, $db->table('transactions')->countAllResults());
     }
 
+    public function testCheckoutRetryReturnsOriginalReceiptWithoutDuplicateStockOrPayment(): void
+    {
+        require_once APPPATH.'Database/Migrations/2026-09-30-000001_AddPosRequestReceipts.php';
+        (new \App\Database\Migrations\AddPosRequestReceipts())->up();
+        $db=Database::connect(); $db->resetDataCache(); $now=date('Y-m-d H:i:s');
+        $this->seedStore($now); $this->seedOpenStoreDay($now); $this->seedPaymentMethod('cash',true,$now); $this->seedProduct(101,3,100,$now);
+        $service=new TransactionService();
+        $request=['request_key'=>'retry-checkout-intent-0001','store_id'=>1,'payment_method'=>'cash','cash_received'=>100,'items'=>[['product_id'=>101,'qty'=>1]]];
+        $sale=$service->createTransaction($request,7,'STORE_SYSTEM');
+        $this->assertSame('success',$sale['status'],json_encode($sale));
+        $this->assertSame($sale,$service->createTransaction($request,7,'STORE_SYSTEM'));
+        $db->table('store_day_sessions')->update(['status'=>'closed']);
+        $this->assertSame($sale,$service->createTransaction($request,7,'STORE_SYSTEM'));
+        $this->assertSame(1,$db->table('transactions')->countAllResults());
+        $this->assertSame(1,$db->table('transaction_payments')->countAllResults());
+        $this->assertSame(2,(int)$db->table('products')->where('id',101)->get()->getRow('stock_qty'));
+        $conflict=$service->createTransaction(array_replace($request,['cash_received'=>200]),7,'STORE_SYSTEM');
+        $this->assertSame(409,$conflict['code']);
+        $denied=$service->createTransaction($request,999,'STORE_SYSTEM');
+        $this->assertSame(403,$denied['code']);
+        $this->assertSame(1,$db->table('pos_request_receipts')->countAllResults());
+    }
+
+    public function testCheckoutReceiptFailureRollsBackSaleAndInventory(): void
+    {
+        require_once APPPATH.'Database/Migrations/2026-09-30-000001_AddPosRequestReceipts.php';
+        (new \App\Database\Migrations\AddPosRequestReceipts())->up();
+        $db=Database::connect(); $db->resetDataCache(); $now=date('Y-m-d H:i:s');
+        $this->seedStore($now); $this->seedOpenStoreDay($now); $this->seedPaymentMethod('cash',true,$now); $this->seedProduct(101,3,100,$now);
+        $db->query('CREATE TRIGGER reject_pos_receipt BEFORE INSERT ON '.$db->prefixTable('pos_request_receipts')." BEGIN SELECT RAISE(ABORT, 'synthetic receipt failure'); END");
+        $result=(new TransactionService())->createTransaction(['request_key'=>'failed-checkout-intent-0001','store_id'=>1,'payment_method'=>'cash','cash_received'=>100,'items'=>[['product_id'=>101,'qty'=>1]]],7,'STORE_SYSTEM');
+        $this->assertSame('error',$result['status']);
+        $this->assertSame(0,$db->table('transactions')->countAllResults());
+        $this->assertSame(0,$db->table('transaction_payments')->countAllResults());
+        $this->assertSame(0,$db->table('inventory_movements')->countAllResults());
+        $this->assertSame(3,(int)$db->table('products')->where('id',101)->get()->getRow('stock_qty'));
+        $db->resetTransStatus();
+    }
+
+    public function testInvalidQuantityDoesNotPoisonNextValidCheckout(): void
+    {
+        $now=date('Y-m-d H:i:s');
+        $this->seedStore($now); $this->seedOpenStoreDay($now); $this->seedPaymentMethod('cash',true,$now); $this->seedProduct(101,3,100,$now);
+        $service=new TransactionService();
+        $request=['store_id'=>1,'payment_method'=>'cash','cash_received'=>100,'items'=>[['product_id'=>101,'qty'=>-1]]];
+        $this->assertSame('error',$service->createTransaction($request,7,'STORE_SYSTEM')['status']);
+        $request['items'][0]['qty']=1;
+        $this->assertSame('success',$service->createTransaction($request,7,'STORE_SYSTEM')['status']);
+        $this->assertSame(1,Database::connect()->table('transactions')->countAllResults());
+    }
+
     private function resetSchema(): void
     {
         $db = Database::connect();
@@ -773,6 +1028,13 @@ final class TransactionServiceTest extends CIUnitTestCase
         $tn = static fn (string $name): string => $prefix . $name;
 
         $tables = [
+            'store_repayment_receipts',
+            'payment_destination_accounts',
+            'pos_request_receipts',
+            'department_debt_transactions', 'department_debt_entries', 'department_debt_periods', 'department_authorization_pins', 'departments',
+            'rental_bookings', 'rental_packages', 'rental_assets', 'daily_food_offerings', 'store_cash_movements',
+            'food_template_details','food_daily_batches','product_families',
+            'store_capabilities',
             'user_purchase_cards',
             'debt_pin_security',
             'debt_cashbook_entries',
@@ -794,6 +1056,7 @@ final class TransactionServiceTest extends CIUnitTestCase
             $db->query('DROP TABLE IF EXISTS ' . $tn($table));
         }
 
+        $db->query('CREATE TABLE ' . $tn('store_capabilities') . ' (id INTEGER PRIMARY KEY AUTOINCREMENT, store_id INTEGER NOT NULL, capability TEXT NOT NULL, created_at TEXT, updated_at TEXT)');
         $db->query('CREATE TABLE ' . $tn('stores') . ' (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             store_name TEXT NOT NULL,
@@ -894,6 +1157,7 @@ final class TransactionServiceTest extends CIUnitTestCase
             barcode TEXT,
             price REAL NOT NULL DEFAULT 0,
             stock_qty INTEGER NOT NULL DEFAULT 0,
+            low_stock_threshold INTEGER NOT NULL DEFAULT 0,
             item_type TEXT NOT NULL DEFAULT \'stock_item\',
             stock_policy TEXT NOT NULL DEFAULT \'tracked\',
             unit_code TEXT NOT NULL DEFAULT \'piece\',
@@ -977,6 +1241,271 @@ final class TransactionServiceTest extends CIUnitTestCase
             created_at TEXT,
             updated_at TEXT
         )');
+    }
+
+    public static function repaymentFailureTables(): array
+    {
+        return ['balance' => ['balances', 'UPDATE'], 'collection' => ['store_cash_movements', 'INSERT'],
+            'cashbook' => ['debt_cashbook_entries', 'INSERT'], 'audit' => ['audit_logs', 'INSERT']];
+    }
+
+    public static function invalidRepaymentAmounts(): array
+    {
+        return [
+            'numeric prefix' => ['20abc'], 'too many decimals' => ['20.001'],
+            'scientific notation' => ['2e1'], 'boolean' => [true], 'array' => [[20]],
+            'null' => [null], 'negative' => [-1], 'zero' => [0],
+            'comma' => ['1,000'], 'missing integer' => ['.50'],
+            'nonfinite' => [INF], 'nan' => [NAN],
+        ];
+    }
+
+    public static function missingRepaymentKeys(): array
+    {
+        return ['omitted'=>[false,null], 'null'=>[true,null], 'empty'=>[true,''],
+            'whitespace'=>[true,'   '], 'array'=>[true,['invalid']], 'boolean'=>[true,true]];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('missingRepaymentKeys')]
+    public function testRepaymentRequiresAStringIntentKeyBeforeFinancialWrites(bool $present,mixed $key): void
+    {
+        $this->offeringSetup();
+        require_once APPPATH . 'Database/Migrations/2026-09-30-000002_AddStoreRepaymentReceipts.php';
+        (new \App\Database\Migrations\AddStoreRepaymentReceipts())->up();
+        $db=Database::connect(); $db->resetDataCache();
+        $this->seedDebtCustomer(501,'staff',1000,100,'1234',ibems_now()->format('Y-m-d H:i:s'));
+        $request=['store_id'=>1,'user_id'=>501,'amount'=>20,'payment_method'=>'cash'];
+        if($present) $request['request_key']=$key;
+        $before=$db->table('balances')->get()->getResultArray();
+        $result=(new \App\Services\StoreCashOperationService())->createDebtRepayment($request,7,'STORE_SYSTEM');
+        $this->assertSame(400,$result['code']);
+        $this->assertSame($before,$db->table('balances')->get()->getResultArray());
+        foreach(['store_cash_movements','debt_cashbook_entries','audit_logs','store_repayment_receipts'] as $table)
+            $this->assertSame(0,$db->table($table)->countAllResults(),$table);
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('invalidRepaymentAmounts')]
+    public function testRepaymentRejectsMalformedMoneyWithoutFinancialWrites(mixed $amount): void
+    {
+        $this->offeringSetup();
+        require_once APPPATH . 'Database/Migrations/2026-09-30-000002_AddStoreRepaymentReceipts.php';
+        (new \App\Database\Migrations\AddStoreRepaymentReceipts())->up();
+        $db = Database::connect(); $db->resetDataCache();
+        $this->seedDebtCustomer(501, 'staff', 1000, 100, '1234', ibems_now()->format('Y-m-d H:i:s'));
+        $before = $db->table('balances')->get()->getResultArray();
+        $result = (new \App\Services\StoreCashOperationService())->createDebtRepayment([
+            'store_id'=>1,'user_id'=>501,'amount'=>$amount,'payment_method'=>'cash','request_key'=>'repayment-invalid-money-0001',
+        ],7,'STORE_SYSTEM');
+        $this->assertSame(400,$result['code']);
+        $this->assertSame($before,$db->table('balances')->get()->getResultArray());
+        foreach (['store_cash_movements','debt_cashbook_entries','audit_logs','store_repayment_receipts'] as $table)
+            $this->assertSame(0,$db->table($table)->countAllResults(),$table);
+    }
+
+    public static function invalidLegacyRepaymentMethods(): array
+    {
+        return ['unknown'=>['invented',true], 'unnamed electronic'=>['ecash',true],
+            'electronic without receiving account'=>['gcash',true], 'inactive cash'=>['cash',false]];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('invalidLegacyRepaymentMethods')]
+    public function testLegacyRepaymentCannotBypassActiveMethodAndAccountChecks(string $channel,bool $cashActive): void
+    {
+        $this->offeringSetup();
+        require_once APPPATH . 'Database/Migrations/2026-09-30-000002_AddStoreRepaymentReceipts.php';
+        (new \App\Database\Migrations\AddStoreRepaymentReceipts())->up();
+        $db = Database::connect(); $db->resetDataCache();
+        $this->seedDebtCustomer(501, 'staff', 1000, 100, '1234', ibems_now()->format('Y-m-d H:i:s'));
+        $db->table('store_payment_methods')->where(['store_id'=>1,'code'=>'cash'])->update(['is_active'=>$cashActive]);
+        $before = $db->table('balances')->get()->getResultArray();
+        $result = (new \App\Services\StoreCashOperationService())->createDebtRepayment([
+            'store_id'=>1,'user_id'=>501,'amount'=>20,'channel'=>$channel,'request_key'=>'legacy-channel-validation-0001',
+        ],7,'STORE_SYSTEM');
+        $this->assertSame(400,$result['code']);
+        $this->assertSame($before,$db->table('balances')->get()->getResultArray());
+        foreach (['store_cash_movements','debt_cashbook_entries','audit_logs'] as $table)
+            $this->assertSame(0,$db->table($table)->countAllResults(),$table);
+    }
+
+    public static function electronicRepaymentAccounts(): array
+    {
+        return ['valid explicit'=>[false,'valid',200], 'valid legacy'=>[true,'valid',200],
+            'missing'=>[true,'missing',400], 'inactive method'=>[false,'inactive_method',400],
+            'inactive account'=>[false,'inactive_account',400], 'other store'=>[true,'other_store',400],
+            'other method'=>[true,'other_method',400]];
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('electronicRepaymentAccounts')]
+    public function testElectronicRepaymentChecksAccountOwnershipAndPreservesReceipt(bool $legacy,string $case,int $expected): void
+    {
+        $this->offeringSetup();
+        require_once APPPATH . 'Database/Migrations/2026-09-30-000002_AddStoreRepaymentReceipts.php';
+        (new \App\Database\Migrations\AddStoreRepaymentReceipts())->up();
+        $db=Database::connect(); $db->resetDataCache();
+        $this->seedDebtCustomer(501,'staff',1000,100,'1234',ibems_now()->format('Y-m-d H:i:s'));
+        $this->seedPaymentMethod('gcash',$case!=='inactive_method',ibems_now()->format('Y-m-d H:i:s'));
+        $this->seedPaymentMethod('bank',true,ibems_now()->format('Y-m-d H:i:s'));
+        $method=(int)$db->table('store_payment_methods')->where('code','gcash')->get()->getRow('id');
+        $bank=(int)$db->table('store_payment_methods')->where('code','bank')->get()->getRow('id');
+        $db->query('CREATE TABLE '.$db->prefixTable('payment_destination_accounts').' (id INTEGER PRIMARY KEY,store_id INTEGER,payment_method_id INTEGER,account_name TEXT,account_number TEXT,is_active INTEGER)');
+        $db->table('payment_destination_accounts')->insert(['id'=>1,'store_id'=>$case==='other_store'?2:1,
+            'payment_method_id'=>$case==='other_method'?$bank:$method,'account_name'=>'Synthetic GCash','account_number'=>'QA-ONLY','is_active'=>$case!=='inactive_account']);
+        $request=['store_id'=>1,'user_id'=>501,'amount'=>'20.50',
+            $legacy?'channel':'payment_method'=>'gcash','destination_account_id'=>$case==='missing'?0:1,
+            'request_key'=>'repayment-account-check-0001'];
+        $service=new \App\Services\StoreCashOperationService();
+        $result=$service->createDebtRepayment($request,7,'STORE_SYSTEM');
+        $this->assertSame($expected,$result['code']);
+        $this->assertSame($expected===200?79.5:100.0,(float)$db->table('balances')->where('user_id',501)->get()->getRow('current_debt'));
+        foreach(['store_cash_movements','debt_cashbook_entries','audit_logs','store_repayment_receipts'] as $table)
+            $this->assertSame($expected===200?1:0,$db->table($table)->countAllResults(),$table);
+        if($expected===200) {
+            $this->assertSame(1,$result['payload']['payment']['destination_account_id']);
+            $this->assertSame('ecash',$result['payload']['payment']['channel']);
+            $before=[]; foreach(['balances','store_cash_movements','debt_cashbook_entries','audit_logs','store_repayment_receipts'] as $table) $before[$table]=$db->table($table)->get()->getResultArray();
+            // Historical acknowledgement survives a later receiving-account disable.
+            $db->table('payment_destination_accounts')->where('id',1)->update(['is_active'=>false]);
+            $this->assertSame($result,$service->createDebtRepayment($request,7,'STORE_SYSTEM'));
+            foreach($before as $table=>$rows) $this->assertSame($rows,$db->table($table)->get()->getResultArray());
+        }
+    }
+
+    public function testRepaymentRetryReplaysOriginalResultAfterClosingAndRejectsChangedDetails(): void
+    {
+        $this->offeringSetup();
+        require_once APPPATH . 'Database/Migrations/2026-09-30-000002_AddStoreRepaymentReceipts.php';
+        (new \App\Database\Migrations\AddStoreRepaymentReceipts())->up();
+        $db = Database::connect(); $db->resetDataCache();
+        $this->seedDebtCustomer(501, 'staff', 1000, 100, '1234', ibems_now()->format('Y-m-d H:i:s'));
+        $service = new \App\Services\StoreCashOperationService();
+        $request = ['store_id' => 1, 'user_id' => 501, 'amount' => 20, 'channel' => 'cash',
+            'request_key' => 'repayment-intent-0001'];
+        $first = $service->createDebtRepayment($request, 7, 'STORE_SYSTEM');
+        $this->assertSame('success', $first['payload']['status']);
+        $this->assertSame($first, $service->createDebtRepayment($request, 7, 'STORE_SYSTEM'));
+        $this->assertSame(80.0, (float) $db->table('balances')->where('user_id', 501)->get()->getRow('current_debt'));
+        $db->table('store_day_sessions')->where('store_id', 1)->update(['status' => 'closed']);
+        $this->assertSame($first, $service->createDebtRepayment($request, 7, 'STORE_SYSTEM'));
+        $request['amount'] = 21;
+        $this->assertSame(409, $service->createDebtRepayment($request, 7, 'STORE_SYSTEM')['code']);
+        foreach (['store_cash_movements', 'debt_cashbook_entries', 'audit_logs', 'store_repayment_receipts'] as $table)
+            $this->assertSame(1, $db->table($table)->countAllResults(), $table);
+    }
+
+    public function testDefaultStoreRepaymentUsesTheResolvedStoreReceiptScope(): void
+    {
+        $this->offeringSetup();
+        require_once APPPATH . 'Database/Migrations/2026-09-30-000002_AddStoreRepaymentReceipts.php';
+        (new \App\Database\Migrations\AddStoreRepaymentReceipts())->up();
+        $db=Database::connect(); $db->resetDataCache();
+        $this->seedDebtCustomer(501,'staff',1000,100,'1234',ibems_now()->format('Y-m-d H:i:s'));
+        $request=['user_id'=>501,'amount'=>20,'payment_method'=>'cash','request_key'=>'default-store-repayment-0001'];
+        $service=new \App\Services\StoreCashOperationService();
+        $first=$service->createDebtRepayment($request,7,'STORE_SYSTEM');
+        $this->assertSame(200,$first['code']);
+        $this->assertSame(1,$first['payload']['payment']['store_id']);
+        $request['store_id']=0;
+        $this->assertSame($first,$service->createDebtRepayment($request,7,'STORE_SYSTEM'));
+        $request['store_id']=1;
+        $this->assertSame($first,$service->createDebtRepayment($request,7,'STORE_SYSTEM'));
+        $this->assertSame(80.0,(float)$db->table('balances')->where('user_id',501)->get()->getRow('current_debt'));
+        foreach(['store_cash_movements','debt_cashbook_entries','audit_logs','store_repayment_receipts'] as $table)
+            $this->assertSame(1,$db->table($table)->countAllResults(),$table);
+        $this->assertSame(hash('sha256','1:7:default-store-repayment-0001'),$db->table('store_repayment_receipts')->get()->getRow('request_key'));
+    }
+
+    public function testRepaymentReceiptFailureRollsBackBalanceCollectionLedgerAndAudit(): void
+    {
+        $this->offeringSetup();
+        require_once APPPATH . 'Database/Migrations/2026-09-30-000002_AddStoreRepaymentReceipts.php';
+        (new \App\Database\Migrations\AddStoreRepaymentReceipts())->up();
+        $db = Database::connect(); $db->resetDataCache();
+        $this->seedDebtCustomer(501, 'staff', 1000, 100, '1234', ibems_now()->format('Y-m-d H:i:s'));
+        $db->query('CREATE TRIGGER qa_receipt_fault BEFORE INSERT ON ' . $db->prefixTable('store_repayment_receipts')
+            . " BEGIN SELECT RAISE(ABORT, 'Synthetic receipt failure'); END");
+        $service = new \App\Services\StoreCashOperationService();
+        $request = ['store_id' => 1, 'user_id' => 501, 'amount' => 20, 'channel' => 'cash', 'request_key' => 'repayment-intent-0002'];
+        try {
+            $this->assertSame('error', $service->createDebtRepayment($request, 7, 'STORE_SYSTEM')['payload']['status']);
+            $this->assertSame(100.0, (float) $db->table('balances')->where('user_id', 501)->get()->getRow('current_debt'));
+            foreach (['store_cash_movements', 'debt_cashbook_entries', 'audit_logs', 'store_repayment_receipts'] as $table)
+                $this->assertSame(0, $db->table($table)->countAllResults());
+        } finally { $db->query('DROP TRIGGER qa_receipt_fault'); $db->resetTransStatus(); }
+        $first = $service->createDebtRepayment($request, 7, 'STORE_SYSTEM');
+        $this->assertSame('success', $first['payload']['status']);
+        $this->assertSame($first, $service->createDebtRepayment($request, 7, 'STORE_SYSTEM'));
+    }
+
+    public function testRepaymentRetryRequiresMigrationAndPreservesCurrentActorAuthority(): void
+    {
+        $this->offeringSetup();
+        $db = Database::connect();
+        $this->seedDebtCustomer(501, 'staff', 1000, 100, '1234', ibems_now()->format('Y-m-d H:i:s'));
+        $service = new \App\Services\StoreCashOperationService();
+        $request = ['store_id' => 1, 'user_id' => 501, 'amount' => 20, 'channel' => 'cash', 'request_key' => 'repayment-actor-scope-0001'];
+        $this->assertSame(503, $service->createDebtRepayment($request, 7, 'STORE_SYSTEM')['code']);
+        $this->assertSame(0, $db->table('store_cash_movements')->countAllResults());
+        $this->assertSame(100.0, (float) $db->table('balances')->where('user_id', 501)->get()->getRow('current_debt'));
+        require_once APPPATH . 'Database/Migrations/2026-09-30-000002_AddStoreRepaymentReceipts.php';
+        (new \App\Database\Migrations\AddStoreRepaymentReceipts())->up();
+        $db->resetDataCache();
+        $bad = $request; $bad['request_key'] = 'bad';
+        $this->assertSame(400, $service->createDebtRepayment($bad, 7, 'STORE_SYSTEM')['code']);
+        $first = $service->createDebtRepayment($request, 7, 'STORE_SYSTEM');
+        $this->assertSame('success', $first['payload']['status']);
+        $db->table('stores')->where('id', 1)->update(['officer_id' => 8]);
+        $this->assertSame(403, $service->createDebtRepayment($request, 7, 'STORE_SYSTEM')['code']);
+        $second = $service->createDebtRepayment($request, 8, 'STORE_SYSTEM');
+        $this->assertSame('success', $second['payload']['status']);
+        $this->assertNotSame($first['payload']['payment']['movement_id'], $second['payload']['payment']['movement_id']);
+        $this->assertSame(60.0, (float) $db->table('balances')->where('user_id', 501)->get()->getRow('current_debt'));
+        $this->assertSame(2, $db->table('store_repayment_receipts')->countAllResults());
+    }
+
+    #[\PHPUnit\Framework\Attributes\DataProvider('repaymentFailureTables')]
+    public function testRepaymentFailureRollsBackEveryFinancialRecordAndRetryReconciles(string $table, string $operation): void
+    {
+        $this->offeringSetup();
+        require_once APPPATH . 'Database/Migrations/2026-09-30-000002_AddStoreRepaymentReceipts.php';
+        (new \App\Database\Migrations\AddStoreRepaymentReceipts())->up();
+        Database::connect()->resetDataCache();
+        $this->seedDebtCustomer(501, 'staff', 1000, 100, '1234', ibems_now()->format('Y-m-d H:i:s'));
+        $db = Database::connect();
+        $state = static fn (): array => [
+            $db->table('balances')->orderBy('user_id')->get()->getResultArray(),
+            $db->table('store_cash_movements')->orderBy('id')->get()->getResultArray(),
+            $db->table('debt_cashbook_entries')->orderBy('id')->get()->getResultArray(),
+            $db->table('audit_logs')->orderBy('id')->get()->getResultArray(),
+            $db->table('store_repayment_receipts')->orderBy('request_key')->get()->getResultArray(),
+        ];
+        $before = $state();
+        $db->query('CREATE TRIGGER qa_repayment_fault BEFORE ' . $operation . ' ON ' . $db->prefixTable($table)
+            . " BEGIN SELECT RAISE(ABORT, 'Synthetic repayment failure'); END");
+        $service = new \App\Services\StoreCashOperationService();
+        $request = ['store_id' => 1, 'user_id' => 501, 'amount' => 60, 'channel' => 'cash', 'reference_no' => 'QA-60','request_key'=>'fault-repayment-intent-0001'];
+        try {
+            $this->assertSame('error', $service->createDebtRepayment($request, 7, 'STORE_SYSTEM')['payload']['status']);
+            $this->assertSame($before, $state());
+        } finally {
+            $db->query('DROP TRIGGER qa_repayment_fault');
+            $db->resetTransStatus();
+        }
+        $paid = $service->createDebtRepayment($request, 7, 'STORE_SYSTEM');
+        $this->assertSame('success', $paid['payload']['status']);
+        $after = $state();
+        $this->assertSame(40.0, (float) $after[0][0]['current_debt']);
+        $this->assertCount(1, $after[1]);
+        $this->assertCount(1, $after[2]);
+        $this->assertCount(1, $after[3]);
+        $this->assertCount(1, $after[4], 'A committed repayment requires its retry receipt.');
+        $this->assertSame(100.0, (float) $after[2][0]['debt_before']);
+        $this->assertSame(40.0, (float) $after[2][0]['debt_after']);
+        $this->assertSame((int) $after[1][0]['id'], (int) $after[2][0]['reference_id']);
+        $this->assertSame($paid, $service->createDebtRepayment($request, 7, 'STORE_SYSTEM'));
+        $this->assertSame($after, $state(), 'Replaying the committed intent changes no financial records.');
+        $request['request_key']='fault-repayment-distinct-0002';
+        $this->assertSame('error', $service->createDebtRepayment($request, 7, 'STORE_SYSTEM')['payload']['status']);
+        $this->assertSame($after, $state(), 'A payment exceeding the remaining debt must preserve all financial records.');
     }
 
     private function createPurchaseCardTable(): void

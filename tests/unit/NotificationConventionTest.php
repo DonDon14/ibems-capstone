@@ -39,7 +39,7 @@ class NotificationConventionTest extends CIUnitTestCase
     {
         $auditModel = (string) file_get_contents(APPPATH . 'Models/AuditLogModel.php');
         $this->assertStringContainsString("protected \$afterInsert = ['publishNotification'];", $auditModel);
-        $this->assertStringContainsString('NotificationService())->publishFromAudit', $auditModel);
+        $this->assertStringContainsString('NotificationService($this->db))->publishFromAudit', $auditModel);
     }
 
     public function testDeliveryTracksRetriesWithoutHardcodedCredentials(): void

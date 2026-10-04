@@ -72,7 +72,7 @@ function sadDataState(type, message, detail = "") {
         error: "bi bi-exclamation-circle",
         success: "bi bi-check-circle",
     };
-    return `<div class="data-state data-state--${safeType}" role="${safeType === "error" ? "alert" : "status"}" aria-live="polite">
+    return `<div class="data-state data-state--${safeType}" role="${safeType === "error" ? "alert" : "status"}" aria-live="${safeType === "error" ? "assertive" : "polite"}" aria-atomic="true">
         <i class="${icons[safeType]}" aria-hidden="true"></i>
         <div><strong>${sadEscape(message)}</strong>${detail ? `<small>${sadEscape(detail)}</small>` : ""}</div>
     </div>`;
@@ -156,18 +156,31 @@ function sadRenderReviews(reviews) {
     }).join("");
 }
 
+let sadDashboardSequence = 0;
+function sadDashboardState(type) {
+    for (const id of ["sad-assigned-stores", "sad-open-days", "sad-pending-reviews", "sad-today-sales"]) {
+        sadSetText(id, type === "loading" ? "Loading…" : "Unavailable");
+    }
+    sadSetText("sad-shortage-total", type === "loading" ? "Loading shortage exposure…" : "Shortage exposure unavailable");
+    for (const id of ["sad-pending-reviews-list", "sad-store-list"]) {
+        const panel = document.getElementById(id);
+        if (panel) panel.innerHTML = sadDataState(type, type === "loading" ? "Loading dashboard…" : "Dashboard could not be loaded", type === "loading" ? "Please wait." : "Refresh the page to try again.");
+    }
+}
 async function sadLoadDashboard() {
     const root = sadRoot();
     if (!root) return;
     const period = window.IbemsDashboardPeriod?.get() || "day";
+    const requestId = ++sadDashboardSequence;
+    sadDashboardState("loading");
     const dashboardUrl = new URL(root.getAttribute("data-dashboard-url") || "/store-admin/dashboard/data", window.location.origin);
     dashboardUrl.searchParams.set("period", period);
+    try {
     const response = await fetch(dashboardUrl);
     const data = await response.json().catch(() => ({}));
-    if ((window.IbemsDashboardPeriod?.get() || "day") !== period) return;
+    if (requestId !== sadDashboardSequence || (window.IbemsDashboardPeriod?.get() || "day") !== period) return;
     if (!response.ok || data.status !== "success") {
-        document.getElementById("sad-pending-reviews-list").innerHTML = sadDataState("error", "Variance reviews could not be loaded", "Refresh the page or check the server connection.");
-        document.getElementById("sad-store-list").innerHTML = sadDataState("error", "Assigned stores could not be loaded", "Refresh the page or check the server connection.");
+        sadDashboardState("error");
         return;
     }
 
@@ -180,6 +193,10 @@ async function sadLoadDashboard() {
     sadSetText("sad-shortage-total", `Shortage exposure: ${sadMoney(summary.pending_shortage_total || 0)}`);
     sadRenderReviews(data.pending_reviews || []);
     sadRenderStores(data.stores || []);
+    } catch (error) {
+        if (requestId !== sadDashboardSequence || (window.IbemsDashboardPeriod?.get() || "day") !== period) return;
+        sadDashboardState("error");
+    }
 }
 
 async function sadReviewVariance(sessionId, action) {

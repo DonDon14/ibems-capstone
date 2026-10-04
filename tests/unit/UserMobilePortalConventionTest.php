@@ -72,7 +72,8 @@ final class UserMobilePortalConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('data-label="Remarks"', $historyScript);
         $this->assertStringContainsString('data-label="Debt Before"', $deductionsScript);
         $this->assertStringContainsString('data-label="Debt After"', $deductionsScript);
-        $this->assertStringContainsString('data-label="Status"', $deductionsScript);
+        $this->assertStringContainsString('data-label="Not deducted"', $deductionsScript);
+        $this->assertStringContainsString('data-label="Result details"', $deductionsScript);
     }
 
     public function testPwaIsInstallableButDoesNotCacheUserFinancialData(): void

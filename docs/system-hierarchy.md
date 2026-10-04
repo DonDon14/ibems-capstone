@@ -1,48 +1,53 @@
 # IBEMS System Hierarchy
 
-This is the source reference for the external client document at `docs/client/IBEMS-System-Hierarchy.docx`. It is intentionally not a portal page.
+This is the current source reference for the external client document at `docs/client/IBEMS-System-Hierarchy.docx`. The client document must be regenerated and visually reviewed before it is treated as current. This is not a portal page.
 
 ```mermaid
 flowchart TD
-    ADMIN[Administrator<br/>System governance and school-wide oversight]
-    ACCT[Accounting Office<br/>Salary-grade profiles, dynamic credit, debt, deductions, settlements]
-    SUP[Store Supervisor<br/>Assigned-store review and variance handling]
-    STORE[Store Officer / Cashier<br/>POS, inventory, receipts, store-day custody]
-    USER[Employee / User<br/>Catalog, history, credit, deductions]
+    ADMIN[System Administrator<br/>Institution-wide configuration and audit]
+    HR[Human Resources<br/>Staff onboarding]
+    USER[Faculty / Staff / Student users<br/>Own account and history]
+    CASHHEAD[School Cashier Head<br/>Office-wide sales and inherited collecting functions]
+    COLLECT[Collecting Officer<br/>Daily sales and shared deductions]
+    ACCTHEAD[Accounting Head / Bookkeeper<br/>Accounting-wide oversight]
+    PAYROLL[Payroll Clerk<br/>Shared deductions]
+    BE[Business Enterprise Director<br/>Store report review and finance reports]
+    SUP[Store Supervisor<br/>Assigned-store operations and report submission]
+    STORECASH[Store Cashier<br/>Assigned-store POS and store-day custody]
 
-    ADMIN --> ACCT
-    ADMIN --> SUP
-    ADMIN --> STORE
+    ADMIN --> HR
     ADMIN --> USER
-    SUP --> STORE
-    STORE --> USER
+    ADMIN --> CASHHEAD
+    ADMIN --> ACCTHEAD
+    ADMIN --> BE
+    CASHHEAD --> COLLECT
+    ACCTHEAD --> PAYROLL
+    BE --> SUP
+    SUP --> STORECASH
 ```
 
-## Connected transaction flow
+The arrows describe the business hierarchy, not automatic permission inheritance. The only confirmed inheritance is Cashier Head access to the Collecting Officer's functions. The School Cashier Office is separate from the Store Cashier and Store Supervisor. A user's active role, not their position in this diagram, determines route access; store assignments further constrain store routes. System Administrator actions that affect financial records require documented, audited authority rather than implicit approval.
+
+## Connected transaction and report flow
 
 ```mermaid
 flowchart LR
-    CATALOG[Active store and product catalog]
-    POS[POS transaction and payment allocation]
-    HISTORY[Employee history and per-store totals]
-    DEBT[Credit balance and debt cashbook]
-    PAYROLL[Accounting deduction workflow]
-    AUDIT[Supervisor and administrator review]
+    POS[Store Cashier sale and payment]
+    DEBT[Employee or department debt ledger]
+    DEDUCT[Shared deduction workflow<br/>Collecting Officer / Payroll Clerk / Cashier Head]
+    CLOSE[Store Cashier closes store day]
+    SUBMIT[Assigned Store Supervisor submits snapshot]
+    REVIEW[BE Director reviews]
+    RECEIVE[School Cashier Office receives]
+    COPY[Accounting receives furnished copy]
 
-    CATALOG --> POS
-    POS --> HISTORY
     POS --> DEBT
-    DEBT --> PAYROLL
-    POS --> AUDIT
-    PAYROLL --> AUDIT
+    DEBT --> DEDUCT
+    POS --> CLOSE
+    CLOSE --> SUBMIT
+    SUBMIT --> REVIEW
+    REVIEW --> RECEIVE
+    REVIEW --> COPY
 ```
 
-## Responsibility rules
-
-- Administrator: users, stores, products, school-wide operations, and audit records.
-- Accounting Office: employee salary-grade profiles, policy-derived credit balances, deductions, settlements, and debt investigations.
-- Store Supervisor: assigned-store review, store-day variances, supporting evidence, and handoffs.
-- Store Officer / Cashier: POS transactions, products, inventory, receipts, repayments, and store-day custody.
-- Employee / User: active store catalog, personal transactions, receipts, credit status, and deduction history.
-
-The active role controls authorization. Older transactions and inactive-store names remain readable for historical integrity.
+Partial deductions remain supported. Both the Collecting Officer and Payroll Clerk can confirm an actual deduction through the same service; preparation alone does not reduce debt. For exact route permissions and role scope, use `docs/ROLE_PERMISSION_MATRIX.md`.

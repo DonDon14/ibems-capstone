@@ -65,7 +65,7 @@ class StoreDaySessionModel extends Model
 
     public function openDay(int $storeId, string $businessDate, float $openingCash, float $openingEcash, int $openedBy, string $note = ''): array
     {
-        $now = date('Y-m-d H:i:s');
+        $now = ibems_now()->format('Y-m-d H:i:s');
         $payload = [
             'store_id' => $storeId,
             'business_date' => $businessDate,
@@ -107,7 +107,7 @@ class StoreDaySessionModel extends Model
 
     public function reopenDay(int $sessionId, int $openedBy): array
     {
-        $now = date('Y-m-d H:i:s');
+        $now = ibems_now()->format('Y-m-d H:i:s');
         $this->update($sessionId, [
             'status' => 'open',
             'opened_by' => $openedBy > 0 ? $openedBy : null,

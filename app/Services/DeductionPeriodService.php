@@ -36,6 +36,12 @@ class DeductionPeriodService
         if ($dateEnd < $dateStart) {
             return $this->error('End date cannot be before start date.');
         }
+        if (trim((string) ($input['expected_processing_date'] ?? '')) !== '' && !$expectedDate) {
+            return $this->error('Expected processing date must use YYYY-MM-DD format.');
+        }
+        if (trim((string) ($input['preparation_deadline'] ?? '')) !== '' && !$deadline) {
+            return $this->error('Preparation deadline must use YYYY-MM-DD format.');
+        }
         $periodCodeBase = 'PAY-' . $dateStart->format('Ymd') . '-' . $dateEnd->format('Ymd');
         $label = $this->periodLabel($dateStart, $dateEnd);
         if ($expectedDate && $expectedDate < $dateStart) {
@@ -65,7 +71,7 @@ class DeductionPeriodService
             $suffix++;
         }
 
-        $now = date('Y-m-d H:i:s');
+        $now = ibems_now()->format('Y-m-d H:i:s');
         $periodId = $model->insert([
             'period_code' => $periodCode,
             'label' => $label,
@@ -94,9 +100,11 @@ class DeductionPeriodService
 
     private function date(string $value): ?DateTimeImmutable
     {
-        $date = DateTimeImmutable::createFromFormat('!Y-m-d', trim($value));
+        $value = trim($value);
+        $date = DateTimeImmutable::createFromFormat('!Y-m-d', $value);
         $errors = DateTimeImmutable::getLastErrors();
-        if (!$date || (is_array($errors) && ($errors['warning_count'] > 0 || $errors['error_count'] > 0))) {
+        if (!$date || $date->format('Y-m-d') !== $value
+            || (is_array($errors) && ($errors['warning_count'] > 0 || $errors['error_count'] > 0))) {
             return null;
         }
 

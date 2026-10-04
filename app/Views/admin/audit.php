@@ -1,11 +1,12 @@
 <?= $this->extend('layouts/admin') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/admin-overview.css') ?>?v=20260824a">
+<link rel="stylesheet" href="<?= base_url('assets/css/admin-overview.css') ?>?v=20261004-variance-feedback">
+<link rel="stylesheet" href="<?= base_url('assets/css/admin-audit.css') ?>?v=20261004-list-states">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
-<section class="admin-overview-shell space-y-5">
+<section class="admin-overview-shell admin-audit-page space-y-5">
     <?= view('components/page_header', [
         'eyebrow' => 'System accountability',
         'title' => 'Audit log',
@@ -14,10 +15,10 @@
     ]) ?>
 
     <div class="summary-grid grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        <?= view('components/stat_card', ['title' => 'Total Events', 'value' => '0', 'valueId' => 'audit-total-events', 'icon' => 'bi bi-journal-text', 'tone' => 'finance']) ?>
-        <?= view('components/stat_card', ['title' => 'Today', 'value' => '0', 'valueId' => 'audit-today-events', 'icon' => 'bi bi-calendar-check', 'tone' => 'sales']) ?>
-        <?= view('components/stat_card', ['title' => 'Actors', 'value' => '0', 'valueId' => 'audit-actor-count', 'icon' => 'bi bi-person-badge', 'tone' => 'users']) ?>
-        <?= view('components/stat_card', ['title' => 'Action Types', 'value' => '0', 'valueId' => 'audit-action-count', 'icon' => 'bi bi-diagram-3', 'tone' => 'alerts']) ?>
+        <?= view('components/stat_card', ['title' => 'Total Events', 'value' => 'Loading…', 'valueId' => 'audit-total-events', 'icon' => 'bi bi-journal-text', 'tone' => 'finance']) ?>
+        <?= view('components/stat_card', ['title' => 'Today', 'value' => 'Loading…', 'valueId' => 'audit-today-events', 'icon' => 'bi bi-calendar-check', 'tone' => 'sales']) ?>
+        <?= view('components/stat_card', ['title' => 'Actors', 'value' => 'Loading…', 'valueId' => 'audit-actor-count', 'icon' => 'bi bi-person-badge', 'tone' => 'users']) ?>
+        <?= view('components/stat_card', ['title' => 'Action Types', 'value' => 'Loading…', 'valueId' => 'audit-action-count', 'icon' => 'bi bi-diagram-3', 'tone' => 'alerts']) ?>
     </div>
 
     <div class="overview-filter audit-filter-panel rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" data-compact-filters>
@@ -80,10 +81,10 @@
         </div>
     </div>
 
-    <p id="audit-result" class="stores-result text-sm font-semibold"></p>
-    <p id="audit-count-text" class="uv-count-text text-sm text-slate-500">Showing 0 events</p>
+    <p id="audit-result" class="stores-result text-sm font-semibold" role="status" aria-live="polite"></p>
+    <p id="audit-count-text" class="uv-count-text text-sm text-slate-500" role="status">Loading events…</p>
 
-    <div class="overview-table-wrap rounded-2xl border border-slate-200 bg-white p-2 shadow-sm">
+    <div id="audit-table-region" class="overview-table-wrap rounded-2xl border border-slate-200 bg-white p-2 shadow-sm" tabindex="0" role="region" aria-label="Audit event records">
         <table class="table audit-table">
             <thead>
                 <tr>
@@ -116,11 +117,11 @@
             </div>
             <button id="audit-view-close" type="button" class="admin-modal-close" aria-label="Close audit event">x</button>
         </div>
-        <div id="audit-view-content" class="app-inset-modal-scroll audit-detail-grid"></div>
+        <div id="audit-view-content" class="app-inset-modal-scroll audit-detail-grid" tabindex="0" role="region" aria-label="Audit event details and payload"></div>
     </div>
 </div>
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/admin-audit.js') ?>?v=20260824a"></script>
+<script src="<?= base_url('assets/js/admin-audit.js') ?>?v=20261004-list-feedback"></script>
 <?= $this->endSection() ?>

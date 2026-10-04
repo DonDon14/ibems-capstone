@@ -203,6 +203,12 @@ class Database extends Config
             $this->default['username'] = (string) getenv('IBEMS_DATABASE_USERNAME');
             $this->default['password'] = (string) getenv('IBEMS_DATABASE_PASSWORD');
             $this->default['DBDriver'] = $runtimeDriver;
+            if ($runtimeDriver === 'SQLite3') {
+                // Give competing local financial writers a bounded opportunity
+                // to finish instead of failing immediately with SQLITE_BUSY.
+                $this->default['busyTimeout'] ??= 5000;
+                $this->default['foreignKeys'] ??= true;
+            }
             $this->default['port'] = (int) getenv('IBEMS_DATABASE_PORT');
             $this->default['schema'] = (string) (getenv('IBEMS_DATABASE_SCHEMA') ?: 'public');
             $this->default['sslmode'] = (string) (getenv('IBEMS_DATABASE_SSLMODE') ?: 'require');

@@ -23,6 +23,7 @@ class TransactionService
     public function createTransaction(array $request, int $actorId, string $role): array
     {
         $validation = Services::validation();
+        $validation->reset();
         $validation->setRules([
             'store_id' => 'required|is_natural_no_zero',
             'payment_method' => 'permit_empty|max_length[50]',
@@ -62,7 +63,7 @@ class TransactionService
             return $this->error('At least one transaction item is required.');
         }
 
-        $itemValidation = Services::validation();
+        $itemValidation = Services::validation(null, false);
         $itemValidation->setRules([
             'product_id' => 'required|is_natural_no_zero',
             'qty' => 'required|is_natural_no_zero',
@@ -82,6 +83,20 @@ class TransactionService
         $storeModel = new StoreModel();
         if (!$storeModel->canUserAccessStore($actorId, $role, $storeId)) {
             return $this->error('You cannot create transactions for this store.', 403);
+        }
+
+        $db = Database::connect();
+        $requestKey = trim((string) ($request['request_key'] ?? ''));
+        $requestHash = null;
+        if ($requestKey !== '') {
+            if (!preg_match('/^[A-Za-z0-9_-]{16,100}$/D', $requestKey)) return $this->error('Invalid checkout request key.');
+            if (!$db->tableExists('pos_request_receipts')) return $this->error('Apply the checkout retry migration before processing this request.', 503);
+            $requestKey = hash('sha256', $storeId . ':' . $actorId . ':' . $requestKey);
+            $hashInput = $request;
+            unset($hashInput['debt_pin'], $hashInput['department_pin'], $hashInput['request_key']);
+            $requestHash = hash('sha256', json_encode($hashInput, JSON_THROW_ON_ERROR));
+            $replay = $this->requestReceipt($requestKey, $requestHash);
+            if ($replay !== null) return $replay;
         }
 
         $daySessionModel = new StoreDaySessionModel();
@@ -121,7 +136,21 @@ class TransactionService
                 return $this->error('Product is inactive: ' . ($product['name'] ?? ('#' . $productId)));
             }
 
+            try {
+                ProductBehaviorService::assertStoreAllows($storeId, $product);
+            } catch (\InvalidArgumentException $e) {
+                return $this->error($e->getMessage());
+            }
             $price = (float) ($product['price'] ?? 0);
+            if (($product['item_type'] ?? '') === 'prepared_item' && Database::connect()->tableExists('daily_food_offerings')) {
+                $offering = StoreOfferingService::foodForSale($storeId, (int) $productId);
+                if (!$offering || (int) $offering['capacity'] - (int) $offering['sold'] < $qty) return $this->error('This food is not available in today’s menu or has insufficient servings.');
+                $price = (int) $offering['price_cents'] / 100;
+                if (!empty($offering['snapshot_json'])) {
+                    $saved=json_decode($offering['snapshot_json'],true);
+                    foreach (['name','variant_label','unit_code','image_url','category'] as $field) if (isset($saved[$field])) $product[$field]=$saved[$field];
+                }
+            }
             $lineTotal = $price * $qty;
             $totalAmount += $lineTotal;
 
@@ -155,6 +184,14 @@ class TransactionService
         $debtAmount = (float) ($debtLine['amount'] ?? 0);
         $cashReceived = $cashLine['cash_received'] ?? null;
         $changeDue = $cashLine['change_due'] ?? null;
+
+        $internalCustomer = $customer !== null
+            && in_array($customerType, ['faculty', 'staff', 'student'], true);
+        $departmentCharge = $debtLine !== null && $debtAccountType === 'department';
+        if (ProductBehaviorService::requiresInternalCustomer($storeId)
+            && !$internalCustomer && !$departmentCharge) {
+            return $this->error('Water-station sales require a selected university customer or an authorized department charge.');
+        }
 
         $balanceModel = new BalanceModel();
         $debtCashbookModel = new DebtCashbookEntryModel();
@@ -234,7 +271,34 @@ class TransactionService
         $db = Database::connect();
         $db->transBegin();
 
+        try {
+            ProductBehaviorService::lockStore($db, $storeId);
+            if ($requestKey !== '') {
+                $replay = $this->requestReceipt($requestKey, $requestHash);
+                if ($replay !== null) {
+                    $db->transRollback();
+                    return $replay;
+                }
+            }
+            $lockedSession = $daySessionModel->getToday($storeId);
+            if (!$lockedSession || (string) ($lockedSession['status'] ?? '') !== 'open') {
+                throw new \RuntimeException('Store day is not open. Open today\'s store session before creating transactions.');
+            }
+            if (ProductBehaviorService::requiresInternalCustomer($storeId)
+                && !$internalCustomer && !$departmentCharge) {
+                throw new \InvalidArgumentException('Water-station sales require a selected university customer or an authorized department charge.');
+            }
+            foreach ($productSnapshot as $snapshot) {
+                ProductBehaviorService::assertStoreAllows($storeId, $snapshot['product']);
+            }
+            StoreOfferingService::checkout($request, $storeId, $productSnapshot);
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            return $this->error($e->getMessage());
+        }
+
         if ($purchaseCardAuthorizationRequired) {
+            try {
             $cardAuthorization = $purchaseCardService->authorizeAndConsume(
                 (int) $customerUserId,
                 $actorId,
@@ -245,10 +309,14 @@ class TransactionService
                 $db->transRollback();
                 return $cardAuthorization;
             }
+            } catch (\Throwable $exception) {
+                $db->transRollback();
+                return $this->error('Unable to authorize the employee purchase card. Retry the original purchase.', 500);
+            }
         }
 
         $clientTxnId = uniqid('txn_', true);
-        $createdAt = date('Y-m-d H:i:s');
+        $createdAt = ibems_now()->format('Y-m-d H:i:s');
 
         try {
             if ($debtLine !== null && $debtAccountType === 'employee') {
@@ -277,6 +345,9 @@ class TransactionService
 
             if (!$txnId) {
                 throw new \RuntimeException('Failed to create transaction.');
+            }
+            if (!empty($request['rental_booking_id'])) {
+                $db->table('rental_bookings')->where(['id' => (int) $request['rental_booking_id'], 'store_id' => $storeId])->set('version', 'version + 1', false)->update(['transaction_id' => (int) $txnId]);
             }
 
             foreach ($supportsPaymentLines ? $paymentLines : [] as $paymentLine) {
@@ -424,6 +495,16 @@ class TransactionService
                 );
             }
 
+            $response = [
+                'status'=>'success', 'transaction_id'=>(int)$txnId, 'client_txn_id'=>$clientTxnId,
+                'created_at'=>$createdAt, 'total_amount'=>$totalAmount, 'cash_received'=>$cashReceived,
+                'change_due'=>$changeDue, 'payments'=>$paymentLines, 'code'=>200,
+            ];
+            if ($requestKey !== '' && !$db->table('pos_request_receipts')->insert([
+                'request_key'=>$requestKey, 'request_hash'=>$requestHash, 'transaction_id'=>(int)$txnId,
+                'response_json'=>json_encode($response, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION), 'created_at'=>$createdAt,
+            ])) throw new \RuntimeException('Checkout retry receipt could not be saved.');
+
             if (!$db->transStatus()) {
                 throw new \RuntimeException('Transaction failed.');
             }
@@ -434,17 +515,15 @@ class TransactionService
             return $this->error($e->getMessage() !== '' ? $e->getMessage() : 'Transaction failed.');
         }
 
-        return [
-            'status' => 'success',
-            'transaction_id' => (int) $txnId,
-            'client_txn_id' => $clientTxnId,
-            'created_at' => $createdAt,
-            'total_amount' => $totalAmount,
-            'cash_received' => $cashReceived,
-            'change_due' => $changeDue,
-            'payments' => $paymentLines,
-            'code' => 200,
-        ];
+        return $response;
+    }
+
+    private function requestReceipt(string $key, string $hash): ?array
+    {
+        $row = Database::connect()->table('pos_request_receipts')->where('request_key', $key)->get()->getRowArray();
+        if ($row === null) return null;
+        if (!hash_equals($row['request_hash'], $hash)) return $this->error('This checkout request key was already used with different sale details.', 409);
+        return json_decode($row['response_json'], true, 512, JSON_THROW_ON_ERROR);
     }
 
     private function normalizePaymentLines(

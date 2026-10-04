@@ -14,20 +14,19 @@ final class AccountingFinancialProfileService
         $scheduleId = (int) ($request['salary_schedule_id'] ?? 0);
         $employmentType = SalaryCreditPolicy::normalizeEmploymentType((string) ($request['employment_type'] ?? ''));
         $salaryGrade = trim((string) ($request['salary_grade'] ?? ''));
-        $salaryStep = (int) ($request['salary_step'] ?? 0);
+        $salaryStep = SalaryCreditPolicy::parseSalaryStep($request['salary_step'] ?? null);
         $effectiveDate = trim((string) ($request['salary_effective_date'] ?? ''));
         $creditPercentage = array_key_exists('credit_percentage', $request)
-            ? (float) $request['credit_percentage']
+            ? SalaryCreditPolicy::parseCreditPercentage($request['credit_percentage'])
             : SalaryCreditPolicy::percentageFromRate(SalaryCreditPolicy::DEFAULT_CREDIT_RATE);
         $reason = trim((string) ($request['reason'] ?? ''));
 
         if ($userId <= 0 || $scheduleId <= 0 || !in_array($employmentType, SalaryCreditPolicy::EMPLOYMENT_TYPES, true)
-            || $salaryGrade === '' || $salaryStep < 1 || $salaryStep > 8
+            || $salaryGrade === '' || $salaryStep === null
             || !SalaryCreditPolicy::isValidEffectiveDate($effectiveDate)
-            || !SalaryCreditPolicy::isValidCreditPercentage($creditPercentage) || $reason === '') {
+            || $creditPercentage === null || $reason === '') {
             return $this->error(400, 'Salary schedule, grade, step, employment type, effective date, credit percentage, and reason are required.');
         }
-
         foreach (['employment_type', 'salary_grade', 'salary_step', 'salary_effective_date', 'salary_schedule_id'] as $field) {
             if (!$db->fieldExists($field, 'users')) {
                 return $this->error(503, 'Dynamic salary-grade setup is unavailable until the latest database migration is applied.');
@@ -46,7 +45,14 @@ final class AccountingFinancialProfileService
             return $this->error(400, 'The effective date must fall within the selected salary schedule.');
         }
 
-        $salary = (float) $resolvedRate['monthly_salary'];
+        $salaryInput = $request['monthly_salary'] ?? null;
+        $salary = $salaryInput === null || trim((string) $salaryInput) === ''
+            ? (float) $resolvedRate['monthly_salary']
+            : SalaryCreditPolicy::parseMonthlySalary($salaryInput);
+        if ($salary === null) {
+            return $this->error(400, 'Monthly salary must be a positive amount with at most two decimal places.');
+        }
+        $salaryOverride = abs($salary - (float) $resolvedRate['monthly_salary']) >= 0.005;
         $creditRate = SalaryCreditPolicy::rateFromPercentage($creditPercentage);
         $creditLimit = SalaryCreditPolicy::creditLimit($salary, $creditRate);
         $current = $db->table('users u')
@@ -62,6 +68,21 @@ final class AccountingFinancialProfileService
             return $this->error(400, 'Only active Faculty and Staff can have an employee financial profile.');
         }
 
+        if (SalaryCreditPolicy::isFutureEffectiveDate($effectiveDate)) {
+            return (new ScheduledSalaryProfileService())->schedule($db, $userId, [
+                'effective_date' => $effectiveDate,
+                'employment_type' => $employmentType,
+                'schedule_id' => $scheduleId,
+                'schedule_code' => $resolvedRate['schedule_code'],
+                'salary_grade_label' => $resolvedRate['salary_grade_label'],
+                'salary_step' => $salaryStep,
+                'schedule_monthly_salary' => (float) $resolvedRate['monthly_salary'],
+                'monthly_salary' => $salary,
+                'credit_rate' => $creditRate,
+                'credit_limit' => $creditLimit,
+            ], $actorId, $reason);
+        }
+
         $wasConfigured = $current['balance_user_id'] !== null;
         $beforeSalary = (float) ($current['base_salary'] ?? 0);
         $beforeLimit = (float) ($current['credit_limit'] ?? 0);
@@ -73,7 +94,7 @@ final class AccountingFinancialProfileService
             'salary_effective_date' => $current['salary_effective_date'] ?? null,
             'salary_schedule_id' => $current['salary_schedule_id'] ?? null,
         ];
-        $now = date('Y-m-d H:i:s');
+        $now = ibems_now()->format('Y-m-d H:i:s');
 
         $db->transException(true)->transStart();
         try {
@@ -100,7 +121,7 @@ final class AccountingFinancialProfileService
                     'updated_at' => $now,
                 ]);
             }
-            (new AuditLogModel())->insert([
+            if (!(new AuditLogModel($db))->insert([
                 'actor_id' => $actorId,
                 'action' => 'ACCOUNTING_UPDATE_FINANCIAL_PROFILE',
                 'entity' => 'balances',
@@ -108,6 +129,8 @@ final class AccountingFinancialProfileService
                 'payload_json' => json_encode([
                     'previous_base_salary' => $beforeSalary,
                     'new_base_salary' => $salary,
+                    'schedule_monthly_salary' => (float) $resolvedRate['monthly_salary'],
+                    'salary_override' => $salaryOverride,
                     'previous_credit_limit' => $beforeLimit,
                     'new_credit_limit' => $creditLimit,
                     'previous_salary_profile' => $beforeProfile,
@@ -126,7 +149,9 @@ final class AccountingFinancialProfileService
                     'financial_profile_created' => !$wasConfigured,
                 ]),
                 'created_at' => $now,
-            ]);
+            ])) {
+                throw new \RuntimeException('Financial profile audit could not be recorded.');
+            }
             $db->transComplete();
         } catch (\Throwable) {
             $db->transRollback();
@@ -140,6 +165,8 @@ final class AccountingFinancialProfileService
                 'user_id' => $userId,
                 'previous_base_salary' => $beforeSalary,
                 'new_base_salary' => $salary,
+                'schedule_monthly_salary' => (float) $resolvedRate['monthly_salary'],
+                'salary_override' => $salaryOverride,
                 'previous_credit_limit' => $beforeLimit,
                 'new_credit_limit' => $creditLimit,
                 'employment_type' => $employmentType,

@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/user') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/user-portal.css') ?>?v=20260824a" data-user-page-style>
+<link rel="stylesheet" href="<?= base_url('assets/css/user-portal.css') ?>?v=20261004-history-totals" data-user-page-style>
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -35,32 +35,32 @@
                     <i class="bi bi-speedometer2"></i>
                 </span>
             </div>
-            <strong id="u-credit-used-percent">0%</strong>
-            <small id="u-credit-used-amount">Used: PHP 0.00 of PHP 0.00</small>
+            <strong id="u-credit-used-percent">Loading…</strong>
+            <small id="u-credit-used-amount">Loading credit usage…</small>
             <div class="credit-meter-track" aria-hidden="true">
                 <i id="u-credit-meter-fill" class="credit-meter-fill"></i>
             </div>
-            <small id="u-credit-meter-status">Remaining: PHP 0.00</small>
+            <small id="u-credit-meter-status">Loading available credit…</small>
         </article>
     </div>
 
     <div class="dashboard-grid">
-        <?= view('components/stat_card', ['title' => 'Credit Limit', 'value' => 'PHP 0.00', 'valueId' => 'u-credit-limit', 'icon' => 'bi bi-wallet2', 'tone' => 'finance']) ?>
-        <?= view('components/stat_card', ['title' => 'Current Debt', 'value' => 'PHP 0.00', 'valueId' => 'u-current-debt', 'icon' => 'bi bi-credit-card-2-front', 'tone' => 'debt']) ?>
-        <?= view('components/stat_card', ['title' => 'Available Credit', 'value' => 'PHP 0.00', 'valueId' => 'u-available-credit', 'icon' => 'bi bi-cash-coin', 'tone' => 'sales']) ?>
-        <?= view('components/stat_card', ['title' => 'Period Purchases', 'value' => 'PHP 0.00', 'valueId' => 'u-total-spent', 'icon' => 'bi bi-bag-check', 'tone' => 'finance']) ?>
+        <?= view('components/stat_card', ['title' => 'Credit Limit', 'value' => 'Loading…', 'valueId' => 'u-credit-limit', 'icon' => 'bi bi-wallet2', 'tone' => 'finance']) ?>
+        <?= view('components/stat_card', ['title' => 'Current Debt', 'value' => 'Loading…', 'valueId' => 'u-current-debt', 'icon' => 'bi bi-credit-card-2-front', 'tone' => 'debt']) ?>
+        <?= view('components/stat_card', ['title' => 'Available Credit', 'value' => 'Loading…', 'valueId' => 'u-available-credit', 'icon' => 'bi bi-cash-coin', 'tone' => 'sales']) ?>
+        <?= view('components/stat_card', ['title' => 'Period Purchases', 'value' => 'Loading…', 'valueId' => 'u-total-spent', 'icon' => 'bi bi-bag-check', 'tone' => 'finance']) ?>
     </div>
 
     <div class="dashboard-grid dashboard-grid-three">
-        <?= view('components/stat_card', ['title' => 'Period Debt Purchases', 'value' => 'PHP 0.00', 'valueId' => 'u-debt-added-total', 'icon' => 'bi bi-plus-circle', 'tone' => 'warning']) ?>
-        <?= view('components/stat_card', ['title' => 'Period Deductions', 'value' => 'PHP 0.00', 'valueId' => 'u-debt-deducted-total', 'icon' => 'bi bi-dash-circle', 'tone' => 'debt']) ?>
-        <?= view('components/stat_card', ['title' => 'Period Transactions', 'value' => '0', 'valueId' => 'u-txn-count', 'icon' => 'bi bi-receipt-cutoff', 'tone' => 'users']) ?>
+        <?= view('components/stat_card', ['title' => 'Period Debt Purchases', 'value' => 'Loading…', 'valueId' => 'u-debt-added-total', 'icon' => 'bi bi-plus-circle', 'tone' => 'warning']) ?>
+        <?= view('components/stat_card', ['title' => 'Period Deductions', 'value' => 'Loading…', 'valueId' => 'u-debt-deducted-total', 'icon' => 'bi bi-dash-circle', 'tone' => 'debt']) ?>
+        <?= view('components/stat_card', ['title' => 'Period Transactions', 'value' => 'Loading…', 'valueId' => 'u-txn-count', 'icon' => 'bi bi-receipt-cutoff', 'tone' => 'users']) ?>
     </div>
 
     <div class="dash-panels">
         <article class="dash-panel">
             <h4><i class="bi bi-graph-up-arrow"></i> Spending Trend</h4>
-            <p>Daily purchases across all stores.</p>
+            <p>Purchases across all stores in the selected period.</p>
             <div class="dash-chart-wrap user-chart-wrap">
                 <canvas id="u-trend-chart" class="is-hidden" aria-label="Spending trend for the selected dashboard period" role="img"></canvas>
                 <div id="u-trend-chart-state" class="user-chart-state" role="status" aria-live="polite">
@@ -100,6 +100,6 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" data-user-page-script data-user-page-once></script>
-<script src="<?= base_url('assets/js/user-dashboard.js') ?>?v=20260902a" data-user-page-script></script>
+<script src="<?= base_url('assets/vendor/chart.js/chart.umd.js') ?>" data-user-page-script data-user-page-once></script>
+<script src="<?= base_url('assets/js/user-dashboard.js') ?>?v=20261002-trend-loading" data-user-page-script></script>
 <?= $this->endSection() ?>

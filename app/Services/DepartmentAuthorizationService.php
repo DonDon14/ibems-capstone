@@ -100,6 +100,36 @@ class DepartmentAuthorizationService
             return $this->error('The selected approver is not the active head of this department.', 403);
         }
 
+        try {
+            if (!$this->db->transBegin()) {
+                throw new RuntimeException('Unable to start department PIN authorization.');
+            }
+
+            // A write before the first PIN-state read serializes attempts for this
+            // approver. It takes a row lock on MySQL/PostgreSQL and a writer lock
+            // on SQLite, avoiding stale snapshots and lost failed-attempt counts.
+            if (!$this->db->table('department_authorization_pins')
+                ->where('user_id', $approverId)
+                ->set('failed_attempts', 'failed_attempts', false)
+                ->update()) {
+                throw new RuntimeException('Unable to lock department PIN authorization.');
+            }
+
+            $result = $this->authorizeLocked($departmentId, $approverId, $pin, $actorId, $storeId, $amount);
+            if (!$this->db->transStatus() || !$this->db->transCommit()) {
+                throw new RuntimeException('Unable to save department PIN authorization.');
+            }
+
+            return $result;
+        } catch (Throwable $exception) {
+            $this->db->transRollback();
+            log_message('error', 'Department PIN authorization failed: {message}', ['message' => $exception->getMessage()]);
+            return $this->error('Department approval is temporarily unavailable. Please try again.', 503);
+        }
+    }
+
+    private function authorizeLocked(int $departmentId, int $approverId, string $pin, int $actorId, int $storeId, float $amount): array
+    {
         $state = $this->db->table('department_authorization_pins')->where('user_id', $approverId)->get()->getRowArray();
         if (!$state || trim((string) ($state['pin_hash'] ?? '')) === '') {
             return $this->error('The selected approver has not set a department approval PIN.', 409);
@@ -160,7 +190,7 @@ class DepartmentAuthorizationService
     private function audit(string $action, int $departmentId, int $actorId, int $storeId, float $amount, array $extra): void
     {
         $payload = array_merge(['department_id' => $departmentId, 'store_id' => $storeId, 'amount' => $amount], $extra);
-        if (!(new AuditLogModel())->insert([
+        if (!(new AuditLogModel($this->db))->insert([
             'actor_id' => $actorId > 0 ? $actorId : null,
             'action' => $action,
             'entity' => $departmentId > 0 ? 'departments' : 'users',

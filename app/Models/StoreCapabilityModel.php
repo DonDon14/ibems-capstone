@@ -21,7 +21,7 @@ class StoreCapabilityModel extends Model
 
     public function syncForStore(int $storeId, array $capabilities): void
     {
-        $now = date('Y-m-d H:i:s');
+        $now = ibems_now()->format('Y-m-d H:i:s');
         $this->db->table($this->table)->where('store_id', $storeId)->delete();
         foreach ($capabilities as $capability) {
             $this->db->table($this->table)->insert([

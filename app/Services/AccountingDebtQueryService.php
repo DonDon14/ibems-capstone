@@ -90,9 +90,10 @@ final class AccountingDebtQueryService
     /** @return list<array<string, mixed>> */
     public function history(BaseConnection $db, int $userId, int $limit): array
     {
-        $rows = $db->table('audit_logs al')
+        $query = $db->table('audit_logs al')
             ->select('al.id, al.created_at, al.action, al.payload_json, u.name AS actor_name')
             ->join('users u', 'u.id = al.actor_id', 'left')
+            ->groupStart()
             ->where('al.entity', 'balances')
             ->where('al.entity_id', $userId)
             ->whereIn('al.action', [
@@ -102,7 +103,19 @@ final class AccountingDebtQueryService
                 'ACCOUNTING_UPDATE_FINANCIAL_PROFILE',
                 'STORE_DEBT_REPAYMENT',
             ])
-            ->orderBy('al.id', 'DESC')
+            ->groupEnd();
+        if ($db->tableExists('scheduled_salary_profiles')) {
+            $query->orGroupStart()
+                ->where('al.entity', 'scheduled_salary_profiles')
+                ->whereIn('al.entity_id', $db->table('scheduled_salary_profiles')->select('id')->where('user_id', $userId))
+                ->whereIn('al.action', [
+                    'ACCOUNTING_SCHEDULE_FINANCIAL_PROFILE',
+                    'ACCOUNTING_REVISE_SCHEDULED_PROFILE',
+                    'SALARY_PROFILE_ACTIVATED',
+                ])
+                ->groupEnd();
+        }
+        $rows = $query->orderBy('al.id', 'DESC')
             ->limit(max(1, min(100, $limit)))
             ->get()
             ->getResultArray();

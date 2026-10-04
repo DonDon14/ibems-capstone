@@ -17,12 +17,13 @@
     }
 
     function qrImageCandidates(text) {
-        const encoded = encodeURIComponent(text);
-        return [
-            `https://quickchart.io/qr?size=220&text=${encoded}`,
-            `https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=${encoded}`,
-            `https://chart.googleapis.com/chart?cht=qr&chs=220x220&chl=${encoded}`,
-        ];
+        if (typeof window.qrcode !== "function") return [];
+
+        const qr = window.qrcode(0, "M");
+        qr.addData(text);
+        qr.make();
+
+        return [qr.createDataURL(5, 4)];
     }
 
     function wireQrFallback(root) {
@@ -39,7 +40,7 @@
                 if (index >= candidates.length) {
                     img.removeAttribute("src");
                     img.alt = "QR unavailable";
-                    img.title = "Unable to load QR image from configured providers.";
+                    img.title = "The local QR generator is unavailable.";
                     return;
                 }
                 img.src = candidates[index];
@@ -154,7 +155,7 @@
                     ${cashTenderLines}
                 </section>
 
-                <div class="ibems-receipt-total"><span>Total paid</span><strong>${money(total)}</strong></div>
+                <div class="ibems-receipt-total"><span>Transaction total</span><strong>${money(total)}</strong></div>
 
                 <div class="ibems-receipt-thankyou"><strong>Thank you for your purchase</strong><span>Keep this receipt for your records.</span></div>
                 <div class="ibems-receipt-qr-wrap">

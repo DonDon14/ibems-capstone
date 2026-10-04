@@ -300,6 +300,11 @@ final class AdminProductService
 
     public function create(array $request, int $actorId, $imageFile = null): array
     {
+        try {
+            ProductBehaviorService::assertStoreAllows((int) ($request['store_id'] ?? 0), ['item_type' => 'stock_item']);
+        } catch (\InvalidArgumentException $e) {
+            return $this->result(400, ['status' => 'error', 'message' => $e->getMessage()]);
+        }
 
         $storeId = (int) ($request['store_id'] ?? 0);
         $sku = trim((string) ($request['sku'] ?? ''));

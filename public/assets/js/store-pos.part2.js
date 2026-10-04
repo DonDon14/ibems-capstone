@@ -1,5 +1,6 @@
 async function saveOpeningBalance() {
-    if (!activeStoreId) return;
+    if (!activeStoreId || openingBalanceSubmitting) return;
+    const reopening = openingBalanceMode === "reopen";
 
     const amount = Number(document.getElementById("opening-balance-input").value || 0);
     const accountOpenings = Array.from(document.querySelectorAll("[data-opening-account-id]")).map((input) => ({destination_account_id: Number(input.dataset.openingAccountId), opening_balance: Number(input.value || 0)}));
@@ -7,7 +8,7 @@ async function saveOpeningBalance() {
     const note = String(document.getElementById("opening-balance-note").value || "").trim();
     const saveBtn = document.getElementById("opening-balance-save");
 
-    if (openingBalanceMode === "reopen" && note === "") {
+    if (reopening && note === "") {
         setOpeningBalanceResult("Enter a reason before reopening the store day.", "error");
         document.getElementById("opening-balance-note").focus();
         return;
@@ -18,8 +19,10 @@ async function saveOpeningBalance() {
         return;
     }
 
-    saveBtn.disabled = true;
-    saveBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Saving...';
+    openingBalanceSubmitting = true;
+    const modal = document.getElementById("opening-balance-modal");
+    setPosStoreDayDialogBusy(modal, true);
+    saveBtn.innerHTML = '<i class="bi bi-hourglass-split" aria-hidden="true"></i> Saving...';
     try {
         const data = await requestJson(
             "/store/day-session/open",
@@ -44,9 +47,9 @@ async function saveOpeningBalance() {
         currentDaySession = data.session || null;
         setPosTransactionEnabled(true);
         updateOpeningBalanceDisplay(data.session, data.session?.business_date || null);
-        closeOpeningBalanceModal();
+        closeOpeningBalanceModal(true);
         setResult(
-            openingBalanceMode === "reopen"
+            reopening
                 ? `Store day reopened: cash ${formatMoney(amount)} and ${accountOpenings.length} receiving account${accountOpenings.length === 1 ? "" : "s"} counted.`
                 : `Store day opened: cash ${formatMoney(amount)} and ${accountOpenings.length} receiving account${accountOpenings.length === 1 ? "" : "s"} counted.`,
             "ok"
@@ -54,19 +57,24 @@ async function saveOpeningBalance() {
     } catch (error) {
         setOpeningBalanceResult(error.message || "Failed to open store day.", "error");
     } finally {
-        saveBtn.disabled = false;
+        openingBalanceSubmitting = false;
+        setPosStoreDayDialogBusy(modal, false);
         saveBtn.innerHTML =
-            openingBalanceMode === "reopen"
-                ? '<i class="bi bi-check2-circle"></i> Reopen Store Day'
-                : '<i class="bi bi-check2-circle"></i> Open Store Day';
+            reopening
+                ? '<i class="bi bi-check2-circle" aria-hidden="true"></i> Reopen Store Day'
+                : '<i class="bi bi-check2-circle" aria-hidden="true"></i> Open Store Day';
     }
 }
 
 function setStoreDayCloseResult(message, type) {
     const resultEl = document.getElementById("store-day-close-result");
     if (!resultEl) return;
+    resultEl.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    resultEl.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
+    resultEl.setAttribute('aria-atomic', 'true');
     resultEl.textContent = message || "";
-    resultEl.style.color = type === "error" ? "#b91c1c" : "#166534";
+    resultEl.style.color = type === "error" ? "var(--feedback-error, #b91c1c)" : "var(--feedback-success, #166534)";
+    if (type === 'error' && resultEl.getClientRects?.().length) resultEl.focus();
     if (message) {
         showToast(message, type === "error" ? "error" : "success");
     }
@@ -92,7 +100,7 @@ function closeDayReconcileRow(label, value, className = "") {
 const CASH_DENOMINATIONS = [1000, 500, 200, 100, 50, 20, 10, 5, 1];
 
 function denominationCounterMarkup(target) {
-    return `<div class="cash-denomination-grid">${CASH_DENOMINATIONS.map((denomination) => `<label class="cash-denomination-item"><strong>PHP ${denomination.toLocaleString()}</strong><input type="number" min="0" step="1" inputmode="numeric" value="" data-denomination="${denomination}" data-denomination-scope="${target}" aria-label="PHP ${denomination.toLocaleString()} quantity"><small data-denomination-subtotal="${denomination}">PHP 0.00</small></label>`).join("")}</div><div class="cash-denomination-total"><span>Counted amount</span><strong data-denomination-total="${target}">PHP 0.00</strong></div><button type="button" class="primary-btn cash-denomination-apply" data-denomination-apply="${target}"><i class="bi bi-check2"></i> Use counted amount</button>`;
+    return `<div class="cash-denomination-grid">${CASH_DENOMINATIONS.map((denomination) => `<label class="cash-denomination-item"><strong>PHP ${denomination.toLocaleString()}</strong><input type="number" min="0" step="1" inputmode="numeric" value="" data-denomination="${denomination}" data-denomination-scope="${target}" aria-label="PHP ${denomination.toLocaleString()} quantity"><small data-denomination-subtotal="${denomination}">PHP 0.00</small></label>`).join("")}</div><div class="cash-denomination-total"><span>Counted amount</span><strong data-denomination-total="${target}">PHP 0.00</strong></div><button type="button" class="primary-btn cash-denomination-apply" data-denomination-apply="${target}"><i class="bi bi-check2" aria-hidden="true"></i> Use counted amount</button>`;
 }
 
 function updateDenominationCounter(target) {
@@ -231,10 +239,14 @@ function updateStoreDayCloseVariance() {
 }
 
 async function openStoreDayCloseModal() {
+    if (storeDayCloseSubmitting) return;
     const modal = document.getElementById("store-day-close-modal");
     if (!modal) return;
-
+    const version = ++storeDayCloseOpenVersion;
+    const storeId = activeStoreId;
+    const returnFocus = document.activeElement;
     await loadOpeningBalanceStatus();
+    if (version !== storeDayCloseOpenVersion || storeId !== activeStoreId || !modal.isConnected) return;
     const summary = document.getElementById("store-day-close-summary");
     if (!currentDaySession || String(currentDaySession.status || "") !== "open") {
         setResult("The store day is no longer open. Reload its current status before closing.", "error");
@@ -254,17 +266,21 @@ async function openStoreDayCloseModal() {
     setStoreDayCloseResult("", "ok");
     modal.classList.remove("is-hidden");
     modal.style.display = "grid";
+    focusPosCheckoutDialog(modal, document.getElementById("store-day-close-x"), returnFocus);
 }
 
-function closeStoreDayCloseModal() {
+function closeStoreDayCloseModal(force = false) {
+    if (storeDayCloseSubmitting && force !== true) return;
+    ++storeDayCloseOpenVersion;
     const modal = document.getElementById("store-day-close-modal");
     if (!modal) return;
     modal.style.display = "none";
     modal.classList.add("is-hidden");
+    releasePosCheckoutDialogFocus(modal);
 }
 
 async function saveStoreDayClose() {
-    if (!activeStoreId) return;
+    if (!activeStoreId || storeDayCloseSubmitting) return;
 
     const countedCash = Number(document.getElementById("closing-cash-input").value || 0);
     const accountCounts = Array.from(document.querySelectorAll("[data-closing-account-id]")).map((input) => ({destination_account_id: Number(input.dataset.closingAccountId), counted_balance: Number(input.value || 0)}));
@@ -287,8 +303,10 @@ async function saveStoreDayClose() {
         return;
     }
 
-    saveBtn.disabled = true;
-    saveBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Closing...';
+    storeDayCloseSubmitting = true;
+    const modal = document.getElementById("store-day-close-modal");
+    setPosStoreDayDialogBusy(modal, true);
+    saveBtn.innerHTML = '<i class="bi bi-hourglass-split" aria-hidden="true"></i> Closing...';
     try {
         const data = await requestJson(
             "/store/day-session/close",
@@ -312,35 +330,42 @@ async function saveStoreDayClose() {
 
         openingBalanceReady = false;
         setPosTransactionEnabled(false);
-        closeStoreDayCloseModal();
-        await loadOpeningBalanceStatus();
+        closeStoreDayCloseModal(true);
+        let statusRefreshed = false;
+        try { statusRefreshed = await loadOpeningBalanceStatus(false); } catch (_) { /* Confirmed close remains successful. */ }
 
         const varianceCash = Number(data.session?.variance_cash || 0);
         const varianceEcash = Number(data.session?.variance_ecash || 0);
         const reviewStatus = String(data.session?.review_status || "not_required");
         const reviewText = reviewStatus === "pending" ? " Flagged for review." : "";
-        setResult(`Store day closed. Variance: cash ${formatMoney(varianceCash)}, e-cash ${formatMoney(varianceEcash)}.${reviewText}`, "ok");
+        setResult(`Store day closed. Variance: cash ${formatMoney(varianceCash)}, e-cash ${formatMoney(varianceEcash)}.${reviewText}${statusRefreshed ? "" : " Status refresh failed; reload before the next store-day action."}`, statusRefreshed ? "ok" : "warning");
     } catch (error) {
         setStoreDayCloseResult(error.message || "Failed to close store day.", "error");
     } finally {
-        saveBtn.disabled = false;
-        saveBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Close Store Day';
+        storeDayCloseSubmitting = false;
+        setPosStoreDayDialogBusy(modal, false);
+        saveBtn.innerHTML = '<i class="bi bi-check2-circle" aria-hidden="true"></i> Close Store Day';
     }
 }
 
 function setScannerStatus(message, isError = false) {
     const el = document.getElementById("scanner-status");
     el.textContent = message || "";
-    el.style.color = isError ? "#b91c1c" : "#475569";
+    el.style.color = isError ? "var(--feedback-error, #b91c1c)" : "var(--text-soft, #475569)";
+    el.setAttribute('role', isError ? 'alert' : 'status');
+    el.setAttribute('aria-live', isError ? 'assertive' : 'polite');
+    el.setAttribute('aria-atomic', 'true');
 }
 
-function setScannerUiState(running) {
+function setScannerUiState(running, starting = false) {
     const startBtn = document.getElementById("scanner-start");
     const stopBtn = document.getElementById("scanner-stop");
     const openBtn = document.getElementById("open-scanner-btn");
     const openDebtBtn = document.getElementById("open-debt-scanner-btn");
 
-    if (running) {
+    document.getElementById('scanner-reader').setAttribute('aria-busy', String(starting));
+    stopBtn.innerHTML = starting ? '<i class="bi bi-x-circle" aria-hidden="true"></i> Cancel start' : '<i class="bi bi-stop-fill" aria-hidden="true"></i> Stop';
+    if (running || starting) {
         if (startBtn) {
             startBtn.style.display = "none";
             startBtn.disabled = true;
@@ -358,108 +383,120 @@ function setScannerUiState(running) {
     stopBtn.disabled = true;
     openBtn.disabled = false;
     if (openDebtBtn) openDebtBtn.disabled = false;
+    if (document.activeElement === stopBtn) startBtn?.focus();
 }
 
 async function openScannerModal(mode = "product") {
+    if (scannerSession && !scannerSession.cancelled) return;
     scannerMode = mode === "debt" ? "debt" : "product";
     const titleEl = document.getElementById("scanner-title");
     if (titleEl) {
         titleEl.innerHTML =
             scannerMode === "debt"
-                ? '<i class="bi bi-person-badge"></i> Employee QR Scanner'
-                : '<i class="bi bi-upc-scan"></i> Barcode Scanner';
+                ? '<i class="bi bi-person-badge" aria-hidden="true"></i> Employee QR Scanner'
+                : '<i class="bi bi-upc-scan" aria-hidden="true"></i> Barcode Scanner';
     }
 
     document.getElementById("barcode-scanner-modal").style.display = "grid";
-    setScannerUiState(scannerRunning);
-    setScannerStatus("Starting scanner...");
+    focusPosCheckoutDialog(document.getElementById('barcode-scanner-modal'), document.getElementById('scanner-close'));
     await startScanner();
 }
 
 async function closeScannerModal() {
-    await stopScanner();
+    const stopping = stopScanner();
     document.getElementById("barcode-scanner-modal").style.display = "none";
+    releasePosCheckoutDialogFocus(document.getElementById('barcode-scanner-modal'));
+    await stopping;
 }
 
 async function startScanner() {
-    if (scannerRunning) return;
+    if (scannerSession && !scannerSession.cancelled) return scannerSession.promise;
+    const previousCleanup = scannerCleanupPromise;
+    const session = { cancelled: false, engine: null, cleanup: null, promise: null };
+    scannerSession = session;
+    setScannerUiState(false, true);
+    setScannerStatus('Starting scanner...');
+    if (document.activeElement?.id === 'scanner-start') document.getElementById('scanner-close')?.focus();
+    session.promise = (async () => {
+        await previousCleanup;
+        if (scannerSession !== session || session.cancelled) return;
+        if (typeof window.Html5Qrcode === 'undefined') {
+            setScannerStatus('Scanner unavailable. Reload the page and try again.', true);
+            return;
+        }
+        if (!navigator.mediaDevices?.getUserMedia) {
+            setScannerStatus('Camera API not available in this browser.', true);
+            return;
+        }
+        const readerId = 'scanner-reader';
+        document.getElementById(readerId).innerHTML = '';
+        try {
+            session.engine = new window.Html5Qrcode(readerId);
+            scannerEngine = session.engine;
+            await session.engine.start(
+                { facingMode: "environment" },
+                {
+                    fps: 10,
+                    qrbox: { width: 260, height: 180 },
+                    aspectRatio: 1.7777778,
+                },
+                async (decodedText) => {
+                    if (scannerSession !== session || session.cancelled) return;
+                    const rawValue = String(decodedText || "").trim();
+                    if (rawValue === "") return;
 
-    if (typeof window.Html5Qrcode === "undefined") {
-        setScannerStatus("Scanner library not loaded. Check internet/CDN access.", true);
-        setScannerUiState(false);
-        return;
-    }
-
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        setScannerStatus("Camera API not available in this browser.", true);
-        setScannerUiState(false);
-        return;
-    }
-
-    const readerId = "scanner-reader";
-    const readerEl = document.getElementById(readerId);
-    readerEl.innerHTML = "";
-    scannerEngine = new window.Html5Qrcode(readerId);
-
-    try {
-        await scannerEngine.start(
-            { facingMode: "environment" },
-            {
-                fps: 10,
-                qrbox: { width: 260, height: 180 },
-                aspectRatio: 1.7777778,
-            },
-            async (decodedText) => {
-                const rawValue = String(decodedText || "").trim();
-                if (rawValue === "") return;
-
-                const now = Date.now();
-                if (rawValue === scannerLastDetected && now - scannerLastDetectedAt <= 1200) {
-                    return;
-                }
-
-                scannerLastDetected = rawValue;
-                scannerLastDetectedAt = now;
-                setScannerStatus(`Detected: ${rawValue}`);
-                await handleDetectedScannerCode(rawValue);
-            },
-            () => {}
-        );
-    } catch (error) {
+                    const now = Date.now();
+                    if (rawValue === scannerLastDetected && now - scannerLastDetectedAt <= 1200) return;
+                    scannerLastDetected = rawValue;
+                    scannerLastDetectedAt = now;
+                    setScannerStatus(`Detected: ${rawValue}`);
+                    await handleDetectedScannerCode(rawValue);
+                },
+                () => {}
+            );
+        } catch (error) {
+            if (scannerSession === session && !session.cancelled) setScannerStatus('Unable to start the camera. Check camera access, then try again.', true);
+            await disposeScannerSession(session);
+            return;
+        }
+        if (scannerSession !== session || session.cancelled) return;
+        scannerRunning = true;
+        setScannerUiState(true);
+        setScannerStatus('Scanning... Point camera to barcode/QR.');
+    })();
+    await session.promise;
+    if (scannerSession === session && !session.cancelled && !scannerRunning) {
+        scannerSession = null;
         scannerEngine = null;
-        scannerRunning = false;
-        setScannerStatus("Failed to start camera scanner.", true);
         setScannerUiState(false);
-        return;
     }
+}
 
-    scannerRunning = true;
-    setScannerUiState(true);
-    setScannerStatus("Scanning... Point camera to barcode/QR.");
+async function disposeScannerSession(session) {
+    if (!session.engine) return;
+    session.cleanup ||= (async () => {
+        try { await session.engine.stop(); } catch (error) { /* May already be stopped. */ }
+        try { await session.engine.clear(); } catch (error) { /* Keep cancellation usable. */ }
+    })();
+    await session.cleanup;
 }
 
 async function stopScanner() {
-    if (!scannerRunning || !scannerEngine) {
-        scannerRunning = false;
-        setScannerUiState(false);
-        return;
-    }
-
-    try {
-        await scannerEngine.stop();
-    } catch (error) {
-        // Ignore stop errors on already-stopped sessions.
-    }
-
-    try {
-        await scannerEngine.clear();
-    } catch (error) {
-        // Ignore clear errors.
-    }
-
+    const session = scannerSession;
+    if (session) session.cancelled = true;
+    scannerSession = null;
     scannerEngine = null;
     scannerRunning = false;
     setScannerUiState(false);
+    if (session) scannerCleanupPromise = Promise.resolve(session.promise).catch(() => {}).then(() => disposeScannerSession(session));
+    await scannerCleanupPromise;
+}
+
+async function stopScannerFromUi() {
+    await stopScanner();
+    if (scannerSession || document.getElementById('barcode-scanner-modal').style.display === 'none') return;
+    setScannerStatus('Scanner stopped. Start it again when ready.');
+    document.getElementById('scanner-start')?.focus();
 }
 
 function autoSelectDebtCustomerByCode(rawCode) {
@@ -578,6 +615,7 @@ function getPaymentOptionLabel(method) {
 function getPaymentMethodGuidance(method) {
     const code = String(method || "").toLowerCase();
     if (code === "debt") return "Choose an employee or department account. The matching balance is charged only after secure PIN authorization.";
+    if (waterStationInternalOnly) return "Select a registered faculty, staff, or student account before accepting payment. Walk-in sales are not available at this water station.";
     return "Customer selection is optional. Leave it blank for a walk-in sale.";
 }
 

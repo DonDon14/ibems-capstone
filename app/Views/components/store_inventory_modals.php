@@ -5,7 +5,7 @@
             <button id="close-product-modal" type="button" class="inv-modal-close" aria-label="Close new product form">x</button>
         </div>
 
-        <div class="create-product-layout">
+        <div class="create-product-layout" role="region" aria-label="New product details and variants" tabindex="0">
             <div class="create-product-section section-product-info">
                 <h5>Product Information</h5>
                 <div class="form-grid">
@@ -44,7 +44,7 @@
                     </div>
                     <div class="field field-wide">
                         <label for="new-product-barcode">Barcode / Product Code (optional)</label>
-                        <div class="barcode-entry-row"><input id="new-product-barcode" type="text" inputmode="numeric" autocomplete="off" placeholder="Type the barcode digits manually"><button class="secondary-btn barcode-camera-btn" type="button" data-barcode-camera-target="new-product-barcode" title="Scan barcode with camera"><i class="bi bi-camera"></i><span>Camera</span></button></div>
+                        <div class="barcode-entry-row"><input id="new-product-barcode" type="text" inputmode="numeric" autocomplete="off" placeholder="Type the barcode digits manually"><button class="secondary-btn barcode-camera-btn" type="button" data-barcode-camera-target="new-product-barcode" aria-label="Scan barcode with camera" title="Scan barcode with camera"><i class="bi bi-camera"></i><span>Camera</span></button></div>
                         <small>No scanner required. Type the number printed below the barcode; a USB scanner can use this same field later.</small>
                     </div>
                 </div>
@@ -144,6 +144,7 @@
         </div>
 
         <div class="inv-modal-actions">
+            <p id="modal-product-result" class="inventory-stock-result" role="status" aria-live="polite" aria-atomic="true" tabindex="-1" hidden></p>
             <button id="new-product-cancel" class="secondary-btn" type="button">Cancel</button>
             <button id="new-product-submit" class="primary-btn" type="button">Create Product</button>
         </div>
@@ -157,7 +158,7 @@
             <button id="close-product-action-modal" type="button" class="inv-modal-close" aria-label="Close product management">x</button>
         </div>
 
-        <div class="product-actions-body app-inset-modal-scroll">
+        <div class="product-actions-body app-inset-modal-scroll" role="region" aria-label="Product details and stock controls" tabindex="0">
             <div id="product-action-info" class="product-action-info"></div>
 
             <div class="product-detail-view">
@@ -275,6 +276,15 @@
                         <label for="modal-stock-reason">Reason</label>
                         <input id="modal-stock-reason" type="text" value="Physical count adjustment">
                     </div>
+                    <div class="field">
+                        <label for="modal-stock-waste-disposition">Loss classification</label>
+                        <select id="modal-stock-waste-disposition">
+                            <option value="">Count correction / not waste</option>
+                            <option value="discarded">Discarded</option>
+                            <option value="spoiled">Spoiled</option>
+                        </select>
+                        <small>Choose discarded or spoiled only when reducing stock for that reason.</small>
+                    </div>
                 </div>
                 <div id="modal-adjust-preview" class="adjust-preview">
                     <div>
@@ -323,6 +333,7 @@
         </div>
 
         <div class="inv-modal-actions">
+            <p id="modal-stock-result" class="inventory-stock-result" role="status" aria-live="polite" aria-atomic="true" tabindex="-1" hidden></p>
             <button id="modal-start-edit-product" class="secondary-btn" type="button">Edit Product</button>
             <button id="modal-cancel-edit-product" class="secondary-btn is-hidden" type="button">Cancel Edit</button>
             <button id="modal-save-product" class="secondary-btn is-hidden" type="button">Save Details</button>
@@ -334,9 +345,14 @@
 
 <div id="inventory-barcode-camera-modal" class="inv-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="inventory-barcode-camera-title">
     <div class="inv-modal-card barcode-camera-card">
-        <div class="inv-modal-head"><h4 id="inventory-barcode-camera-title"><i class="bi bi-upc-scan"></i> Scan Product Barcode</h4><button id="inventory-barcode-camera-close" class="inv-modal-close" type="button" aria-label="Close barcode camera">x</button></div>
-        <div id="inventory-barcode-camera-reader"></div>
-        <p id="inventory-barcode-camera-status" class="inventory-result">Point the camera at the barcode. Manual entry and USB scanners remain supported.</p>
-        <div class="inv-modal-actions"><button id="inventory-barcode-camera-cancel" class="secondary-btn" type="button">Cancel</button></div>
+        <div class="inv-modal-head"><h4 id="inventory-barcode-camera-title"><i class="bi bi-upc-scan" aria-hidden="true"></i> Scan Product Barcode</h4><button id="inventory-barcode-camera-close" class="inv-modal-close" type="button" aria-label="Close barcode camera">x</button></div>
+        <div class="barcode-camera-body" role="region" aria-label="Camera preview and scanning status" tabindex="0">
+            <div id="inventory-barcode-camera-reader"></div>
+            <p id="inventory-barcode-camera-status" class="inventory-result" role="status" aria-live="polite" aria-atomic="true" tabindex="-1">Point the camera at the barcode. Manual entry and USB scanners remain supported.</p>
+        </div>
+        <div class="inv-modal-actions">
+            <button id="inventory-barcode-camera-retry" class="primary-btn" type="button" hidden>Retry camera</button>
+            <button id="inventory-barcode-camera-cancel" class="secondary-btn" type="button">Use manual entry</button>
+        </div>
     </div>
 </div>

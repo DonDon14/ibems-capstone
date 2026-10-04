@@ -1,0 +1,30 @@
+.admin-products-page,
+.admin-products-page .summary-grid,
+.admin-products-page .metric-card,
+.admin-products-page .metric-card-head { min-width: 0; }
+.admin-products-page .metric-card :is(strong, .metric-card-label),
+.admin-products-page .stores-result { overflow-wrap: anywhere; }
+.admin-products-page .summary-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.admin-products-page .is-ap-list-state { overflow: visible; }
+.admin-products-page .is-ap-list-state .ap-table { min-width: 0; width: 100%; }
+.admin-products-page .is-ap-list-state thead { display: none; }
+.admin-products-page .is-ap-list-state td { white-space: normal; border: 0; }
+.admin-products-page .is-ap-list-state tbody tr { cursor: default; }
+.admin-products-page .is-ap-list-state .data-state { flex-wrap: wrap; }
+.admin-products-page .is-ap-list-state .data-state > div { min-width: 0; flex: 1 1 200px; }
+.admin-products-page .is-ap-list-state .data-state :is(strong, small) { overflow-wrap: anywhere; }
+.admin-products-page .data-state:focus { outline: 2px solid #2563eb; outline-offset: -2px; }
+html[data-theme="dark"] .admin-products-page .data-state:focus { outline-color: #93c5fd; }
+.admin-products-page .ap-table tbody td:first-child { width: 20rem; min-width: 16rem; max-width: 24rem; }
+.admin-products-page .ap-product-cell { min-width: 0; white-space: normal; }
+.admin-products-page .ap-product-cell > div { min-width: 0; overflow-wrap: anywhere; }
+.admin-products-page .ap-table tbody :is(td:nth-child(2), td:nth-child(3), td:nth-child(4)) { width: 12rem; min-width: 10rem; max-width: 20rem; white-space: normal; overflow-wrap: anywhere; }
+.admin-products-page .ap-table tbody :is(td:nth-child(5), td:nth-child(8)) { white-space: nowrap; }
+.admin-products-page .is-ap-list-state td:first-child { width: auto; min-width: 0; max-width: none; }
+.ap-view-card :is(.ap-detail-hero, .ap-detail-hero > div, .ap-detail-item) { min-width: 0; }
+.ap-view-card :is(.ap-detail-hero h5, .ap-detail-hero p, .ap-detail-item strong) { overflow-wrap: anywhere; }
+@media (max-width: 900px) { .admin-products-page .summary-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 480px) {
+    .admin-products-page .summary-grid { grid-template-columns: minmax(0, 1fr); }
+    .ap-view-card .ap-detail-hero { flex-direction: column; align-items: flex-start; }
+}

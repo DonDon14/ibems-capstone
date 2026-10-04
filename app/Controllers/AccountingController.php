@@ -7,8 +7,6 @@ use App\Models\BalanceModel;
 use App\Models\SalaryImportBatchModel;
 use App\Models\SalaryImportRowModel;
 use App\Models\UserModel;
-use App\Services\DeductionBatchService;
-use App\Services\DeductionPeriodService;
 use App\Services\DebtInvestigationService;
 use App\Services\SalaryCreditPolicy;
 use App\Services\AccountingReportingService;
@@ -16,6 +14,7 @@ use App\Services\AccountingDebtQueryService;
 use App\Services\AccountingSettlementQueryService;
 use App\Services\AccountingFinancialProfileService;
 use App\Services\SalaryScheduleService;
+use App\Services\SalaryImportIdentityGuard;
 use CodeIgniter\Controller;
 use Config\Database;
 
@@ -23,7 +22,7 @@ class AccountingController extends Controller
 {
     public function deductions()
     {
-        return view('accounting/debts', ['deductionsPage' => true]);
+        return redirect()->to(site_url('deductions/workspace'));
     }
 
     public function debtInvestigationsData()
@@ -36,7 +35,7 @@ class AccountingController extends Controller
     public function openDebtInvestigation()
     {
         $result = (new DebtInvestigationService())->open(
-            $this->request->getJSON(true) ?? $this->request->getPost(),
+            str_contains(strtolower($this->request->getHeaderLine('Content-Type')), 'application/json') ? $this->request->getJSON(true) : $this->request->getPost(),
             (int) session()->get('user_id')
         );
         return $this->response->setStatusCode((int) ($result['code'] ?? 400))->setJSON($result);
@@ -46,7 +45,7 @@ class AccountingController extends Controller
     {
         $result = (new DebtInvestigationService())->recommend(
             $investigationId,
-            $this->request->getJSON(true) ?? $this->request->getPost(),
+            str_contains(strtolower($this->request->getHeaderLine('Content-Type')), 'application/json') ? $this->request->getJSON(true) : $this->request->getPost(),
             (int) session()->get('user_id')
         );
         return $this->response->setStatusCode((int) ($result['code'] ?? 400))->setJSON($result);
@@ -58,104 +57,6 @@ class AccountingController extends Controller
             $investigationId,
             (int) session()->get('user_id')
         );
-        return $this->response->setStatusCode((int) ($result['code'] ?? 400))->setJSON($result);
-    }
-
-    public function deductionWorkflowData()
-    {
-        $db = Database::connect();
-        $batchId = max(0, (int) ($this->request->getGet('batch_id') ?? 0));
-        $periodId = max(0, (int) ($this->request->getGet('period_id') ?? 0));
-        $periods = $db->table('deduction_periods dp')
-            ->select('dp.*, db.id AS batch_id, db.status AS batch_status, db.total_accounts, db.total_requested, db.total_confirmed, db.total_carryover, db.created_by AS batch_created_by')
-            ->join('deduction_batches db', 'db.period_id = dp.id', 'left')
-            ->orderBy('dp.date_start', 'DESC')
-            ->orderBy('dp.id', 'DESC')
-            ->get()
-            ->getResultArray();
-
-        $items = [];
-        if ($batchId > 0) {
-            $items = $db->table('deduction_batch_items dbi')
-                ->select('dbi.*, u.employee_id, u.name, u.email, u.user_type, b.current_debt')
-                ->join('users u', 'u.id = dbi.user_id', 'inner')
-                ->join('balances b', 'b.user_id = dbi.user_id', 'left')
-                ->where('dbi.batch_id', $batchId)
-                ->orderBy('u.name', 'ASC')
-                ->get()
-                ->getResultArray();
-        }
-
-        $register = [];
-        if ($periodId > 0) {
-            $period = $db->table('deduction_periods')->where('id', $periodId)->get()->getRowArray();
-            if ($period) {
-                $register = (new \App\Services\DebtPeriodRegisterService())->build($period);
-            }
-        }
-
-        return $this->response->setJSON([
-            'status' => 'success',
-            'periods' => $periods,
-            'items' => $items,
-            'register' => $register,
-        ]);
-    }
-
-    public function createDeductionPeriod()
-    {
-        $request = $this->request->getJSON(true) ?? $this->request->getPost();
-        $result = (new DeductionPeriodService())->create($request, (int) session()->get('user_id'));
-
-        return $this->response
-            ->setStatusCode((int) ($result['code'] ?? 400))
-            ->setJSON($result);
-    }
-
-    public function prepareDeductionBatch()
-    {
-        $request = $this->request->getJSON(true) ?? $this->request->getPost();
-        $result = (new DeductionBatchService())->prepare(
-            (int) ($request['period_id'] ?? 0),
-            is_array($request['requests'] ?? null) ? $request['requests'] : [],
-            (int) session()->get('user_id'),
-            isset($request['notes']) ? (string) $request['notes'] : null
-        );
-
-        return $this->response
-            ->setStatusCode((int) ($result['code'] ?? 400))
-            ->setJSON($result);
-    }
-
-    public function confirmDeductionResult(int $itemId)
-    {
-        $request = $this->request->getJSON(true) ?? $this->request->getPost();
-        $result = (new DeductionBatchService())->confirmResult(
-            $itemId,
-            $request,
-            (int) session()->get('user_id')
-        );
-
-        return $this->response
-            ->setStatusCode((int) ($result['code'] ?? 400))
-            ->setJSON($result);
-    }
-
-    public function applyDeductionBatch(int $batchId)
-    {
-        $result = (new DeductionBatchService())->applyPrepared($batchId, (int) session()->get('user_id'));
-        return $this->response->setStatusCode((int) ($result['code'] ?? 400))->setJSON($result);
-    }
-
-    public function reconcileDeductionBatch(int $batchId)
-    {
-        $result = (new DeductionBatchService())->reconcile($batchId, (int) session()->get('user_id'));
-        return $this->response->setStatusCode((int) ($result['code'] ?? 400))->setJSON($result);
-    }
-
-    public function finalizeDeductionBatch(int $batchId)
-    {
-        $result = (new DeductionBatchService())->finalize($batchId, (int) session()->get('user_id'));
         return $this->response->setStatusCode((int) ($result['code'] ?? 400))->setJSON($result);
     }
 
@@ -217,7 +118,8 @@ class AccountingController extends Controller
             ]);
         }
 
-        $row = (new AccountingDebtQueryService())->profile(Database::connect(), $userId);
+        $db = Database::connect();
+        $row = (new AccountingDebtQueryService())->profile($db, $userId);
         if ($row === null) {
             return $this->response->setStatusCode(404)->setJSON([
                 'status' => 'error',
@@ -225,7 +127,38 @@ class AccountingController extends Controller
             ]);
         }
 
+        $row['pending_salary_profiles'] = (new \App\Services\ScheduledSalaryProfileService())->pendingForUser($db, $userId);
         return $this->response->setJSON(['status' => 'success', 'data' => $row]);
+    }
+
+    public function activateScheduledSalaryProfile(int $profileId)
+    {
+        $result = (new \App\Services\ScheduledSalaryProfileService())->activate(
+            Database::connect(), $profileId, (int) session()->get('user_id')
+        );
+
+        return $this->response->setStatusCode($result['code'])->setJSON($result['payload']);
+    }
+
+    public function scheduledSalaryQueue()
+    {
+        $pageInput = $this->request->getGet('page');
+        $page = $pageInput === null ? 1 : filter_var($pageInput, FILTER_VALIDATE_INT, ['options' => ['min_range' => 1, 'max_range' => 100000]]);
+        if ($page === false) {
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => 'Page must be a positive integer.',
+            ]);
+        }
+        $queue = (new \App\Services\ScheduledSalaryProfileService())->pendingQueue(Database::connect(), $page);
+        if ($queue === null) {
+            return $this->response->setStatusCode(503)->setJSON([
+                'status' => 'error',
+                'message' => 'Scheduled salary profiles are unavailable until the latest migration is applied.',
+            ]);
+        }
+
+        return $this->response->setJSON(['status' => 'success'] + $queue);
     }
 
     public function debtHistory()
@@ -339,15 +272,13 @@ class AccountingController extends Controller
             return strtolower(trim((string) $value));
         }, $rawHeaders);
 
-        $required = ['employee_id', 'name', 'email', 'user_type', 'employment_type', 'salary_grade', 'salary_step', 'salary_effective_date'];
-        foreach ($required as $field) {
-            if (!in_array($field, $headers, true)) {
-                fclose($handle);
-                return $this->response->setStatusCode(400)->setJSON([
-                    'status' => 'error',
-                    'message' => "Missing required column: {$field}",
-                ]);
-            }
+        $headerError = $this->salaryCsvHeaderError($headers);
+        if ($headerError !== null) {
+            fclose($handle);
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => $headerError,
+            ]);
         }
 
         $batchModel = new SalaryImportBatchModel();
@@ -355,6 +286,7 @@ class AccountingController extends Controller
         $userModel = new UserModel();
         $balanceModel = new BalanceModel();
         $auditLogModel = new AuditLogModel();
+        $sourceHash = hash_file('sha256', $path);
 
         $db = Database::connect();
         $db->transStart();
@@ -372,6 +304,9 @@ class AccountingController extends Controller
         $validRows = 0;
         $invalidRows = 0;
         $invalidPreview = [];
+        $identityGuard = new SalaryImportIdentityGuard();
+        $seenEmployeeIds = [];
+        $seenEmails = [];
 
         while (($rowValues = fgetcsv($handle)) !== false) {
             $totalRows++;
@@ -382,11 +317,11 @@ class AccountingController extends Controller
 
             $employeeId = $rowAssoc['employee_id'] ?? '';
             $name = $rowAssoc['name'] ?? '';
-            $email = $rowAssoc['email'] ?? '';
+            $email = strtolower($rowAssoc['email'] ?? '');
             $userType = strtolower((string) ($rowAssoc['user_type'] ?? ''));
             $employmentType = SalaryCreditPolicy::normalizeEmploymentType((string) ($rowAssoc['employment_type'] ?? ''));
             $salaryGrade = SalaryCreditPolicy::normalizeSalaryGrade((string) ($rowAssoc['salary_grade'] ?? ''));
-            $salaryStep = (int) ($rowAssoc['salary_step'] ?? 0);
+            $salaryStep = SalaryCreditPolicy::parseSalaryStep($rowAssoc['salary_step'] ?? null);
             $effectiveDate = trim((string) ($rowAssoc['salary_effective_date'] ?? ''));
             $scheduleCode = strtoupper(trim((string) ($rowAssoc['salary_schedule_code'] ?? '')));
             if ($scheduleCode === '') {
@@ -394,13 +329,14 @@ class AccountingController extends Controller
             }
             $creditPercentage = trim((string) ($rowAssoc['credit_percentage'] ?? '')) === ''
                 ? SalaryCreditPolicy::percentageFromRate(SalaryCreditPolicy::DEFAULT_CREDIT_RATE)
-                : (float) $rowAssoc['credit_percentage'];
-            $resolvedRate = (new SalaryScheduleService())->resolveRateByCode($db, $scheduleCode, $salaryGrade, $salaryStep);
+                : SalaryCreditPolicy::parseCreditPercentage($rowAssoc['credit_percentage']);
+            $resolvedRate = $salaryStep === null ? null : (new SalaryScheduleService())->resolveRateByCode($db, $scheduleCode, $salaryGrade, $salaryStep);
             $monthlySalary = (float) ($resolvedRate['monthly_salary'] ?? 0);
-            $creditRate = SalaryCreditPolicy::rateFromPercentage($creditPercentage);
+            $creditRate = SalaryCreditPolicy::rateFromPercentage($creditPercentage ?? 0);
             $creditLimit = SalaryCreditPolicy::creditLimit($monthlySalary, $creditRate);
 
-            $errors = [];
+            $errors = count($rowValues) === count($headers)
+                ? [] : ['row must contain exactly one value for each CSV column'];
             if ($name === '') {
                 $errors[] = 'name is required';
             }
@@ -416,14 +352,25 @@ class AccountingController extends Controller
             if ($resolvedRate === null) {
                 $errors[] = 'salary schedule, grade, and step combination is invalid';
             }
+            if ($salaryStep === null) {
+                $errors[] = 'salary_step must be an integer from 1 to 8';
+            }
             if (!SalaryCreditPolicy::isValidEffectiveDate($effectiveDate)) {
                 $errors[] = 'salary_effective_date must be YYYY-MM-DD';
+            }
+            if (SalaryCreditPolicy::isFutureEffectiveDate($effectiveDate)) {
+                $errors[] = 'future-effective salary profiles cannot be imported until scheduling is available';
             }
             if ($resolvedRate !== null && ($effectiveDate < $resolvedRate['effective_from'] || ($resolvedRate['effective_to'] !== null && $effectiveDate > $resolvedRate['effective_to']))) {
                 $errors[] = 'salary_effective_date is outside the selected schedule';
             }
-            if (!SalaryCreditPolicy::isValidCreditPercentage($creditPercentage)) {
-                $errors[] = 'credit_percentage must be from 0 to 100';
+            if ($creditPercentage === null) {
+                $errors[] = 'credit_percentage must be a number from 0 to 100 with at most two decimals';
+            }
+            $identity = ['errors' => [], 'existing' => null];
+            if ($errors === []) {
+                $identity = $identityGuard->inspect($db, $employeeId, $email, $seenEmployeeIds, $seenEmails);
+                array_push($errors, ...$identity['errors']);
             }
 
             if ($errors !== []) {
@@ -450,16 +397,15 @@ class AccountingController extends Controller
                 continue;
             }
 
-            $existingUser = null;
-            if ($employeeId !== '') {
-                $existingUser = $db->table('users')->where('employee_id', $employeeId)->get()->getRowArray();
-            }
-            if (!$existingUser) {
-                $existingUser = $db->table('users')->where('email', $email)->get()->getRowArray();
-            }
+            $identityGuard->claim($employeeId, $email, $seenEmployeeIds, $seenEmails);
+            $existingUser = $identity['existing'];
+            $previousBalance = $existingUser ? $balanceModel->getBalanceByUserId((int) $existingUser['id']) : null;
+            $previousProfile = $existingUser ? array_intersect_key($existingUser, array_flip([
+                'user_type', 'employment_type', 'salary_grade', 'salary_step', 'salary_effective_date', 'salary_schedule_id',
+            ])) : null;
 
             if ($existingUser) {
-                $userModel->update((int) $existingUser['id'], [
+                $userSaved = $userModel->update((int) $existingUser['id'], [
                     'employee_id' => $employeeId !== '' ? $employeeId : $existingUser['employee_id'],
                     'name' => $name,
                     'email' => $email,
@@ -472,7 +418,7 @@ class AccountingController extends Controller
                     'salary_schedule_id' => $resolvedRate['schedule_id'],
                     'is_active' => true,
                 ]);
-                $userId = (int) $existingUser['id'];
+                $userId = $userSaved ? (int) $existingUser['id'] : false;
             } else {
                 $generatedPassword = password_hash(bin2hex(random_bytes(8)), PASSWORD_BCRYPT);
                 $qrToken = bin2hex(random_bytes(16));
@@ -523,14 +469,51 @@ class AccountingController extends Controller
             $balance = $balanceModel->getBalanceByUserId((int) $userId);
             if ($balance) {
                 $updateData = ['credit_limit' => $creditLimit, 'credit_rate' => $creditRate, 'updated_at' => date('Y-m-d H:i:s')];
-                $balanceModel->update((int) $userId, $updateData);
+                $balanceSaved = $balanceModel->update((int) $userId, $updateData);
             } else {
-                $balanceModel->insert([
+                $balanceSaved = $balanceModel->insert([
                     'user_id' => (int) $userId,
                     'credit_limit' => $creditLimit,
                     'credit_rate' => $creditRate,
                     'current_debt' => 0,
                     'updated_at' => date('Y-m-d H:i:s'),
+                ]);
+            }
+
+            $profileAudit = $balanceSaved && $auditLogModel->insert([
+                'actor_id' => $actorId,
+                'action' => 'ACCOUNTING_UPDATE_FINANCIAL_PROFILE',
+                'entity' => 'balances',
+                'entity_id' => (int) $userId,
+                'payload_json' => json_encode([
+                    'source' => 'salary_csv_import',
+                    'import_batch_id' => (int) $batchId,
+                    'source_sha256' => $sourceHash,
+                    'source_line' => $totalRows + 1,
+                    'operation' => $existingUser ? 'update' : 'create',
+                    'reason' => 'Accounting salary schedule CSV import',
+                    'previous_base_salary' => $existingUser ? (float) $existingUser['base_salary'] : null,
+                    'new_base_salary' => $monthlySalary,
+                    'previous_credit_limit' => $previousBalance ? (float) $previousBalance['credit_limit'] : null,
+                    'new_credit_limit' => $creditLimit,
+                    'previous_salary_profile' => $previousProfile,
+                    'new_salary_profile' => [
+                        'user_type' => $userType, 'employment_type' => $employmentType,
+                        'salary_grade' => $resolvedRate['salary_grade_label'], 'salary_step' => $salaryStep,
+                        'salary_effective_date' => $effectiveDate, 'salary_schedule_id' => $resolvedRate['schedule_id'],
+                    ],
+                    'previous_credit_percentage' => $previousBalance ? SalaryCreditPolicy::percentageFromRate((float) $previousBalance['credit_rate']) : null,
+                    'new_credit_percentage' => $creditPercentage,
+                    'current_debt' => (float) ($previousBalance['current_debt'] ?? 0),
+                ]),
+                'created_at' => date('Y-m-d H:i:s'),
+            ]);
+            if (!$profileAudit) {
+                fclose($handle);
+                $db->transRollback();
+                return $this->response->setStatusCode(500)->setJSON([
+                    'status' => 'error',
+                    'message' => 'Import could not save the financial profile and its audit history. No changes were applied.',
                 ]);
             }
 
@@ -561,6 +544,7 @@ class AccountingController extends Controller
             'entity_id' => (int) $batchId,
             'payload_json' => json_encode([
                 'filename' => $file->getClientName(),
+                'source_sha256' => $sourceHash,
                 'total_rows' => $totalRows,
                 'valid_rows' => $validRows,
                 'invalid_rows' => $invalidRows,
@@ -628,15 +612,13 @@ class AccountingController extends Controller
             return strtolower(trim((string) $value));
         }, $rawHeaders);
 
-        $required = ['employee_id', 'name', 'email', 'user_type', 'employment_type', 'salary_grade', 'salary_step', 'salary_effective_date'];
-        foreach ($required as $field) {
-            if (!in_array($field, $headers, true)) {
-                fclose($handle);
-                return $this->response->setStatusCode(400)->setJSON([
-                    'status' => 'error',
-                    'message' => "Missing required column: {$field}",
-                ]);
-            }
+        $headerError = $this->salaryCsvHeaderError($headers);
+        if ($headerError !== null) {
+            fclose($handle);
+            return $this->response->setStatusCode(400)->setJSON([
+                'status' => 'error',
+                'message' => $headerError,
+            ]);
         }
 
         $db = Database::connect();
@@ -648,6 +630,9 @@ class AccountingController extends Controller
         $creditLimitUpdateCount = 0;
         $invalidPreview = [];
         $validPreview = [];
+        $identityGuard = new SalaryImportIdentityGuard();
+        $seenEmployeeIds = [];
+        $seenEmails = [];
 
         while (($rowValues = fgetcsv($handle)) !== false) {
             $totalRows++;
@@ -658,11 +643,11 @@ class AccountingController extends Controller
 
             $employeeId = $rowAssoc['employee_id'] ?? '';
             $name = $rowAssoc['name'] ?? '';
-            $email = $rowAssoc['email'] ?? '';
+            $email = strtolower($rowAssoc['email'] ?? '');
             $userType = strtolower((string) ($rowAssoc['user_type'] ?? ''));
             $employmentType = SalaryCreditPolicy::normalizeEmploymentType((string) ($rowAssoc['employment_type'] ?? ''));
             $salaryGrade = SalaryCreditPolicy::normalizeSalaryGrade((string) ($rowAssoc['salary_grade'] ?? ''));
-            $salaryStep = (int) ($rowAssoc['salary_step'] ?? 0);
+            $salaryStep = SalaryCreditPolicy::parseSalaryStep($rowAssoc['salary_step'] ?? null);
             $effectiveDate = trim((string) ($rowAssoc['salary_effective_date'] ?? ''));
             $scheduleCode = strtoupper(trim((string) ($rowAssoc['salary_schedule_code'] ?? '')));
             if ($scheduleCode === '') {
@@ -670,13 +655,14 @@ class AccountingController extends Controller
             }
             $creditPercentage = trim((string) ($rowAssoc['credit_percentage'] ?? '')) === ''
                 ? SalaryCreditPolicy::percentageFromRate(SalaryCreditPolicy::DEFAULT_CREDIT_RATE)
-                : (float) $rowAssoc['credit_percentage'];
-            $resolvedRate = (new SalaryScheduleService())->resolveRateByCode($db, $scheduleCode, $salaryGrade, $salaryStep);
+                : SalaryCreditPolicy::parseCreditPercentage($rowAssoc['credit_percentage']);
+            $resolvedRate = $salaryStep === null ? null : (new SalaryScheduleService())->resolveRateByCode($db, $scheduleCode, $salaryGrade, $salaryStep);
             $monthlySalary = (float) ($resolvedRate['monthly_salary'] ?? 0);
-            $creditRate = SalaryCreditPolicy::rateFromPercentage($creditPercentage);
+            $creditRate = SalaryCreditPolicy::rateFromPercentage($creditPercentage ?? 0);
             $creditLimit = SalaryCreditPolicy::creditLimit($monthlySalary, $creditRate);
 
-            $errors = [];
+            $errors = count($rowValues) === count($headers)
+                ? [] : ['row must contain exactly one value for each CSV column'];
             if ($name === '') {
                 $errors[] = 'name is required';
             }
@@ -692,14 +678,25 @@ class AccountingController extends Controller
             if ($resolvedRate === null) {
                 $errors[] = 'salary schedule, grade, and step combination is invalid';
             }
+            if ($salaryStep === null) {
+                $errors[] = 'salary_step must be an integer from 1 to 8';
+            }
             if (!SalaryCreditPolicy::isValidEffectiveDate($effectiveDate)) {
                 $errors[] = 'salary_effective_date must be YYYY-MM-DD';
+            }
+            if (SalaryCreditPolicy::isFutureEffectiveDate($effectiveDate)) {
+                $errors[] = 'future-effective salary profiles cannot be imported until scheduling is available';
             }
             if ($resolvedRate !== null && ($effectiveDate < $resolvedRate['effective_from'] || ($resolvedRate['effective_to'] !== null && $effectiveDate > $resolvedRate['effective_to']))) {
                 $errors[] = 'salary_effective_date is outside the selected schedule';
             }
-            if (!SalaryCreditPolicy::isValidCreditPercentage($creditPercentage)) {
-                $errors[] = 'credit_percentage must be from 0 to 100';
+            if ($creditPercentage === null) {
+                $errors[] = 'credit_percentage must be a number from 0 to 100 with at most two decimals';
+            }
+            $identity = ['errors' => [], 'existing' => null];
+            if ($errors === []) {
+                $identity = $identityGuard->inspect($db, $employeeId, $email, $seenEmployeeIds, $seenEmails);
+                array_push($errors, ...$identity['errors']);
             }
 
             if ($errors !== []) {
@@ -716,13 +713,8 @@ class AccountingController extends Controller
                 continue;
             }
 
-            $existingUser = null;
-            if ($employeeId !== '') {
-                $existingUser = $db->table('users')->where('employee_id', $employeeId)->get()->getRowArray();
-            }
-            if (!$existingUser) {
-                $existingUser = $db->table('users')->where('email', $email)->get()->getRowArray();
-            }
+            $identityGuard->claim($employeeId, $email, $seenEmployeeIds, $seenEmails);
+            $existingUser = $identity['existing'];
 
             $validRows++;
             $action = $existingUser ? 'update' : 'create';
@@ -769,9 +761,31 @@ class AccountingController extends Controller
         ]);
     }
 
+    /** @param list<string> $headers */
+    private function salaryCsvHeaderError(array $headers): ?string
+    {
+        $required = ['employee_id', 'name', 'email', 'user_type', 'employment_type', 'salary_grade', 'salary_step', 'salary_effective_date'];
+        foreach ($required as $field) {
+            if (!in_array($field, $headers, true)) {
+                return "Missing required column: {$field}";
+            }
+        }
+        if (count(array_unique($headers)) !== count($headers)) {
+            return 'CSV column names must be unique.';
+        }
+        $unsupported = array_diff($headers, [...$required, 'salary_schedule_code', 'credit_percentage']);
+        if ($unsupported !== []) {
+            return 'Unsupported CSV columns: ' . implode(', ', $unsupported)
+                . '. This import accepts salary schedule profiles only; debt and salary overrides require their separate workflows.';
+        }
+
+        return null;
+    }
+
     public function updateFinancialProfile()
     {
-        $request = $this->request->getJSON(true) ?? $this->request->getPost();
+        $request = str_contains(strtolower($this->request->getHeaderLine('Content-Type')), 'application/json')
+            ? $this->request->getJSON(true) : $this->request->getPost();
         $result = (new AccountingFinancialProfileService())->update(
             Database::connect(),
             is_array($request) ? $request : [],

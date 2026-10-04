@@ -13,6 +13,8 @@ class DebtPeriodRegisterService
         if ($start === '' || $end === '') {
             return [];
         }
+        $startUtc = ibems_business_day_utc_bounds($start)['start'];
+        $endUtc = ibems_business_day_utc_bounds($end)['end'];
 
         $db = Database::connect();
         $accounts = $db->table('balances b')
@@ -25,6 +27,7 @@ class DebtPeriodRegisterService
             ->getResultArray();
 
         $entriesByUser = [];
+        $historyComplete = true;
         try {
             $entries = $db->table('debt_cashbook_entries')
                 ->select('user_id, direction, amount, created_at')
@@ -36,9 +39,10 @@ class DebtPeriodRegisterService
             }
         } catch (\Throwable) {
             $entriesByUser = [];
+            $historyComplete = false;
         }
 
-        return array_map(function (array $account) use ($entriesByUser, $start, $end): array {
+        return array_map(function (array $account) use ($entriesByUser, $historyComplete, $startUtc, $endUtc): array {
             $userId = (int) $account['user_id'];
             $periodDebits = 0.0;
             $periodCredits = 0.0;
@@ -47,14 +51,14 @@ class DebtPeriodRegisterService
             foreach ($entriesByUser[$userId] ?? [] as $entry) {
                 $amount = round((float) ($entry['amount'] ?? 0), 2);
                 $isDebit = strtolower((string) ($entry['direction'] ?? '')) === 'debit';
-                $date = substr((string) ($entry['created_at'] ?? ''), 0, 10);
-                if ($date >= $start && $date <= $end) {
+                $recordedAt = (string) ($entry['created_at'] ?? '');
+                if ($recordedAt >= $startUtc && $recordedAt <= $endUtc) {
                     if ($isDebit) {
                         $periodDebits += $amount;
                     } else {
                         $periodCredits += $amount;
                     }
-                } elseif ($date > $end) {
+                } elseif ($recordedAt > $endUtc) {
                     if ($isDebit) {
                         $afterDebits += $amount;
                     } else {
@@ -73,7 +77,7 @@ class DebtPeriodRegisterService
                 'period_credits' => round($periodCredits, 2),
                 'cutoff_debt' => $cutoffDebt,
                 'salary_reference' => max(0, round((float) ($account['base_salary'] ?? 0), 2)),
-                'history_complete' => true,
+                'history_complete' => $historyComplete,
             ];
         }, $accounts);
     }

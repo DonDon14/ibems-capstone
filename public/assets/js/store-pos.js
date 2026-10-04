@@ -3,6 +3,7 @@ let productsCache = [];
 let productsLoadCompleted = false;
 let filteredProducts = [];
 let activeStoreId = null;
+let waterStationInternalOnly = false;
 let myStores = [];
 let searchQuery = "";
 let categories = ["All"];
@@ -19,12 +20,17 @@ let lastReceipt = null;
 let lastCardAddAt = 0;
 let scannerEngine = null;
 let scannerRunning = false;
+let scannerSession = null;
+let scannerCleanupPromise = Promise.resolve();
 let scannerLastDetected = "";
 let scannerLastDetectedAt = 0;
 let scannerMode = "product";
 let pendingTransaction = null;
 let paymentMethodsCache = [];
 let openingBalanceReady = false;
+let openingBalanceSubmitting = false;
+let storeDayCloseSubmitting = false;
+let storeDayCloseOpenVersion = 0;
 const currentUserRole = String(document.querySelector(".pos-shell")?.dataset.userRole || "").toUpperCase();
 const isAdminUser = currentUserRole === "ADMIN";
 let openingBalanceMode = "create";
@@ -141,7 +147,9 @@ document.addEventListener("error", (event) => replaceBrokenCatalogImage(event.ta
 
 function closeProductVariantPicker() {
     activeVariantFamilyKey = null;
-    document.getElementById("product-variant-modal").style.display = "none";
+    const modal = document.getElementById("product-variant-modal");
+    modal.style.display = "none";
+    releasePosCheckoutDialogFocus(modal);
 }
 
 function openProductVariantPicker(familyKey) {
@@ -174,8 +182,13 @@ function openProductVariantPicker(familyKey) {
             <span class="product-variant-option-side"><strong>${formatMoney(variant.price)}</strong><small>${tracked ? `${stock} available` : `Per ${escapeHtml(variant.unit_code || "unit")}`}</small></span>
         </button>`;
     }).join("");
-    document.getElementById("product-variant-modal").style.display = "grid";
-    document.querySelector("[data-pick-variant]:not(:disabled)")?.focus();
+    const modal = document.getElementById("product-variant-modal");
+    modal.style.display = "grid";
+    const firstAvailable = modal.querySelector("[data-pick-variant]:not(:disabled)");
+    if (!firstAvailable) {
+        document.getElementById("product-variant-guidance").textContent = "All variants are currently unavailable. Choose another product or adjust quantities already in the order.";
+    }
+    focusPosCheckoutDialog(modal, firstAvailable);
 }
 
 function setOpeningReadinessState(state, message = "") {
@@ -231,10 +244,12 @@ function showToast(message, type = "success", timeoutMs = 3000) {
 
     const host = ensureToastHost();
     const toast = document.createElement("div");
-    const cssType = type === "error" ? "is-error" : "is-success";
+    const cssType = type === "error" ? "is-error" : type === "warning" ? "is-warning" : "is-success";
     toast.className = `toast-item ${cssType}`;
     toast.textContent = text;
+    toast.setAttribute('role', type === 'error' ? 'alert' : 'status');
     host.appendChild(toast);
+    if (type === 'error') window.IbemsFeedbackSound?.play('error');
 
     window.setTimeout(() => {
         toast.remove();
@@ -396,7 +411,7 @@ function getProductById(productId) {
     return productsCache.find((p) => Number(p.id) === Number(productId));
 }
 function productTracksStock(product) {
-    return String(product?.stock_policy || "tracked") === "tracked";
+    return product?.daily_remaining !== undefined || String(product?.stock_policy || "tracked") === "tracked";
 }
 
 function sanitizeIconClass(iconClass) {
@@ -473,17 +488,24 @@ function getCartQty(productId) {
 function setResult(message, type) {
     const resultEl = document.getElementById("result");
     resultEl.textContent = message || "";
-    resultEl.style.color = type === "error" ? "#b91c1c" : "#166534";
+    resultEl.dataset.tone = type === 'error' ? 'error' : type === 'warning' ? 'warning' : 'success';
+    resultEl.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    resultEl.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
+    resultEl.setAttribute('aria-atomic', 'true');
     if (message) {
-        showToast(message, type === "error" ? "error" : "success");
+        showToast(message, type === "error" ? "error" : type === "warning" ? "warning" : "success");
     }
 }
 
 function setOpeningBalanceResult(message, type) {
     const resultEl = document.getElementById("opening-balance-result");
     if (!resultEl) return;
+    resultEl.setAttribute('role', type === 'error' ? 'alert' : 'status');
+    resultEl.setAttribute('aria-live', type === 'error' ? 'assertive' : 'polite');
+    resultEl.setAttribute('aria-atomic', 'true');
     resultEl.textContent = message || "";
-    resultEl.style.color = type === "error" ? "#b91c1c" : "#166534";
+    resultEl.dataset.tone = type === 'error' ? 'error' : 'success';
+    if (type === 'error' && resultEl.getClientRects?.().length) resultEl.focus();
     if (message) {
         showToast(message, type === "error" ? "error" : "success");
     }
@@ -521,6 +543,7 @@ function setPosTransactionEnabled(enabled) {
 }
 
 function openOpeningBalanceModal(prefill = null) {
+    if (openingBalanceSubmitting) return;
     const modal = document.getElementById("opening-balance-modal");
     const titleEl = document.getElementById("opening-balance-title");
     const descEl = document.getElementById("opening-balance-description");
@@ -531,6 +554,14 @@ function openOpeningBalanceModal(prefill = null) {
     if (!modal) return;
     const accountWrap = document.getElementById("opening-payment-account-balances");
     const accounts = paymentMethodsCache.flatMap((method) => (method.destination_accounts || []).map((account) => ({...account, payment_method_label: method.label})));
+    const cashCounterToggle = modal.querySelector('[data-denomination-target="opening"]');
+    if (cashCounterToggle) {
+        cashCounterToggle.disabled = openingBalanceMode === "reopen";
+        if (cashCounterToggle.disabled) {
+            document.getElementById("opening-denomination-counter")?.classList.add("is-hidden");
+            cashCounterToggle.setAttribute("aria-expanded", "false");
+        }
+    }
     if (accountWrap) accountWrap.innerHTML = accounts.length ? `<div class="opening-account-head"><strong>Electronic receiving accounts</strong><small>Enter the verified starting balance of each account.</small></div>${accounts.map((account) => `<label class="store-day-account-count"><span><strong>${escapeHtml(account.payment_method_label)} · ${escapeHtml(account.account_name)}</strong><small>${escapeHtml(account.masked_number)}</small></span><input type="number" min="0" step="0.01" value="0.00" data-opening-account-id="${Number(account.id)}"></label>`).join("")}` : "";
     if (prefill && typeof prefill.opening_cash !== "undefined") {
         document.getElementById("opening-balance-input").value = Number(prefill.opening_cash || 0).toFixed(2);
@@ -541,7 +572,7 @@ function openOpeningBalanceModal(prefill = null) {
         });
     }
     if (openingBalanceMode === "reopen") {
-        if (titleEl) titleEl.innerHTML = '<i class="bi bi-arrow-clockwise"></i> Admin Reopen Store Day';
+        if (titleEl) titleEl.innerHTML = '<i class="bi bi-arrow-clockwise" aria-hidden="true"></i> Admin Reopen Store Day';
         if (descEl) descEl.textContent = "Review the previous close and explain why more transactions must be added. Original opening balances will not change.";
         if (labelEl) labelEl.textContent = "Original Opening Cash (preserved)";
         document.getElementById("opening-balance-input").disabled = true;
@@ -554,7 +585,7 @@ function openOpeningBalanceModal(prefill = null) {
             previewEl.classList.remove("is-hidden");
             previewEl.innerHTML = `<strong>Previous close</strong><div><span>Closed at</span><b>${escapeHtml(prefill?.closed_at ? formatDateTime(prefill.closed_at) : "-")}</b></div><div><span>Expected total</span><b>${escapeHtml(formatMoney(Number(prefill?.expected_cash || 0) + Number(prefill?.expected_ecash || 0)))}</b></div><div><span>Counted total</span><b>${escapeHtml(formatMoney(Number(prefill?.counted_cash || 0) + Number(prefill?.counted_ecash || 0)))}</b></div><div><span>Variance</span><b>${escapeHtml(formatMoney(Number(prefill?.variance_cash || 0) + Number(prefill?.variance_ecash || 0)))}</b></div>${prefill?.closing_note ? `<small>Closing note: ${escapeHtml(prefill.closing_note)}</small>` : ""}`;
         }
-        if (saveBtn) saveBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Reopen Store Day';
+        if (saveBtn) saveBtn.innerHTML = '<i class="bi bi-check2-circle" aria-hidden="true"></i> Reopen Store Day';
     } else {
         document.getElementById("opening-balance-input").disabled = false;
         document.querySelectorAll("[data-opening-account-id]").forEach((input) => { input.disabled = false; });
@@ -562,22 +593,25 @@ function openOpeningBalanceModal(prefill = null) {
         if (noteLabel) noteLabel.textContent = "Note (optional)";
         document.getElementById("opening-balance-note").required = false;
         document.getElementById("opening-balance-note").placeholder = "e.g. Start of day float";
-        if (titleEl) titleEl.innerHTML = '<i class="bi bi-safe2"></i> Open Store Day';
+        if (titleEl) titleEl.innerHTML = '<i class="bi bi-safe2" aria-hidden="true"></i> Open Store Day';
         if (descEl) descEl.textContent = "Count today's starting cash and every electronic receiving account.";
         if (labelEl) labelEl.textContent = "Opening Cash";
-        if (saveBtn) saveBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Open Store Day';
+        if (saveBtn) saveBtn.innerHTML = '<i class="bi bi-check2-circle" aria-hidden="true"></i> Open Store Day';
     }
     setOpeningBalanceResult("", "ok");
     modal.style.display = "grid";
+    focusPosCheckoutDialog(modal, document.getElementById(openingBalanceMode === "reopen" ? "opening-balance-close" : "opening-balance-input"));
 }
 
-function closeOpeningBalanceModal() {
+function closeOpeningBalanceModal(force = false) {
+    if (openingBalanceSubmitting && force !== true) return;
     const modal = document.getElementById("opening-balance-modal");
     if (!modal) return;
     modal.style.display = "none";
+    releasePosCheckoutDialogFocus(modal);
 }
 
-async function loadOpeningBalanceStatus() {
+async function loadOpeningBalanceStatus(reportError = true) {
     if (!activeStoreId) return;
     try {
         const data = await requestJson(
@@ -596,12 +630,14 @@ async function loadOpeningBalanceStatus() {
         if (openingBalanceReady) {
             closeOpeningBalanceModal();
         }
+        return true;
     } catch (error) {
         openingBalanceReady = false;
         currentDaySession = null;
         updateOpeningBalanceDisplay(null, null);
         setOpeningReadinessState("error", "Unable to verify store day status. Check connection or try again.");
         setPosTransactionEnabled(false);
-        setOpeningBalanceResult("Unable to verify store day status.", "error");
+        if (reportError) setOpeningBalanceResult("Unable to verify store day status.", "error");
+        return false;
     }
 }

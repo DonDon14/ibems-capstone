@@ -1,5 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600&display=swap");
-
 :root {
     --auth-bg-dark: #0b1732;
     --auth-bg-mid: #123f8a;
@@ -236,28 +234,6 @@ button:disabled {
     to { transform: rotate(360deg); }
 }
 
-.demo-creds {
-    margin-top: 10px;
-    width: 100%;
-    max-width: 380px;
-    display: grid;
-    gap: 4px;
-    padding-top: 14px;
-    border-top: 1px dashed #d4dceb;
-}
-
-.demo-creds strong {
-    font-size: 0.76rem;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    color: #374151;
-}
-
-.demo-creds span {
-    font-size: 0.8rem;
-    color: #6b7280;
-}
-
 .auth-role-list {
     width: 100%;
     max-width: 380px;
@@ -479,8 +455,7 @@ body.auth-modern {
 
 .auth-modern .auth-form,
 .auth-modern .auth-role-list,
-.auth-modern #status,
-.auth-modern .demo-creds {
+.auth-modern #status {
     max-width: 360px;
 }
 
@@ -488,8 +463,7 @@ body.auth-modern {
     gap: 8px;
 }
 
-.auth-modern label,
-.auth-modern .demo-creds strong {
+.auth-modern label {
     color: #475569;
     font-family: "JetBrains Mono", ui-monospace, monospace;
     font-size: 0.65rem;
@@ -544,24 +518,34 @@ body.auth-modern {
     box-shadow: 0 0 0 2px #fff, 0 0 0 4px #2563eb;
 }
 
-.auth-modern .demo-creds {
-    margin-top: 16px;
-    padding: 14px;
-    gap: 5px;
-    border: 1px dashed #cbd5e1;
-    border-radius: 12px;
-    background: #f8fafc;
-}
-
-.auth-modern .demo-creds span {
-    color: #64748b;
-    font-family: "JetBrains Mono", ui-monospace, monospace;
-    font-size: 0.67rem;
-}
-
 .auth-modern .auth-role-list {
     gap: 10px;
 }
+
+.auth-modern.auth-role-selection #status {
+    width: 100%;
+    max-width: 420px;
+    overflow-wrap: anywhere;
+}
+.auth-modern.auth-role-selection #status.loading {
+    padding: 12px 14px;
+    color: #1e40af;
+    border: 1px solid #bfdbfe;
+    border-radius: 12px;
+    background: #eff6ff;
+    text-align: left;
+}
+.auth-modern.auth-role-selection #status:focus-visible {
+    outline: 2px solid #2563eb;
+    outline-offset: 3px;
+}
+.auth-modern .auth-role-btn:disabled { cursor: wait; }
+html[data-theme="dark"] .auth-modern.auth-role-selection #status.loading {
+    color: #bfdbfe;
+    border-color: #365783;
+    background: #142d4d;
+}
+html[data-theme="dark"] .auth-modern.auth-role-selection #status:focus-visible { outline-color: #93c5fd; }
 
 .auth-modern .auth-role-btn {
     min-height: 70px;
@@ -647,9 +631,8 @@ body.auth-modern {
 
 .auth-modern .auth-role-meta > span {
     min-width: 0;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
+    overflow-wrap: anywhere;
+    white-space: normal;
 }
 
 .auth-modern .auth-role-arrow {
@@ -692,7 +675,7 @@ html[data-theme="dark"] .auth-modern .auth-panel-form {
 
 html[data-theme="dark"] .auth-modern .auth-mark {
     border-color: #405672;
-    background: #14243a;
+    background: #e8f1ff;
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.26);
 }
 
@@ -700,13 +683,11 @@ html[data-theme="dark"] .auth-modern h1 {
     color: #f4f7fb;
 }
 
-html[data-theme="dark"] .auth-modern p,
-html[data-theme="dark"] .auth-modern .demo-creds span {
+html[data-theme="dark"] .auth-modern p {
     color: #9fb0c4;
 }
 
-html[data-theme="dark"] .auth-modern label,
-html[data-theme="dark"] .auth-modern .demo-creds strong {
+html[data-theme="dark"] .auth-modern label {
     color: #c6d2e1;
 }
 
@@ -728,11 +709,6 @@ html[data-theme="dark"] .auth-modern input:hover {
 html[data-theme="dark"] .auth-modern input:focus {
     border-color: #5b9cf5;
     box-shadow: 0 0 0 3px rgba(91, 156, 245, 0.2);
-}
-
-html[data-theme="dark"] .auth-modern .demo-creds {
-    border-color: #405672;
-    background: #14243a;
 }
 
 html[data-theme="dark"] .auth-modern .auth-panel-art {
@@ -809,6 +785,12 @@ html[data-theme="dark"] .auth-modern .auth-role-btn:hover {
     border-color: #5b83b2;
     background: #17304e;
     box-shadow: 0 6px 18px rgba(0, 0, 0, 0.24);
+}
+
+html[data-theme="dark"] .auth-modern .auth-role-btn:focus-visible {
+    outline: 2px solid #93c5fd;
+    outline-offset: 3px;
+    box-shadow: 0 0 0 2px #14243a, 0 0 0 4px #93c5fd;
 }
 
 html[data-theme="dark"] .auth-modern .auth-role-icon {
@@ -920,4 +902,21 @@ html.theme-transitioning-fallback body {
     0% { opacity: 1; }
     45%, 55% { opacity: 0; }
     100% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .auth-modern,
+    .auth-modern *,
+    .auth-modern *::before,
+    .auth-modern *::after,
+    html.theme-transitioning-fallback body,
+    html.theme-transitioning::view-transition-old(root),
+    html.theme-transitioning::view-transition-new(root) {
+        animation-duration: 0.01ms !important;
+        animation-delay: 0ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+        transition-delay: 0ms !important;
+        scroll-behavior: auto !important;
+    }
 }

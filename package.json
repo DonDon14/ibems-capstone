@@ -27,5 +27,11 @@
   "devDependencies": {
     "@tailwindcss/cli": "^4.2.4",
     "tailwindcss": "^4.2.4"
+  },
+  "dependencies": {
+    "bootstrap-icons": "1.11.3",
+    "chart.js": "4.4.3",
+    "html5-qrcode": "2.3.8",
+    "qrcode-generator": "1.4.4"
   }
 }

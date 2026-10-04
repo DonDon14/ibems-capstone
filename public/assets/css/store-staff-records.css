@@ -11,9 +11,12 @@
     gap: 12px;
 }
 
-.staff-head h3 {
+.staff-head h3,
+.staff-card-head h4 {
     margin: 0;
     color: #003366;
+    font-size: 1.05rem;
+    font-weight: 650 !important;
 }
 
 .staff-head p {
@@ -198,7 +201,7 @@
 .staff-result.is-error,
 .scanner-status.is-error { color: #b91c1c; }
 
-html[data-theme="dark"] .ibems-modern .staff-result { color: #86efac; }
+html[data-theme="dark"] .ibems-modern .app-container .staff-result { color: #86efac; }
 html[data-theme="dark"] .ibems-modern :is(.staff-result.is-error, .scanner-status.is-error) { color: #fca5a5; }
 
 

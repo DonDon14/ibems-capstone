@@ -1,0 +1,25 @@
+const test=require('node:test'),assert=require('node:assert/strict'),vm=require('node:vm');
+const {fixture,previewData,validRow,reply}=require('./helpers/accounting-import-fixture.cjs');
+test('preview captures exact file multipart packet, freezes changes, suppresses duplicates and enables only its valid review',async()=>{
+    let release;const f=fixture({fetch:()=>new Promise(resolve=>release=resolve)}),loading=f.preview();
+    await f.preview();assert.equal(f.requests.length,1);assert.equal(f.requests[0].url,'/accounting/debts/preview-csv');assert.equal(f.requests[0].options.body.fields[0][0],'csv_file');assert.equal(f.requests[0].options.body.fields[0][1],f.file);assert.equal(f.requests[0].options.signal,f.signal);
+    assert.equal(f.node('import-csv-file').disabled,true);assert.equal(f.node('close-import-csv').disabled,false);assert.equal(f.modal.getAttribute('aria-busy'),'true');
+    release(reply(previewData()));await loading;assert.equal(f.node('import-csv-submit').disabled,false);assert.equal(f.node('import-csv-file').disabled,false);assert.equal(f.result.getAttribute('role'),'status');assert.match(f.result.textContent,/Preview ready.*Valid: 1.*Invalid: 1/);assert.match(f.result.className,/is-warning/);assert.deepEqual(f.sounds,[]);
+});
+for(const failure of ['network','parser','http','application','missing counts','wrong filename','bad totals','missing rows','invalid salary','bad line','duplicate line'])test(`preview ${failure} stays unavailable and a fresh preview recovers`,async()=>{
+    let fail=true;const f=fixture({fetch:async()=>{if(!fail)return reply(previewData());if(failure==='network')throw Error('Offline');if(failure==='parser')return{ok:true,json:async()=>{throw Error('Parser');}};const data=previewData();if(failure==='application')data.status='error';if(failure==='missing counts')delete data.create_count;if(failure==='wrong filename')data.filename='other.csv';if(failure==='bad totals')data.total_rows=20;if(failure==='missing rows')data.valid_preview=[];if(failure==='invalid salary')data.valid_preview=[validRow({monthly_salary:''})];if(failure==='bad line')data.invalid_preview[0].line='<script>';if(failure==='duplicate line')data.invalid_preview[0].line=2;return reply(data,failure!=='http');}});
+    await f.preview();assert.equal(f.node('import-csv-submit').disabled,true);assert.equal(f.context.importCsvPreviewReady,false);assert.equal(f.result.getAttribute('role'),'alert');assert.equal(f.node('import-csv-file').files[0],f.file);assert.deepEqual(f.sounds,[]);fail=false;await f.preview();assert.equal(f.node('import-csv-submit').disabled,false);
+});
+for(const departure of ['file','close','abort','detach','page'])test(`late preview after ${departure} cannot enable Apply or replace current feedback`,async()=>{
+    let release;const f=fixture({fetch:()=>new Promise(resolve=>release=resolve)}),loading=f.preview();if(departure==='file'){f.node('import-csv-file').files=[{name:'new.csv'}];f.actions.invalidate();}if(departure==='close')vm.runInContext('closeImportModal()',f.context);if(departure==='abort')f.signal.aborted=true;if(departure==='detach')f.modal.isConnected=false;if(departure==='page')f.context.window.IbemsPortalNavigation.currentSignal={aborted:false};
+    const message=f.result.textContent;release(reply(previewData()));await loading;assert.equal(f.result.textContent,message);assert.equal(f.node('import-csv-submit').disabled,true);assert.equal(f.actions.busy,false);assert.equal(f.node('import-csv-file').disabled,false);
+});
+test('confirmed empty and all-invalid previews remain truthful and cannot apply',async()=>{
+    for(const empty of [true,false]){const f=fixture({fetch:async()=>reply(previewData({total_rows:empty?0:1,valid_rows:0,invalid_rows:empty?0:1,create_count:0,update_count:0,credit_limit_update_count:0,valid_preview:[],invalid_preview:empty?[]:[{line:2,error:'Invalid fixture'}]}))});await f.preview();assert.equal(f.node('import-csv-submit').disabled,true);assert.equal(f.result.getAttribute('role'),'status');assert.match(f.result.textContent,empty?/no data rows/:/All 1 rows are invalid/);}
+});
+test('rendered preview escapes server strings and outside focus survives',async()=>{
+    let release;const f=fixture({fetch:()=>new Promise(resolve=>release=resolve)}),loading=f.preview();f.node('outside').focus();release(reply(previewData({valid_preview:[validRow({name:'Fictional <script>'})]})));await loading;assert.equal(f.document.activeElement,f.node('outside'));assert.match(f.node('import-csv-valid').innerHTML,/Fictional &lt;script>/);assert.doesNotMatch(f.node('import-csv-valid').innerHTML,/<script>/);
+});
+test('missing or unsupported file receives local validation without a request',async()=>{
+    const f=fixture();f.node('import-csv-file').files=[];await f.preview();assert.equal(f.document.activeElement,f.node('import-csv-file'));assert.equal(f.requests.length,0);f.node('import-csv-file').files=[{name:'fictional.pdf'}];await f.preview();assert.match(f.result.textContent,/\.csv or \.txt/);assert.equal(f.requests.length,0);
+});

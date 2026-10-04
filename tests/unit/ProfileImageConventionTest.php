@@ -40,8 +40,8 @@ class ProfileImageConventionTest extends TestCase
         $this->assertStringContainsString("'USER_CHANGE_PASSWORD'", $controller);
         $this->assertStringContainsString('id="account-security-modal"', $shell);
         $this->assertStringContainsString('autocomplete="current-password"', $shell);
-        $this->assertStringContainsString('submitJson("/profile/password"', $script);
-        $this->assertStringContainsString('submitJson("/profile/debt-pin"', $script);
+        $this->assertStringContainsString('url: "/profile/password"', $script);
+        $this->assertStringContainsString('url: "/profile/debt-pin"', $script);
     }
 
     public function testAuthenticatedUploadUsesTheManagedImageStoragePath(): void

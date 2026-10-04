@@ -1,0 +1,34 @@
+.offering-shell{max-width:1300px;margin:auto;padding:20px;color:var(--text-main,inherit)}
+.offering-shell h2{margin-top:30px}.offering-shell p{line-height:1.6}.offering-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:16px;margin-block:18px}
+.food-template-photo{width:100%;height:190px;object-fit:contain;border-radius:10px;background:var(--surface-soft,#f8fafc)}.offering-shell fieldset{margin:12px 0;padding:12px;border:1px solid #64748b;border-radius:8px}.offering-shell textarea{width:100%;min-height:80px;background:transparent;color:inherit;border:1px solid #64748b}
+.offering-panel{border:1px solid var(--border,#64748b);border-radius:14px;padding:20px;background:var(--surface,#fff)}
+.offering-shell label{display:grid;gap:6px;margin-block:12px}.offering-shell input,.offering-shell select{min-height:42px;padding:8px;border:1px solid #64748b;border-radius:7px;color:inherit;background:transparent;max-width:100%;width:100%}
+.offering-shell button{min-height:42px;margin:6px 6px 6px 0}.offering-shell input[type=checkbox]{width:20px;min-height:20px}.offering-shell summary{cursor:pointer;font-weight:600}.offering-shell [hidden]{display:none!important}
+.offering-shell .is-error{color:#dc2626}.offering-shell .is-selected{border:2px solid #22c55e}.offering-shell button:disabled{opacity:.5}.offering-shell form{margin-bottom:16px}
+html[data-theme=dark] .offering-shell .is-error{color:#fca5a5}html[data-theme=dark] .offering-panel{background:var(--surface-soft,#14263d)}html[data-theme=dark] .offering-shell select option{background:#14263d;color:#fff}
+.offering-shell > h1 { margin: 0 0 .4rem; font-size: 1.5rem; font-weight: 700; line-height: 1.25; color: var(--text-main); }
+.offering-shell > p { color: var(--text-soft); }
+.offering-shell h2 { font-size: 1.2rem; font-weight: 650; }
+.offering-shell h3 { font-size: 1rem; font-weight: 600; }
+.offering-grid { align-items: start; }
+.offering-panel { min-width: 0; overflow-wrap: anywhere; }
+.offering-shell #offering-result {
+    overflow-wrap: anywhere;
+}
+.offering-shell #offering-result:focus {
+    outline: 2px solid currentColor;
+    outline-offset: 4px;
+    border-radius: 4px;
+}
+.offering-shell :is(.primary-btn, .secondary-btn) {
+    max-width: 100%;
+    white-space: normal;
+    padding-block: 10px;
+    line-height: 1.4;
+    text-align: center;
+}
+.offering-shell summary:focus-visible {
+    outline: 2px solid var(--text-main, #0f172a);
+    outline-offset: 4px;
+    border-radius: 4px;
+}

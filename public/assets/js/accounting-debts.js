@@ -8,13 +8,11 @@ let employeeModalProfile = null;
 let settlementRunsCache = [];
 let importCsvPreviewReady = false;
 let activeSettlementDetails = null;
-let deductionWorkflowPeriods = [];
-let deductionWorkflowRegister = [];
-let deductionWorkflowItems = [];
 let acctPage = 1;
 let acctSalarySchedules = [];
 let acctDefaultCreditPercentage = 25;
 let acctSalarySchedulesPromise = null;
+let acctSalarySchedulesSignal;
 
 function aEscape(value) {
     return String(value ?? "")
@@ -41,18 +39,49 @@ function aMoney(value) {
 }
 
 async function loadAcctSalarySchedules() {
-    if (acctSalarySchedulesPromise) return acctSalarySchedulesPromise;
-    acctSalarySchedulesPromise = fetch("/accounting/salary-schedules")
-        .then((response) => response.json())
-        .then((data) => {
-            if (!data || data.status !== "success" || !Array.isArray(data.data) || !data.data.length) {
-                throw new Error(data?.message || "Salary schedules are unavailable. Apply the latest development database migration, then refresh this page.");
-            }
-            acctSalarySchedules = data.data;
-            acctDefaultCreditPercentage = Number(data.default_credit_percentage ?? 25);
-            return acctSalarySchedules;
-        });
-    return acctSalarySchedulesPromise;
+    const signal = window.IbemsPortalNavigation?.currentSignal;
+    if (signal?.aborted) throw new Error("Salary schedule request ended.");
+    if (acctSalarySchedulesPromise && acctSalarySchedulesSignal === signal) return acctSalarySchedulesPromise;
+    acctSalarySchedulesSignal = signal;
+    const numeric = value => (typeof value === "number" || typeof value === "string" && value.trim() !== "") && Number.isFinite(Number(value));
+    const positiveId = value => numeric(value) && Number.isSafeInteger(Number(value)) && Number(value) > 0;
+    const date = value => typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value)
+        && Number.isFinite(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0,10) === value;
+    const request = Promise.resolve().then(async () => {
+        const response = await fetch("/accounting/salary-schedules", {signal, cache: "no-store"});
+        const data = await response.json();
+        if (signal?.aborted || signal !== window.IbemsPortalNavigation?.currentSignal || acctSalarySchedulesPromise !== request) throw new Error("Salary schedule request ended.");
+        const percentage = data?.default_credit_percentage ?? 25;
+        const ids = new Set();
+        const valid = response.ok && data?.status === "success" && Array.isArray(data.data) && data.data.length
+            && numeric(percentage) && Number(percentage) >= 0 && Number(percentage) <= 100
+            && data.data.every(schedule => {
+                if (!schedule || !positiveId(schedule.id) || ids.has(Number(schedule.id))
+                    || typeof schedule.name !== "string" || !schedule.name.trim() || typeof schedule.code !== "string" || !schedule.code.trim()
+                    || !date(schedule.effective_from) || schedule.effective_to != null && (!date(schedule.effective_to) || schedule.effective_to < schedule.effective_from)
+                    || !Array.isArray(schedule.rates) || !schedule.rates.length) return false;
+                ids.add(Number(schedule.id));
+                const rates = new Set();
+                return schedule.rates.every(rate => {
+                    if (!rate || !positiveId(rate.salary_grade) || !positiveId(rate.salary_step) || !numeric(rate.monthly_salary) || Number(rate.monthly_salary) <= 0) return false;
+                    const key = `${Number(rate.salary_grade)}:${Number(rate.salary_step)}`;
+                    if (rates.has(key)) return false;
+                    rates.add(key); return true;
+                });
+            });
+        if (!valid) throw new Error("Salary schedules could not be loaded. Retry employee details to check again.");
+        acctSalarySchedules = data.data;
+        acctDefaultCreditPercentage = Number(percentage);
+        return acctSalarySchedules;
+    }).catch(error => {
+        if (acctSalarySchedulesPromise === request) {
+            acctSalarySchedulesPromise = null;
+            if (!signal?.aborted && signal === window.IbemsPortalNavigation?.currentSignal) acctSalarySchedules = [];
+        }
+        throw error;
+    });
+    acctSalarySchedulesPromise = request;
+    return request;
 }
 
 function selectedAcctSalarySchedule() {
@@ -84,13 +113,19 @@ function populateAcctSalaryProfile(profile = {}) {
     stepEl.value = String(steps.includes(requestedStep) ? requestedStep : steps[0] || "");
 
     document.getElementById("employee-employment-type").value = profile.employment_type || "plantilla";
-    const today = new Date().toISOString().slice(0, 10);
+    const today = new Intl.DateTimeFormat("en-CA", {timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit"}).format(new Date());
     const defaultEffectiveDate = today < (schedule?.effective_from || today)
         ? schedule.effective_from
         : (schedule?.effective_to && today > schedule.effective_to ? schedule.effective_to : today);
     document.getElementById("employee-salary-effective-date").value = profile.salary_effective_date || defaultEffectiveDate;
     document.getElementById("employee-credit-percentage").value = Number(profile.credit_percentage ?? acctDefaultCreditPercentage);
+    const selectedRate = rates.find((rate) => Number(rate.salary_grade) === Number(gradeEl.value) && Number(rate.salary_step) === Number(stepEl.value));
+    const savedSalary = Number(profile.base_salary || 0);
+    document.getElementById("employee-salary-value").value = (savedSalary > 0 ? savedSalary : Number(selectedRate?.monthly_salary || 0)).toFixed(2);
     refreshDynamicCreditPreview();
+    ["employee-employment-type", "employee-salary-effective-date"].forEach((id) => {
+        document.getElementById(id).dispatchEvent(new Event("change", {bubbles: true}));
+    });
 }
 
 function aDateTime(value) {
@@ -132,7 +167,7 @@ function debtStatusPill(row) {
 function setAcctResult(message, type) {
     const el = document.getElementById("acct-result");
     el.textContent = message || "";
-    el.style.color = type === "error" ? "#b91c1c" : "#166534";
+    el.style.color = type === "error" ? "var(--feedback-error, #b91c1c)" : "var(--feedback-success, #166534)";
 }
 
 function renderSummary(rows) {
@@ -155,7 +190,8 @@ function renderSettlementRuns(rows) {
 
     wrap.innerHTML = settlementRunsCache.map((row) => {
         const notes = row.notes || {};
-        const deducted = Number(notes.total_deducted || 0);
+        const deducted = notes.total_deducted;
+        const recordedDeduction = (typeof deducted === "number" || typeof deducted === "string" && deducted.trim() !== "") && Number.isFinite(Number(deducted)) && Number(deducted) >= 0;
         return `
             <button class="history-item run-item w-full rounded-xl border border-slate-200 bg-white p-3 text-left transition hover:bg-slate-50" type="button" data-settle-run="${row.id}">
                 <div class="h-top flex items-center justify-between gap-2 text-xs text-slate-500">
@@ -165,7 +201,7 @@ function renderSettlementRuns(rows) {
                 <div class="h-body mt-1 text-sm text-slate-700">
                     Payroll accounts: ${aEscape(String(row.total_accounts || 0))} |
                     Debt Before: ${aEscape(aMoney(row.total_debt_before || 0))} |
-                    Deducted: ${aEscape(aMoney(deducted))}
+                    Deducted: ${aEscape(recordedDeduction ? aMoney(deducted) : "Not recorded")}
                 </div>
             </button>
         `;
@@ -173,78 +209,60 @@ function renderSettlementRuns(rows) {
 
 }
 
+let settlementDetailsReturnFocus = null;
 async function openSettlementRunDetails(runId) {
     const modal = document.getElementById("settlement-run-details-modal");
+    if (getComputedStyle(modal).display === "none") settlementDetailsReturnFocus = document.activeElement;
+    document.getElementById("settlement-run-modal").inert = true;
+    document.getElementById("settlement-run-modal").setAttribute("aria-hidden", "true");
+    modal.style.display = "grid";
+    document.getElementById("close-settlement-run-details").focus();
+    return window.IbemsLegacyHistory.details(runId);
+}
+
+function renderSettlementDetails(data) {
+    const run = data.run, summary = data.summary, notes = run.notes;
     const head = document.getElementById("settlement-details-head");
     const body = document.getElementById("settlement-details-body");
-    const exportBtn = document.getElementById("settlement-details-export");
-    const printBtn = document.getElementById("settlement-details-print");
-    activeSettlementDetails = null;
-    if (exportBtn) exportBtn.disabled = true;
-    if (printBtn) printBtn.disabled = true;
-    modal.style.display = "grid";
-    head.innerHTML = "Loading salary deduction batch details...";
-    body.innerHTML = '<tr><td colspan="6">Loading details...</td></tr>';
-    document.getElementById("settle-details-count").textContent = "0";
-    document.getElementById("settle-details-deducted").textContent = aMoney(0);
-    document.getElementById("settle-details-after").textContent = aMoney(0);
+    head.innerHTML = `
+        <div><strong>Run Month:</strong> ${aEscape(run.run_month || "-")}</div>
+        <div><strong>Run At:</strong> ${aEscape(aDateTime(run.run_at))}</div>
+        <div><strong>Run By:</strong> ${aEscape(run.run_by_name || "Unknown")}</div>
+        <div><strong>Notes:</strong> ${aEscape(notes.note || "-")}</div>
+    `;
 
-    try {
-        const response = await fetch(`/accounting/settlement/runs/${Number(runId)}`);
-        const data = await response.json();
-        if (!data || data.status !== "success") {
-            head.innerHTML = '<div class="mode-profile-empty">Failed to load salary deduction batch details.</div>';
-            body.innerHTML = '<tr><td colspan="6">No details available.</td></tr>';
-            return;
-        }
+    document.getElementById("settle-details-count").textContent = String(summary.processed_accounts || 0);
+    document.getElementById("settle-details-deducted").textContent = aMoney(summary.total_deducted || 0);
+    document.getElementById("settle-details-after").textContent = aMoney(summary.total_debt_after || 0);
 
-        activeSettlementDetails = data;
-        const run = data.run || {};
-        const summary = data.summary || {};
-        const notes = run.notes || {};
-        if (exportBtn) exportBtn.disabled = false;
-        if (printBtn) printBtn.disabled = false;
-
-        head.innerHTML = `
-            <div><strong>Run Month:</strong> ${aEscape(run.run_month || "-")}</div>
-            <div><strong>Run At:</strong> ${aEscape(aDateTime(run.run_at || new Date().toISOString()))}</div>
-            <div><strong>Run By:</strong> ${aEscape(run.run_by_name || "Unknown")}</div>
-            <div><strong>Notes:</strong> ${aEscape(notes.note || "-")}</div>
-        `;
-
-        document.getElementById("settle-details-count").textContent = String(summary.processed_accounts || 0);
-        document.getElementById("settle-details-deducted").textContent = aMoney(summary.total_deducted || 0);
-        document.getElementById("settle-details-after").textContent = aMoney(summary.total_debt_after || 0);
-
-        const rows = Array.isArray(data.items) ? data.items : [];
-        if (rows.length === 0) {
-            body.innerHTML = '<tr><td colspan="6">No deducted accounts found for this batch.</td></tr>';
-            return;
-        }
-
-        body.innerHTML = rows.map((row) => `
-            <tr>
-                <td>${aEscape(row.name || "-")}<br><small>${aEscape(row.employee_id || "-")}</small></td>
-                <td>${aEscape(aCategory(row.category))}</td>
-                <td>${aEscape(aMoney(row.monthly_salary || 0))}</td>
-                <td>${aEscape(aMoney(row.previous_debt || 0))}</td>
-                <td>${aEscape(aMoney(row.deducted_amount || 0))}</td>
-                <td>${aEscape(aMoney(row.new_debt || 0))}</td>
-            </tr>
-        `).join("");
-    } catch (error) {
-        head.innerHTML = '<div class="mode-profile-empty">Failed to load salary deduction batch details.</div>';
-        body.innerHTML = '<tr><td colspan="6">No details available.</td></tr>';
+    const rows = Array.isArray(data.items) ? data.items : [];
+    if (rows.length === 0) {
+        body.innerHTML = '<tr><td colspan="6">No deducted accounts found for this batch.</td></tr>';
+        return;
     }
+
+    body.innerHTML = rows.map((row) => `
+        <tr>
+            <td>${aEscape(row.name || "-")}<br><small>${aEscape(row.employee_id || "-")}</small></td>
+            <td>${aEscape(aCategory(row.category))}</td>
+            <td>${aEscape(aMoney(row.monthly_salary || 0))}</td>
+            <td>${aEscape(aMoney(row.previous_debt || 0))}</td>
+            <td>${aEscape(aMoney(row.deducted_amount || 0))}</td>
+            <td>${aEscape(aMoney(row.new_debt || 0))}</td>
+        </tr>
+    `).join("");
 }
 
 function closeSettlementRunDetails() {
+    window.IbemsLegacyHistory.reset("details");
     document.getElementById("settlement-run-details-modal").style.display = "none";
-    activeSettlementDetails = null;
-    document.getElementById("settlement-details-export").disabled = true;
-    document.getElementById("settlement-details-print").disabled = true;
+    const parent = document.getElementById("settlement-run-modal");
+    parent.inert = false;
+    parent.removeAttribute("aria-hidden");
+    if (settlementDetailsReturnFocus?.isConnected && getComputedStyle(parent).display !== "none") settlementDetailsReturnFocus.focus();
+    else if (getComputedStyle(parent).display !== "none") document.getElementById("close-settlement-run").focus();
+    else document.getElementById("open-settlement-run").focus();
 }
-
 function exportSettlementDetailsCsv() {
     if (!activeSettlementDetails) return;
 
@@ -396,7 +414,7 @@ function renderRows(rows) {
     }
 
     body.innerHTML = pageRows.map((row) => `
-        <article data-row-user="${row.user_id}" class="acct-record-row acct-row-clickable interactive-record-row flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
+        <article data-row-user="${row.user_id}" role="button" tabindex="0" aria-label="Open employee details for ${aEscape(row.name)}" aria-haspopup="dialog" class="acct-record-row acct-row-clickable interactive-record-row flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-4">
             <div class="acct-person flex min-w-0 items-center gap-3">
                 ${window.IbemsAvatar.html(row.name, row.profile_image_url, "acct-avatar h-11 w-11 flex-none rounded-full border border-slate-200 bg-slate-50")}
                 <div class="acct-person-meta min-w-0">
@@ -410,7 +428,7 @@ function renderRows(rows) {
                 </div>
             </div>
             <div class="acct-finance flex flex-wrap items-center justify-end gap-4">
-                ${!aBool(row.financial_profile_configured) ? '<div class="text-sm font-semibold text-amber-700">Open to set salary and credit limit</div>' : `
+                ${!aBool(row.financial_profile_configured) ? '<div class="text-sm font-semibold acct-setup-guidance">Open to set salary and credit limit</div>' : `
                 <div class="acct-fin-kv grid gap-0.5">
                     <span class="text-xs text-slate-500">Current Debt</span>
                     <strong class="text-sm font-semibold ${Number(row.current_debt || 0) > 0 ? "acct-money-debt text-rose-600" : "text-slate-900"}">${aEscape(aMoney(row.current_debt))}</strong>
@@ -517,6 +535,8 @@ function renderActiveAccountingTab() {
         const isActive = button.getAttribute("data-acct-tab") === activeAcctTab;
         button.classList.toggle("is-active", isActive);
         button.setAttribute("aria-selected", isActive ? "true" : "false");
+        button.tabIndex = isActive ? 0 : -1;
+        if (isActive) document.getElementById("acct-record-panel")?.setAttribute("aria-labelledby", button.id);
     });
 
     if (activeAcctTab === "advance-payments") {

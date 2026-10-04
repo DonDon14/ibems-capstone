@@ -1,13 +1,9 @@
 function saveDebtPinFromModal() {
     const input = document.getElementById("debt-pin-input");
-    const result = document.getElementById("debt-pin-modal-result");
     const pin = String(input?.value || "").replace(/\D/g, "").slice(0, 6);
 
     if (!/^[0-9]{4,6}$/.test(pin)) {
-        if (result) {
-            result.textContent = "Enter a 4 to 6 digit PIN.";
-            result.className = "result-msg error";
-        }
+        setDebtPinModalResult("Enter a 4 to 6 digit PIN.", "error");
         input?.focus();
         return false;
     }
@@ -45,11 +41,16 @@ function updateCheckoutState() {
     updateDebtCreditMeter();
 
     if (debtPaymentBtn) {
-        debtPaymentBtn.disabled = !openingBalanceReady;
-        debtPaymentBtn.title = openingBalanceReady
+        const recovering = debtPaymentRecoveryAvailable();
+        debtPaymentBtn.disabled = !openingBalanceReady && !recovering;
+        debtPaymentBtn.title = recovering
+            ? "Check the saved payment even when today's store day is closed"
+            : openingBalanceReady
             ? "Record a direct collection against existing employee debt"
             : "Open today's store day before recording a debt collection";
-        debtPaymentBtn.innerHTML = openingBalanceReady
+        debtPaymentBtn.innerHTML = recovering
+            ? '<i class="bi bi-arrow-repeat"></i> Check unfinished payment'
+            : openingBalanceReady
             ? '<i class="bi bi-plus-circle"></i> Record Payment'
             : '<i class="bi bi-lock"></i> Open Day First';
     }
@@ -89,9 +90,9 @@ function updateCheckoutState() {
     const department = departmentMode ? getSelectedDepartmentDebtAccount() : null;
     const departmentApprover = departmentMode ? getSelectedDepartmentApprover() : null;
     const departmentRequesterName = String(document.getElementById("department-requester-name")?.value || "").trim();
-    if (((!splitTenderEnabled && requiresCheckoutCustomer(paymentMethod)) || splitIncludesDebt()) && !departmentMode && !selectedDebtCustomerId) {
+    if (((!splitTenderEnabled && requiresCheckoutCustomer(paymentMethod)) || splitIncludesDebt() || waterStationInternalOnly) && !departmentMode && !selectedDebtCustomerId) {
         submitBtn.disabled = true;
-        submitBtn.innerHTML = `<i class="bi bi-person-check"></i> Select ${paymentMethod === "debt" ? "Debt" : "Employee"} Customer`;
+        submitBtn.innerHTML = `<i class="bi bi-person-check"></i> Select ${waterStationInternalOnly ? "University" : paymentMethod === "debt" ? "Debt" : "Employee"} Customer`;
         return;
     }
     if (departmentMode && (!department || !departmentApprover || !departmentRequesterName)) {
@@ -284,8 +285,8 @@ function renderCart() {
             itemCount += Number(item.qty);
 
             const product = getProductById(item.product_id);
-            const maxedOut = product ? Number(item.qty) >= Number(product.stock_qty || 0) : false;
-            const stockText = product ? `${Number(product.stock_qty || 0)} available` : "Stock unavailable";
+            const maxedOut = product ? productTracksStock(product) && Number(item.qty) >= Number(product.stock_qty || 0) : false;
+            const stockText = product ? (productTracksStock(product) ? `${Number(product.stock_qty || 0)} available` : `Sold per ${product.unit_code || 'unit'}`) : "Stock unavailable";
 
             return `
                 <div class="cart-item ${maxedOut ? "is-maxed" : ""}">
@@ -327,10 +328,11 @@ function renderDebtSuggestions() {
     const items = debtCustomers.slice(0, 8).map((customer) => {
         const category = String(customer.user_type || "");
         const categoryLabel = category ? category.charAt(0).toUpperCase() + category.slice(1).toLowerCase() : "N/A";
+        const accountDetail = category === "student" ? "Cash/non-debt sale" : formatCredit(customer);
         return `
             <button type="button" class="debt-suggestion-item" data-customer-id="${customer.id}">
                 ${window.IbemsAvatar.html(customer.name, customer.profile_image_url, "debt-suggestion-avatar")}
-                <span class="debt-suggestion-copy"><span class="name">${escapeHtml(customer.name)}</span><span class="meta">${escapeHtml(customer.employee_id || customer.email)} • ${escapeHtml(categoryLabel)} • ${escapeHtml(formatCredit(customer))}</span></span>
+                <span class="debt-suggestion-copy"><span class="name">${escapeHtml(customer.name)}</span><span class="meta">${escapeHtml(customer.employee_id || customer.email)} • ${escapeHtml(categoryLabel)} • ${escapeHtml(accountDetail)}</span></span>
             </button>
         `;
     });
@@ -339,33 +341,39 @@ function renderDebtSuggestions() {
     box.style.display = "block";
 }
 
-async function loadDebtCustomers(query = "") {
+async function loadDebtCustomers(query = "", reportError = true) {
     try {
         const data = await requestJson(
-            `/store/debt-customers?q=${encodeURIComponent(query)}`,
+            `/store/debt-customers?q=${encodeURIComponent(query)}${waterStationInternalOnly ? `&store_id=${activeStoreId}&include_students=1` : ""}`,
             {},
             "Unable to load debt customers."
         );
         if (!data || data.status !== "success") {
             debtCustomers = [];
             renderDebtSuggestions();
-            return;
+            return false;
         }
 
         debtCustomers = Array.isArray(data.customers) ? data.customers : [];
         renderDebtSuggestions();
+        return true;
     } catch (error) {
         debtCustomers = [];
         renderDebtSuggestions();
-        setResult(error.message || "Unable to load debt customers.", "error");
+        if (reportError) setResult(error.message || "Unable to load debt customers.", "error");
+        return false;
     }
 }
 
-function setDebtPaymentResult(message = "", type = "") {
+function setDebtPaymentResult(message = "", type = "", focusError = true) {
     const result = document.getElementById("debt-payment-result");
     if (!result) return;
+    result.setAttribute("role", type === "error" ? "alert" : "status");
+    result.setAttribute("aria-live", type === "error" ? "assertive" : "polite");
+    result.setAttribute("aria-atomic", "true");
     result.textContent = message;
     result.className = `result-msg ${type === "error" ? "error" : type === "ok" ? "ok" : ""}`.trim();
+    if (message && type === 'error' && focusError && result.getClientRects?.().length) result.focus();
 }
 
 function renderDebtPaymentSuggestions() {
@@ -395,18 +403,25 @@ function renderDebtPaymentSuggestions() {
 }
 
 async function loadDebtPaymentCustomers(query = "") {
+    const version = ++debtPaymentCustomerLoadVersion;
+    const store = activeStoreId;
+    const modal = document.getElementById('debt-payment-modal');
+    const isCurrent = () => version === debtPaymentCustomerLoadVersion && store === activeStoreId
+        && (!modal || (modal.isConnected && modal.style.display !== 'none')) && !selectedRepaymentCustomer;
     try {
         const data = await requestJson(
             `/store/debt-customers?q=${encodeURIComponent(query)}`,
             {},
             "Unable to load debt customers."
         );
+        if (!isCurrent()) return;
         repaymentCustomers = Array.isArray(data.customers) ? data.customers : [];
         renderDebtPaymentSuggestions();
     } catch (error) {
+        if (!isCurrent()) return;
         repaymentCustomers = [];
         renderDebtPaymentSuggestions();
-        setDebtPaymentResult(error.message || "Unable to load debt customers.", "error");
+        setDebtPaymentResult(error.message || "Unable to load debt customers.", "error", false);
     }
 }
 
@@ -443,14 +458,22 @@ function renderDebtPaymentProfile() {
 }
 
 function resetDebtPaymentModal() {
+    debtPaymentCustomerLoadVersion++;
     selectedRepaymentCustomer = null;
     repaymentCustomers = [];
+    ["debt-payment-search", "debt-payment-amount", "debt-payment-reference", "debt-payment-remarks", "debt-payment-channel", "debt-payment-destination"].forEach((id) => {
+        const control = document.getElementById(id);
+        if (control) control.disabled = false;
+    });
     ["debt-payment-search", "debt-payment-amount", "debt-payment-reference", "debt-payment-remarks"].forEach((id) => {
         const el = document.getElementById(id);
         if (el) el.value = "";
     });
     const channel = document.getElementById("debt-payment-channel");
     if (channel) channel.value = "cash";
+    const button = document.getElementById('debt-payment-save');
+    if (button) button.innerHTML = '<i class="bi bi-check2-circle" aria-hidden="true"></i> Record Payment';
+    renderDebtPaymentDestinations();
     const suggestions = document.getElementById("debt-payment-suggestions");
     if (suggestions) {
         suggestions.innerHTML = "";
@@ -468,22 +491,67 @@ function renderDebtPaymentDestinations() {
     const select = document.getElementById("debt-payment-destination");
     if (!wrap || !select) return;
     wrap.classList.toggle("is-hidden", methodCode === "cash");
+    wrap.hidden = methodCode === 'cash';
     select.innerHTML = accounts.map((account) => `<option value="${Number(account.id)}">${escapeHtml(account.account_name)} · ${escapeHtml(account.masked_number)}</option>`).join("");
     select.disabled = methodCode === "cash" || accounts.length === 0;
 }
 
-function openDebtPaymentModal() {
+function openDebtPaymentModal(showRecovery = false) {
+    if (debtPaymentSubmitting && showRecovery !== true) return;
     if (!activeStoreId) {
         setResult("No active store selected.", "error");
         return;
     }
 
+    let unfinished;
+    try { unfinished = readDebtPaymentIntent(); }
+    catch (error) { setResult(error.message, "error"); return; }
+    if (unfinished) {
+        resetDebtPaymentModal();
+        const modal = document.getElementById("debt-payment-modal");
+        if (modal) modal.style.display = "grid";
+        debtPaymentIntent = unfinished;
+        debtPaymentRecoveryKey = unfinished.key;
+        const values = { "debt-payment-search": `Employee #${unfinished.payload.user_id}`,
+            "debt-payment-amount": unfinished.payload.amount, "debt-payment-reference": unfinished.payload.reference_no,
+            "debt-payment-remarks": unfinished.payload.remarks };
+        Object.entries(values).forEach(([id, value]) => {
+            const control = document.getElementById(id);
+            if (control) control.value = value ?? "";
+        });
+        const method = document.getElementById("debt-payment-channel");
+        if (method) {
+            method.innerHTML = `<option value="${escapeHtml(unfinished.payload.payment_method)}">${escapeHtml(unfinished.payload.payment_method)}</option>`;
+            method.value = unfinished.payload.payment_method;
+        }
+        renderDebtPaymentDestinations();
+        const destination = document.getElementById('debt-payment-destination');
+        const accountId = Number(unfinished.payload.destination_account_id || 0);
+        if (destination && accountId) {
+            const accounts = paymentMethodsCache.find(row => String(row.code) === String(unfinished.payload.payment_method))?.destination_accounts || [];
+            if (!accounts.some(account => Number(account.id) === accountId)) {
+                destination.innerHTML = `<option value="${accountId}">Receiving account #${accountId} (original payment)</option>`;
+            }
+            destination.value = String(accountId);
+        }
+        ["debt-payment-search", "debt-payment-amount", "debt-payment-reference", "debt-payment-remarks", "debt-payment-channel", "debt-payment-destination"].forEach((id) => {
+            const control = document.getElementById(id);
+            if (control) control.disabled = true;
+        });
+        setDebtPaymentResult(`Check the unfinished ${formatMoney(unfinished.payload.amount)} payment for employee #${unfinished.payload.user_id} before recording another payment.`, "error", false);
+        const button = document.getElementById("debt-payment-save");
+        if (button) button.textContent = "Check unfinished payment";
+        if (modal) focusPosCheckoutDialog(modal, document.getElementById('debt-payment-close'));
+        return;
+    }
     if (!openingBalanceReady) {
         setResult("Open today's store day before recording debt payments.", "error");
         return;
     }
 
     resetDebtPaymentModal();
+    debtPaymentIntent = null;
+    debtPaymentRecoveryKey = null;
     const methodSelect = document.getElementById("debt-payment-channel");
     if (methodSelect) {
         const methods = paymentMethodsCache.filter((method) => String(method.code || "").toLowerCase() !== "debt");
@@ -494,16 +562,111 @@ function openDebtPaymentModal() {
     const modal = document.getElementById("debt-payment-modal");
     const input = document.getElementById("debt-payment-search");
     if (modal) modal.style.display = "grid";
-    loadDebtPaymentCustomers("").catch(() => setDebtPaymentResult("Unable to load debt customers.", "error"));
-    setTimeout(() => input?.focus(), 30);
+    loadDebtPaymentCustomers("");
+    if (modal) focusPosCheckoutDialog(modal, input);
 }
 
-function closeDebtPaymentModal() {
+function closeDebtPaymentModal(force = false) {
+    if (debtPaymentSubmitting && force !== true) return;
+    debtPaymentCustomerLoadVersion++;
     const modal = document.getElementById("debt-payment-modal");
     if (modal) modal.style.display = "none";
+    if (modal) releasePosCheckoutDialogFocus(modal);
+}
+
+let debtPaymentCustomerLoadVersion = 0;
+let debtPaymentSubmitting = false;
+let debtPaymentIntent = null;
+let debtPaymentRecoveryKey = null;
+
+function debtPaymentStorageKey() {
+    const actor = Number(document.querySelector(".pos-shell")?.dataset.userId || 0);
+    if (!actor || !activeStoreId) throw new Error("Payment account or store is unavailable. Reload before recording payment.");
+    return `ibems.repayment.${actor}.${Number(activeStoreId)}`;
+}
+
+function readDebtPaymentIntent() {
+    const storageKey = debtPaymentStorageKey();
+    const durable = parseDebtPaymentIntent(localStorage.getItem(storageKey));
+    const legacy = parseDebtPaymentIntent(sessionStorage.getItem(storageKey));
+    if (durable && legacy && (durable.key !== legacy.key || durable.fingerprint !== legacy.fingerprint)) {
+        throw new Error("Two unfinished payment records conflict. Check the collection history before recording another payment.");
+    }
+    return durable || legacy;
+}
+
+function parseDebtPaymentIntent(raw) {
+    if (!raw) return null;
+    let pending;
+    try { pending = JSON.parse(raw); }
+    catch (_) { throw new Error("The unfinished payment record cannot be read. Check the collection history before recording another payment."); }
+    if (!pending || !/^[a-f0-9-]{36}$/.test(pending.key || "") || Number(pending.payload?.store_id) !== Number(activeStoreId)
+        || !Number.isInteger(pending.payload?.user_id) || pending.payload.user_id <= 0
+        || !Number.isFinite(pending.payload.amount) || pending.payload.amount <= 0
+        || pending.fingerprint !== JSON.stringify(pending.payload)) {
+        throw new Error("The unfinished payment record cannot be read. Check the collection history before recording another payment.");
+    }
+    return pending;
+}
+
+function debtPaymentRecoveryAvailable() {
+    try {
+        const key = debtPaymentStorageKey();
+        return Boolean(localStorage.getItem(key) || sessionStorage.getItem(key));
+    }
+    catch (_) { return false; }
 }
 
 async function submitDebtPayment() {
+    if (debtPaymentSubmitting) return;
+    debtPaymentSubmitting = true;
+    const saveBtn = document.getElementById("debt-payment-save");
+    if (saveBtn) saveBtn.disabled = true;
+    try {
+        const storageKey = debtPaymentStorageKey();
+        if (typeof navigator === "undefined" || !navigator.locks?.request) {
+            throw new Error("This browser cannot safely coordinate payments across tabs. Use a current browser over HTTPS before recording a payment.");
+        }
+        // Never queue a stale click behind a different tab's financial request.
+        await navigator.locks.request(storageKey, { mode: "exclusive", ifAvailable: true }, async (lock) => {
+            if (!lock) throw new Error("A payment is being recorded or checked in another tab. Wait for that tab before trying again.");
+            if (storageKey !== debtPaymentStorageKey()) throw new Error("The payment account or store changed. Reopen the payment form.");
+            await submitDebtPaymentLocked();
+        });
+    } catch (error) {
+        setDebtPaymentResult(error.message || "Unable to record debt payment.", "error");
+    } finally {
+        debtPaymentSubmitting = false;
+        const modal = document.getElementById('debt-payment-modal');
+        if (modal) setPosStoreDayDialogBusy(modal, false);
+        if (saveBtn) {
+            saveBtn.disabled = false;
+            saveBtn.innerHTML = debtPaymentRecoveryAvailable()
+                ? "Check unfinished payment" : '<i class="bi bi-check2-circle" aria-hidden="true"></i> Record Payment';
+        }
+    }
+}
+
+async function submitDebtPaymentLocked() {
+    try {
+        const unfinished = readDebtPaymentIntent();
+        if (unfinished) {
+            // Another tab's unresolved payment must be shown before it is retried.
+            if (debtPaymentRecoveryKey !== unfinished.key) {
+                openDebtPaymentModal(true);
+                return;
+            }
+            debtPaymentIntent = unfinished;
+            return await sendDebtPayment({ ...unfinished.payload, request_key: unfinished.key });
+        }
+        if (debtPaymentRecoveryKey) {
+            debtPaymentIntent = null;
+            debtPaymentRecoveryKey = null;
+            closeDebtPaymentModal(true);
+            setResult("The unfinished payment was resolved in another tab. Check the collection history before starting another payment.", "error");
+            return;
+        }
+    } catch (error) { setDebtPaymentResult(error.message, "error"); return; }
     if (!selectedRepaymentCustomer) {
         setDebtPaymentResult("Select a debtor before recording payment.", "error");
         return;
@@ -520,7 +683,6 @@ async function submitDebtPayment() {
         return;
     }
 
-    const saveBtn = document.getElementById("debt-payment-save");
     const payload = {
         store_id: activeStoreId,
         user_id: Number(selectedRepaymentCustomer.id),
@@ -530,11 +692,31 @@ async function submitDebtPayment() {
         reference_no: document.getElementById("debt-payment-reference")?.value || "",
         remarks: document.getElementById("debt-payment-remarks")?.value || "",
     };
+    const intentFingerprint = JSON.stringify(payload);
+    if (!debtPaymentIntent || debtPaymentIntent.fingerprint !== intentFingerprint) {
+        debtPaymentIntent = { fingerprint: intentFingerprint, key: crypto.randomUUID(), payload: { ...payload } };
+    }
+    payload.request_key = debtPaymentIntent.key;
+    return sendDebtPayment(payload);
+}
 
+async function sendDebtPayment(payload) {
+    const saveBtn = document.getElementById("debt-payment-save");
+    let storageKey;
     try {
+        storageKey = debtPaymentStorageKey();
+        // Persist before posting; inability to save recovery state must not send money.
+        const savedIntent = JSON.stringify(debtPaymentIntent);
+        localStorage.setItem(storageKey, savedIntent);
+        if (localStorage.getItem(storageKey) !== savedIntent) throw new Error("Unable to save the unfinished payment. Check browser storage before trying again.");
+        // Migrate the previous same-tab record only after its durable copy is saved.
+        sessionStorage.removeItem(storageKey);
+        debtPaymentRecoveryKey = debtPaymentIntent.key;
+        const modal = document.getElementById('debt-payment-modal');
+        if (modal) setPosStoreDayDialogBusy(modal, true);
         if (saveBtn) {
             saveBtn.disabled = true;
-            saveBtn.innerHTML = '<i class="bi bi-hourglass-split"></i> Recording...';
+            saveBtn.innerHTML = '<i class="bi bi-hourglass-split" aria-hidden="true"></i> Recording...';
         }
         const data = await requestJson(
             "/store/debt-repayments/create",
@@ -551,24 +733,41 @@ async function submitDebtPayment() {
         }
 
         const payment = data.payment || {};
+        clearDebtPaymentIntent(storageKey);
+        debtPaymentIntent = null;
+        debtPaymentRecoveryKey = null;
         setResult(
-            `Debt payment recorded for ${payment.debtor_name || selectedRepaymentCustomer.name}. New debt: ${formatMoney(payment.new_debt || 0)}.`,
+            `Debt payment recorded for ${payment.debtor_name || selectedRepaymentCustomer?.name || "employee"}. New debt: ${formatMoney(payment.new_debt || 0)}.`,
             "ok"
         );
-        showToast("Debt payment recorded.", "success");
-        selectedRepaymentCustomer.current_debt = Number(payment.new_debt || 0);
+        window.IbemsFeedbackSound?.play('success');
+        if (selectedRepaymentCustomer) selectedRepaymentCustomer.current_debt = Number(payment.new_debt || 0);
         renderDebtPaymentProfile();
-        await loadOpeningBalanceStatus();
-        await loadDebtCustomers();
-        closeDebtPaymentModal();
-    } catch (error) {
-        setDebtPaymentResult(error.message || "Unable to record debt payment.", "error");
-    } finally {
-        if (saveBtn) {
-            saveBtn.disabled = false;
-            saveBtn.innerHTML = '<i class="bi bi-check2-circle"></i> Record Payment';
+        closeDebtPaymentModal(true);
+        try {
+            const refreshed = await loadOpeningBalanceStatus(false);
+            const customersRefreshed = await loadDebtCustomers('', false);
+            if (refreshed === false || customersRefreshed === false) throw new Error('Balance refresh failed');
+        } catch (_) {
+            setResult("Debt payment recorded. Balance refresh failed; reload to view updated balances.", "warning");
         }
+    } catch (error) {
+        if ([400, 404, 503].includes(error.status) && error.data?.status === "error") {
+            try { clearDebtPaymentIntent(storageKey); debtPaymentIntent = null; debtPaymentRecoveryKey = null; } catch (_) {}
+        }
+        setDebtPaymentResult(error.message || "Unable to record debt payment.", "error");
+        window.IbemsFeedbackSound?.play('error');
     }
+}
+
+function clearDebtPaymentIntent(storageKey) {
+    // Called only while holding the actor/store lock; retain any conflicting record.
+    const pending = readDebtPaymentIntent();
+    if (!pending || pending.key !== debtPaymentIntent?.key || pending.fingerprint !== debtPaymentIntent?.fingerprint) {
+        throw new Error("The unfinished payment record changed. Check the collection history before recording another payment.");
+    }
+    sessionStorage.removeItem(storageKey);
+    localStorage.removeItem(storageKey);
 }
 
 function updateDebtCustomerVisibility() {
@@ -577,7 +776,7 @@ function updateDebtCustomerVisibility() {
     const label = document.getElementById("checkout-customer-label");
     const help = document.getElementById("checkout-customer-help");
 
-    const customerRequired = requiresCheckoutCustomer(paymentMethod) || splitIncludesDebt();
+    const customerRequired = requiresCheckoutCustomer(paymentMethod) || splitIncludesDebt() || waterStationInternalOnly;
     const usesDebt = paymentMethod === "debt" || splitIncludesDebt();
     wrap.style.display = "flex";
     const debtAccountTypeWrap = document.getElementById("debt-account-type-wrap");
@@ -585,10 +784,12 @@ function updateDebtCustomerVisibility() {
     if (debtAccountTypeWrap) debtAccountTypeWrap.hidden = !usesDebt;
     if (debtAccountTypeWrap) debtAccountTypeWrap.style.display = usesDebt ? "grid" : "none";
     if (label) {
-        label.textContent = customerRequired ? "Employee customer (required)" : "Customer (optional)";
+        label.textContent = waterStationInternalOnly ? "University customer (required)" : customerRequired ? "Employee customer (required)" : "Customer (optional)";
     }
     if (help) {
-        help.textContent = customerRequired
+        help.textContent = waterStationInternalOnly
+            ? "Water-station sales are for university customers only. Select registered faculty, staff, or a student, or use an authorized department charge."
+            : customerRequired
             ? (paymentMethod === "debt" || splitIncludesDebt()
                 ? "Select the faculty or staff member who is authorizing this debt purchase."
                 : "Select the employee associated with this advance payment sale.")

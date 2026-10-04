@@ -84,8 +84,8 @@ final class PersistentPortalNavigationConventionTest extends CIUnitTestCase
         $this->assertStringContainsString("color: #9bc4ff;\n    border-color: #315d91;\n    background: #102c52;", $modernStyles);
         $this->assertStringNotContainsString('content: "Workspace";', $modernStyles);
         $this->assertStringContainsString('@media (prefers-reduced-motion: reduce)', $modernStyles);
-        $this->assertStringContainsString("assets/css/app.css') ?>?v=20260824e", $shell);
-        $this->assertStringContainsString("assets/css/modern-ui.css') ?>?v=20260825e", $shell);
+        $this->assertMatchesRegularExpression('~assets/css/app\.css.*\?v=[a-zA-Z0-9-]+~', $shell);
+        $this->assertMatchesRegularExpression('~assets/css/modern-ui\.css.*\?v=[a-zA-Z0-9-]+~', $shell);
         $this->assertStringContainsString('body:is(.app-modal-open, .user-product-modal-open) .app-container', $baseStyles);
         $this->assertStringContainsString('body.account-menu-open .app-container', $baseStyles);
         $this->assertStringContainsString('.app-modal, .user-product-modal)', $modernStyles);
@@ -163,6 +163,20 @@ final class PersistentPortalNavigationConventionTest extends CIUnitTestCase
 
     public function testRepresentativeRolePagesRenderScopedPageAssetsInsideTheSharedShell(): void
     {
+        // Supervisor navigation resolves assignments during rendering. Keep this
+        // shell test independent of tables left behind by earlier database tests.
+        $db = \Config\Database::connect('tests');
+        $this->assertSame(':memory:', $db->database);
+        $createdAssignments = !$db->tableExists('store_supervisors');
+        $forge = \Config\Database::forge($db);
+        if ($createdAssignments) {
+            $forge->addField([
+                'id' => ['type' => 'INTEGER'],
+                'store_id' => ['type' => 'INTEGER'],
+                'user_id' => ['type' => 'INTEGER'],
+            ]);
+            $forge->createTable('store_supervisors');
+        }
         $pages = [
             'admin/dashboard' => 'ADMIN',
             'accounting/dashboard' => 'ACCOUNTING_OFFICE',
@@ -170,21 +184,27 @@ final class PersistentPortalNavigationConventionTest extends CIUnitTestCase
             'user/dashboard' => 'USER',
         ];
 
-        foreach ($pages as $view => $role) {
-            session()->set([
-                'logged_in' => true,
-                'user_id' => 1,
-                'name' => 'Navigation Test',
-                'role' => $role,
-                'available_roles' => [$role],
-            ]);
+        try {
+            foreach ($pages as $view => $role) {
+                session()->set([
+                    'logged_in' => true,
+                    'user_id' => $role === 'STORE_SUPERVISOR' ? 900001 : 1,
+                    'name' => 'Navigation Test',
+                    'role' => $role,
+                    'available_roles' => [$role],
+                ]);
 
-            $html = view($view);
-            $this->assertStringContainsString('data-portal-navigation-shell', $html, $view);
-            $this->assertStringContainsString('data-portal-page-content', $html, $view);
-            $this->assertStringContainsString('<template id="portal-page-scripts">', $html, $view);
-            $this->assertStringContainsString('data-portal-page-script', $html, $view);
-            $this->assertSame(1, substr_count($html, 'assets/js/user-navigation.js'), $view);
+                $html = view($view);
+                $this->assertStringContainsString('data-portal-navigation-shell', $html, $view);
+                $this->assertStringContainsString('data-portal-page-content', $html, $view);
+                $this->assertStringContainsString('<template id="portal-page-scripts">', $html, $view);
+                $this->assertStringContainsString('data-portal-page-script', $html, $view);
+                $this->assertSame(1, substr_count($html, 'assets/js/user-navigation.js'), $view);
+            }
+        } finally {
+            if ($createdAssignments) {
+                $forge->dropTable('store_supervisors');
+            }
         }
     }
 }

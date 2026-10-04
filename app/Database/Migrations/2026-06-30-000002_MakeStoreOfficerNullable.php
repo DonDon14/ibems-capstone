@@ -12,15 +12,26 @@ class MakeStoreOfficerNullable extends Migration
             return;
         }
 
-        $this->forge->modifyColumn('stores', [
-            'officer_id' => [
-                'name' => 'officer_id',
-                'type' => 'INT',
-                'constraint' => 11,
-                'unsigned' => true,
-                'null' => true,
-            ],
-        ]);
+        // CI's SQLite Forge renames stores to temp_stores while rebuilding it.
+        // Legacy alter mode keeps child-table foreign keys pointed at stores.
+        if ($this->db->DBDriver === 'SQLite3') {
+            $this->db->query('PRAGMA legacy_alter_table = ON');
+        }
+        try {
+            $this->forge->modifyColumn('stores', [
+                'officer_id' => [
+                    'name' => 'officer_id',
+                    'type' => 'INT',
+                    'constraint' => 11,
+                    'unsigned' => true,
+                    'null' => true,
+                ],
+            ]);
+        } finally {
+            if ($this->db->DBDriver === 'SQLite3') {
+                $this->db->query('PRAGMA legacy_alter_table = OFF');
+            }
+        }
     }
 
     public function down()
@@ -37,14 +48,23 @@ class MakeStoreOfficerNullable extends Migration
             return;
         }
 
-        $this->forge->modifyColumn('stores', [
-            'officer_id' => [
-                'name' => 'officer_id',
-                'type' => 'INT',
-                'constraint' => 11,
-                'unsigned' => true,
-                'null' => false,
-            ],
-        ]);
+        if ($this->db->DBDriver === 'SQLite3') {
+            $this->db->query('PRAGMA legacy_alter_table = ON');
+        }
+        try {
+            $this->forge->modifyColumn('stores', [
+                'officer_id' => [
+                    'name' => 'officer_id',
+                    'type' => 'INT',
+                    'constraint' => 11,
+                    'unsigned' => true,
+                    'null' => false,
+                ],
+            ]);
+        } finally {
+            if ($this->db->DBDriver === 'SQLite3') {
+                $this->db->query('PRAGMA legacy_alter_table = OFF');
+            }
+        }
     }
 }

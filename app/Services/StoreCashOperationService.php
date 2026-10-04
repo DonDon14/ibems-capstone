@@ -132,7 +132,7 @@ final class StoreCashOperationService
             ]);
         }
 
-        $now = date('Y-m-d H:i:s');
+        $now = ibems_now()->format('Y-m-d H:i:s');
 
         $model->update((int) $existing['id'], [
             'opening_balance' => $openingBalance,
@@ -236,6 +236,30 @@ final class StoreCashOperationService
     public function createMovement(array $request, int $actorId, string $role): array
     {
         $storeId = (int) ($request['store_id'] ?? 0);
+        if (!(new StoreAccessService())->resolve($actorId, $role, $storeId)) {
+            return $this->result(403, ['status' => 'error', 'message' => 'You cannot access this store.']);
+        }
+        $db = Database::connect();
+        $db->transBegin();
+        try {
+            ProductBehaviorService::lockStore($db, $storeId);
+            $result = $this->createMovementLocked($request, $actorId, $role);
+            if (($result['payload']['status'] ?? '') !== 'success') {
+                $db->transRollback();
+                return $result;
+            }
+            if (!$db->transStatus()) throw new \RuntimeException('Cash movement transaction failed.');
+            $db->transCommit();
+            return $result;
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            return $this->result(500, ['status' => 'error', 'message' => 'Cash movement could not be saved. Reload and retry.']);
+        }
+    }
+
+    private function createMovementLocked(array $request, int $actorId, string $role): array
+    {
+        $storeId = (int) ($request['store_id'] ?? 0);
         $amount = (float) ($request['amount'] ?? 0);
         $reason = trim((string) ($request['reason'] ?? ''));
         $channel = strtolower(trim((string) ($request['channel'] ?? 'cash')));
@@ -303,8 +327,8 @@ final class StoreCashOperationService
             'amount' => $amount,
             'reason' => $reason,
             'created_by' => $actorId > 0 ? $actorId : null,
-            'created_at' => date('Y-m-d H:i:s'),
-            'updated_at' => date('Y-m-d H:i:s'),
+            'created_at' => ibems_now()->format('Y-m-d H:i:s'),
+            'updated_at' => ibems_now()->format('Y-m-d H:i:s'),
         ]);
 
         if (!$movementId) {
@@ -315,7 +339,7 @@ final class StoreCashOperationService
         }
 
         $auditLogModel = new AuditLogModel();
-        $auditLogModel->insert([
+        $auditId = $auditLogModel->insert([
             'actor_id' => $actorId > 0 ? $actorId : null,
             'action' => 'CREATE_CASH_MOVEMENT',
             'entity' => 'store_cash_movements',
@@ -328,8 +352,10 @@ final class StoreCashOperationService
                 'amount' => $amount,
                 'reason' => $reason,
             ]),
-            'created_at' => date('Y-m-d H:i:s'),
+            'created_at' => ibems_now()->format('Y-m-d H:i:s'),
         ]);
+
+        if (!$auditId) throw new \RuntimeException('Cash movement audit could not be saved.');
 
         return $this->result(200, [
             'status' => 'success',
@@ -348,9 +374,64 @@ final class StoreCashOperationService
     public function createDebtRepayment(array $request, int $actorId, string $role): array
     {
         $storeId = (int) ($request['store_id'] ?? 0);
+        $store = (new StoreAccessService())->resolve($actorId, $role, $storeId);
+        if (!$store) {
+            return $this->result(403, ['status' => 'error', 'message' => 'You cannot access this store.']);
+        }
+        $storeId = (int) $store['id'];
+        $request['store_id'] = $storeId;
+        $amount = $this->moneyAmount($request['amount'] ?? null);
+        if ($amount === null || $amount <= 0) {
+            return $this->result(400, ['status' => 'error', 'message' => 'Enter a positive payment amount with at most two decimal places.']);
+        }
+        $clientKey = $request['request_key'] ?? null;
+        if (!is_string($clientKey) || !preg_match('/^[A-Za-z0-9_-]{16,100}$/D', trim($clientKey))) {
+            return $this->result(400, ['status' => 'error', 'message' => 'Provide a valid repayment request key before recording this payment.']);
+        }
+        $db = Database::connect();
+        if (!$db->tableExists('store_repayment_receipts')) {
+            return $this->result(503, ['status' => 'error', 'message' => 'Apply the repayment retry migration before recording this payment.']);
+        }
+        $key = hash('sha256', $storeId . ':' . $actorId . ':' . trim($clientKey));
+        $hashInput = $request;
+        unset($hashInput['request_key']);
+        $requestHash = hash('sha256', json_encode($hashInput, JSON_THROW_ON_ERROR));
+        $db->transBegin();
+        try {
+            ProductBehaviorService::lockStore($db, $storeId);
+            $receipt = $db->table('store_repayment_receipts')->where('request_key', $key)->get()->getRowArray();
+            if ($receipt) {
+                $db->transRollback();
+                if (!hash_equals($receipt['request_hash'], $requestHash)) {
+                    return $this->result(409, ['status' => 'error', 'message' => 'This repayment request key was already used with different payment details.']);
+                }
+                return json_decode($receipt['response_json'], true, 512, JSON_THROW_ON_ERROR);
+            }
+            $result = $this->createDebtRepaymentLocked($request, $actorId, $role);
+            if (($result['payload']['status'] ?? '') !== 'success') {
+                $db->transRollback();
+                return $result;
+            }
+            if (!$db->table('store_repayment_receipts')->insert([
+                'request_key' => $key, 'request_hash' => $requestHash,
+                'cash_movement_id' => (int) $result['payload']['payment']['movement_id'],
+                'response_json' => json_encode($result, JSON_THROW_ON_ERROR | JSON_PRESERVE_ZERO_FRACTION),
+                'created_at' => ibems_now()->format('Y-m-d H:i:s'),
+            ])) throw new \RuntimeException('Repayment retry receipt could not be saved.');
+            if (!$db->transStatus()) throw new \RuntimeException('Debt payment transaction failed.');
+            $db->transCommit();
+            return $result;
+        } catch (\Throwable $e) {
+            $db->transRollback();
+            return $this->result(500, ['status' => 'error', 'message' => 'Failed to record debt payment. Reload and retry.']);
+        }
+    }
+
+    private function createDebtRepaymentLocked(array $request, int $actorId, string $role): array
+    {
+        $storeId = (int) ($request['store_id'] ?? 0);
         $debtorId = (int) ($request['user_id'] ?? 0);
         $amount = round((float) ($request['amount'] ?? 0), 2);
-        $hasExplicitPaymentMethod = array_key_exists('payment_method', $request);
         $paymentMethod = strtolower(trim((string) ($request['payment_method'] ?? $request['channel'] ?? 'cash')));
         $channel = $paymentMethod === 'cash' ? 'cash' : 'ecash';
         $destinationAccountId = (int) ($request['destination_account_id'] ?? 0);
@@ -387,13 +468,11 @@ final class StoreCashOperationService
             ]);
         }
 
-        $methodRow = $hasExplicitPaymentMethod
-            ? (new StorePaymentMethodModel())->where('store_id', (int) $store['id'])->where('code', $paymentMethod)->where('is_active', true)->first()
-            : ['code' => $paymentMethod];
+        $methodRow = (new StorePaymentMethodModel())->where('store_id', (int) $store['id'])->where('code', $paymentMethod)->where('is_active', true)->first();
         if (!$methodRow || $paymentMethod === 'debt') {
             return $this->result(400, ['status' => 'error', 'message' => 'Select an active cash or electronic payment method.']);
         }
-        if ($channel === 'ecash' && $hasExplicitPaymentMethod) {
+        if ($channel === 'ecash') {
             $destination = $destinationAccountId > 0 ? (new PaymentDestinationAccountModel())->find($destinationAccountId) : null;
             if (!$destination || (int) ($destination['store_id'] ?? 0) !== (int) $store['id'] || (int) ($destination['payment_method_id'] ?? 0) !== (int) ($methodRow['id'] ?? 0) || !ibems_bool($destination['is_active'] ?? false)) {
                 return $this->result(400, ['status' => 'error', 'message' => 'Select an active receiving account for this electronic collection.']);
@@ -426,8 +505,11 @@ final class StoreCashOperationService
             ]);
         }
 
-        $currentDebt = round((float) ($debtor['current_debt'] ?? 0), 2);
-        $creditLimit = round((float) ($debtor['credit_limit'] ?? 0), 2);
+        // Use the current locked row, not the earlier consistent-read join snapshot.
+        $lockedBalance = (new BalanceModel())->getBalanceForUpdate($debtorId);
+        if (!$lockedBalance) return $this->result(404, ['status' => 'error', 'message' => 'Debtor balance not found.']);
+        $currentDebt = round((float) $lockedBalance['current_debt'], 2);
+        $creditLimit = round((float) $lockedBalance['credit_limit'], 2);
         if ($currentDebt <= 0) {
             return $this->result(400, [
                 'status' => 'error',
@@ -443,7 +525,7 @@ final class StoreCashOperationService
         }
 
         $newDebt = round($currentDebt - $amount, 2);
-        $now = date('Y-m-d H:i:s');
+        $now = ibems_now()->format('Y-m-d H:i:s');
         $reasonParts = [
             'Debt repayment',
             'Method: ' . ($paymentMethod === 'ecash' ? 'electronic' : $paymentMethod),
@@ -460,12 +542,10 @@ final class StoreCashOperationService
         $cashMovementModel = new StoreCashMovementModel();
         $auditLogModel = new AuditLogModel();
 
-        $db->transStart();
-
-        $balanceModel->update($debtorId, [
+        if (!$balanceModel->update($debtorId, [
             'current_debt' => $newDebt,
             'updated_at' => $now,
-        ]);
+        ])) throw new \RuntimeException('Debt balance could not be updated.');
 
         $movementId = $cashMovementModel->insert([
             'store_id' => (int) $store['id'],
@@ -501,7 +581,7 @@ final class StoreCashOperationService
             ]
         );
 
-        $auditLogModel->insert([
+        $auditId = $auditLogModel->insert([
             'actor_id' => $actorId > 0 ? $actorId : null,
             'action' => 'STORE_DEBT_REPAYMENT',
             'entity' => 'balances',
@@ -521,7 +601,7 @@ final class StoreCashOperationService
             'created_at' => $now,
         ]);
 
-        $db->transComplete();
+        if (!$auditId) throw new \RuntimeException('Debt repayment audit could not be saved.');
 
         if (!$db->transStatus() || !$movementId) {
             return $this->result(500, [
@@ -564,7 +644,7 @@ final class StoreCashOperationService
         array $meta = []
     ): void {
         $cashbookModel = new DebtCashbookEntryModel();
-        $cashbookModel->insert([
+        $entryId = $cashbookModel->insert([
             'user_id' => $userId,
             'entry_type' => $entryType,
             'direction' => $debtAfter >= $debtBefore ? 'debit' : 'credit',
@@ -578,10 +658,20 @@ final class StoreCashOperationService
             'actor_id' => $actorId,
             'remarks' => $remarks,
             'meta_json' => $meta !== [] ? json_encode($meta) : null,
-            'created_at' => date('Y-m-d H:i:s'),
-            'updated_at' => date('Y-m-d H:i:s'),
+            'created_at' => ibems_now()->format('Y-m-d H:i:s'),
+            'updated_at' => ibems_now()->format('Y-m-d H:i:s'),
         ]);
+        if (!$entryId) throw new \RuntimeException('Debt repayment cashbook entry could not be saved.');
     }
+    private function moneyAmount(mixed $value): ?float
+    {
+        if (!is_string($value) && !is_int($value) && !is_float($value)) return null;
+        $text = trim((string) $value);
+        if (!preg_match('/^\d+(?:\.\d{1,2})?$/D', $text)) return null;
+        $amount = (float) $text;
+        return is_finite($amount) ? $amount : null;
+    }
+
     /** @param array<string, mixed> $payload @return array{code:int,payload:array<string, mixed>} */
     private function result(int $code, array $payload): array
     {

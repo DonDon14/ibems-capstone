@@ -20,6 +20,7 @@ class InventoryMovementModel extends Model
         'total_cost',
         'expected_profit',
         'reason',
+        'waste_disposition',
         'txn_id',
         'created_at',
     ];

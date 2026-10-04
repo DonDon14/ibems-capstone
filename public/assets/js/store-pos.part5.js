@@ -1,3 +1,12 @@
+function posAvailableOfferings(data) {
+    return (Array.isArray(data.products) ? data.products : [])
+        .filter(product => product.available_for_sale !== false && (data.allowed_item_types || []).includes(product.item_type || 'stock_item'))
+        .map(product => {
+            if (product.daily_remaining === undefined) return product;
+            return {...product, price:product.daily_price, stock_qty:product.stock_policy === 'tracked' ? Math.min(Number(product.stock_qty), Number(product.daily_remaining)) : Number(product.daily_remaining)};
+        });
+}
+
 function renderPaymentMethods() {
     const chipsEl = document.getElementById("payment-quick");
     const selectEl = document.getElementById("payment-method");
@@ -206,7 +215,7 @@ function increaseQty(productId) {
     const product = getProductById(productId);
     if (!product) return;
 
-    if (Number(item.qty) >= Number(product.stock_qty || 0)) {
+    if (productTracksStock(product) && Number(item.qty) >= Number(product.stock_qty || 0)) {
         setResult("Cannot increase. Reached available stock.", "error");
         return;
     }
@@ -246,6 +255,22 @@ async function loadMyStores() {
     updatePosStoreContext();
 }
 
+async function loadStoreCapabilities() {
+    const data = await requestJson(
+        `/store/capabilities?store_id=${activeStoreId}`,
+        {},
+        "Unable to load store sales rules."
+    );
+    if (!data || data.status !== "success" || !Array.isArray(data.capabilities)) {
+        throw new Error(data?.message || "Unable to load store sales rules.");
+    }
+    waterStationInternalOnly = data.capabilities.includes("refill_service");
+    const paymentGuidance = document.getElementById("payment-method-help");
+    if (paymentGuidance) paymentGuidance.textContent = getPaymentMethodGuidance(document.getElementById("payment-method")?.value || "cash");
+    updateDebtCustomerVisibility();
+    updateCheckoutState();
+}
+
 async function loadProducts() {
     if (!activeStoreId) {
         productsLoadCompleted = false;
@@ -272,7 +297,7 @@ async function loadProducts() {
             return;
         }
 
-        productsCache = Array.isArray(data.products) ? data.products : [];
+        productsCache = posAvailableOfferings(data);
         productsLoadCompleted = true;
         buildCategories();
         renderCategoryTabs();
@@ -301,7 +326,7 @@ async function refreshProductsForCheckout() {
         throw new Error(data?.message || "Unable to refresh product stock.");
     }
 
-    productsCache = data.products;
+    productsCache = posAvailableOfferings(data);
     buildCategories();
     renderCategoryTabs();
 }
@@ -321,7 +346,7 @@ async function preflightCartStock() {
                 return null;
             }
 
-            const latestStock = Number(product.stock_qty || 0);
+            const latestStock = productTracksStock(product) ? Number(product.stock_qty || 0) : Number.POSITIVE_INFINITY;
             if (latestStock <= 0) {
                 unavailable.push(item.name);
                 adjusted = true;
@@ -377,7 +402,7 @@ function buildPendingTransaction() {
     const department = departmentMode ? getSelectedDepartmentDebtAccount() : null;
     const departmentApprover = departmentMode ? getSelectedDepartmentApprover() : null;
     const departmentRequesterName = String(document.getElementById("department-requester-name")?.value || "").trim();
-    if (((!splitTenderEnabled && requiresCheckoutCustomer(paymentMethod)) || splitIncludesDebt()) && !departmentMode && !selectedDebtCustomerId) return null;
+    if (((!splitTenderEnabled && requiresCheckoutCustomer(paymentMethod)) || splitIncludesDebt() || waterStationInternalOnly) && !departmentMode && !selectedDebtCustomerId) return null;
     if (departmentMode && (!department || !departmentApprover || !departmentRequesterName)) return null;
     if ((paymentMethod === "debt" || splitIncludesDebt()) && (departmentMode || !employeeUsesPurchaseCard()) && !selectedDebtPin) return null;
 
@@ -449,6 +474,8 @@ function buildPendingTransaction() {
 
 async function processConfirmedTransaction(dataToProcess) {
     if (isSubmitting || !dataToProcess) return;
+    // Keep the same intent key when a response is lost and this confirmation is retried.
+    dataToProcess.payload.request_key ||= crypto.randomUUID();
     if (dataToProcess.payments?.some((line) => String(line.payment_method) === "cash") && !updateConfirmCashTender()) {
         document.getElementById("confirm-cash-received")?.focus();
         return;
@@ -493,16 +520,20 @@ async function processConfirmedTransaction(dataToProcess) {
                 lookupUrl: `${window.location.origin}/store/receipt/${encodeURIComponent(String(data.transaction_id))}`,
             };
 
-            closeConfirmTransactionModal(true);
+            const receiptReturnFocus = closeConfirmTransactionModal(true);
             cart = [];
             splitTenderEnabled = false;
             splitTenderAmounts.clear();
             selectedDebtPin = "";
             const debtPinInput = document.getElementById("debt-pin-input");
             if (debtPinInput) debtPinInput.value = "";
-            await loadProducts();
-            openReceiptModal(receipt);
+            openReceiptModal(receipt, receiptReturnFocus);
             renderSuccessStrip(receipt);
+            try {
+                await loadProducts();
+            } catch (_) {
+                setResult("Transaction completed. Product refresh failed; reload before the next sale.", "warning");
+            }
             return;
         }
 

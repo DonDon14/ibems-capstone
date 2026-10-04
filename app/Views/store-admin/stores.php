@@ -1,17 +1,17 @@
 <?= $this->extend('layouts/store_admin') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/admin-stores.css') ?>?v=20260824a">
+<link rel="stylesheet" href="<?= base_url('assets/css/admin-stores.css') ?>?v=20261004-editor-feedback">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
 <section class="admin-stores-shell" data-can-manage-stores="0" data-stores-data-url="<?= site_url('store-admin/stores/data') ?>" data-store-detail-prefix="<?= site_url('store-admin/stores') ?>">
-    <div class="admin-stores-head">
-        <div>
-            <h3>Assigned Stores</h3>
-            <p>Review store-day variances and monitor stores assigned to you.</p>
-        </div>
-    </div>
+    <?= view('components/page_header', [
+        'eyebrow' => 'Assigned store oversight',
+        'title' => 'Assigned Stores',
+        'description' => 'Review store-day variances and monitor stores assigned to you.',
+        'icon' => 'bi bi-shop',
+    ]) ?>
 
     <div class="admin-stores-filters" data-compact-filters>
         <div class="field">
@@ -31,6 +31,8 @@
         <button id="store-refresh-btn" class="secondary-btn" type="button">Refresh</button>
     </div>
 
+    <p id="stores-result" class="stores-result"></p>
+
     <div id="stores-gallery" class="stores-gallery">
         <?= view('components/data_state', [
             'type' => 'loading',
@@ -38,11 +40,10 @@
         ]) ?>
     </div>
 
-    <p id="stores-result" class="stores-result"></p>
 </section>
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/admin-stores.js') ?>?v=20260824b"></script>
-<script src="<?= base_url('assets/js/admin-stores.part2.js') ?>?v=20260824b"></script>
+<script src="<?= base_url('assets/js/admin-stores.js') ?>?v=20261004-editor-feedback"></script>
+<script src="<?= base_url('assets/js/admin-stores.part2.js') ?>?v=20261004-editor-feedback"></script>
 <?= $this->endSection() ?>

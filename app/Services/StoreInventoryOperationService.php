@@ -8,6 +8,7 @@ use App\Models\ProductModel;
 use App\Models\StoreCategoryModel;
 use App\Models\StoreModel;
 use Config\Database;
+use Throwable;
 
 final class StoreInventoryOperationService
 {
@@ -45,6 +46,13 @@ final class StoreInventoryOperationService
             ]);
         }
 
+        if (!ProductBehaviorService::tracksStock($product)) {
+            return $this->result(400, [
+                'status' => 'error',
+                'message' => 'This offering does not track physical stock and cannot be restocked.',
+            ]);
+        }
+
         $totalCost = $unitCost * $qty;
         $profitPerPiece = $sellPrice - $unitCost;
         $expectedProfit = $profitPerPiece * $qty;
@@ -64,7 +72,7 @@ final class StoreInventoryOperationService
             'total_cost' => $totalCost,
             'expected_profit' => $expectedProfit,
             'reason' => $reason !== '' ? $reason : 'Stock in',
-            'created_at' => date('Y-m-d H:i:s'),
+            'created_at' => ibems_now()->format('Y-m-d H:i:s'),
         ]);
 
         $auditLogModel = new AuditLogModel();
@@ -84,7 +92,7 @@ final class StoreInventoryOperationService
                 'profit_per_piece' => $profitPerPiece,
                 'reason' => $reason,
             ]),
-            'created_at' => date('Y-m-d H:i:s'),
+            'created_at' => ibems_now()->format('Y-m-d H:i:s'),
         ]);
 
         $db->transComplete();
@@ -112,9 +120,14 @@ final class StoreInventoryOperationService
         $productId = (int) ($request['product_id'] ?? 0);
         $actualQtyRaw = $request['actual_qty'] ?? null;
         $actualQty = filter_var($actualQtyRaw, FILTER_VALIDATE_INT);
+        $expectedQtyRaw = $request['expected_qty'] ?? null;
+        $expectedQty = $expectedQtyRaw === null ? null : filter_var($expectedQtyRaw, FILTER_VALIDATE_INT);
         $reason = trim((string) ($request['reason'] ?? 'Physical count adjustment'));
+        $wasteDisposition = strtolower(trim((string) ($request['waste_disposition'] ?? '')));
 
-        if ($storeId <= 0 || $productId <= 0 || $actualQty === false || $actualQty < 0) {
+        if ($storeId <= 0 || $productId <= 0 || $actualQty === false || $actualQty < 0
+            || ($expectedQtyRaw !== null && ($expectedQty === false || $expectedQty < 0))
+            || !in_array($wasteDisposition, ['', 'discarded', 'spoiled'], true)) {
             return $this->result(400, [
                 'status' => 'error',
                 'message' => 'Invalid stock adjustment payload.',
@@ -138,8 +151,27 @@ final class StoreInventoryOperationService
             ]);
         }
 
+        if (!ProductBehaviorService::tracksStock($product)) {
+            return $this->result(400, [
+                'status' => 'error',
+                'message' => 'This offering does not track physical stock and cannot have its stock adjusted.',
+            ]);
+        }
+
         $previousQty = (int) $product['stock_qty'];
+        if ($expectedQty !== null && $expectedQty !== $previousQty) {
+            return $this->result(409, [
+                'status' => 'error',
+                'message' => 'Stock changed since this product was opened. Reload it before adjusting.',
+            ]);
+        }
         $diffQty = $actualQty - $previousQty;
+        if ($wasteDisposition !== '' && $diffQty >= 0) {
+            return $this->result(400, [
+                'status' => 'error',
+                'message' => 'Discarded or spoiled stock must reduce the current quantity.',
+            ]);
+        }
 
         if ($diffQty === 0) {
             return $this->result(200, [
@@ -152,44 +184,66 @@ final class StoreInventoryOperationService
         }
 
         $db = Database::connect();
-        $db->transStart();
+        if ($wasteDisposition !== '' && !$db->fieldExists('waste_disposition', 'inventory_movements')) {
+            return $this->result(503, [
+                'status' => 'error',
+                'message' => 'Waste classification is unavailable until the inventory migration is applied.',
+            ]);
+        }
+        $db->transBegin();
+        try {
+            $db->table('products')->where('id', $productId)->where('store_id', $storeId)
+                ->where('stock_qty', $previousQty)->update([
+                    'stock_qty' => $actualQty,
+                    'updated_at' => ibems_now()->format('Y-m-d H:i:s'),
+                ]);
+            if ($db->affectedRows() !== 1) {
+                $db->transRollback();
+                return $this->result(409, [
+                    'status' => 'error',
+                    'message' => 'Stock changed during this adjustment. Reload it and retry.',
+                ]);
+            }
 
-        $productModel->update($productId, [
-            'stock_qty' => $actualQty,
-            'updated_at' => date('Y-m-d H:i:s'),
-        ]);
-
-        $movementModel = new InventoryMovementModel();
-        $movementId = $movementModel->insert([
-            'product_id' => $productId,
-            'store_id' => $storeId,
-            'type' => 'adjustment',
-            'qty' => $diffQty,
-            'reason' => $reason !== '' ? $reason : 'Physical count adjustment',
-            'created_at' => date('Y-m-d H:i:s'),
-        ]);
-
-        $auditLogModel = new AuditLogModel();
-        $auditLogModel->insert([
-            'actor_id' => $actorId,
-            'action' => 'ADJUST_PRODUCT_STOCK',
-            'entity' => 'products',
-            'entity_id' => $productId,
-            'payload_json' => json_encode([
-                'store_id' => $storeId,
+            $movementValues = [
                 'product_id' => $productId,
-                'previous_qty' => $previousQty,
-                'actual_qty' => $actualQty,
-                'diff_qty' => $diffQty,
-                'reason' => $reason,
-                'movement_id' => $movementId,
-            ]),
-            'created_at' => date('Y-m-d H:i:s'),
-        ]);
+                'store_id' => $storeId,
+                'type' => 'adjustment',
+                'qty' => $diffQty,
+                'reason' => $reason !== '' ? $reason : 'Physical count adjustment',
+                'created_at' => ibems_now()->format('Y-m-d H:i:s'),
+            ];
+            if ($wasteDisposition !== '') {
+                $movementValues['waste_disposition'] = $wasteDisposition;
+            }
+            $movementId = (new InventoryMovementModel())->insert($movementValues);
+            if (!$movementId) {
+                throw new \RuntimeException('Inventory movement insert failed.');
+            }
 
-        $db->transComplete();
-
-        if (!$db->transStatus()) {
+            $auditId = (new AuditLogModel())->insert([
+                'actor_id' => $actorId,
+                'action' => 'ADJUST_PRODUCT_STOCK',
+                'entity' => 'products',
+                'entity_id' => $productId,
+                'payload_json' => json_encode([
+                    'store_id' => $storeId,
+                    'product_id' => $productId,
+                    'previous_qty' => $previousQty,
+                    'actual_qty' => $actualQty,
+                    'diff_qty' => $diffQty,
+                    'reason' => $reason,
+                    'waste_disposition' => $wasteDisposition !== '' ? $wasteDisposition : null,
+                    'movement_id' => $movementId,
+                ]),
+                'created_at' => ibems_now()->format('Y-m-d H:i:s'),
+            ]);
+            if (!$auditId || !$db->transStatus()) {
+                throw new \RuntimeException('Stock adjustment audit failed.');
+            }
+            $db->transCommit();
+        } catch (Throwable) {
+            $db->transRollback();
             return $this->result(500, [
                 'status' => 'error',
                 'message' => 'Stock adjustment failed.',
@@ -228,12 +282,6 @@ final class StoreInventoryOperationService
         } catch (\InvalidArgumentException $e) {
             return $this->result(400, ['status' => 'error', 'message' => $e->getMessage()]);
         }
-        if (($product['stock_policy'] ?? 'tracked') === 'tracked' && $behavior['stock_policy'] === 'untracked' && (int) ($product['stock_qty'] ?? 0) !== 0) {
-            return $this->result(409, [
-                'status' => 'error',
-                'message' => 'Adjust this product stock to zero before changing it to untracked inventory.',
-            ]);
-        }
         if ($behavior['stock_policy'] === 'untracked') {
             $initialStock = 0;
             $lowStockThreshold = 0;
@@ -254,6 +302,11 @@ final class StoreInventoryOperationService
             ]);
         }
 
+        try {
+            ProductBehaviorService::assertStoreAllows($storeId, $behavior);
+        } catch (\InvalidArgumentException $e) {
+            return $this->result(400, ['status' => 'error', 'message' => $e->getMessage()]);
+        }
         $productModel = new ProductModel();
         $categoryModel = new StoreCategoryModel();
         if ($productModel->getBySku($storeId, $sku)) {
@@ -310,7 +363,7 @@ final class StoreInventoryOperationService
             'stock_policy' => $behavior['stock_policy'],
             'unit_code' => $behavior['unit_code'],
             'is_active' => true,
-            'updated_at' => date('Y-m-d H:i:s'),
+            'updated_at' => ibems_now()->format('Y-m-d H:i:s'),
         ]);
 
         $movementId = null;
@@ -332,7 +385,7 @@ final class StoreInventoryOperationService
                 'total_cost' => $totalCost,
                 'expected_profit' => $expectedProfit,
                 'reason' => $reason !== '' ? $reason : 'Initial stock',
-                'created_at' => date('Y-m-d H:i:s'),
+                'created_at' => ibems_now()->format('Y-m-d H:i:s'),
             ]);
         }
 
@@ -358,7 +411,7 @@ final class StoreInventoryOperationService
                 'unit_cost' => $unitCost,
                 'movement_id' => $movementId,
             ]),
-            'created_at' => date('Y-m-d H:i:s'),
+            'created_at' => ibems_now()->format('Y-m-d H:i:s'),
         ]);
 
         $db->transComplete();

@@ -122,7 +122,7 @@ final class AdminUserService
         ]);
     }
 
-    public function create(array $request, int $actorId, $profileImageFile = null): array
+    public function create(array $request, int $actorId, $profileImageFile = null, string $auditAction = 'ADMIN_CREATE_USER'): array
     {
 
         $employeeId = trim((string) ($request['employee_id'] ?? ''));
@@ -149,7 +149,7 @@ final class AdminUserService
             ]);
         }
 
-        $allowedRoles = ['USER', 'STORE_SYSTEM', 'STORE_SUPERVISOR', 'ACCOUNTING_OFFICE', 'ADMIN'];
+        $allowedRoles = ['USER', 'STORE_SYSTEM', 'STORE_SUPERVISOR', 'ACCOUNTING_OFFICE', 'ACCOUNTING_HEAD', 'PAYROLL_CLERK', 'CASHIER_HEAD', 'COLLECTING_OFFICER', 'BE_DIRECTOR', 'HR', 'ADMIN'];
         $allowedTypes = ['faculty', 'staff', 'student'];
         $roles = $this->sanitizeRoles($roles, ['USER']);
         foreach ($roles as $selectedRole) {
@@ -220,7 +220,7 @@ final class AdminUserService
             'qr_token' => bin2hex(random_bytes(16)),
             'base_salary' => (float) ($financialProfile['monthly_salary'] ?? 0),
             'is_active' => $isActive,
-            'created_at' => date('Y-m-d H:i:s'),
+            'created_at' => ibems_now()->format('Y-m-d H:i:s'),
         ];
         if ($financialProfile !== null) {
             $userPayload += [
@@ -242,7 +242,7 @@ final class AdminUserService
                 'user_id' => (int) $userId,
                 'credit_limit' => $initialCreditLimit,
                 'current_debt' => 0,
-                'updated_at' => date('Y-m-d H:i:s'),
+                'updated_at' => ibems_now()->format('Y-m-d H:i:s'),
             ];
             if ($db->fieldExists('credit_rate', 'balances')) {
                 $balancePayload['credit_rate'] = (float) ($financialProfile['credit_rate'] ?? 0);
@@ -252,7 +252,7 @@ final class AdminUserService
 
         $auditLogModel->insert([
             'actor_id' => $actorId,
-            'action' => 'ADMIN_CREATE_USER',
+            'action' => $auditAction,
             'entity' => 'users',
             'entity_id' => (int) $userId,
             'payload_json' => json_encode([
@@ -263,7 +263,7 @@ final class AdminUserService
                 'initial_credit_limit' => $initialCreditLimit,
                 'salary_profile' => $financialProfile,
             ]),
-            'created_at' => date('Y-m-d H:i:s'),
+            'created_at' => ibems_now()->format('Y-m-d H:i:s'),
         ]);
 
         $db->transComplete();
@@ -306,7 +306,7 @@ final class AdminUserService
             ]);
         }
 
-        $allowedRoles = ['USER', 'STORE_SYSTEM', 'STORE_SUPERVISOR', 'ACCOUNTING_OFFICE', 'ADMIN'];
+        $allowedRoles = ['USER', 'STORE_SYSTEM', 'STORE_SUPERVISOR', 'ACCOUNTING_OFFICE', 'ACCOUNTING_HEAD', 'PAYROLL_CLERK', 'CASHIER_HEAD', 'COLLECTING_OFFICER', 'BE_DIRECTOR', 'HR', 'ADMIN'];
         $allowedTypes = ['faculty', 'staff', 'student'];
         $roles = $this->sanitizeRoles($roles, ['USER']);
         foreach ($roles as $selectedRole) {
@@ -338,16 +338,11 @@ final class AdminUserService
         }
         $roles = $this->employeeRolesWithAssignments($userId, $roles, $db);
         $existingBalance = $balanceModel->find($userId);
-        $financialProfile = null;
-        if (in_array($userType, ['faculty', 'staff'], true)) {
-            try {
-                $financialProfile = $this->resolveEmployeeFinancialProfile($db, $request, array_merge($user, $existingBalance ?? []));
-            } catch (\InvalidArgumentException $exception) {
-                return $this->result(400, [
-                    'status' => 'error',
-                    'message' => $exception->getMessage(),
-                ]);
-            }
+        // Existing financial profiles belong to Accounting. Identity/category edits
+        // must never recalculate, reset, or initialize salary-derived credit.
+        if ($this->requestsFinancialChange($request, $user, $existingBalance)) {
+            return $this->result(403, ['status' => 'error',
+                'message' => 'Only Accounting may change an existing employee financial profile or credit percentage/limit.']);
         }
 
         $sameEmail = $db->table('users')->where('email', $email)->where('id !=', $userId)->get()->getRowArray();
@@ -386,41 +381,8 @@ final class AdminUserService
         if ($profileImageUrl !== null) {
             $userPayload['profile_image_url'] = $profileImageUrl;
         }
-        if ($financialProfile !== null) {
-            $userPayload += [
-                'base_salary' => $financialProfile['monthly_salary'],
-                'employment_type' => $financialProfile['employment_type'],
-                'salary_grade' => $financialProfile['salary_grade_label'],
-                'salary_step' => $financialProfile['salary_step'],
-                'salary_effective_date' => $financialProfile['effective_date'],
-                'salary_schedule_id' => $financialProfile['schedule_id'],
-            ];
-        }
         $db->table('users')->where('id', $userId)->update($userPayload);
         $this->syncUserRoles($userId, $roles);
-
-        $balance = $existingBalance;
-        if ($balance) {
-            $balancePayload = [
-                'credit_limit' => (float) ($financialProfile['credit_limit'] ?? 0),
-                'updated_at' => date('Y-m-d H:i:s'),
-            ];
-            if ($db->fieldExists('credit_rate', 'balances')) {
-                $balancePayload['credit_rate'] = (float) ($financialProfile['credit_rate'] ?? 0);
-            }
-            $balanceModel->update($userId, $balancePayload);
-        } else {
-            $balancePayload = [
-                'user_id' => $userId,
-                'credit_limit' => (float) ($financialProfile['credit_limit'] ?? 0),
-                'current_debt' => 0,
-                'updated_at' => date('Y-m-d H:i:s'),
-            ];
-            if ($db->fieldExists('credit_rate', 'balances')) {
-                $balancePayload['credit_rate'] = (float) ($financialProfile['credit_rate'] ?? 0);
-            }
-            $balanceModel->insert($balancePayload);
-        }
 
         $auditLogModel->insert([
             'actor_id' => $actorId,
@@ -433,8 +395,9 @@ final class AdminUserService
                 'roles' => $roles,
                 'user_type' => $userType,
                 'is_active' => $isActive,
+                'financial_profile_preserved' => true,
             ]),
-            'created_at' => date('Y-m-d H:i:s'),
+            'created_at' => ibems_now()->format('Y-m-d H:i:s'),
         ]);
 
         $db->transComplete();
@@ -459,7 +422,7 @@ final class AdminUserService
         ]);
     }
 
-    public function importCsv($file, int $actorId): array
+    public function importCsv($file, int $actorId, array $options = []): array
     {
         if (!$file || !$file->isValid()) {
             return $this->result(400, [
@@ -478,7 +441,20 @@ final class AdminUserService
 
         $headersRaw = fgetcsv($handle, null, ',', '"', '');
         $headers = is_array($headersRaw) ? array_map(static fn($h): string => strtolower(trim((string) $h)), $headersRaw) : [];
-        $required = ['name', 'email', 'user_type'];
+        $allowedHeaders = $options['allowed_headers'] ?? null;
+        if (is_array($allowedHeaders) && (count($headers) !== count(array_unique($headers))
+            || count(array_diff($headers, $allowedHeaders)) > 0)) {
+            fclose($handle);
+            return $this->result(400, [
+                'status' => 'error',
+                'message' => 'This CSV import accepts only these columns: ' . implode(', ', $allowedHeaders) . '.',
+            ]);
+        }
+        $forceUserType = strtolower(trim((string) ($options['force_user_type'] ?? '')));
+        $forceActive = ($options['force_active'] ?? false) === true;
+        $allowUpdates = ($options['allow_updates'] ?? true) === true;
+        $auditAction = trim((string) ($options['audit_action'] ?? 'ADMIN_IMPORT_USERS_CSV')) ?: 'ADMIN_IMPORT_USERS_CSV';
+        $required = $forceUserType !== '' ? ['name', 'email'] : ['name', 'email', 'user_type'];
         foreach ($required as $field) {
             if (!in_array($field, $headers, true)) {
                 fclose($handle);
@@ -495,17 +471,25 @@ final class AdminUserService
         $auditLogModel = new AuditLogModel();
         $standardProfile = (new SalaryScheduleService())->standardProfile($db);
 
-        $allowedRoles = ['USER', 'STORE_SYSTEM', 'STORE_SUPERVISOR', 'ACCOUNTING_OFFICE', 'ADMIN'];
-        $allowedTypes = ['faculty', 'staff', 'student'];
+        $allowedRoles = ['USER', 'STORE_SYSTEM', 'STORE_SUPERVISOR', 'ACCOUNTING_OFFICE', 'ACCOUNTING_HEAD', 'PAYROLL_CLERK', 'CASHIER_HEAD', 'COLLECTING_OFFICER', 'BE_DIRECTOR', 'HR', 'ADMIN'];
+        $allowedTypes = array_values((array) ($options['allowed_user_types'] ?? ['faculty', 'staff', 'student']));
         $total = 0;
         $created = 0;
         $updated = 0;
+        $skipped = 0;
         $invalid = 0;
+        $identityGuard = new SalaryImportIdentityGuard();
+        $seenEmployeeIds = [];
+        $seenEmails = [];
 
         $db->transException(true)->transStart();
         try {
         while (($values = fgetcsv($handle, null, ',', '"', '')) !== false) {
             $total++;
+            if (($options['strict_column_count'] ?? false) === true && count($values) !== count($headers)) {
+                $invalid++;
+                continue;
+            }
             $row = [];
             foreach ($headers as $i => $key) {
                 $row[$key] = trim((string) ($values[$i] ?? ''));
@@ -513,14 +497,17 @@ final class AdminUserService
 
             $name = $row['name'] ?? '';
             $email = strtolower($row['email'] ?? '');
-            $role = strtoupper($row['role'] ?? 'USER');
+            $role = $forceUserType !== '' ? 'USER' : strtoupper($row['role'] ?? 'USER');
             if ($role === '') {
                 $role = 'USER';
             }
             $roles = $this->parseRoleList($role);
-            $userType = strtolower($row['user_type'] ?? '');
+            $userType = $forceUserType !== '' ? $forceUserType : strtolower($row['user_type'] ?? '');
             $employeeId = $row['employee_id'] ?? '';
             $isActive = isset($row['is_active']) ? (int) $row['is_active'] === 1 : true;
+            if ($forceActive) {
+                $isActive = true;
+            }
 
             if ($name === '' || !filter_var($email, FILTER_VALIDATE_EMAIL) || empty($roles) || !in_array($userType, $allowedTypes, true)) {
                 $invalid++;
@@ -532,9 +519,16 @@ final class AdminUserService
                     continue 2;
                 }
             }
-            $existing = $db->table('users')->where('email', $email)->get()->getRowArray();
-            if (!$existing && $employeeId !== '') {
-                $existing = $db->table('users')->where('employee_id', $employeeId)->get()->getRowArray();
+            $identity = $identityGuard->inspect($db, $employeeId, $email, $seenEmployeeIds, $seenEmails);
+            if ($identity['errors'] !== []) {
+                $invalid++;
+                continue;
+            }
+            $identityGuard->claim($employeeId, $email, $seenEmployeeIds, $seenEmails);
+            $existing = $identity['existing'];
+            if ($existing && !$allowUpdates) {
+                $skipped++;
+                continue;
             }
             $roles = $existing
                 ? $this->employeeRolesWithAssignments((int) $existing['id'], $roles, $db)
@@ -542,7 +536,7 @@ final class AdminUserService
             $primaryRole = $this->pickPrimaryRole($roles);
 
             $needsStandardProfile = in_array($userType, ['faculty', 'staff'], true)
-                && (!$existing || empty($existing['salary_schedule_id']));
+                && !$existing;
             if ($needsStandardProfile && $standardProfile === null) {
                 throw new \RuntimeException('The standard salary schedule is unavailable. Apply the latest database migration before importing employees.');
             }
@@ -584,7 +578,7 @@ final class AdminUserService
                     'qr_token' => bin2hex(random_bytes(16)),
                     'base_salary' => $needsStandardProfile ? $standardProfile['monthly_salary'] : 0,
                     'is_active' => $isActive,
-                    'created_at' => date('Y-m-d H:i:s'),
+                    'created_at' => ibems_now()->format('Y-m-d H:i:s'),
                 ];
                 if ($needsStandardProfile) {
                     $newUserPayload += [
@@ -606,10 +600,12 @@ final class AdminUserService
             }
             $this->syncUserRoles($userId, $roles);
 
+            // CSV updates retain the existing account's financial values too.
+            if (!$existing) {
             $balance = $balanceModel->find($userId);
             if ($balance) {
                 $balanceUpdate = [
-                    'updated_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => ibems_now()->format('Y-m-d H:i:s'),
                 ];
                 if ($needsStandardProfile) {
                     $balanceUpdate['credit_limit'] = $standardCreditLimit;
@@ -622,24 +618,26 @@ final class AdminUserService
                     'credit_limit' => $standardCreditLimit,
                     'credit_rate' => $needsStandardProfile ? $standardCreditRate : 0,
                     'current_debt' => 0,
-                    'updated_at' => date('Y-m-d H:i:s'),
+                    'updated_at' => ibems_now()->format('Y-m-d H:i:s'),
                 ]);
+            }
             }
         }
         fclose($handle);
 
         $auditLogModel->insert([
             'actor_id' => $actorId,
-            'action' => 'ADMIN_IMPORT_USERS_CSV',
+            'action' => $auditAction,
             'entity' => 'users',
             'entity_id' => null,
             'payload_json' => json_encode([
                 'total' => $total,
                 'created' => $created,
                 'updated' => $updated,
+                'skipped' => $skipped,
                 'invalid' => $invalid,
             ]),
-            'created_at' => date('Y-m-d H:i:s'),
+            'created_at' => ibems_now()->format('Y-m-d H:i:s'),
         ]);
 
         $db->transComplete();
@@ -660,8 +658,28 @@ final class AdminUserService
             'total' => $total,
             'created' => $created,
             'updated' => $updated,
+            'skipped' => $skipped,
             'invalid' => $invalid,
         ]);
+    }
+
+    private function requestsFinancialChange(array $request, array $user, ?array $balance): bool
+    {
+        $stored = $user + ['base_salary' => 0];
+        $stored['credit_limit'] = $balance['credit_limit'] ?? 0;
+        $stored['credit_rate'] = $balance['credit_rate'] ?? 0;
+        $stored['credit_percentage'] = SalaryCreditPolicy::percentageFromRate((float) $stored['credit_rate']);
+        $stored['monthly_salary'] = $stored['base_salary'];
+        $numeric = ['base_salary', 'monthly_salary', 'credit_limit', 'credit_rate', 'credit_percentage', 'salary_schedule_id', 'salary_step'];
+        foreach (array_merge($numeric, ['employment_type', 'salary_grade', 'salary_effective_date']) as $field) {
+            if (!array_key_exists($field, $request)) continue;
+            $value = $request[$field];
+            if (!is_scalar($value) || is_bool($value)) return true;
+            if (in_array($field, $numeric, true)) {
+                if (!is_numeric($value) || !is_finite((float) $value) || (float) $value !== (float) ($stored[$field] ?? 0)) return true;
+            } elseif (trim((string) $value) !== trim((string) ($stored[$field] ?? ''))) return true;
+        }
+        return false;
     }
 
     private function resolveEmployeeFinancialProfile($db, array $request, ?array $current = null): array
@@ -677,10 +695,12 @@ final class AdminUserService
 
         $scheduleId = (int) ($request['salary_schedule_id'] ?? $current['salary_schedule_id'] ?? 0);
         $grade = (string) ($request['salary_grade'] ?? $current['salary_grade'] ?? '');
-        $step = (int) ($request['salary_step'] ?? $current['salary_step'] ?? 0);
+        $step = SalaryCreditPolicy::parseSalaryStep($request['salary_step'] ?? $current['salary_step'] ?? null);
         $employmentType = SalaryCreditPolicy::normalizeEmploymentType((string) ($request['employment_type'] ?? $current['employment_type'] ?? 'plantilla'));
         $effectiveDate = trim((string) ($request['salary_effective_date'] ?? $current['salary_effective_date'] ?? ''));
-        $creditPercentage = (float) ($request['credit_percentage'] ?? SalaryCreditPolicy::percentageFromRate((float) ($current['credit_rate'] ?? SalaryCreditPolicy::DEFAULT_CREDIT_RATE)));
+        $creditPercentage = SalaryCreditPolicy::parseCreditPercentage(
+            $request['credit_percentage'] ?? SalaryCreditPolicy::percentageFromRate((float) ($current['credit_rate'] ?? SalaryCreditPolicy::DEFAULT_CREDIT_RATE))
+        );
 
         if (!in_array($employmentType, SalaryCreditPolicy::EMPLOYMENT_TYPES, true)) {
             throw new \InvalidArgumentException('Select a valid employment type.');
@@ -688,8 +708,14 @@ final class AdminUserService
         if (!SalaryCreditPolicy::isValidEffectiveDate($effectiveDate)) {
             throw new \InvalidArgumentException('Select a valid salary effective date.');
         }
-        if (!SalaryCreditPolicy::isValidCreditPercentage($creditPercentage)) {
-            throw new \InvalidArgumentException('Credit percentage must be from 0% to 100%.');
+        if (SalaryCreditPolicy::isFutureEffectiveDate($effectiveDate)) {
+            throw new \InvalidArgumentException('Future-effective salary profiles cannot be applied immediately; scheduling is not available yet.');
+        }
+        if ($creditPercentage === null) {
+            throw new \InvalidArgumentException('Credit percentage must be a number from 0% to 100% with at most two decimals.');
+        }
+        if ($step === null) {
+            throw new \InvalidArgumentException('Salary step must be an integer from 1 to 8.');
         }
 
         $rate = (new SalaryScheduleService())->resolveRate($db, $scheduleId, $grade, $step);
@@ -701,13 +727,24 @@ final class AdminUserService
         }
 
         $creditRate = SalaryCreditPolicy::rateFromPercentage($creditPercentage);
-        return $rate + [
+        $sameActiveProfile = $current !== null
+            && (int) ($current['salary_schedule_id'] ?? 0) === $scheduleId
+            && (string) ($current['salary_grade'] ?? '') === (string) $rate['salary_grade_label']
+            && (int) ($current['salary_step'] ?? 0) === $step
+            && (string) ($current['salary_effective_date'] ?? '') === $effectiveDate
+            && (string) ($current['employment_type'] ?? '') === $employmentType;
+        // Admin account edits must not erase an Accounting-approved individual salary override.
+        $monthlySalary = $sameActiveProfile && (float) ($current['base_salary'] ?? 0) > 0
+            ? (float) $current['base_salary']
+            : (float) $rate['monthly_salary'];
+        return array_merge($rate, [
+            'monthly_salary' => $monthlySalary,
             'employment_type' => $employmentType,
             'effective_date' => $effectiveDate,
             'credit_percentage' => $creditPercentage,
             'credit_rate' => $creditRate,
-            'credit_limit' => SalaryCreditPolicy::creditLimit((float) $rate['monthly_salary'], $creditRate),
-        ];
+            'credit_limit' => SalaryCreditPolicy::creditLimit($monthlySalary, $creditRate),
+        ]);
     }
 
     private function storeUserProfileImage($file, ?string $currentUrl = null): ?string
@@ -793,7 +830,7 @@ final class AdminUserService
 
     private function pickPrimaryRole(array $roles): string
     {
-        $priority = ['ADMIN', 'ACCOUNTING_OFFICE', 'STORE_SUPERVISOR', 'STORE_SYSTEM', 'USER'];
+        $priority = ['ADMIN', 'HR', 'ACCOUNTING_HEAD', 'ACCOUNTING_OFFICE', 'PAYROLL_CLERK', 'CASHIER_HEAD', 'COLLECTING_OFFICER', 'BE_DIRECTOR', 'STORE_SUPERVISOR', 'STORE_SYSTEM', 'USER'];
         foreach ($priority as $preferred) {
             if (in_array($preferred, $roles, true)) {
                 return $preferred;
@@ -824,7 +861,7 @@ final class AdminUserService
             $userRoleModel->where('user_id', $userId)->whereIn('role', array_values($toDelete))->delete();
         }
 
-        $now = date('Y-m-d H:i:s');
+        $now = ibems_now()->format('Y-m-d H:i:s');
         foreach ($toInsert as $role) {
             $userRoleModel->insert([
                 'user_id' => $userId,

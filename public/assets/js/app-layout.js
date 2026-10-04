@@ -46,6 +46,7 @@
         const label = (link.querySelector("span")?.textContent || link.textContent || "").trim();
         if (label !== "") {
             link.setAttribute("data-tooltip", label);
+            link.setAttribute("aria-label", label);
         }
     });
 
@@ -101,8 +102,14 @@
         }
     });
 
+    let hadDesktopScroll = canCollapse();
     window.addEventListener("resize", () => {
         applyResponsiveState();
+        const hasDesktopScroll = canCollapse();
+        if (hasDesktopScroll && !hadDesktopScroll) {
+            window.scrollTo({top: 0, left: 0, behavior: "instant"});
+        }
+        hadDesktopScroll = hasDesktopScroll;
     });
 
     const modalSelectors = [
@@ -245,6 +252,7 @@
         });
 
         const setOpen = (mode = "filter", open = true) => {
+            const wasOpen = !panel.hidden;
             panel.hidden = !open;
             panel.dataset.mode = mode;
             if (open && window.matchMedia("(min-width: 761px)").matches) {
@@ -272,6 +280,13 @@
                 button.setAttribute("aria-expanded", active ? "true" : "false");
             });
             bar.classList.toggle("has-open-filter-panel", open);
+            if (open) {
+                panel.setAttribute("role", "dialog");
+                panel.setAttribute("aria-label", mode === "sort" ? "Sort results" : "Filters");
+                panel.querySelector(".compact-filter-close")?.focus();
+            } else if (wasOpen && panel.contains(document.activeElement)) {
+                (mode === "sort" ? sortToggle : filterToggle)?.focus();
+            }
         };
 
         const activeFor = (control) => {
@@ -302,7 +317,7 @@
         panel.querySelector(".compact-filter-close").addEventListener("click", () => setOpen(panel.dataset.mode, false));
         panel.querySelector("[data-compact-filter-apply]").addEventListener("click", () => setOpen(panel.dataset.mode, false));
         panel.querySelector("[data-compact-filter-reset]").addEventListener("click", () => {
-            const resetButton = originalButtons.find((button) => /refresh|reset|clear/i.test(`${button.id} ${button.textContent}`));
+            const resetButton = originalButtons.find((button) => /reset|clear/i.test(`${button.id} ${button.textContent}`));
             if (resetButton) {
                 resetButton.click();
             } else {
@@ -319,6 +334,7 @@
             window.setTimeout(updateCounts, 0);
         });
 
+        advancedControls.forEach((control) => control.addEventListener("ibems:control-sync", updateCounts));
         advancedControls.forEach((control) => control.addEventListener("change", () => {
             updateCounts();
             if (window.matchMedia("(max-width: 760px)").matches && panel.dataset.mode === "sort" && sortControls.includes(control)) {
@@ -328,12 +344,26 @@
         const pageSignal = window.IbemsPortalNavigation?.currentSignal || window.IbemsUserNavigation?.currentSignal;
         document.addEventListener("click", (event) => {
             if (panel.hidden || bar.contains(event.target)) return;
-            const isMobileFilterPopup = window.matchMedia("(max-width: 760px)").matches
-                && panel.dataset.mode === "filter"
-                && event.target.closest?.(".ui-select-menu, .ui-date-popup");
-            if (!isMobileFilterPopup) setOpen(panel.dataset.mode, false);
+            // Navigation can rebuild the popup before this document listener runs.
+            // The original event path still contains its popup ancestor.
+            const isFilterPopup = event.composedPath().some((node) => node.matches?.(".ui-select-menu, .ui-date-popup"));
+            if (!isFilterPopup) setOpen(panel.dataset.mode, false);
         }, pageSignal ? { signal: pageSignal } : undefined);
         bar.addEventListener("keydown", (event) => {
+            if (event.defaultPrevented) return;
+            if (event.key === "Tab" && !panel.hidden && window.matchMedia("(max-width: 760px)").matches) {
+                const controls = Array.from(panel.querySelectorAll('button, input, select, textarea, a[href], [tabindex]'))
+                    .filter((control) => !control.disabled && control.tabIndex >= 0 && control.getClientRects().length);
+                const first = controls[0];
+                const last = controls[controls.length - 1];
+                if (first && event.shiftKey && (document.activeElement === first || !panel.contains(document.activeElement))) {
+                    event.preventDefault();
+                    last.focus();
+                } else if (last && !event.shiftKey && (document.activeElement === last || !panel.contains(document.activeElement))) {
+                    event.preventDefault();
+                    first.focus();
+                }
+            }
             if (event.key === "Escape" && !panel.hidden) {
                 const activeToggle = panel.dataset.mode === "sort" ? sortToggle : filterToggle;
                 setOpen(panel.dataset.mode, false);

@@ -18,7 +18,8 @@ final class AccountingReportingService
             ->get()
             ->getRowArray() ?? [];
 
-        $periodDeductions = $this->deductionSummaryForStorageRange($db, $period['start'], $period['end']);
+        $deductionReport = (new FinanceDeductionReportService($db))->buildForStorageRange($period['start'], $period['end']);
+        $periodDeductions = ['count' => $deductionReport['count'], 'amount' => $deductionReport['total_cents'] / 100];
 
         $lastPeriod = $db->table('deduction_periods')
             ->select('period_code, label, status, updated_at')
@@ -50,7 +51,7 @@ final class AccountingReportingService
             ->get()
             ->getResultArray();
 
-        $staleCutoff = date('Y-m-d H:i:s', strtotime('-30 day'));
+        $staleCutoff = ibems_now()->modify('-30 days')->format('Y-m-d H:i:s');
         $staleDebtAccounts = $db->table('balances b')
             ->select('u.id AS user_id, u.employee_id, u.name, u.email, u.profile_image_url, b.current_debt, b.updated_at, MAX(dce.created_at) AS last_cashbook_at')
             ->join('users u', 'u.id = b.user_id', 'inner')
@@ -82,25 +83,15 @@ final class AccountingReportingService
             $trendByDate[$seed['key']] = ['date' => $seed['date'], 'amount' => 0.0, 'count' => 0];
         }
 
-        $trendRows = $db->table('debt_cashbook_entries')
-            ->select('created_at, amount')
-            ->where('direction', 'credit')
-            ->whereIn('entry_type', ['confirmed_salary_deduction', 'salary_deduction', 'manual_deduction', 'full_deduction'])
-            ->where('created_at >=', $period['start'])
-            ->where('created_at <=', $period['end'])
-            ->orderBy('created_at', 'ASC')
-            ->get()
-            ->getResultArray();
-
-        foreach ($trendRows as $row) {
-            $createdAt = trim((string) ($row['created_at'] ?? ''));
+        foreach ($deductionReport['rows'] as $row) {
+            $createdAt = trim((string) ($row['recorded_at'] ?? ''));
             $date = $createdAt === '' ? '' : (new \DateTimeImmutable($createdAt, $storageZone))->setTimezone($businessZone)->format('Y-m-d');
             $bucketKey = DashboardPeriod::bucketKey($date, $period);
             if (!isset($trendByDate[$bucketKey])) {
                 continue;
             }
 
-            $amount = (float) ($row['amount'] ?? 0);
+            $amount = (int) ($row['amount_cents'] ?? 0) / 100;
             if ($amount <= 0) {
                 continue;
             }
@@ -240,41 +231,13 @@ final class AccountingReportingService
     public function dailySummary(BaseConnection $db): array
     {
         [$start, $end, $businessDate] = $this->businessDayStorageBounds();
-        $summary = $this->deductionSummaryForStorageRange($db, $start, $end);
+        $report = (new FinanceDeductionReportService($db))->buildForStorageRange($start, $end);
 
         return [
             'status' => 'success',
             'date' => $businessDate,
-            'deduction_count' => $summary['count'],
-            'deducted_amount' => $summary['amount'],
-        ];
-    }
-
-    /** @return array{count:int,amount:float} */
-    private function deductionSummaryForStorageRange(BaseConnection $db, string $start, string $end): array
-    {
-        // Confirmed batch items are authoritative for the new payroll workflow.
-        // Exclude their mirrored cashbook rows so the same result is not counted twice.
-        $legacy = $db->table('debt_cashbook_entries')
-            ->select('COUNT(*) AS entry_count, COALESCE(SUM(amount), 0) AS total_amount')
-            ->where('direction', 'credit')
-            ->whereIn('entry_type', ['salary_deduction', 'manual_deduction', 'full_deduction'])
-            ->where('created_at >=', $start)
-            ->where('created_at <=', $end)
-            ->get()
-            ->getRowArray() ?? [];
-
-        $batch = $db->table('deduction_batch_items')
-            ->select('COUNT(*) AS entry_count, COALESCE(SUM(confirmed_amount), 0) AS total_amount')
-            ->where('confirmed_amount >', 0)
-            ->where('confirmed_at >=', $start)
-            ->where('confirmed_at <=', $end)
-            ->get()
-            ->getRowArray() ?? [];
-
-        return [
-            'count' => (int) ($legacy['entry_count'] ?? 0) + (int) ($batch['entry_count'] ?? 0),
-            'amount' => (float) ($legacy['total_amount'] ?? 0) + (float) ($batch['total_amount'] ?? 0),
+            'deduction_count' => $report['count'],
+            'deducted_amount' => $report['total_cents'] / 100,
         ];
     }
 
@@ -283,7 +246,7 @@ final class AccountingReportingService
     {
         $businessZone = new \DateTimeZone('Asia/Manila');
         $storageZone = new \DateTimeZone('UTC');
-        $businessNow = new \DateTimeImmutable('now', $businessZone);
+        $businessNow = ibems_now()->setTimezone($businessZone);
         $start = $businessNow->setTime(0, 0)->setTimezone($storageZone);
         $end = $businessNow->setTime(23, 59, 59)->setTimezone($storageZone);
 

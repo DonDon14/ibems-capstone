@@ -22,6 +22,12 @@ class RoleFilter implements FilterInterface
 
     public function before(RequestInterface $request, $arguments = null)
     {
+        $availableRoles = [];
+        if (session()->get('logged_in')) {
+            $method = strtoupper($request->getMethod());
+            $availableRoles = ibems_refresh_session_roles(! in_array($method, ['GET', 'HEAD'], true));
+        }
+
         if (!session()->get('logged_in')) {
             if ($this->isDocumentRequest($request)) {
                 return redirect()->to('/login');
@@ -35,8 +41,6 @@ class RoleFilter implements FilterInterface
                 ]);
         }
 
-        $method = strtoupper($request->getMethod());
-        $availableRoles = ibems_refresh_session_roles(! in_array($method, ['GET', 'HEAD'], true));
         $userRole = ibems_current_role();
 
         if ($userRole === null) {

@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/department') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/department-debt.css') ?>?v=20260825a" data-portal-page-style>
+<link rel="stylesheet" href="<?= base_url('assets/css/department-debt.css') ?>?v=20261004-admin-save-feedback" data-portal-page-style>
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -26,5 +26,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/department-portal.js') ?>?v=20260902a" data-portal-page-script></script>
+<script src="<?= base_url('assets/js/department-portal.js') ?>?v=20261003-loading-icon" data-portal-page-script></script>
 <?= $this->endSection() ?>

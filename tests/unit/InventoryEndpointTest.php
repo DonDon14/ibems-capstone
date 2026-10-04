@@ -225,6 +225,55 @@ final class InventoryEndpointTest extends CIUnitTestCase
         $this->assertSame('Physical count', $movement['reason'] ?? null);
     }
 
+    public function testExplicitSpoilageIsRecordedOnlyForStockReduction(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+        $this->seedStore($now);
+        $this->seedProduct(101, 'SKU-101', 'BAR-101', 5, $now);
+
+        $invalid = $this->inventoryPost('store/inventory/adjust-stock', [
+            'store_id' => 1, 'product_id' => 101, 'actual_qty' => 6,
+            'reason' => 'Spoiled', 'waste_disposition' => 'spoiled',
+        ]);
+        $invalid->assertStatus(400);
+        $this->assertSame(5, (int) $db->table('products')->where('id', 101)->get()->getRow()->stock_qty);
+
+        $result = $this->inventoryPost('store/inventory/adjust-stock', [
+            'store_id' => 1, 'product_id' => 101, 'actual_qty' => 2,
+            'expected_qty' => 5, 'reason' => 'Damaged during storage', 'waste_disposition' => 'spoiled',
+        ]);
+        $result->assertOK();
+        $movement = $db->table('inventory_movements')->where('product_id', 101)->get()->getRowArray();
+        $this->assertSame(-3, (int) $movement['qty']);
+        $this->assertSame('spoiled', $movement['waste_disposition']);
+        $audit = $db->table('audit_logs')->where('action', 'ADJUST_PRODUCT_STOCK')->get()->getRowArray();
+        $this->assertSame('spoiled', json_decode($audit['payload_json'], true)['waste_disposition']);
+    }
+
+    public function testStaleStockAdjustmentCannotCreateASecondWasteMovement(): void
+    {
+        $db = Database::connect();
+        $now = date('Y-m-d H:i:s');
+        $this->seedStore($now);
+        $this->seedProduct(101, 'SKU-101', 'BAR-101', 5, $now);
+
+        $first = $this->inventoryPost('store/inventory/adjust-stock', [
+            'store_id' => 1, 'product_id' => 101, 'actual_qty' => 2,
+            'expected_qty' => 5, 'waste_disposition' => 'discarded',
+        ]);
+        $first->assertOK();
+        $stale = $this->inventoryPost('store/inventory/adjust-stock', [
+            'store_id' => 1, 'product_id' => 101, 'actual_qty' => 1,
+            'expected_qty' => 5, 'waste_disposition' => 'discarded',
+        ]);
+        $stale->assertStatus(409);
+
+        $this->assertSame(2, (int) $db->table('products')->where('id', 101)->get()->getRow()->stock_qty);
+        $this->assertSame(1, $db->table('inventory_movements')->where('product_id', 101)->countAllResults());
+        $this->assertSame(1, $db->table('audit_logs')->where('action', 'ADJUST_PRODUCT_STOCK')->countAllResults());
+    }
+
     public function testAdjustStockRejectsFractionalActualQuantityWithoutChangingStock(): void
     {
         $db = Database::connect();
@@ -416,6 +465,7 @@ final class InventoryEndpointTest extends CIUnitTestCase
             total_cost REAL,
             expected_profit REAL,
             reason TEXT,
+            waste_disposition TEXT,
             txn_id INTEGER,
             created_at TEXT
         )');

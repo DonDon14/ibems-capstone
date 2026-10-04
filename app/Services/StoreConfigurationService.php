@@ -14,6 +14,9 @@ final class StoreConfigurationService
     public function updateCapabilities(array $request, int $actorId, string $role): array
     {
         $storeId = (int) ($request['store_id'] ?? 0);
+        if ($storeId <= 0 || !is_array($request['capabilities'] ?? null) || $request['capabilities'] === [] || array_filter($request['capabilities'], static fn ($value) => !is_string($value) || !in_array($value, ProductBehaviorService::CAPABILITIES, true)) !== []) {
+            return $this->result(400, ['status' => 'error', 'message' => 'Select a store and at least one valid activity.']);
+        }
         $store = (new StoreAccessService())->resolve($actorId, $role, $storeId);
         if (!$store) {
             return $this->result(403, ['status' => 'error', 'message' => 'You cannot update this store.']);
@@ -25,6 +28,7 @@ final class StoreConfigurationService
         }
         $db->transBegin();
         try {
+            ProductBehaviorService::lockStore($db, $storeId);
             (new StoreCapabilityModel())->syncForStore($storeId, $capabilities);
             (new AuditLogModel())->insert([
                 'actor_id' => $actorId,

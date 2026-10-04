@@ -17,7 +17,7 @@ final class ProductVariantBuilderTest extends TestCase
         $this->assertStringContainsString('/store/inventory/add-product-family', $js);
         $this->assertStringContainsString('formData.append("variants", JSON.stringify', $js);
         $this->assertStringContainsString('Scan Product Barcode', $view);
-        $this->assertStringContainsString('facingMode:"environment"', $js);
+        $this->assertMatchesRegularExpression('/facingMode:\s*"environment"/', $js);
         $css = file_get_contents(ROOTPATH . 'public/assets/css/store-inventory.css');
         $this->assertStringContainsString('grid-template-columns:repeat(2,minmax(0,1fr))', $css);
         $this->assertStringContainsString('max-height:360px', $css);

@@ -1,4 +1,11 @@
 let settingsStoreId = null;
+const settingsPageSignal = window.IbemsPortalNavigation?.currentSignal;
+let settingsCategoryLoadId = 0;
+let settingsMethodLoadId = 0;
+let settingsContextLoadId = 0;
+let settingsCapabilityLoadId = 0;
+let settingsAccountLoadId = 0;
+let settingsStores = [];
 let settingsCategories = [];
 let settingsPaymentMethods = [];
 let settingsPaymentAccounts = [];
@@ -6,6 +13,7 @@ let editingPaymentMethodId = null;
 let editingPaymentAccountId = null;
 let editingPaymentMethodImageUrl = "";
 let paymentMethodSavePending = false;
+let paymentAccountSavePending = false;
 let categoryMutationPending = false;
 let categoryQuery = "";
 let categorySort = "name-asc";
@@ -15,7 +23,10 @@ let categoryPendingButton = null;
 let categoryPendingButtonHtml = "";
 let editingCategoryId = null;
 let categoryEditTrigger = null;
+let categoryDialogVersion = 0;
 let settingsCapabilities = [];
+let capabilitySavePending = false;
+let capabilitiesLoaded = false;
 
 function settingsEscape(value) {
     return String(value ?? "")
@@ -38,23 +49,30 @@ function settingsDataState(type, message, colspan) {
     return `<tr class="data-state-row"><td colspan="${Number(colspan)}"><div class="data-state data-state--${safeType}" role="${role}" aria-live="polite"><i class="${icons[safeType]}" aria-hidden="true"></i><div><strong>${settingsEscape(message)}</strong></div></div></td></tr>`;
 }
 
-function settingsSetResult(message, isError = false) {
-    const el = document.getElementById("settings-result");
-    el.textContent = message || "";
-    el.classList.toggle("is-error", Boolean(message) && isError);
+function settingsAnnounceResult(target, message, isError) {
+    if (!target) return;
+    target.setAttribute('role', isError ? 'alert' : 'status');
+    target.setAttribute('aria-live', isError ? 'assertive' : 'polite');
+    target.setAttribute('aria-atomic', 'true');
+    target.textContent = message || '';
+    target.classList.toggle('is-error', Boolean(message) && isError);
 }
 
-function settingsSetMethodResult(message, isError = false) {
+function settingsSetResult(message, isError = false) {
+    const el = document.getElementById("settings-result");
+    settingsAnnounceResult(el, message, isError);
+}
+
+function settingsSetMethodResult(message, isError = false, type = "") {
     const el = document.getElementById("settings-method-result");
-    el.textContent = message || "";
-    el.classList.toggle("is-error", Boolean(message) && isError);
+    settingsAnnounceResult(el, message, isError);
+    el?.classList.toggle('is-warning', Boolean(message) && type === 'warning');
 }
 
 function setCategoryEditResult(message, isError = false) {
     const result = document.getElementById("category-edit-result");
     if (!result) return;
-    result.textContent = message || "";
-    result.classList.toggle("is-error", Boolean(message) && isError);
+    settingsAnnounceResult(result, message, isError);
 }
 
 function syncCategoryEditSaveState() {
@@ -85,7 +103,10 @@ function openCategoryCreateModal(trigger = null) {
     modal.classList.remove("is-hidden");
     document.body.classList.add("settings-modal-open");
     syncCategoryEditSaveState();
-    window.requestAnimationFrame(() => input.focus());
+    const version = ++categoryDialogVersion;
+    window.requestAnimationFrame(() => {
+        if (version === categoryDialogVersion && !settingsPageSignal?.aborted && !modal.classList.contains('is-hidden')) input.focus();
+    });
 }
 
 function openCategoryEditModal(categoryId, trigger = null) {
@@ -110,7 +131,9 @@ function openCategoryEditModal(categoryId, trigger = null) {
     modal.classList.remove("is-hidden");
     document.body.classList.add("settings-modal-open");
     syncCategoryEditSaveState();
+    const version = ++categoryDialogVersion;
     window.requestAnimationFrame(() => {
+        if (version !== categoryDialogVersion || settingsPageSignal?.aborted || modal.classList.contains('is-hidden')) return;
         input.focus();
         input.select();
     });
@@ -118,6 +141,7 @@ function openCategoryEditModal(categoryId, trigger = null) {
 
 function closeCategoryEditModal(restoreFocus = true) {
     if (categoryMutationPending) return;
+    categoryDialogVersion++;
     const modal = document.getElementById("category-edit-modal");
     modal?.classList.add("is-hidden");
     editingCategoryId = null;
@@ -257,52 +281,97 @@ function renderPaymentMethods() {
 }
 
 async function loadStoreContext() {
-    const response = await fetch("/store/my-stores");
+    const requestId = ++settingsContextLoadId;
+    const response = await fetch("/store/my-stores", {signal: settingsPageSignal});
     const data = await response.json();
-    if (!data || data.status !== "success" || !Array.isArray(data.stores) || data.stores.length === 0) {
+    if (settingsPageSignal?.aborted || requestId !== settingsContextLoadId) return;
+    if (!response.ok || !data || data.status !== "success" || !Array.isArray(data.stores) || data.stores.length === 0) {
         throw new Error("No accessible store found.");
     }
-    settingsStoreId = Number(data.default_store_id || data.stores[0].id);
+    settingsStores = data.stores.map((store) => ({id: Number(store.id), store_name: String(store.store_name || "Store")}));
+    const requestedStoreId = Number(new URL(window.location.href).searchParams.get("store_id") || 0);
+    const requestedStore = settingsStores.find((store) => store.id === requestedStoreId);
+    if (requestedStoreId && !requestedStore) throw new Error("You cannot access the requested store.");
+    settingsStoreId = Number(requestedStore?.id || data.default_store_id || settingsStores[0].id);
+    renderStoreContext();
+}
+
+function renderStoreContext() {
+    const select = document.getElementById("settings-store-select");
+    const context = document.getElementById("settings-store-context");
+    if (!select) return;
+    select.innerHTML = settingsStores.map((store) => `<option value="${store.id}"${store.id === settingsStoreId ? " selected" : ""}>${settingsEscape(store.store_name)}</option>`).join("");
+    select.disabled = settingsStores.length <= 1;
+    const selected = settingsStores.find((store) => store.id === settingsStoreId);
+    if (context) context.textContent = selected ? `You are editing ${selected.store_name} only (Store ID ${selected.id}).` : "No store selected.";
+}
+
+async function switchSettingsStore(storeId) {
+    const selected = settingsStores.find((store) => store.id === Number(storeId));
+    if (!selected || selected.id === settingsStoreId) return;
+    if (capabilitySavePending || categoryMutationPending || paymentMethodSavePending || document.querySelector('.settings-modal:not(.is-hidden)')) {
+        renderStoreContext();
+        setCapabilityResult("Finish or close the current edit before switching stores.", true);
+        return;
+    }
+    const destination = new URL(window.location.href);
+    destination.searchParams.set("store_id", String(selected.id));
+    window.location.assign(destination.href);
 }
 function setCapabilityResult(message, isError = false) {
     const el = document.getElementById("capability-result");
     if (!el) return;
-    el.textContent = message || "";
-    el.classList.toggle("is-error", Boolean(message) && isError);
+    settingsAnnounceResult(el, message, isError);
 }
 
 async function loadCapabilities() {
-    const response = await fetch(`/store/capabilities?store_id=${settingsStoreId}`);
+    const storeId = settingsStoreId, requestId = ++settingsCapabilityLoadId;
+    const response = await fetch(`/store/capabilities?store_id=${storeId}`, {signal: settingsPageSignal});
     const data = await response.json();
+    if (settingsPageSignal?.aborted || storeId !== settingsStoreId || requestId !== settingsCapabilityLoadId) return;
     if (!response.ok || data?.status !== "success") throw new Error(data?.message || "Unable to load store capabilities.");
     settingsCapabilities = Array.isArray(data.capabilities) ? data.capabilities : ["retail"];
+    capabilitiesLoaded = true;
+    document.getElementById("save-capabilities-btn").disabled = false;
     document.querySelectorAll('#store-capability-grid input[type="checkbox"]').forEach((input) => {
         input.checked = settingsCapabilities.includes(input.value);
+        input.disabled = false;
     });
 }
 
 async function saveCapabilities() {
+    if (capabilitySavePending || !capabilitiesLoaded) return;
+    capabilitySavePending = true;
     const button = document.getElementById("save-capabilities-btn");
     const capabilities = Array.from(document.querySelectorAll('#store-capability-grid input[type="checkbox"]:checked')).map((input) => input.value);
     button.disabled = true;
-    setCapabilityResult("");
+    document.querySelectorAll('#store-capability-grid input').forEach((input) => { input.disabled = true; });
+    setCapabilityResult("Saving store behavior...");
     try {
         const response = await fetch("/store/capabilities/update", {method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({store_id:settingsStoreId,capabilities})});
         const data = await response.json();
         if (!response.ok || data?.status !== "success") throw new Error(data?.message || "Unable to save store capabilities.");
         settingsCapabilities = data.capabilities;
-        setCapabilityResult("Business capabilities saved. Product and POS behavior remain unified for this store.");
+        document.querySelectorAll('#store-capability-grid input[type="checkbox"]').forEach((input) => {
+            input.checked = settingsCapabilities.includes(input.value);
+        });
+        setCapabilityResult("Saved for this store. Enabled activities now control product types and new sales. Existing stock and history are preserved.");
+        window.location.reload();
     } catch (error) {
         setCapabilityResult(error.message || "Unable to save store capabilities.", true);
     } finally {
+        capabilitySavePending = false;
+        document.querySelectorAll('#store-capability-grid input').forEach((input) => { input.checked = settingsCapabilities.includes(input.value); input.disabled = false; });
         button.disabled = false;
     }
 }
 
 async function loadCategories() {
-    const response = await fetch(`/store/categories?store_id=${settingsStoreId}`);
+    const storeId = settingsStoreId, requestId = ++settingsCategoryLoadId;
+    const response = await fetch(`/store/categories?store_id=${storeId}`, {signal: settingsPageSignal});
     const data = await response.json();
-    if (!data || data.status !== "success") {
+    if (settingsPageSignal?.aborted || storeId !== settingsStoreId || requestId !== settingsCategoryLoadId) return;
+    if (!response.ok || !data || data.status !== "success") {
         const message = data?.message || "Unable to load categories.";
         document.getElementById("category-body").innerHTML = settingsDataState("error", message, 3);
         document.getElementById("category-count").textContent = "Unavailable";
@@ -313,9 +382,11 @@ async function loadCategories() {
 }
 
 async function loadPaymentMethods() {
-    const response = await fetch(`/store/payment-methods?store_id=${settingsStoreId}`);
+    const storeId = settingsStoreId, requestId = ++settingsMethodLoadId;
+    const response = await fetch(`/store/payment-methods?store_id=${storeId}`, {signal: settingsPageSignal});
     const data = await response.json();
-    if (!data || data.status !== "success") {
+    if (settingsPageSignal?.aborted || storeId !== settingsStoreId || requestId !== settingsMethodLoadId) return;
+    if (!response.ok || !data || data.status !== "success") {
         const message = data?.message || "Unable to load payment methods.";
         document.getElementById("payment-method-list").innerHTML = `<div class="payment-method-empty is-error"><i class="bi bi-exclamation-circle"></i><strong>${settingsEscape(message)}</strong></div>`;
         throw new Error(message);
@@ -324,31 +395,39 @@ async function loadPaymentMethods() {
     renderPaymentMethods();
 }
 
-function setAccountResult(message, isError = false) {
+function setAccountResult(message, isError = false, type = "") {
     const el = document.getElementById("settings-account-result");
     if (!el) return;
-    el.textContent = message || "";
-    el.classList.toggle("is-error", Boolean(message) && isError);
+    settingsAnnounceResult(el, message, isError);
+    el.classList.toggle('is-warning', Boolean(message) && type === 'warning');
+    el.classList.toggle('is-progress', Boolean(message) && type === 'progress');
+    if (message && isError) {
+        el.tabIndex = -1;
+        el.focus();
+    }
 }
 
 function renderPaymentAccounts() {
     const list = document.getElementById("payment-account-list");
     const accounts = settingsPaymentAccounts.filter((account) => Number(account.payment_method_id) === Number(editingPaymentMethodId));
     if (!accounts.length) {
-        list.innerHTML = '<div class="payment-account-empty"><i class="bi bi-wallet2"></i><strong>No receiving accounts configured.</strong><span>Add one for each GCash, bank, card terminal, or online destination.</span></div>';
+        list.innerHTML = '<div class="payment-account-empty"><i class="bi bi-wallet2" aria-hidden="true"></i><strong>No receiving accounts configured.</strong><span>Add one for each GCash, bank, card terminal, or online destination.</span></div>';
         return;
     }
     list.innerHTML = accounts.map((account) => {
         const visual = account.image_url
             ? `<img src="${settingsEscape(account.image_url)}" alt="QR for ${settingsEscape(account.account_name)}">`
-            : `<span class="payment-account-fallback"><i class="${settingsEscape(account.icon_class || "bi bi-wallet2")}"></i></span>`;
-        return `<article class="payment-account-card">${visual}<div><span class="payment-account-method">${settingsEscape(account.payment_method_label)}</span><strong>${settingsEscape(account.account_name)}</strong><small>${settingsEscape(account.masked_number)}</small></div><div class="payment-account-actions"><button class="secondary-btn btn-sm" type="button" data-account-edit="${Number(account.id)}"><i class="bi bi-pencil-square"></i> Edit</button><button class="danger-btn btn-sm" type="button" data-account-remove="${Number(account.id)}">Deactivate</button></div></article>`;
+            : `<span class="payment-account-fallback"><i class="${settingsEscape(account.icon_class || "bi bi-wallet2")}" aria-hidden="true"></i></span>`;
+        return `<article class="payment-account-card">${visual}<div><span class="payment-account-method">${settingsEscape(account.payment_method_label)}</span><strong>${settingsEscape(account.account_name)}</strong><small>${settingsEscape(account.masked_number)}</small></div><div class="payment-account-actions"><button class="secondary-btn btn-sm" type="button" data-account-edit="${Number(account.id)}"><i class="bi bi-pencil-square" aria-hidden="true"></i> Edit</button><button class="danger-btn btn-sm" type="button" data-account-remove="${Number(account.id)}">Deactivate</button></div></article>`;
     }).join("");
+    if (paymentMethodSavePending || paymentAccountSavePending) syncPaymentEditorPending(null, "");
 }
 
 async function loadPaymentAccounts() {
-    const response = await fetch(`/store/payment-accounts?store_id=${settingsStoreId}`);
+    const storeId = settingsStoreId, requestId = ++settingsAccountLoadId;
+    const response = await fetch(`/store/payment-accounts?store_id=${storeId}`, {signal: settingsPageSignal});
     const data = await response.json();
+    if (settingsPageSignal?.aborted || storeId !== settingsStoreId || requestId !== settingsAccountLoadId) return;
     if (!response.ok || data?.status !== "success") throw new Error(data?.message || "Unable to load receiving accounts.");
     settingsPaymentAccounts = Array.isArray(data.accounts) ? data.accounts : [];
     renderPaymentAccounts();

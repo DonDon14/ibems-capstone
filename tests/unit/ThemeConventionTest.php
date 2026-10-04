@@ -50,7 +50,7 @@ final class ThemeConventionTest extends CIUnitTestCase
 
         foreach ([$login, $roleSelection] as $view) {
             $this->assertStringContainsString('id="theme-toggle"', $view);
-                $this->assertStringContainsString("assets/js/theme.js') ?>?v=20260825c", $view);
+                $this->assertMatchesRegularExpression('~assets/js/theme\.js.*\?v=[a-zA-Z0-9-]+~', $view);
             $this->assertStringContainsString("localStorage.getItem('ibems-theme')", $view);
             $this->assertStringContainsString('name="theme-color"', $view);
         }
@@ -70,7 +70,7 @@ final class ThemeConventionTest extends CIUnitTestCase
 
         foreach ([$login, $roleSelection] as $view) {
             $this->assertStringContainsString('class="auth-mark-logo"', $view);
-            $this->assertStringContainsString('auth-login.css\') ?>?v=20260825c', $view);
+            $this->assertMatchesRegularExpression('~auth-login\.css.*\?v=[a-zA-Z0-9-]+~', $view);
         }
 
         $this->assertStringContainsString('width: clamp(108px, 9vw, 128px);', $styles);
@@ -189,7 +189,7 @@ final class ThemeConventionTest extends CIUnitTestCase
         $this->assertStringContainsString('.account-menu-logout button:is(:hover, :focus-visible)', $css);
         $this->assertStringContainsString('background: #dc2626;', $css);
         $this->assertStringContainsString('color: #fff;', $css);
-        $this->assertStringContainsString('account-menu.css\') ?>?v=20260902a', (string) file_get_contents(APPPATH . 'Views/components/portal_shell.php'));
+        $this->assertMatchesRegularExpression('~account-menu\.css.*\?v=[a-zA-Z0-9-]+~', (string) file_get_contents(APPPATH . 'Views/components/portal_shell.php'));
         $this->assertStringContainsString('height: 100dvh;', $css);
         $this->assertStringContainsString('overscroll-behavior: contain;', $css);
         $this->assertStringContainsString('background: #2a1720', $css);

@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/store') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/store-settings.css') ?>?v=20260824f">
+<link rel="stylesheet" href="<?= base_url('assets/css/store-settings.css') ?>?v=20261003-receiving-account-wrap">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -13,22 +13,37 @@
         'icon' => 'bi bi-gear',
     ]) ?>
 
+    <article class="settings-card store-scope-card">
+        <div class="settings-card-head">
+            <div>
+                <h4>Settings for</h4>
+                <p class="settings-note">Every category, capability, payment method, and receiving account below belongs only to the selected store.</p>
+            </div>
+            <label class="settings-input-field store-settings-picker" for="settings-store-select">
+                <span>Assigned store</span>
+                <select id="settings-store-select" aria-label="Select store settings"></select>
+            </label>
+        </div>
+        <p id="settings-store-context" class="settings-note" role="status" aria-live="polite">Loading assigned stores...</p>
+    </article>
+
     <article class="settings-card capability-settings-card">
         <div class="settings-card-head">
             <div>
                 <h4>Business capabilities</h4>
-                <p class="settings-note">Select every operation this store performs. Capabilities can be combined; a cafeteria can also sell retail goods and produced items.</p>
+                <p class="settings-note">Selecting an activity saves it immediately for this store. You can choose several; for example, a store can sell goods and rent equipment.</p>
             </div>
-            <button id="save-capabilities-btn" class="primary-btn" type="button"><i class="bi bi-check2-circle"></i> Save capabilities</button>
+            <button id="save-capabilities-btn" class="primary-btn" type="button" disabled><i class="bi bi-check2-circle"></i> Save capabilities</button>
         </div>
         <div id="store-capability-grid" class="store-capability-grid" aria-live="polite">
-            <label class="capability-option"><input type="checkbox" value="retail"><span><i class="bi bi-basket2"></i><strong>Retail goods</strong><small>Packaged snacks, bottled products, supplies, and other stocked items.</small></span></label>
-            <label class="capability-option"><input type="checkbox" value="food_service"><span><i class="bi bi-cup-hot"></i><strong>Food service</strong><small>Prepared meals, daily dishes, servings, and made-to-order products.</small></span></label>
-            <label class="capability-option"><input type="checkbox" value="production"><span><i class="bi bi-gear-wide-connected"></i><strong>Production</strong><small>Products made by the university, including processed dairy goods.</small></span></label>
-            <label class="capability-option"><input type="checkbox" value="refill_service"><span><i class="bi bi-droplet"></i><strong>Refill service</strong><small>Water refills and products sold by gallon, liter, or container.</small></span></label>
-            <label class="capability-option"><input type="checkbox" value="container_deposits"><span><i class="bi bi-arrow-left-right"></i><strong>Container deposits</strong><small>Separate refundable container or bottle deposit line items.</small></span></label>
+            <label class="capability-option"><input type="checkbox" disabled value="retail"><span><i class="bi bi-basket2"></i><strong>Retail goods</strong><small>Packaged snacks, bottled products, supplies, and other stocked items.</small></span></label>
+            <label class="capability-option"><input type="checkbox" disabled value="food_service"><span><i class="bi bi-cup-hot"></i><strong>Food service</strong><small>Prepared meals, daily dishes, servings, and made-to-order products.</small></span></label>
+            <label class="capability-option"><input type="checkbox" disabled value="production"><span><i class="bi bi-gear-wide-connected"></i><strong>Production</strong><small>Products made by the university, including processed dairy goods.</small></span></label>
+            <label class="capability-option"><input type="checkbox" disabled value="refill_service"><span><i class="bi bi-droplet"></i><strong>Refill service</strong><small>Water refills and products sold by gallon, liter, or container.</small></span></label>
+            <label class="capability-option"><input type="checkbox" disabled value="container_deposits"><span><i class="bi bi-arrow-left-right"></i><strong>Container deposits</strong><small>Separate refundable container or bottle deposit line items.</small></span></label>
+            <label class="capability-option"><input type="checkbox" disabled value="rental"><span><i class="bi bi-calendar-check"></i><strong>Equipment rental</strong><small>Items lent for a fee and returned later, such as chairs, tools, or event equipment.</small></span></label>
         </div>
-        <p class="settings-note capability-guidance"><i class="bi bi-info-circle"></i> Fixed sizes remain product variants. Checkout customizations and production recipes are separate concerns and are not disguised as variants.</p>
+        <p class="settings-note capability-guidance"><i class="bi bi-info-circle"></i> Click a card to save immediately for this store. Activities enable their corresponding product types and new sales; disabling one does not delete products, stock, or history. Select at least one activity. Use Daily Food &amp; Rentals for today's menu, rental packages, bookings, returns, and refundable cash deposits.</p>
         <p id="capability-result" class="settings-result" role="status" aria-live="polite"></p>
     </article>
 
@@ -118,7 +133,7 @@
 <div id="payment-method-modal" class="settings-modal is-hidden" role="dialog" aria-modal="true" aria-labelledby="payment-method-modal-title">
     <div class="settings-modal-card app-inset-modal-card">
         <header class="settings-modal-head"><div><span class="settings-modal-eyebrow">Payment settings</span><h3 id="payment-method-modal-title">Edit payment method</h3></div><button id="payment-method-modal-close" class="icon-btn" type="button" aria-label="Close payment method editor"><i class="bi bi-x-lg"></i></button></header>
-        <div class="settings-modal-body app-inset-modal-scroll">
+        <div class="settings-modal-body app-inset-modal-scroll" role="region" aria-label="Payment method and receiving account details" tabindex="0">
             <section class="method-editor-section">
                 <h4>Display</h4>
                 <div class="method-display-grid">
@@ -138,7 +153,7 @@
                     <div class="modal-account-actions"><button id="cancel-account-form" class="secondary-btn" type="button">Cancel</button><button id="add-account-btn" class="primary-btn" type="button"><i class="bi bi-check2"></i> Save account</button></div>
                 </div>
                 <div id="payment-account-list" class="payment-account-list"></div>
-                <p id="settings-account-result" class="settings-result"></p>
+                <p id="settings-account-result" class="settings-result" role="status" aria-live="polite" aria-atomic="true" tabindex="-1"></p>
             </section>
         </div>
         <footer class="settings-modal-actions"><button id="delete-method-btn" class="danger-btn is-hidden" type="button"><i class="bi bi-trash3"></i> Delete payment method</button><span class="settings-modal-spacer"></span><button id="payment-method-modal-cancel" class="secondary-btn" type="button">Cancel</button><button id="save-method-btn" class="primary-btn" type="button"><i class="bi bi-check2-circle"></i> Save changes</button></footer>
@@ -147,6 +162,6 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/store-settings.js') ?>?v=20260824f"></script>
-<script src="<?= base_url('assets/js/store-settings.part2.js') ?>?v=20260824f"></script>
+<script src="<?= base_url('assets/js/store-settings.js') ?>?v=20261003-account-result"></script>
+<script src="<?= base_url('assets/js/store-settings.part2.js') ?>?v=20261003-account-pending"></script>
 <?= $this->endSection() ?>

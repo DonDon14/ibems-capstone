@@ -16,6 +16,7 @@ final class AdminAccessRouteConfigTest extends CIUnitTestCase
             "store/transactions', 'StoreController::transactions', ['filter' => 'access:store.inspect']",
             "store/reports/summary', 'StoreController::reportSummary', ['filter' => 'access:store.inspect']",
             "accounting/debts/data', 'AccountingController::debtsData', ['filter' => 'access:accounting.inspect']",
+            "accounting/debts/scheduled-salary', 'AccountingController::scheduledSalaryQueue', ['filter' => 'access:accounting.inspect']",
             "accounting/salary-schedules', 'AccountingController::salarySchedules', ['filter' => 'access:accounting.inspect']",
             "accounting/settlement/preview', 'AccountingController::settlementPreview', ['filter' => 'access:accounting.inspect']",
         ] as $expectedRoute) {
@@ -43,16 +44,25 @@ final class AdminAccessRouteConfigTest extends CIUnitTestCase
             "store/inventory/adjust-stock', 'StoreController::adjustStock', ['filter' => 'access:store.manage_assigned']",
             "store/inventory/add-product', 'StoreController::addProduct', ['filter' => 'access:store.manage_assigned']",
             "store/inventory/update-product', 'StoreController::updateProduct', ['filter' => 'access:store.manage_assigned']",
-            "accounting/deduction-batches/(:num)/apply', 'AccountingController::applyDeductionBatch/$1', ['filter' => 'access:accounting.operate']",
-            "accounting/deduction-batches/(:num)/reconcile', 'AccountingController::reconcileDeductionBatch/$1', ['filter' => 'access:accounting.operate']",
-            "accounting/deduction-batches/(:num)/finalize', 'AccountingController::finalizeDeductionBatch/$1', ['filter' => 'access:accounting.operate']",
-            "accounting/debt-investigations', 'AccountingController::openDebtInvestigation', ['filter' => 'access:accounting.operate']",
-            "accounting/debt-investigations/(:num)/recommend', 'AccountingController::recommendDebtInvestigation/$1', ['filter' => 'access:accounting.operate']",
-            "accounting/debts/import-csv', 'AccountingController::importCsv', ['filter' => 'access:accounting.operate']",
-            "accounting/debts/financial-profile', 'AccountingController::updateFinancialProfile', ['filter' => 'access:accounting.operate']",
+            "deductions/workspace/batches/(:num)/reconcile', 'DeductionWorkspaceController::reconcileBatch/$1', ['filter' => 'access:deduction.workflow']",
+            "deductions/workspace/batches/(:num)/finalize', 'DeductionWorkspaceController::finalizeBatch/$1', ['filter' => 'access:deduction.workflow']",
+            "deductions/workspace/items/(:num)/confirm', 'DeductionWorkspaceController::confirmItem/$1', ['filter' => 'access:deduction.workflow']",
+            "accounting/debt-investigations', 'AccountingController::openDebtInvestigation', ['filter' => 'access:accounting.investigate']",
+            "accounting/debt-investigations/(:num)/recommend', 'AccountingController::recommendDebtInvestigation/$1', ['filter' => 'access:accounting.investigate']",
+            "accounting/debts/import-csv', 'AccountingController::importCsv', ['filter' => 'access:accounting.debt_manage']",
+            "accounting/debts/financial-profile', 'AccountingController::updateFinancialProfile', ['filter' => 'access:accounting.debt_manage']",
+            "accounting/debts/scheduled-salary/(:num)/activate', 'AccountingController::activateScheduledSalaryProfile/$1', ['filter' => 'access:accounting.debt_manage']",
         ] as $expectedRoute) {
             $this->assertStringContainsString($expectedRoute, $routes);
         }
+
+        $authorization = config(Authorization::class);
+        $this->assertNull($authorization->rolesFor('accounting.deduct'));
+        $this->assertStringNotContainsString("accounting/deduction-batches/(:num)/apply", $routes);
+        $this->assertSame(['ACCOUNTING_OFFICE', 'ACCOUNTING_HEAD', 'PAYROLL_CLERK', 'CASHIER_HEAD', 'COLLECTING_OFFICER'], $authorization->rolesFor('deduction.workflow'));
+        $this->assertSame(['ACCOUNTING_OFFICE', 'ACCOUNTING_HEAD'], $authorization->rolesFor('accounting.debt_manage'));
+        $this->assertSame(['ACCOUNTING_OFFICE', 'ACCOUNTING_HEAD'], $authorization->rolesFor('accounting.investigate'));
+        $this->assertNull($authorization->rolesFor('accounting.operate'));
 
         foreach ([
             "accounting/settlement/apply'",
@@ -73,12 +83,14 @@ final class AdminAccessRouteConfigTest extends CIUnitTestCase
             "store-admin/stores/data', 'StoreAdminController::storesData', ['filter' => 'access:store.review_assigned']",
             "store-admin/stores/(:num)/data', 'StoreAdminController::storeDetailsData/$1', ['filter' => 'access:store.review_assigned']",
             "store-admin/store-day-sessions/(:num)/review', 'StoreAdminController::reviewStoreDayVariance/$1', ['filter' => 'access:store.review_assigned']",
+            "store-admin/daily-reports/submit', 'DailyStoreReportController::submit', ['filter' => 'access:store.report_submit']",
             "store-admin/store-day-sessions/(:num)/resolve-stale', 'StoreAdminController::resolveStaleStoreDay/$1', ['filter' => 'access:store.review_assigned']",
         ] as $expectedRoute) {
             $this->assertStringContainsString($expectedRoute, $routes);
         }
 
         $this->assertSame(['STORE_SUPERVISOR'], config(Authorization::class)->rolesFor('store.review_assigned'));
+        $this->assertSame(['STORE_SUPERVISOR'], config(Authorization::class)->rolesFor('store.report_submit'));
     }
 
     public function testEveryMixedAdminOperationalRouteIsReadOnlyOrAnExplicitPreview(): void

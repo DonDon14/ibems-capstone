@@ -52,7 +52,7 @@ final class UserPortalPageConventionTest extends CIUnitTestCase
     public function testUserPortalStyleChangesInvalidateTheOfflineShellCache(): void
     {
         $worker = (string) file_get_contents(FCPATH . 'user/service-worker.js');
-        $this->assertStringContainsString('ibems-user-shell-v7', $worker);
+        $this->assertStringContainsString('ibems-user-shell-v8', $worker);
         $this->assertStringContainsString('/assets/css/user-portal.css', $worker);
     }
 

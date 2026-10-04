@@ -1,7 +1,7 @@
 <?= $this->extend('layouts/admin') ?>
 
 <?= $this->section('styles') ?>
-<link rel="stylesheet" href="<?= base_url('assets/css/admin-overview.css') ?>?v=20260824b">
+<link rel="stylesheet" href="<?= base_url('assets/css/admin-overview.css') ?>?v=20261004-variance-feedback">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -14,15 +14,15 @@
     ]) ?>
 
     <div class="summary-grid">
-        <?= view('components/stat_card', ['title' => 'Accounts', 'value' => '0', 'valueId' => 'ad-account-count', 'icon' => 'bi bi-people', 'tone' => 'users']) ?>
-        <?= view('components/stat_card', ['title' => 'With Debt', 'value' => '0', 'valueId' => 'ad-debt-accounts', 'icon' => 'bi bi-exclamation-circle', 'tone' => 'warning']) ?>
-        <?= view('components/stat_card', ['title' => 'Total Debt', 'value' => 'PHP 0.00', 'valueId' => 'ad-total-debt', 'icon' => 'bi bi-cash-stack', 'tone' => 'debt']) ?>
-        <?= view('components/stat_card', ['title' => 'Today Deducted', 'value' => 'PHP 0.00', 'valueId' => 'ad-today-deducted', 'icon' => 'bi bi-cash-coin', 'tone' => 'finance']) ?>
+        <?= view('components/stat_card', ['title' => 'Accounts', 'value' => 'Loading…', 'valueId' => 'ad-account-count', 'icon' => 'bi bi-people', 'tone' => 'users']) ?>
+        <?= view('components/stat_card', ['title' => 'With Debt', 'value' => 'Loading…', 'valueId' => 'ad-debt-accounts', 'icon' => 'bi bi-exclamation-circle', 'tone' => 'warning']) ?>
+        <?= view('components/stat_card', ['title' => 'Total Debt', 'value' => 'Loading…', 'valueId' => 'ad-total-debt', 'icon' => 'bi bi-cash-stack', 'tone' => 'debt']) ?>
+        <?= view('components/stat_card', ['title' => 'Today Deducted', 'value' => 'Loading…', 'valueId' => 'ad-today-deducted', 'icon' => 'bi bi-cash-coin', 'tone' => 'finance']) ?>
     </div>
 
     <section class="data-panel">
         <header class="data-panel-head"><h4>Top Debt Accounts</h4></header>
-        <div class="data-panel-body table-standard-wrap">
+        <div class="data-panel-body table-standard-wrap" role="region" aria-label="Top debt accounts" tabindex="0">
         <table class="table table-standard">
             <thead>
                 <tr>
@@ -68,5 +68,5 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/admin-accounting-debts.js') ?>?v=20260822c"></script>
+<script src="<?= base_url('assets/js/admin-accounting-debts.js') ?>?v=20261003-history-filter-order"></script>
 <?= $this->endSection() ?>

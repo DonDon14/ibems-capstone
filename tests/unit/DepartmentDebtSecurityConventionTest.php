@@ -35,7 +35,7 @@ final class DepartmentDebtSecurityConventionTest extends TestCase
         $view = (string) file_get_contents(ROOTPATH . 'app/Views/accounting/department-debts.php');
         $script = (string) file_get_contents(ROOTPATH . 'public/assets/js/department-debt-pages.js');
 
-        $this->assertStringContainsString("ibems_current_role() === 'ACCOUNTING_OFFICE'", $view);
+        $this->assertStringContainsString("rolesFor('accounting.settle')", $view);
         $this->assertStringContainsString('data-can-operate=', $view);
         $this->assertStringContainsString('if (!canOperate)', $script);
         $this->assertStringContainsString('Read only', $script);

@@ -8,6 +8,7 @@ function setStatus(message, type, options = {}) {
     statusEl.replaceChildren();
     statusEl.className = type || "";
     statusEl.setAttribute("role", type === "error" ? "alert" : "status");
+    statusEl.setAttribute("aria-live", type === "error" ? "assertive" : "polite");
     if (!message) return;
 
     const icon = document.createElement("span");
@@ -29,7 +30,7 @@ function roleLabel(role) {
     if (role === "STORE_SYSTEM") return "Store portal";
     if (role === "ACCOUNTING_OFFICE") return "Accounting portal";
     if (role === "ADMIN") return "Admin portal";
-    if (role === "USER") return "Employee portal";
+    if (role === "USER") return "User portal";
     return "IBEMS workspace";
 }
 

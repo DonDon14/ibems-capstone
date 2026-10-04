@@ -1,0 +1,34 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const vm = require('node:vm');
+const source = fs.readFileSync('public/assets/js/modern-controls.js', 'utf8');
+const context = vm.createContext({});
+vm.runInContext(source.slice(source.indexOf('    const syncAvailability ='), source.indexOf('    const enhanceSelect =')) + '\nthis.sync = syncAvailability;', context);
+test('hidden and disabled controls dismiss popups without restoring focus to unavailable triggers', () => {
+    const wrapper = {}, trigger = {setAttribute() {}}, closed = [];
+    const close = restore => closed.push(restore);
+    context.sync({hidden:true,disabled:false}, wrapper, trigger, close);
+    assert.equal(wrapper.hidden, true);
+    assert.deepEqual(closed, [false]);
+    context.sync({hidden:false,disabled:true}, wrapper, trigger, close);
+    assert.equal(wrapper.hidden, false);
+    assert.equal(trigger.disabled, true);
+    assert.deepEqual(closed, [false,false]);
+    context.sync({hidden:false,disabled:false}, wrapper, trigger, close);
+    assert.equal(trigger.disabled, false);
+    assert.equal(closed.length, 2);
+});
+test('a read-only date cannot be edited through its custom trigger and required state follows the native field', () => {
+    const attrs = {};
+    const trigger = {setAttribute(key, value) {attrs[key] = value;}};
+    let closed = 0;
+    context.sync({hidden:false,disabled:false,readOnly:true,required:true}, {}, trigger, () => closed++);
+    assert.equal(trigger.disabled, true);
+    assert.equal(closed, 1);
+    assert.equal(attrs['aria-description'], 'Required field');
+    context.sync({hidden:false,disabled:false,readOnly:false,required:false}, {}, trigger, () => closed++);
+    assert.equal(trigger.disabled, false);
+    assert.equal(attrs['aria-description'], '');
+    assert.equal(closed, 1);
+});

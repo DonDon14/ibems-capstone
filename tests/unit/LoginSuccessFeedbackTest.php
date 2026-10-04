@@ -18,7 +18,9 @@ class LoginSuccessFeedbackTest extends TestCase
         $this->assertIsString($styles);
         $this->assertIsString($controller);
         $this->assertStringContainsString('id="status" role="status" aria-live="polite"', $view);
-        $this->assertLessThan(strpos($view, 'class="demo-creds"'), strpos($view, 'id="status"'));
+        $this->assertStringNotContainsString('class="demo-creds"', $view);
+        $this->assertStringNotContainsString('Demo Credentials', $view);
+        $this->assertStringNotContainsString('123456', $view);
         $this->assertStringContainsString('Welcome back, ${firstName}!', $script);
         $this->assertStringContainsString('Opening your ${roleLabel(role)} securely.', $script);
         $this->assertStringContainsString('Signed in', $script);

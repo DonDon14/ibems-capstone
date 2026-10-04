@@ -33,14 +33,23 @@ class AddBarcodeAndVariantToProducts extends Migration
         }
 
         $this->db->query("UPDATE products SET category = 'General' WHERE category IS NULL OR category = ''");
-        $this->forge->modifyColumn('products', [
-            'category' => [
-                'type' => 'VARCHAR',
-                'constraint' => 100,
-                'null' => false,
-                'default' => 'General',
-            ],
-        ]);
+        if ($this->db->DBDriver === 'SQLite3') {
+            $this->db->query('PRAGMA legacy_alter_table = ON');
+        }
+        try {
+            $this->forge->modifyColumn('products', [
+                'category' => [
+                    'type' => 'VARCHAR',
+                    'constraint' => 100,
+                    'null' => false,
+                    'default' => 'General',
+                ],
+            ]);
+        } finally {
+            if ($this->db->DBDriver === 'SQLite3') {
+                $this->db->query('PRAGMA legacy_alter_table = OFF');
+            }
+        }
 
         $this->db->query('CREATE INDEX idx_products_store_barcode ON products (store_id, barcode)');
     }

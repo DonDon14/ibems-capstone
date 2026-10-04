@@ -365,7 +365,113 @@
 .import-preview-item,
 .invalid-item {
     line-height: 1.4;
+    overflow-wrap: anywhere;
 }
+
+#acct-salary-queue,
+#acct-salary-queue > *,
+#acct-salary-queue > * > * {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.salary-queue-panel .acct-section-head { flex-wrap: wrap; }
+.salary-queue-panel .acct-section-head > div:first-child { flex: 1 1 20rem; min-width: 0; overflow-wrap: anywhere; }
+.salary-queue-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; min-width: 0; max-width: 100%; }
+.ibems-modern .employee-action-feedback { margin: 0 0 12px; padding: 12px; min-width: 0; border: 1px solid #dbe4ef; border-radius: 10px; background: #f8fafc; color: #64748b !important; font-size: .85rem; line-height: 1.5; overflow-wrap: anywhere; }
+.employee-action-feedback:empty { display: none; }
+.employee-read-recovery { min-width: 0; margin-bottom: 12px; }
+.employee-read-recovery:has(.employee-action-feedback:empty):has(button[hidden]) { display: none; }
+.ibems-modern #employee-read-retry { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+#employee-read-retry[hidden] { display: none !important; }
+.ibems-modern #employee-read-retry:focus-visible,
+.ibems-modern #employee-modal-profile:focus-visible,
+.ibems-modern #employee-modal-history:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+html[data-theme="dark"] .ibems-modern #employee-read-retry:focus-visible,
+html[data-theme="dark"] .ibems-modern #employee-modal-profile:focus-visible,
+html[data-theme="dark"] .ibems-modern #employee-modal-history:focus-visible { outline-color: #93c5fd; }
+.ibems-modern .employee-action-feedback.is-error { color: #b91c1c !important; }
+.ibems-modern .employee-action-feedback.is-warning { color: #92400e !important; }
+.ibems-modern .employee-action-feedback.is-success { color: #166534 !important; }
+.ibems-modern .employee-action-feedback:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+html[data-theme="dark"] .ibems-modern .employee-action-feedback { background: #142437; border-color: #3b526c; color: #9fb0c4 !important; }
+html[data-theme="dark"] .ibems-modern .employee-action-feedback.is-error { color: #fca5a5 !important; }
+html[data-theme="dark"] .ibems-modern .employee-action-feedback.is-warning { color: #fcd34d !important; }
+html[data-theme="dark"] .ibems-modern .employee-action-feedback.is-success { color: #86efac !important; }
+html[data-theme="dark"] .ibems-modern .employee-action-feedback:focus-visible { outline-color: #93c5fd; }
+.ibems-modern #employee-limit-box :is(label, .ui-select, .inline-actions), .ibems-modern #employee-pending-profiles { min-width: 0; overflow-wrap: anywhere; }
+.ibems-modern #employee-modal :is(.employee-profile-overview, .employee-identity, .employee-identity-copy, .employee-identity-copy h5, .employee-identity-meta, .employee-identity-meta span) { min-width: 0; overflow-wrap: anywhere; }
+.ibems-modern #employee-limit-box :is(input, select) { min-width: 0; max-width: 100%; }
+.ibems-modern #employee-modal .employee-details-scroll:focus-visible { outline: 2px solid #2563eb; outline-offset: -2px; }
+html[data-theme="dark"] .ibems-modern #employee-modal .employee-details-scroll:focus-visible { outline-color: #93c5fd; }
+html[data-theme="dark"] .ibems-modern #employee-modal [disabled] { color: #c6d2e1 !important; -webkit-text-fill-color: #c6d2e1; opacity: 1; }
+.salary-queue-tools > button { min-width: 0; max-width: 100%; white-space: normal; }
+.salary-queue-feedback { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-width: 0; margin-top: 12px; padding: 12px; border: 1px solid #dbe4ef; border-radius: 10px; background: #f8fafc; color: #64748b; font-size: .85rem; overflow-wrap: anywhere; }
+.salary-queue-feedback:empty, #acct-salary-queue:empty { display: none; }
+.salary-queue-feedback > span { flex: 1 1 16rem; min-width: 0; }
+.salary-queue-feedback.is-error { color: #b91c1c !important; }
+.salary-queue-feedback:focus-visible, #acct-salary-refresh:focus-visible, #acct-salary-queue button:focus-visible, .salary-queue-feedback button:focus-visible { outline: 2px solid #2563eb; outline-offset: 3px; }
+html[data-theme="dark"] .ibems-modern .salary-queue-feedback { background: #142437; border-color: #3b526c; color: #9fb0c4; }
+html[data-theme="dark"] .ibems-modern .salary-queue-feedback.is-error { color: #fca5a5 !important; }
+html[data-theme="dark"] .ibems-modern :is(.salary-queue-feedback, #acct-salary-refresh, #acct-salary-queue button, .salary-queue-feedback button):focus-visible { outline-color: #93c5fd; }
+html[data-theme="dark"] .ibems-modern #acct-salary-refresh[disabled] { color: #c6d2e1 !important; -webkit-text-fill-color: #c6d2e1; opacity: 1; }
+
+#acct-salary-queue:focus {
+    outline: 2px solid #2563eb;
+    outline-offset: 4px;
+    border-radius: 4px;
+}
+html[data-theme="dark"] .ibems-modern #acct-salary-queue:focus { outline-color: #93c5fd; }
+
+html[data-theme="dark"] .ibems-modern #acct-salary-queue .salary-queue-due {
+    color: var(--feedback-warning, #fcd34d);
+}
+
+#debt-investigations-modal :is(section, .grid > *, #investigation-list, [data-investigation-id]),
+#import-csv-modal :is(.grid > *, .import-valid, .import-invalid) {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+#debt-investigations-modal :is(input, select, textarea) {
+    width: 100%;
+    max-width: 100%;
+    min-width: 0;
+}
+
+#debt-investigations-modal .primary-btn {
+    max-width: 100%;
+    height: auto;
+    white-space: normal;
+    line-height: 1.4;
+    padding-block: 10px;
+}
+.ibems-modern #debt-investigations-modal .investigation-read-feedback { margin: 10px 0; padding: 12px; min-width: 0; border: 1px solid #dbe4ef; border-radius: 10px; background: #f8fafc; color: #64748b !important; font-size: .85rem; line-height: 1.5; overflow-wrap: anywhere; }
+.investigation-read-feedback:empty { display: none; }
+.investigation-read-recovery:has(p:empty):has(button[hidden]) { display: none; }
+.ibems-modern #debt-investigations-modal .investigation-read-feedback.is-error { color: #b91c1c !important; }
+.ibems-modern #debt-investigations-modal .investigation-read-feedback.is-warning { color: #92400e !important; }
+html[data-theme="dark"] .ibems-modern #debt-investigations-modal .investigation-read-feedback { background: #142437; border-color: #3b526c; color: #9fb0c4 !important; }
+html[data-theme="dark"] .ibems-modern #debt-investigations-modal .investigation-read-feedback.is-error { color: #fca5a5 !important; }
+html[data-theme="dark"] .ibems-modern #debt-investigations-modal .investigation-read-feedback.is-warning { color: #fcd34d !important; }
+#debt-investigations-modal .investigation-read-recovery button[hidden] { display: none !important; }
+.ibems-modern #debt-investigations-modal .investigation-read-recovery button,
+.ibems-modern #debt-investigations-modal #investigation-refresh { max-width: 100%; height: auto; min-height: 40px; white-space: normal; overflow-wrap: anywhere; scroll-margin-block: 12px; }
+.ibems-modern #debt-investigations-modal :is(.investigation-read-feedback, #investigation-list) { scroll-margin-block: 12px; }
+.ibems-modern #debt-investigations-modal :is(.investigation-read-feedback, .investigation-read-recovery button, #investigation-list):focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+html[data-theme="dark"] .ibems-modern #debt-investigations-modal :is(.investigation-read-feedback, .investigation-read-recovery button, #investigation-list):focus-visible { outline-color: #93c5fd; }
+html[data-theme="dark"] .ibems-modern #debt-investigations-modal :is(input, select, textarea, .ui-select-trigger):disabled { color: #c6d2e1 !important; -webkit-text-fill-color: #c6d2e1 !important; opacity: 1; }
+.ibems-modern #debt-investigations-modal .investigation-action-feedback { margin: 12px 0 0; padding: 12px; min-width: 0; border: 1px solid #dbe4ef; border-radius: 10px; background: #f8fafc; color: #475569 !important; font-size: .85rem; font-weight: 600; line-height: 1.5; overflow-wrap: anywhere; scroll-margin-block: 12px; }
+.investigation-action-feedback:empty { display: none; }
+.ibems-modern #debt-investigations-modal .investigation-action-feedback.is-error { color: #b91c1c !important; }
+.ibems-modern #debt-investigations-modal .investigation-action-feedback.is-warning { color: #92400e !important; }
+.ibems-modern #debt-investigations-modal .investigation-action-feedback.is-success { color: #166534 !important; }
+html[data-theme="dark"] .ibems-modern #debt-investigations-modal .investigation-action-feedback { background: #142437; border-color: #3b526c; color: #c6d2e1 !important; }
+html[data-theme="dark"] .ibems-modern #debt-investigations-modal .investigation-action-feedback.is-error { color: #fca5a5 !important; }
+html[data-theme="dark"] .ibems-modern #debt-investigations-modal .investigation-action-feedback.is-warning { color: #fcd34d !important; }
+html[data-theme="dark"] .ibems-modern #debt-investigations-modal .investigation-action-feedback.is-success { color: #bbf7d0 !important; }
+.ibems-modern #debt-investigations-modal .investigation-action-feedback:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+html[data-theme="dark"] .ibems-modern #debt-investigations-modal .investigation-action-feedback:focus-visible { outline-color: #93c5fd; }
 
 .acct-empty {
     border: 1px dashed #d3deea;
@@ -382,6 +488,7 @@
 }
 
 .acct-record-row {
+    min-width: 0;
     border: 1px solid #d8e2ee;
     border-radius: 14px;
     background: #fff;
@@ -468,6 +575,10 @@
 
 .acct-cashbook-row .acct-avatar i {
     line-height: 1;
+}
+
+html[data-theme="dark"] .ibems-modern .acct-cashbook-row .acct-avatar i {
+    color: #93c5fd;
 }
 
 .acct-chip {
@@ -973,6 +1084,28 @@ body #workflow-employees-modal .workflow-candidate .workflow-preparation-reason 
     padding: 15px 16px;
 }
 
+.employee-pending-decision {
+    background: #fffbeb;
+    border-color: #fcd34d;
+    color: #1e293b;
+}
+
+.employee-pending-decision p {
+    margin: 0;
+    color: inherit;
+    overflow-wrap: anywhere;
+}
+
+html[data-theme="dark"] .ibems-modern .employee-pending-decision {
+    background: #3b2e19 !important;
+    border-color: #a87928 !important;
+    color: #fff1cd !important;
+}
+
+html[data-theme="dark"] .ibems-modern .employee-pending-decision p {
+    color: inherit !important;
+}
+
 .employee-section-head {
     display: flex;
     align-items: center;
@@ -1120,6 +1253,26 @@ body #workflow-employees-modal .workflow-candidate .workflow-preparation-reason 
     background: color-mix(in srgb, #f59e0b 12%, var(--surface));
     color: color-mix(in srgb, #b45309 72%, var(--text-main));
 }
+.ibems-modern :is(#settlement-run-modal,#settlement-run-details-modal) .legacy-read-feedback { margin: 12px 0; padding: 12px; border: 1px solid #dbe4ef; border-radius: 10px; background: #f8fafc; color: #475569 !important; line-height: 1.5; overflow-wrap: anywhere; scroll-margin-block: 12px; }
+.legacy-read-feedback:empty { display: none; }
+.ibems-modern :is(#settlement-run-modal,#settlement-run-details-modal) .legacy-read-feedback.is-error { color: #b91c1c !important; }
+html[data-theme="dark"] .ibems-modern :is(#settlement-run-modal,#settlement-run-details-modal) .legacy-read-feedback { background: #142437; border-color: #3b526c; color: #c6d2e1 !important; }
+html[data-theme="dark"] .ibems-modern :is(#settlement-run-modal,#settlement-run-details-modal) .legacy-read-feedback.is-error { color: #fca5a5 !important; }
+:is(#settlement-queue-retry,#settlement-details-retry)[hidden] { display: none !important; }
+.ibems-modern :is(#settlement-queue-retry,#settlement-details-retry) { max-width: 100%; min-height: 40px; height: auto; white-space: normal; overflow-wrap: anywhere; scroll-margin-block: 12px; }
+.ibems-modern :is(#settlement-runs-list,#settlement-details-head) { min-width: 0; overflow-wrap: anywhere; }
+.ibems-modern #settlement-runs-list .run-item { min-width: 0; white-space: normal; overflow-wrap: anywhere; }
+.ibems-modern #settlement-details-table-region.is-populated table { min-width: 900px; table-layout: fixed; }
+.ibems-modern #settlement-details-table-region:not(.is-populated) table { min-width: 0; width: 100%; table-layout: fixed; }
+.ibems-modern #settlement-details-table-region:not(.is-populated) thead { display: none; }
+.ibems-modern #settlement-details-table-region :is(th,td) { white-space: normal; overflow-wrap: anywhere; }
+.ibems-modern #settlement-details-table-region { max-width: 100%; scroll-margin-block: 12px; }
+.ibems-modern :is(.legacy-read-feedback,#settlement-runs-list,#settlement-details-table-region,#settlement-queue-retry,#settlement-details-retry):focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+html[data-theme="dark"] .ibems-modern :is(.legacy-read-feedback,#settlement-runs-list,#settlement-details-table-region,#settlement-queue-retry,#settlement-details-retry):focus-visible { outline-color: #93c5fd; }
+@media (min-width: 641px) and (max-width: 1100px) {
+    .ibems-modern #settlement-run-details-modal .settlement-summary { grid-template-columns: repeat(2,minmax(0,1fr)); }
+    .ibems-modern #settlement-run-details-modal .settlement-summary > :last-child { grid-column: 1 / -1; }
+}
 
 .ibems-modern .settlement-warning-panel strong {
     color: inherit;
@@ -1154,6 +1307,24 @@ html[data-theme="dark"] .ibems-modern .app-container .settlement-warning-panel s
     margin-top: 10px;
     color: #166534;
 }
+.ibems-modern #import-csv-modal .import-result { padding: 12px; border: 1px solid #dbe4ef; border-radius: 10px; background: #f8fafc; color: #475569 !important; line-height: 1.5; overflow-wrap: anywhere; scroll-margin-block: 12px; }
+.import-result:empty { display: none; }
+.ibems-modern #import-csv-modal .import-result.is-error { color: #b91c1c !important; }
+.ibems-modern #import-csv-modal .import-result.is-warning { color: #92400e !important; }
+.ibems-modern #import-csv-modal .import-result.is-success { color: #166534 !important; }
+html[data-theme="dark"] .ibems-modern #import-csv-modal .import-result { background: #142437; border-color: #3b526c; color: #c6d2e1 !important; }
+html[data-theme="dark"] .ibems-modern #import-csv-modal .import-result.is-error { color: #fca5a5 !important; }
+html[data-theme="dark"] .ibems-modern #import-csv-modal .import-result.is-warning { color: #fcd34d !important; }
+html[data-theme="dark"] .ibems-modern #import-csv-modal .import-result.is-success { color: #bbf7d0 !important; }
+#import-csv-modal :is(.import-valid,.import-invalid):empty { display: none; }
+.ibems-modern #import-csv-modal :is(.import-result,.import-valid,.import-invalid):focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+html[data-theme="dark"] .ibems-modern #import-csv-modal :is(.import-result,.import-valid,.import-invalid):focus-visible { outline-color: #93c5fd; }
+html[data-theme="dark"] .ibems-modern #import-csv-modal :is(input,button):disabled { color: #c6d2e1 !important; -webkit-text-fill-color: #c6d2e1 !important; opacity: 1; }
+.ibems-modern #import-csv-file:disabled::file-selector-button { background: #e2e8f0; color: #475569; -webkit-text-fill-color: #475569; }
+html[data-theme="dark"] .ibems-modern #import-csv-file::file-selector-button { background: #203b5d; color: #bfdbfe; -webkit-text-fill-color: #bfdbfe; }
+html[data-theme="dark"] .ibems-modern #import-csv-file:disabled::file-selector-button { background: #223a55; color: #c6d2e1; -webkit-text-fill-color: #c6d2e1; }
+.ibems-modern #import-csv-modal .import-guide code:focus-visible { outline: 2px solid #2563eb; outline-offset: 2px; }
+html[data-theme="dark"] .ibems-modern #import-csv-modal .import-guide code:focus-visible { outline-color: #93c5fd; }
 
 .import-invalid {
     margin-top: 8px;
@@ -1168,6 +1339,44 @@ html[data-theme="dark"] .ibems-modern .app-container .settlement-warning-panel s
     border-radius: 8px;
     padding: 8px;
     margin-bottom: 6px;
+}
+
+.ibems-modern .import-preview-item.is-valid {
+    background: #ecfdf5;
+    border-color: #a7f3d0;
+    color: #166534;
+}
+
+.ibems-modern .invalid-item {
+    background: #fffbeb;
+    border-color: #fde68a;
+    color: #92400e;
+}
+
+html[data-theme="dark"] .ibems-modern .import-preview-item.is-valid {
+    background: #12382d;
+    border-color: #2c7158;
+    color: #bbf7d0;
+}
+
+html[data-theme="dark"] .ibems-modern .invalid-item {
+    background: #3b2a13;
+    border-color: #785a26;
+    color: #fde68a;
+}
+
+html[data-theme="dark"] .ibems-modern .investigation-recommendation {
+    background: #3b2a13;
+    border-color: #785a26;
+    color: #fde68a;
+}
+
+html[data-theme="dark"] .ibems-modern .app-container .investigation-recommendation :is(strong, p) {
+    color: inherit;
+}
+
+html[data-theme="dark"] .ibems-modern .investigation-closed {
+    color: var(--feedback-success, #6ee7b7);
 }
 
 @media (max-width: 1100px) {
@@ -1229,8 +1438,20 @@ html[data-theme="dark"] .ibems-modern .app-container .settlement-warning-panel s
     }
 
     .acct-finance {
+        min-width: 0;
         justify-content: flex-start;
         gap: 10px;
     }
 
+    .acct-cashbook-row .acct-subline {
+        white-space: normal;
+        overflow-wrap: anywhere;
+    }
+
 }
+#acct-salary-due-count {
+    color: var(--feedback-warning, #92400e);
+}
+
+.acct-record-row[role='button']:focus-visible { outline: 3px solid var(--primary, #2563eb); outline-offset: 3px; }
+.ibems-modern .acct-setup-guidance { color: var(--text-soft, #475569); }

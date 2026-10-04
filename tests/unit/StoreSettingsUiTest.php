@@ -14,7 +14,7 @@ final class StoreSettingsUiTest extends CIUnitTestCase
         $this->assertStringContainsString('html[data-theme="dark"] .ibems-modern .capability-option strong', $styles);
         $this->assertStringNotContainsString('.dark-mode .capability-option', $styles);
         $this->assertStringNotContainsString('.style.color', $script);
-        $this->assertStringContainsString('classList.toggle("is-error"', $script);
+        $this->assertMatchesRegularExpression('/classList\.toggle\([\x22\x27]is-error[\x22\x27]/', $script);
     }
 
     public function testPaymentMethodSaveShowsAndClearsAnExclusiveLoadingState(): void
@@ -26,7 +26,8 @@ final class StoreSettingsUiTest extends CIUnitTestCase
         $this->assertStringContainsString('function setPaymentMethodSavePending(isPending)', $script);
         $this->assertStringContainsString('Creating payment method...', $script);
         $this->assertStringContainsString('Saving changes...', $script);
-        $this->assertStringContainsString('control.disabled = paymentMethodSavePending;', $script);
+        $this->assertStringContainsString('paymentMethodSavePending || paymentAccountSavePending', $script);
+        $this->assertStringContainsString('control.disabled = disabled;', $script);
         $this->assertStringContainsString('if (paymentMethodSavePending) return;', $script);
         $this->assertStringContainsString('setPaymentMethodSavePending(false);', $script);
         $this->assertStringContainsString('.settings-submit-spinner', $styles);

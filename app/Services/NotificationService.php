@@ -83,6 +83,11 @@ class NotificationService
             ->orderBy('created_at', 'DESC')->orderBy('id', 'DESC')
             ->findAll(max(1, min(30, $limit)));
 
+        foreach ($rows as &$row) {
+            $row['link_url'] = $this->inAppLink((string) ($row['link_url'] ?? ''));
+        }
+        unset($row);
+
         return ['unread_count' => $model->unreadCount($userId), 'notifications' => $rows];
     }
 
@@ -306,8 +311,24 @@ class NotificationService
         if ($departmentId > 0 && ($category === 'department' || $category === 'security' || $departmentApproverId === $userId)) {
             return site_url('user/department-authorizations');
         }
-        if ($transactionId > 0) return site_url('user/transactions/' . $transactionId);
+        if ($transactionId > 0) return site_url('user/receipt/' . $transactionId);
         return site_url('user/dashboard');
+    }
+
+    private function inAppLink(string $link): string
+    {
+        $path = (string) parse_url($link, PHP_URL_PATH);
+        if (preg_match('~^/(?:index\.php/)?user/(?:transactions|receipt)/([1-9][0-9]*)$~', $path, $match)) {
+            return site_url('user/receipt/' . $match[1]);
+        }
+        if (preg_match('~^/(?:index\.php/)?(user/dashboard|admin/audit|user/department-authorizations)$~', $path, $match)) {
+            $query = (string) parse_url($link, PHP_URL_QUERY);
+            $fragment = (string) parse_url($link, PHP_URL_FRAGMENT);
+            return site_url($match[1])
+                . ($query !== '' ? '?' . $query : '')
+                . ($fragment !== '' ? '#' . $fragment : '');
+        }
+        return $link;
     }
 
     private function deliverableAddress(string $email): bool

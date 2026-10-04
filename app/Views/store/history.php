@@ -2,7 +2,7 @@
 
 <?= $this->section('styles') ?>
 <link rel="stylesheet" href="<?= base_url('assets/css/store-history.css') ?>?v=20260824e">
-<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20260825a">
+<link rel="stylesheet" href="<?= base_url('assets/css/receipt-standard.css') ?>?v=20261003-total-wrap">
 <?= $this->endSection() ?>
 
 <?= $this->section('content') ?>
@@ -111,7 +111,8 @@
 <?= $this->endSection() ?>
 
 <?= $this->section('scripts') ?>
-<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20260825a"></script>
-<script src="<?= base_url('assets/js/store-history.js') ?>?v=20260822a"></script>
+<script src="<?= base_url('assets/vendor/qrcode-generator/qrcode.js') ?>"></script>
+<script src="<?= base_url('assets/js/receipt-standard.js') ?>?v=20261002-total-label"></script>
+<script src="<?= base_url('assets/js/store-history.js') ?>?v=20261002-request-order"></script>
 <?= $this->endSection() ?>
 

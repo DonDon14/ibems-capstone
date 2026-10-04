@@ -27,6 +27,12 @@ function acdTableState(title, detail = "", icon = "bi-inbox") {
 }
 
 let acdTrendChart = null;
+window.matchMedia("(prefers-reduced-motion: reduce)").addEventListener("change", event => {
+    if (!acdTrendChart) return;
+    acdTrendChart.stop();
+    acdTrendChart.options.animation = !event.matches;
+    acdTrendChart.update("none");
+});
 let acdTrendRows = [];
 
 function acdRenderTrend(rows) {
@@ -77,6 +83,7 @@ function acdRenderTrend(rows) {
             }],
         },
         options: {
+            animation: !window.matchMedia("(prefers-reduced-motion: reduce)").matches,
             responsive: true,
             maintainAspectRatio: false,
             plugins: {

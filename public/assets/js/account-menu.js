@@ -3,14 +3,14 @@
 
     const body = document.body;
     const menu = document.getElementById("account-menu");
-    const toggles = Array.from(document.querySelectorAll("[data-account-menu-toggle]"));
+    const getToggles = () => Array.from(document.querySelectorAll("[data-account-menu-toggle]"));
     const panel = menu?.querySelector(".account-menu-panel");
     const closeButtons = Array.from(document.querySelectorAll("[data-account-menu-close]"));
     const themeAction = document.querySelector("[data-account-theme]");
     const themeProxy = document.getElementById("theme-toggle");
     let trigger = null;
 
-    if (!menu || !toggles.length || !panel) return;
+    if (!menu || !getToggles().length || !panel) return;
 
     const focusableSelector = [
         "a[href]",
@@ -38,20 +38,23 @@
     function setOpen(open, restoreFocus = true) {
         const shouldOpen = !!open;
         menu.hidden = !shouldOpen;
-        toggles.forEach((toggle) => toggle.setAttribute("aria-expanded", shouldOpen ? "true" : "false"));
+        getToggles().forEach((toggle) => toggle.setAttribute("aria-expanded", shouldOpen ? "true" : "false"));
         body.classList.toggle("account-menu-open", shouldOpen);
 
         if (shouldOpen) {
             trigger = document.activeElement;
             syncThemeAction();
-            window.requestAnimationFrame(() => panel.querySelector(".account-menu-close")?.focus());
+            window.requestAnimationFrame(() => {
+                if (isOpen()) panel.querySelector(".account-menu-close")?.focus();
+            });
         } else if (restoreFocus && trigger instanceof HTMLElement) {
-            trigger.focus();
+            const returnTarget = trigger.getClientRects().length ? trigger
+                : getToggles().find((toggle) => toggle.getClientRects().length);
+            returnTarget?.focus();
             trigger = null;
         }
     }
 
-    toggles.forEach((toggle) => toggle.addEventListener("click", () => setOpen(!isOpen())));
     closeButtons.forEach((button) => button.addEventListener("click", () => setOpen(false)));
 
     themeAction?.addEventListener("click", () => {
@@ -71,7 +74,7 @@
             setOpen(false);
             return;
         }
-        if (event.key !== "Tab" || !window.matchMedia("(max-width: 760px)").matches) return;
+        if (event.key !== "Tab") return;
         const focusable = Array.from(panel.querySelectorAll(focusableSelector)).filter((element) => {
             return element instanceof HTMLElement && !element.hidden && element.offsetParent !== null;
         });
@@ -88,15 +91,20 @@
     });
 
     document.addEventListener("click", (event) => {
+        // POS replaces its header during navigation; resolve its current trigger at click time.
+        if (event.target instanceof Element && event.target.closest("[data-account-menu-toggle]")) {
+            setOpen(!isOpen());
+            return;
+        }
         if (!isOpen() || window.matchMedia("(max-width: 760px)").matches) return;
         if (event.target === themeProxy) return;
-        if (!panel.contains(event.target) && !toggles.some((toggle) => toggle.contains(event.target))) setOpen(false, false);
+        if (!panel.contains(event.target)) setOpen(false, false);
     });
 
     window.addEventListener("ibems:themechange", syncThemeAction);
     window.addEventListener("ibems:account-menu-close", () => setOpen(false, false));
     window.addEventListener("resize", () => {
-        if (isOpen()) setOpen(false, false);
+        if (isOpen()) setOpen(false, menu.contains(document.activeElement));
     });
 
     syncThemeAction();

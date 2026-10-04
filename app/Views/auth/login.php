@@ -8,19 +8,20 @@
     <meta name="csrf-token-value" content="<?= esc(service('security')->getHash()) ?>">
     <meta name="csrf-header-name" content="<?= esc(config('Security')->headerName) ?>">
     <meta name="csrf-cookie-name" content="<?= esc(config('Security')->cookieName) ?>">
-    <title>IBEMS Login</title>
+    <title><?= getenv('IBEMS_INSTRUCTOR_DEMO') === '1' ? 'Campus Business Portal' : 'IBEMS' ?> Login</title>
     <script {csp-script-nonce}>
     (function () {
-        var saved = localStorage.getItem('ibems-theme');
+        var saved = null;
+        try { saved = localStorage.getItem('ibems-theme'); } catch (_) {}
         var theme = saved === 'dark' || saved === 'light' ? saved : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
         document.documentElement.dataset.theme = theme;
     }());
     </script>
     <link rel="icon" type="image/png" href="<?= base_url('assets/images/ibems-logo.png') ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.css') ?>">
-    <link rel="stylesheet" href="<?= base_url('assets/css/auth-login.css') ?>?v=20260825c">
-    <link rel="stylesheet" href="<?= base_url('assets/css/password-visibility.css') ?>?v=20260813b">
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="<?= base_url('assets/css/tailwind.css') ?>?v=20261003-ui-polish">
+    <link rel="stylesheet" href="<?= base_url('assets/css/auth-login.css') ?>?v=20261003-role-feedback">
+    <link rel="stylesheet" href="<?= base_url('assets/css/password-visibility.css') ?>?v=20261004-visibility-focus">
+    <link rel="stylesheet" href="<?= base_url('assets/vendor/bootstrap-icons/bootstrap-icons.min.css') ?>">
 </head>
 <body class="auth-modern">
 <?php $ibemsLogoUrl = base_url('assets/images/ibems-logo.png'); ?>
@@ -33,7 +34,7 @@
                 <img src="<?= esc($ibemsLogoUrl) ?>" alt="IBEMS logo" class="auth-mark-logo">
             </div>
             <h1>Welcome Back</h1>
-            <p>Sign in to the Integrated Business Enterprise Management System.</p>
+            <p><?= getenv('IBEMS_INSTRUCTOR_DEMO') === '1' ? 'Sign in to the Campus Business Portal.' : 'Sign in to the Integrated Business Enterprise Management System.' ?></p>
 
             <form id="login-form" class="auth-form" method="post" action="/auth/login">
                 <?= csrf_field() ?>
@@ -48,14 +49,6 @@
 
             <div id="status" role="status" aria-live="polite"></div>
 
-            <div class="demo-creds">
-                <strong>Demo Credentials</strong>
-                <span>Admin: admin@ibems.local / 123456</span>
-                <span>Store Admin: store.admin@ibems.local / 123456</span>
-                <span>Store: store.main@ibems.local / 123456</span>
-                <span>Accounting: accounting@ibems.local / 123456</span>
-                <span>User: maria.santos@ibems.local / 123456</span>
-            </div>
         </section>
 
         <section class="auth-panel auth-panel-art" aria-hidden="true">
@@ -68,9 +61,9 @@
         </section>
     </main>
 
-    <script src="<?= base_url('assets/js/csrf.js') ?>"></script>
-    <script src="<?= base_url('assets/js/auth-login.js') ?>?v=20260822b"></script>
-    <script src="<?= base_url('assets/js/password-visibility.js') ?>?v=20260813a"></script>
-    <script src="<?= base_url('assets/js/theme.js') ?>?v=20260825c"></script>
+    <script src="<?= base_url('assets/js/csrf.js') ?>?v=20261003-ui-polish"></script>
+    <script src="<?= base_url('assets/js/auth-login.js') ?>?v=20261002-feedback"></script>
+    <script src="<?= base_url('assets/js/password-visibility.js') ?>?v=20261004-mask-reset"></script>
+    <script src="<?= base_url('assets/js/theme.js') ?>?v=20261003-transition-ready"></script>
 </body>
 </html>

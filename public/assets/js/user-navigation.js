@@ -209,7 +209,7 @@
     function shouldLoadOnce(source, sourceUrl) {
         if (source.hasAttribute("data-portal-page-once") || source.hasAttribute("data-user-page-once")) return true;
         if (sourceUrl && new URL(sourceUrl, window.location.href).origin !== window.location.origin) return true;
-        return /\/assets\/js\/receipt-standard\.js$/i.test(new URL(sourceUrl || window.location.href, window.location.href).pathname);
+        return /\/assets\/(?:js\/receipt-standard\.js|vendor\/qrcode-generator\/qrcode\.js)$/i.test(new URL(sourceUrl || window.location.href, window.location.href).pathname);
     }
 
     async function loadOnceScript(source, sourceUrl) {
@@ -319,6 +319,9 @@
         main.className = nextMain.className;
         main.innerHTML = nextMain.innerHTML;
         document.title = nextDocument.title || document.title;
+        const currentTitle = document.querySelector(".topbar-title");
+        const nextTitle = nextDocument.querySelector(".topbar-title");
+        if (currentTitle && nextTitle) currentTitle.innerHTML = nextTitle.innerHTML;
         updateBodyPageClasses(nextDocument);
         updateCsrfMetadata(nextDocument);
         updatePortalContext(nextDocument);
@@ -388,6 +391,24 @@
 
         const url = new URL(link.href, window.location.href);
         if (!isSupportedUrl(url) || (normalizePath(url.pathname) === normalizePath(window.location.pathname) && url.search === window.location.search)) return;
+        event.preventDefault();
+        visit(url);
+    });
+
+    document.addEventListener("submit", (event) => {
+        const form = event.target;
+        if (event.defaultPrevented || !form.matches('form[data-portal-navigation-form]') || form.method.toLowerCase() !== 'get' || form.target) return;
+        const submitter = event.submitter;
+        if (submitter?.hasAttribute('formaction') || submitter?.hasAttribute('formmethod') || submitter?.hasAttribute('formtarget')) return;
+        const url = new URL(form.action, window.location.href);
+        if (!isSupportedUrl(url)) return;
+        url.search = '';
+        const fields = new FormData(form);
+        if (submitter?.name) fields.append(submitter.name, submitter.value);
+        for (const [name, value] of fields) {
+            if (typeof value !== 'string') return;
+            url.searchParams.append(name, value);
+        }
         event.preventDefault();
         visit(url);
     });

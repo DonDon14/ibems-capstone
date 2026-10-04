@@ -12,7 +12,9 @@ $navigation = [
     ['path' => 'accounting/dashboard', 'label' => 'Dashboard', 'icon' => 'bi bi-speedometer2'],
     ['path' => 'accounting/debts', 'label' => 'Debt Monitoring', 'icon' => 'bi bi-cash-stack'],
     ['path' => 'accounting/department-debts', 'label' => 'Department Accounts', 'icon' => 'bi bi-buildings'],
-    ['path' => 'accounting/deductions', 'label' => 'Payroll Deductions', 'icon' => 'bi bi-file-earmark-spreadsheet'],
+    ['path' => 'deductions/workspace', 'label' => 'Payroll Deductions', 'icon' => 'bi bi-file-earmark-spreadsheet'],
+    ['path' => 'accounting/reports', 'label' => 'Report Copies', 'icon' => 'bi bi-clipboard2-check'],
+    ['path' => 'finance/reports', 'label' => 'Sales & Charges', 'icon' => 'bi bi-bar-chart-line'],
 ];
 
 include APPPATH . 'Views/components/portal_shell.php';

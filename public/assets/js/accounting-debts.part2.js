@@ -1,9 +1,141 @@
+let accountingSummaryRequest = 0;
 async function loadDailySummary() {
-    const response = await fetch("/accounting/debts/daily-summary");
+    const request = ++accountingSummaryRequest;
+    const signal = window.IbemsPortalNavigation?.currentSignal;
+    const response = await fetch("/accounting/debts/daily-summary", {signal});
     const data = await response.json();
-    if (!data || data.status !== "success") return;
+    if (signal?.aborted || request !== accountingSummaryRequest) return false;
+    if (!response.ok || !data || data.status !== "success") throw new Error("Daily summary unavailable.");
     document.getElementById("acct-today-count").textContent = String(data.deduction_count || 0);
     document.getElementById("acct-today-amount").textContent = aMoney(data.deducted_amount || 0);
+    return true;
+}
+let accountingSalaryQueueRequest = 0;
+let accountingSalaryQueueLoading = false;
+let accountingSalaryQueuePage = 1;
+async function loadScheduledSalaryQueue(page = 1, {manual = false} = {}) {
+    if (manual && accountingSalaryQueueLoading) return false;
+    const body = document.getElementById("acct-salary-queue");
+    const feedback = document.getElementById("acct-salary-queue-feedback");
+    const refresh = document.getElementById("acct-salary-refresh");
+    const count = document.getElementById("acct-salary-due-count");
+    const signal = window.IbemsPortalNavigation?.currentSignal;
+    if (!body?.isConnected || signal?.aborted) return false;
+    page = Number.isSafeInteger(Number(page)) && Number(page) > 0 ? Number(page) : 1;
+    accountingSalaryQueuePage = page;
+    const request = ++accountingSalaryQueueRequest;
+    const isCurrent = () => request === accountingSalaryQueueRequest && !signal?.aborted && body.isConnected;
+    const previousFocus = document.activeElement;
+    const ownsFocus = body.contains(previousFocus) || feedback.contains(previousFocus) || previousFocus === refresh;
+    const restoreFocus = (failed = false) => {
+        if (!ownsFocus || !isCurrent() || !(feedback.contains(document.activeElement) || document.activeElement === document.body)) return;
+        const target = failed ? feedback.querySelector("button") : previousFocus === refresh ? refresh : body.childElementCount ? body : feedback;
+        target?.focus({preventScroll: true});
+        target?.scrollIntoView({block: "nearest", inline: "nearest"});
+    };
+    accountingSalaryQueueLoading = true;
+    count.textContent = "Loading…";
+    body.innerHTML = "";
+    body.setAttribute("aria-busy", "true");
+    refresh.disabled = true;
+    refresh.textContent = "Refreshing salaries…";
+    feedback.className = "salary-queue-feedback is-pending";
+    feedback.setAttribute("role", "status");
+    feedback.setAttribute("aria-live", "polite");
+    feedback.textContent = "Loading scheduled salary changes…";
+    if (ownsFocus) feedback.focus();
+    let failureMessage = "Unable to load scheduled salaries.";
+    try {
+        const response = await fetch(`/accounting/debts/scheduled-salary?page=${page}`, {cache: "no-store", signal});
+        const data = await response.json();
+        if (!isCurrent()) return false;
+        if (!response.ok || data?.status !== "success") {
+            if (typeof data?.message === "string" && data.message.trim()) failureMessage = data.message;
+            throw new Error("Scheduled salary request rejected");
+        }
+        const integer = value => (typeof value === "number" || typeof value === "string" && value.trim() !== "") && Number.isSafeInteger(Number(value)) && Number(value) >= 0;
+        const rows = data.rows;
+        if (!Array.isArray(rows) || ![data.due_count, data.total_pending, data.page, data.page_size].every(integer)
+            || Number(data.page) !== page || Number(data.page_size) < 1 || Number(data.due_count) > Number(data.total_pending)
+            || typeof data.has_more !== "boolean" || rows.length > Number(data.page_size) || rows.length > Number(data.total_pending)
+            || rows.some(row => !row || typeof row !== "object" || Array.isArray(row) || !integer(row.user_id) || Number(row.user_id) < 1 || typeof row.name !== "string" || typeof row.effective_date !== "string"
+                || !/^\d{4}-\d{2}-\d{2}$/.test(row.effective_date) || ![row.revision, row.salary_grade, row.salary_step].every(integer)
+                || ![row.monthly_salary, row.credit_limit].every(value => value !== null && value !== "" && ["number", "string"].includes(typeof value) && Number.isFinite(Number(value)) && Number(value) >= 0))) {
+            failureMessage = "Scheduled salary records could not be read.";
+            throw new Error("Invalid scheduled salary records");
+        }
+        count.textContent = `${Number(data.due_count)} due · ${Number(data.total_pending)} pending`;
+        feedback.className = "salary-queue-feedback";
+        feedback.textContent = "";
+        if (rows.length === 0) {
+            feedback.textContent = Number(data.total_pending) === 0
+                ? "No scheduled salary changes are pending."
+                : "This page has no pending changes. Return to the first page.";
+            if (Number(data.total_pending) > 0) {
+                const first = document.createElement("button");
+                first.type = "button";
+                first.className = "secondary-btn btn-sm";
+                first.textContent = "First page";
+                first.addEventListener("click", () => loadScheduledSalaryQueue(1, {manual: true}));
+                feedback.appendChild(first);
+            }
+            return true;
+        }
+        const today = new Intl.DateTimeFormat("en-CA", {timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit"}).format(new Date());
+        body.innerHTML = rows.map((row) => `<div class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-slate-200 px-3 py-2 text-sm">
+            <div><strong>${aEscape(row.name)}</strong> <span class="text-slate-500">${aEscape(row.employee_id || "")}</span><br>
+            <span>${aEscape(row.effective_date)} · Revision ${aEscape(row.revision)} · ${aEscape(row.salary_grade)} Step ${aEscape(row.salary_step)} · Salary ${aEscape(aMoney(row.monthly_salary))} · Credit ${aEscape(aMoney(row.credit_limit))}</span><br>
+            <span class="text-slate-500">Reason: ${aEscape(row.reason || "Not recorded")}</span></div>
+            <div class="flex flex-wrap items-center gap-2"><span class="${row.effective_date <= today ? "salary-queue-due text-amber-700" : "text-slate-500"}">${row.effective_date <= today ? "Due for activation" : "Upcoming"}</span>
+            <button type="button" class="secondary-btn btn-sm" data-open-salary-user="${Number(row.user_id)}">Review employee</button></div>
+        </div>`).join("");
+        body.querySelectorAll("[data-open-salary-user]").forEach((button) => button.addEventListener("click", () => openEmployeeModal(Number(button.dataset.openSalaryUser))));
+        if (Number(data.total_pending || 0) > Number(data.page_size || 50)) {
+            const pager = document.createElement("div");
+            pager.className = "salary-queue-pager flex flex-wrap items-center justify-between gap-2 text-xs text-slate-600";
+            const label = document.createElement("span");
+            label.textContent = `Page ${Number(data.page)} of ${Math.ceil(Number(data.total_pending) / Number(data.page_size))}`;
+            pager.appendChild(label);
+            const buttons = document.createElement("div");
+            buttons.className = "flex gap-2";
+            if (Number(data.page) > 1) {
+                const previous = document.createElement("button");
+                previous.type = "button";
+                previous.className = "secondary-btn btn-sm";
+                previous.textContent = "Previous";
+                previous.addEventListener("click", () => loadScheduledSalaryQueue(Number(data.page) - 1, {manual: true}));
+                buttons.appendChild(previous);
+            }
+            if (data.has_more) {
+                const next = document.createElement("button");
+                next.type = "button";
+                next.className = "secondary-btn btn-sm";
+                next.textContent = "Next";
+                next.addEventListener("click", () => loadScheduledSalaryQueue(Number(data.page) + 1, {manual: true}));
+                buttons.appendChild(next);
+            }
+            pager.appendChild(buttons);
+            body.appendChild(pager);
+        }
+        return true;
+    } catch (error) {
+        if (!isCurrent()) return false;
+        count.textContent = "Unavailable";
+        feedback.className = "salary-queue-feedback is-error";
+        feedback.setAttribute("role", "alert");
+        feedback.setAttribute("aria-live", "assertive");
+        feedback.innerHTML = `<span>${aEscape(failureMessage)}</span><button type="button" class="secondary-btn btn-sm">Retry scheduled salaries</button>`;
+        feedback.querySelector("button").addEventListener("click", () => loadScheduledSalaryQueue(page, {manual: true}));
+        return false;
+    } finally {
+        if (isCurrent()) {
+            accountingSalaryQueueLoading = false;
+            body.removeAttribute("aria-busy");
+            refresh.disabled = false;
+            refresh.textContent = "Refresh scheduled salaries";
+            restoreFocus(feedback.classList.contains("is-error"));
+        }
+    }
 }
 function getMainFilteredRows() {
     const keyword = (document.getElementById("acct-search").value || "").trim().toLowerCase();
@@ -29,63 +161,90 @@ function applyMainFiltersAndRender() {
     setAcctResult("", "ok");
 }
 
+let accountingDataRequest = 0;
+let accountingRecordsLoaded = acctRows.length > 0;
 async function loadData() {
+    const request = ++accountingDataRequest;
+    const signal = window.IbemsPortalNavigation?.currentSignal;
+    const isCurrent = () => request === accountingDataRequest && !signal?.aborted;
     const params = new URLSearchParams({ limit: "500" });
-
-    const response = await fetch(`/accounting/debts/data?${params.toString()}`, { cache: "no-store" });
+    try {
+    const response = await fetch(`/accounting/debts/data?${params.toString()}`, { cache: "no-store", signal });
     const data = await response.json();
-
-    if (!data || data.status !== "success") {
-        acctRows = [];
-        acctAdvanceRows = [];
-        acctOperatorRows = [];
-        acctDataSummary = null;
-        renderRows([]);
-        setAcctResult(data?.message || "Unable to load debt records.", "error");
-        return;
+    if (!isCurrent()) return false;
+    if (!response.ok || !data || data.status !== "success") {
+        throw new Error("Unable to refresh debt records.");
     }
 
     acctRows = Array.isArray(data.data) ? data.data : [];
     acctAdvanceRows = Array.isArray(data.advance_payments) ? data.advance_payments : [];
     acctOperatorRows = Array.isArray(data.operator_accountabilities) ? data.operator_accountabilities : [];
     acctDataSummary = data.summary || null;
+    accountingRecordsLoaded = true;
     applyMainFiltersAndRender();
     await loadDailySummary();
+    if (!isCurrent()) return false;
+    const queueLoaded = await loadScheduledSalaryQueue();
+    if (!isCurrent()) return false;
+    if (queueLoaded === false) return false;
     setAcctResult("", "ok");
+    return true;
+    } catch (error) {
+        if (!isCurrent()) return false;
+        if (!accountingRecordsLoaded) {
+            document.getElementById("acct-body").innerHTML = `<div role="alert">${aDataState("Unable to load Accounting records", "Use Refresh to try again.", "bi-exclamation-triangle")}</div>`;
+            document.getElementById("acct-count-text").textContent = "Records unavailable";
+            document.getElementById("acct-pager").innerHTML = "";
+        }
+        setAcctResult(accountingRecordsLoaded
+            ? "Unable to refresh all Accounting data. Displayed records may be outdated. Use Refresh to try again."
+            : "Accounting records could not be loaded. Use Refresh to try again.", "error");
+        return false;
+    }
 }
 
-async function loadSettlementRuns() {
-    const response = await fetch("/accounting/settlement/runs?limit=12");
-    const data = await response.json();
-    if (!data || data.status !== "success") {
-        renderSettlementRuns([]);
-        return;
-    }
-    renderSettlementRuns(Array.isArray(data.data) ? data.data : []);
+async function loadSettlementRuns(options = {}) {
+    return window.IbemsLegacyHistory.queue(options);
 }
 
 function openSettlementModal() {
+    window.IbemsLegacyHistory.reset("queue");
     document.getElementById("settlement-run-modal").style.display = "grid";
-    loadSettlementRuns().catch(() => {
-        renderSettlementRuns([]);
-    });
+    document.getElementById("close-settlement-run").focus();
+    return loadSettlementRuns();
 }
 
 function closeSettlementModal() {
+    if (getComputedStyle(document.getElementById("settlement-run-details-modal")).display !== "none") closeSettlementRunDetails();
+    window.IbemsLegacyHistory.reset("queue");
     document.getElementById("settlement-run-modal").style.display = "none";
+    document.getElementById("open-settlement-run").focus();
+}
+async function loadProfile(userId, signal = window.IbemsPortalNavigation?.currentSignal) {
+    const response = await fetch(`/accounting/debts/profile?user_id=${userId}`, { cache: "no-store", signal });
+    const data = await response.json();
+    const profile = data?.data;
+    const amount = value => (typeof value === "number" || typeof value === "string" && value.trim() !== "") && Number.isFinite(Number(value)) && Number(value) >= 0;
+    if (!response.ok || data?.status !== "success" || !profile || typeof profile !== "object" || Array.isArray(profile)
+        || !Number.isSafeInteger(Number(profile.user_id)) || Number(profile.user_id) !== Number(userId)
+        || typeof profile.name !== "string" || !profile.name.trim() || typeof profile.financial_profile_configured !== "boolean"
+        || ![profile.credit_limit, profile.current_debt, profile.available_credit, profile.credit_percentage].every(amount) || Number(profile.credit_percentage) > 100
+        || !(amount(profile.base_salary) || profile.base_salary === null && !profile.financial_profile_configured)
+        || !Array.isArray(profile.pending_salary_profiles) || profile.pending_salary_profiles.some(row => !row || typeof row !== "object" || Array.isArray(row)
+            || !Number.isSafeInteger(Number(row.id)) || Number(row.id) < 1 || typeof row.effective_date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(row.effective_date)
+            || !Number.isSafeInteger(Number(row.revision)) || Number(row.revision) < 1 || ![row.monthly_salary, row.credit_limit].every(amount))) return null;
+    return profile;
 }
 
-async function loadProfile(userId) {
-    const response = await fetch(`/accounting/debts/profile?user_id=${userId}`, { cache: "no-store" });
+async function loadHistory(userId, signal = window.IbemsPortalNavigation?.currentSignal) {
+    const response = await fetch(`/accounting/debts/history?user_id=${userId}&limit=20`, { cache: "no-store", signal });
     const data = await response.json();
-    if (!data || data.status !== "success" || !data.data) return null;
-    return data.data;
-}
-
-async function loadHistory(userId) {
-    const response = await fetch(`/accounting/debts/history?user_id=${userId}&limit=20`, { cache: "no-store" });
-    const data = await response.json();
-    if (!data || data.status !== "success" || !Array.isArray(data.data)) return [];
+    if (!response.ok || !data || data.status !== "success" || !Array.isArray(data.data)
+        || data.data.some(row => !row || typeof row !== "object" || Array.isArray(row) || !Number.isSafeInteger(Number(row.id)) || Number(row.id) < 1
+            || typeof row.action !== "string" || !row.action.trim() || typeof row.created_at !== "string" || !Number.isFinite(Date.parse(row.created_at))
+            || typeof row.actor_name !== "string" || !row.payload || typeof row.payload !== "object" || Array.isArray(row.payload) && row.payload.length > 0)) {
+        throw new Error("Financial history is unavailable.");
+    }
     return data.data;
 }
 
@@ -148,6 +307,21 @@ function buildHistoryHtml(rows) {
             detail = `Credit Limit: ${aMoney(payload.previous_credit_limit)} -> ${aMoney(payload.new_credit_limit)}`;
         } else if (row.action === "ACCOUNTING_UPDATE_FINANCIAL_PROFILE") {
             detail = `Salary: ${aMoney(payload.previous_base_salary)} -> ${aMoney(payload.new_base_salary)} | Credit: ${aMoney(payload.previous_credit_limit)} -> ${aMoney(payload.new_credit_limit)}`;
+            if (payload.source === "salary_csv_import") {
+                const profile = payload.new_salary_profile || {};
+                detail = payload.operation === "create"
+                    ? `Initial imported salary: ${aMoney(payload.new_base_salary)} | Credit: ${aMoney(payload.new_credit_limit)}`
+                    : detail;
+                detail += ` | Effective ${profile.salary_effective_date || "-"} | Import batch #${payload.import_batch_id}, line ${payload.source_line}`;
+            }
+        } else if (row.action === "SALARY_PROFILE_ACTIVATED") {
+            const previous = payload.previous_profile || {};
+            detail = `Salary activated effective ${payload.effective_date}: ${aMoney(previous.base_salary)} -> ${aMoney(payload.new_monthly_salary)} | Credit: ${aMoney(previous.credit_limit)} -> ${aMoney(payload.new_credit_limit)} | Reason: ${payload.reason || "-"}`;
+        } else if (row.action === "ACCOUNTING_SCHEDULE_FINANCIAL_PROFILE" || row.action === "ACCOUNTING_REVISE_SCHEDULED_PROFILE") {
+            const profile = payload.profile || {};
+            detail = payload.effective_date && payload.revision && profile.monthly_salary !== undefined && profile.credit_limit !== undefined
+                ? `${row.action === "ACCOUNTING_REVISE_SCHEDULED_PROFILE" ? "Salary schedule revised" : "Salary scheduled"} for ${payload.effective_date} · Revision ${payload.revision} | Salary: ${aMoney(profile.monthly_salary)} | Credit: ${aMoney(profile.credit_limit)} | Reason: ${payload.reason || "-"}`
+                : "Salary scheduling recorded; the detailed snapshot is unavailable in this earlier entry.";
         } else {
             detail = row.action;
         }
@@ -164,66 +338,266 @@ function buildHistoryHtml(rows) {
     }).join("");
 }
 
-async function openEmployeeModal(userId) {
-    employeeModalUserId = Number(userId);
+let employeeModalReturnFocus;
+let employeeModalRequest = 0;
+let employeeModalLoading = false;
+let employeeModalReadSignal;
+let employeeReadRelease = () => {};
+function employeeReadFeedback(message = "", type = "pending") {
+    const feedback = document.getElementById("employee-read-feedback");
+    feedback.textContent = message;
+    feedback.className = `employee-action-feedback is-${type}`;
+    feedback.setAttribute("role", type === "error" ? "alert" : "status");
+    feedback.setAttribute("aria-live", type === "error" ? "assertive" : "polite");
+}
+async function openEmployeeModal(userId, {preserveFeedback = false, focus = true, retry = false} = {}) {
+    if (window.IbemsEmployeeActions?.busy) return false;
+    if (window.IbemsPortalNavigation?.currentSignal?.aborted) return false;
+    const selectedUserId = Number(userId);
+    if (!Number.isSafeInteger(selectedUserId) || selectedUserId < 1 || employeeModalLoading && Number(employeeModalUserId) === selectedUserId
+        && employeeModalReadSignal === window.IbemsPortalNavigation?.currentSignal) return false;
+    employeeReadRelease();
+    const request = ++employeeModalRequest;
+    const pageSignal = window.IbemsPortalNavigation?.currentSignal;
+    employeeModalReadSignal = pageSignal;
+    const isCurrent = () => request === employeeModalRequest && !pageSignal?.aborted && pageSignal === window.IbemsPortalNavigation?.currentSignal && modal.isConnected !== false;
+    employeeModalUserId = selectedUserId;
     const modal = document.getElementById("employee-modal");
     const profileEl = document.getElementById("employee-modal-profile");
     const historyEl = document.getElementById("employee-modal-history");
+    const retryButton = document.getElementById("employee-read-retry");
+    const feedback = document.getElementById("employee-read-feedback");
+    const recoveryOwned = () => retry && (document.activeElement === retryButton || document.activeElement === feedback || document.activeElement === document.body);
+    const focusResult = element => { if (recoveryOwned()) { element.focus({preventScroll:true}); element.scrollIntoView({block:"nearest",inline:"nearest"}); } };
+    const unavailable = message => {
+        employeeReadFeedback(message, "error");
+        retryButton.hidden = false;
+        retryButton.disabled = false;
+        retryButton.textContent = employeeModalProfile ? "Retry financial history" : "Retry employee details";
+        focusResult(retryButton);
+        return false;
+    };
 
+    if (getComputedStyle(modal).display === "none") employeeModalReturnFocus = document.activeElement;
     modal.style.display = "grid";
+    if (focus) document.getElementById("close-employee-modal").focus();
+    if (!preserveFeedback) window.IbemsEmployeeActions?.clear();
+    employeeModalProfile = null;
+    employeeModalLoading = true;
+    modal.setAttribute("aria-busy", "true");
+    profileEl.setAttribute("aria-busy", "true");
+    historyEl.setAttribute("aria-busy", "true");
+    retryButton.disabled = true;
+    retryButton.hidden = true;
+    employeeReadFeedback("Loading employee details…");
+    focusResult(feedback);
     profileEl.innerHTML = aDataState("Loading employee profile", "Fetching current salary and credit information.", "bi-person-vcard");
     historyEl.innerHTML = aDataState("Loading financial history", "Fetching the latest account changes.", "bi-clock-history");
     document.getElementById("employee-modal-actions").classList.add("hidden");
     document.getElementById("employee-limit-box").classList.add("hidden");
 
     try {
-        await loadAcctSalarySchedules();
-    } catch (error) {
-        profileEl.innerHTML = aDataState("Unable to load employee profile", error.message || "Salary schedules are unavailable.", "bi-exclamation-triangle");
-        historyEl.innerHTML = aDataState("Financial history unavailable", "Try reopening this employee after the profile service is available.", "bi-exclamation-triangle");
-        return;
-    }
-    employeeModalProfile = await loadProfile(employeeModalUserId);
-    if (!employeeModalProfile) {
-        profileEl.innerHTML = aDataState("Unable to load employee profile", "The selected employee record could not be retrieved.", "bi-exclamation-triangle");
-        historyEl.innerHTML = aDataState("Financial history unavailable", "No employee profile was returned.", "bi-exclamation-triangle");
-        return;
-    }
+        try {
+            await loadAcctSalarySchedules();
+        } catch (error) {
+            if (!isCurrent()) return;
+            profileEl.innerHTML = aDataState("Employee profile unavailable", "Salary reference information could not be loaded.", "bi-exclamation-triangle");
+            historyEl.innerHTML = aDataState("Financial history unavailable", "Employee details could not be loaded.", "bi-exclamation-triangle");
+            return unavailable("Salary schedules could not be loaded. Retry employee details to check again.");
+        }
+        if (!isCurrent()) return;
+        let profile;
+        try {
+            profile = await loadProfile(selectedUserId, pageSignal);
+        } catch (error) {
+            if (!isCurrent()) return;
+            profileEl.innerHTML = aDataState("Unable to load employee profile", "The employee details could not be retrieved.", "bi-exclamation-triangle");
+            historyEl.innerHTML = aDataState("Financial history unavailable", "Employee profile could not be loaded.", "bi-exclamation-triangle");
+            return unavailable("Employee details could not be loaded. Retry employee details to check again.");
+        }
+        if (!isCurrent()) return;
+        employeeModalProfile = profile;
+        if (!employeeModalProfile) {
+            profileEl.innerHTML = aDataState("Unable to load employee profile", "The selected employee record could not be retrieved.", "bi-exclamation-triangle");
+            historyEl.innerHTML = aDataState("Financial history unavailable", "No employee profile was returned.", "bi-exclamation-triangle");
+            return unavailable("Employee details could not be loaded. Retry employee details to check again.");
+        }
 
-    profileEl.innerHTML = buildEmployeeProfileHtml(employeeModalProfile);
-    document.getElementById("employee-limit-current").textContent = aBool(employeeModalProfile.financial_profile_configured)
-        ? `${aCategory(employeeModalProfile.employment_type)} | ${employeeModalProfile.salary_grade || "-"}${employeeModalProfile.salary_step ? ` Step ${employeeModalProfile.salary_step}` : ""} | Salary ${aMoney(employeeModalProfile.base_salary || 0)} | ${Number(employeeModalProfile.credit_percentage ?? acctDefaultCreditPercentage)}% Credit ${aMoney(employeeModalProfile.credit_limit || 0)}`
-        : "No salary-grade schedule is configured. Add one to calculate the employee’s credit limit.";
-    document.getElementById("employee-open-limit-edit").innerHTML = aBool(employeeModalProfile.financial_profile_configured)
-        ? '<i class="bi bi-pencil-square"></i> Edit profile'
-        : '<i class="bi bi-plus-lg"></i> Configure profile';
-    populateAcctSalaryProfile(employeeModalProfile);
-    document.getElementById("employee-modal-actions").classList.remove("hidden");
+        profileEl.innerHTML = buildEmployeeProfileHtml(employeeModalProfile);
+        document.getElementById("employee-limit-current").textContent = aBool(employeeModalProfile.financial_profile_configured)
+            ? `${aCategory(employeeModalProfile.employment_type)} | ${employeeModalProfile.salary_grade || "-"}${employeeModalProfile.salary_step ? ` Step ${employeeModalProfile.salary_step}` : ""} | Salary ${aMoney(employeeModalProfile.base_salary || 0)} | ${Number(employeeModalProfile.credit_percentage ?? acctDefaultCreditPercentage)}% Credit ${aMoney(employeeModalProfile.credit_limit || 0)}`
+            : "No salary-grade schedule is configured. Add one to calculate the employee’s credit limit.";
+        document.getElementById("employee-open-limit-edit").innerHTML = aBool(employeeModalProfile.financial_profile_configured)
+            ? '<i class="bi bi-pencil-square"></i> Edit profile'
+            : '<i class="bi bi-plus-lg"></i> Configure profile';
+        const pending = Array.isArray(employeeModalProfile.pending_salary_profiles) ? employeeModalProfile.pending_salary_profiles : [];
+        const manilaToday = new Intl.DateTimeFormat("en-CA", {timeZone: "Asia/Manila", year: "numeric", month: "2-digit", day: "2-digit"}).format(new Date());
+        const pendingEl = document.getElementById("employee-pending-profiles");
+        pendingEl.innerHTML = pending.length
+            ? `<strong>Pending salary changes</strong>${pending.map((item) => `<div class="employee-pending-decision mt-1 rounded-lg border px-3 py-2"><p>Effective ${aEscape(item.effective_date)} · Revision ${aEscape(item.revision)} · ${aEscape(item.salary_grade)} Step ${aEscape(item.salary_step)} · Salary ${aEscape(aMoney(item.monthly_salary))} · Credit ${aEscape(aMoney(item.credit_limit))} · Reason: ${aEscape(item.reason || "Not recorded")}${item.effective_date <= manilaToday ? "" : " · Not effective yet"}</p>${item.effective_date <= manilaToday ? `<div class="mt-2"><button type="button" class="secondary-btn btn-sm" data-activate-salary-id="${Number(item.id)}">Activate now</button></div>` : ""}</div>`).join("")}`
+            : "";
+        pendingEl.querySelectorAll("[data-activate-salary-id]").forEach((button) => button.addEventListener("click", () => window.IbemsEmployeeActions.activate(button)));
+        populateAcctSalaryProfile(employeeModalProfile);
 
-    const history = await loadHistory(employeeModalUserId);
-    historyEl.innerHTML = buildHistoryHtml(history);
+        try {
+            profileEl.setAttribute("aria-busy", "false");
+            const history = await loadHistory(selectedUserId, pageSignal);
+            if (!isCurrent()) return;
+            historyEl.innerHTML = buildHistoryHtml(history);
+            employeeReadFeedback();
+            focusResult(profileEl);
+            return true;
+        } catch (error) {
+            if (!isCurrent()) return;
+            historyEl.innerHTML = aDataState("Unable to load financial history", "The latest account changes could not be retrieved.", "bi-exclamation-triangle");
+            return unavailable("Financial history could not be loaded. Retry financial history to check again.");
+        }
+    } finally {
+        if (isCurrent()) {
+            employeeModalLoading = false;
+            modal.setAttribute("aria-busy", "false");
+            profileEl.setAttribute("aria-busy", "false");
+            historyEl.setAttribute("aria-busy", "false");
+            retryButton.disabled = false;
+            if (employeeModalProfile) document.getElementById("employee-modal-actions").classList.remove("hidden");
+        }
+    }
+}
+
+async function retryEmployeeHistory() {
+    if (employeeModalLoading || window.IbemsEmployeeActions?.busy || !employeeModalProfile) return false;
+    const userId = employeeModalUserId;
+    const request = employeeModalRequest;
+    const signal = window.IbemsPortalNavigation?.currentSignal;
+    const modal = document.getElementById("employee-modal");
+    const history = document.getElementById("employee-modal-history");
+    const button = document.getElementById("employee-read-retry");
+    const feedback = document.getElementById("employee-read-feedback");
+    const current = () => request === employeeModalRequest && userId === employeeModalUserId && !signal?.aborted
+        && signal === window.IbemsPortalNavigation?.currentSignal && modal.isConnected !== false;
+    if (!current() || getComputedStyle(modal).display === "none") return false;
+    const ownsFocus = () => document.activeElement === button || document.activeElement === feedback || document.activeElement === document.body;
+    const focus = element => { if (ownsFocus()) { element.focus({preventScroll:true}); element.scrollIntoView({block:"nearest",inline:"nearest"}); } };
+    const controls = Array.from(document.getElementById("employee-modal-actions").querySelectorAll("button, input, select, textarea"));
+    const original = controls.map(control => [control, control.disabled]);
+    let released = false;
+    const release = () => {
+        if (released) return;
+        released = true;
+        original.forEach(([control, disabled]) => { control.disabled = disabled; });
+        if (employeeReadRelease === release) employeeReadRelease = () => {};
+    };
+    employeeReadRelease = release;
+    controls.forEach(control => { control.disabled = true; });
+    employeeModalLoading = true;
+    employeeModalReadSignal = signal;
+    modal.setAttribute("aria-busy", "true");
+    history.setAttribute("aria-busy", "true");
+    button.disabled = true;
+    button.hidden = true;
+    employeeReadFeedback("Loading financial history…");
+    focus(feedback);
+    history.innerHTML = aDataState("Loading financial history", "Fetching the latest account changes.", "bi-clock-history");
+    try {
+        const rows = await loadHistory(userId, signal);
+        if (!current()) return false;
+        history.innerHTML = buildHistoryHtml(rows);
+        employeeReadFeedback();
+        focus(history);
+        return true;
+    } catch (_) {
+        if (!current()) return false;
+        history.innerHTML = aDataState("Unable to load financial history", "The latest account changes could not be retrieved.", "bi-exclamation-triangle");
+        employeeReadFeedback("Financial history could not be loaded. Retry financial history to check again.", "error");
+        button.hidden = false;
+        button.disabled = false;
+        focus(button);
+        return false;
+    } finally {
+        if (current()) {
+            employeeModalLoading = false;
+            modal.setAttribute("aria-busy", "false");
+            history.setAttribute("aria-busy", "false");
+            button.disabled = false;
+            release();
+        }
+    }
 }
 
 function closeEmployeeModal() {
+    if (window.IbemsEmployeeActions?.busy) return;
+    employeeReadRelease();
+    employeeModalRequest += 1;
+    employeeModalLoading = false;
+    employeeModalReadSignal = undefined;
     document.getElementById("employee-modal").style.display = "none";
     employeeModalUserId = null;
     employeeModalProfile = null;
+    if (employeeModalReturnFocus?.isConnected) employeeModalReturnFocus.focus();
+}
+
+document.getElementById("employee-modal").addEventListener("keydown", (event) => {
+    if (event.defaultPrevented) return;
+    if (document.body.classList.contains("has-app-dialog")) return;
+    const modal = event.currentTarget;
+    if (!modal.contains(document.activeElement)) return;
+    if (window.IbemsEmployeeActions?.busy) {
+        if (["Tab", "Escape"].includes(event.key)) {
+            event.preventDefault();
+            document.getElementById("employee-action-feedback").focus();
+        }
+        return;
+    }
+    if (event.key === "Escape") {
+        if (modal.querySelector('[aria-expanded="true"]')) return;
+        event.preventDefault();
+        closeEmployeeModal();
+        return;
+    }
+    if (event.key !== "Tab") return;
+    const controls = Array.from(modal.querySelectorAll('button, a[href], input, select, textarea, [tabindex]'))
+        .filter((element) => !element.disabled && element.tabIndex >= 0 && element.getClientRects().length && getComputedStyle(element).visibility !== "hidden");
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last?.focus();
+    } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first?.focus();
+    }
+});
+
+document.getElementById("employee-read-retry").addEventListener("click", () => {
+    if (employeeModalLoading || window.IbemsEmployeeActions?.busy || !employeeModalUserId) return;
+    if (employeeModalProfile) retryEmployeeHistory();
+    else openEmployeeModal(employeeModalUserId, {preserveFeedback:true, focus:false, retry:true});
+});
+
+function invalidateImportCsvPreview() {
+    return window.IbemsAccountingImport.invalidate();
 }
 
 function openImportModal() {
-    importCsvPreviewReady = false;
+    if (window.IbemsAccountingImport.applying) return;
+    invalidateImportCsvPreview();
     document.getElementById("import-csv-modal").style.display = "grid";
-    document.getElementById("import-csv-result").textContent = "";
+    document.getElementById("close-import-csv").focus();
+    setImportCsvResult("");
     document.getElementById("import-csv-valid").innerHTML = "";
     document.getElementById("import-csv-invalid").innerHTML = "";
-    document.getElementById("import-csv-submit").disabled = true;
 }
 
 function closeImportModal() {
+    if (window.IbemsAccountingImport.applying) return;
+    invalidateImportCsvPreview();
     document.getElementById("import-csv-modal").style.display = "none";
-    importCsvPreviewReady = false;
+    document.getElementById("open-import-csv").focus();
 }
 
+function setImportCsvResult(message, type = "normal") {
+    window.IbemsAccountingImport.feedback(message, type === "normal" ? "neutral" : type);
+}
 function renderCsvPreview(data) {
     const resultEl = document.getElementById("import-csv-result");
     const validEl = document.getElementById("import-csv-valid");
@@ -231,8 +605,7 @@ function renderCsvPreview(data) {
     const validPreview = Array.isArray(data.valid_preview) ? data.valid_preview : [];
     const invalidPreview = Array.isArray(data.invalid_preview) ? data.invalid_preview : [];
 
-    resultEl.style.color = data.invalid_rows > 0 ? "#92400e" : "#166534";
-    resultEl.textContent = `Preview ready. Total: ${data.total_rows}, Valid: ${data.valid_rows}, Invalid: ${data.invalid_rows}, Create: ${data.create_count}, Update: ${data.update_count}, Credit limit updates: ${data.credit_limit_update_count}`;
+    setImportCsvResult(`Preview ready. Total: ${data.total_rows}, Valid: ${data.valid_rows}, Invalid: ${data.invalid_rows}, Create: ${data.create_count}, Update: ${data.update_count}, Credit limit updates: ${data.credit_limit_update_count}`, data.invalid_rows > 0 ? "warning" : "success");
 
     validEl.innerHTML = validPreview.length > 0 ? validPreview.map((row) => `
         <div class="import-preview-item is-valid rounded-xl border border-emerald-200 bg-emerald-50 p-3">
@@ -252,269 +625,44 @@ function renderCsvPreview(data) {
 }
 
 async function previewImportCsv() {
-    const fileInput = document.getElementById("import-csv-file");
-    const resultEl = document.getElementById("import-csv-result");
-    const validEl = document.getElementById("import-csv-valid");
-    const invalidEl = document.getElementById("import-csv-invalid");
-    const button = document.getElementById("import-csv-preview");
-    const applyButton = document.getElementById("import-csv-submit");
-    const file = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
-
-    importCsvPreviewReady = false;
-    applyButton.disabled = true;
-
-    if (!file) {
-        resultEl.style.color = "#b91c1c";
-        resultEl.textContent = "Please choose a CSV file first.";
-        return;
-    }
-
-    const formData = new FormData();
-    formData.append("csv_file", file);
-
-    button.disabled = true;
-    button.textContent = "Previewing...";
-    resultEl.style.color = "#334155";
-    resultEl.textContent = "Checking CSV...";
-    validEl.innerHTML = "";
-    invalidEl.innerHTML = "";
-
-    try {
-        const response = await fetch("/accounting/debts/preview-csv", {
-            method: "POST",
-            body: formData,
-        });
-        const data = await response.json();
-        if (!data || data.status !== "success") {
-            resultEl.style.color = "#b91c1c";
-            resultEl.textContent = data?.message || "CSV import failed.";
-            return;
-        }
-
-        renderCsvPreview(data);
-        importCsvPreviewReady = Number(data.valid_rows || 0) > 0;
-        applyButton.disabled = !importCsvPreviewReady;
-    } catch (error) {
-        resultEl.style.color = "#b91c1c";
-        resultEl.textContent = "CSV preview request failed.";
-    } finally {
-        button.disabled = false;
-        button.textContent = "Preview CSV";
-    }
+    return window.IbemsAccountingImport.preview();
 }
 
 async function submitImportCsv() {
-    const fileInput = document.getElementById("import-csv-file");
-    const resultEl = document.getElementById("import-csv-result");
-    const button = document.getElementById("import-csv-submit");
-    const file = fileInput.files && fileInput.files[0] ? fileInput.files[0] : null;
-
-    if (!file || !importCsvPreviewReady) {
-        resultEl.style.color = "#b91c1c";
-        resultEl.textContent = "Preview a valid CSV before applying import.";
-        return;
-    }
-
-    const formData = new FormData();
-    formData.append("csv_file", file);
-
-    button.disabled = true;
-    button.textContent = "Applying...";
-    resultEl.style.color = "#334155";
-    resultEl.textContent = "Applying CSV import...";
-
-    try {
-        const response = await fetch("/accounting/debts/import-csv", {
-            method: "POST",
-            body: formData,
-        });
-        const data = await response.json();
-        if (!data || data.status !== "success") {
-            resultEl.style.color = "#b91c1c";
-            resultEl.textContent = data?.message || "CSV import failed.";
-            button.disabled = false;
-            button.textContent = "Apply Import";
-            return;
-        }
-
-        resultEl.style.color = "#166534";
-        resultEl.textContent = `Import complete. Total: ${data.total_rows}, Valid: ${data.valid_rows}, Invalid: ${data.invalid_rows}`;
-        importCsvPreviewReady = false;
-        await loadData();
-    } catch (error) {
-        resultEl.style.color = "#b91c1c";
-        resultEl.textContent = "CSV import request failed.";
-        button.disabled = false;
-    } finally {
-        button.textContent = "Apply Import";
-    }
+    return window.IbemsAccountingImport.apply();
 }
-
 document.getElementById("acct-refresh-btn").addEventListener("click", async () => {
     await loadData();
 });
+document.getElementById("acct-salary-refresh").addEventListener("click", () => loadScheduledSalaryQueue(accountingSalaryQueuePage, {manual: true}));
 
-function setWorkflowMessage(message, type = "ok") {
-    const element = document.getElementById("workflow-message");
-    element.textContent = message || "";
-    element.className = `text-sm font-semibold ${type === "error" ? "text-red-700" : "text-emerald-700"}`;
-}
-
-function filterWorkflowCandidates() {
-    const query = document.getElementById("workflow-candidate-search").value.trim().toLowerCase();
-    const type = document.getElementById("workflow-candidate-type").value;
-    const salary = document.getElementById("workflow-candidate-salary").value;
-    const candidates = Array.from(document.querySelectorAll(".workflow-candidate"));
-    let matching = 0;
-    candidates.forEach((candidate) => {
-        const matches = (!query || candidate.dataset.search.includes(query))
-            && (type === "all" || candidate.dataset.employeeType === type)
-            && (salary === "all" || candidate.dataset.salaryState === salary);
-        candidate.classList.toggle("hidden", !matches);
-        if (matches) matching++;
-    });
-    const selected = candidates.filter((candidate) => candidate.querySelector(".workflow-candidate-check").checked).length;
-    document.getElementById("workflow-candidate-count").textContent = `Showing ${matching} of ${candidates.length} employees with debt · ${selected} selected`;
-    document.getElementById("workflow-summary-selected").textContent = String(selected);
-}
-
-function renderWorkflowCandidates() {
-    const container = document.getElementById("workflow-candidates");
-    const rows = deductionWorkflowRegister.filter((row) => Number(row.cutoff_debt || 0) > 0);
-    const existingByUser = new Map(deductionWorkflowItems.map((item) => [Number(item.user_id), item]));
-    document.getElementById("workflow-summary-employees").textContent = String(rows.length);
-    document.getElementById("workflow-summary-debt").textContent = aMoney(rows.reduce((sum, row) => sum + Number(row.cutoff_debt || 0), 0));
-    document.getElementById("workflow-summary-missing").textContent = String(rows.filter((row) => Number(row.salary_reference || 0) <= 0).length);
-    container.innerHTML = rows.length ? rows.map((row) => {
-        const existing = existingByUser.get(Number(row.user_id));
-        const choice = existing?.deduction_choice || (existing && Number(existing.requested_amount || 0) === 0 ? "none" : "full");
-        const requested = existing ? Number(existing.requested_amount || 0) : Number(row.cutoff_debt || 0);
-        const reason = existing?.preparation_reason || "";
-        return `
-        <label class="workflow-candidate grid gap-2 rounded-xl border border-slate-200 bg-slate-50 p-2 lg:grid-cols-[auto_minmax(420px,1fr)_190px_160px] lg:items-center" data-search="${aEscape(`${row.name || ""} ${row.employee_id || ""} ${row.email || ""}`.toLowerCase())}" data-employee-type="${aEscape(String(row.user_type || "").toLowerCase())}" data-salary-state="${Number(row.salary_reference || 0) > 0 ? "provided" : "missing"}">
-            <input type="checkbox" class="workflow-candidate-check h-4 w-4" data-workflow-user="${aEscape(row.user_id)}" ${existing ? "checked" : ""}>
-            <span class="flex min-w-0 items-center gap-2 overflow-hidden whitespace-nowrap">
-                <strong class="shrink-0 text-sm text-slate-900">${aEscape(row.name || "Employee")}</strong>
-                <small class="truncate text-slate-500">${aEscape(row.employee_id || "-")} · Cutoff ${aEscape(aMoney(row.cutoff_debt || 0))} · Salary ${Number(row.salary_reference || 0) > 0 ? aEscape(aMoney(row.salary_reference)) : "Not provided"} · Opening ${aEscape(aMoney(row.opening_debt || 0))}</small>
-            </span>
-            <select class="workflow-deduction-choice h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm" aria-label="Deduction choice for ${aEscape(row.name || "employee")}">
-                <option value="full" ${choice === "full" ? "selected" : ""}>Deduct full debt</option>
-                <option value="partial" ${choice === "partial" ? "selected" : ""}>Partial deduction</option>
-                <option value="none" ${choice === "none" ? "selected" : ""}>No deduction</option>
-            </select>
-            <span class="grid gap-2">
-                <input type="number" class="workflow-request-amount ${choice === "none" ? "hidden" : ""} h-10 rounded-xl border border-slate-200 ${choice === "full" ? "bg-slate-100 text-slate-600" : "bg-white"} px-3 text-sm" min="0" max="${aEscape(row.cutoff_debt || 0)}" step="0.01" value="${aEscape(requested.toFixed(2))}" data-cutoff-debt="${aEscape(row.cutoff_debt || 0)}" aria-label="Requested amount for ${aEscape(row.name || "employee")}" ${choice === "full" ? "readonly" : ""}>
-                <input type="text" class="workflow-preparation-reason ${choice === "none" ? "" : "hidden"} h-10 rounded-xl border border-slate-200 bg-white px-3 text-sm" maxlength="200" value="${aEscape(reason)}" placeholder="Reason for no deduction" aria-label="No deduction reason for ${aEscape(row.name || "employee")}">
-            </span>
-        </label>
-    `}).join("") : '<div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-500">No active faculty/staff debt accounts are available.</div>';
-    filterWorkflowCandidates();
-}
-
-function workflowStatusLabel(value) {
-    return aCategory(String(value || "pending").replace(/_/g, " "));
-}
-
-function renderWorkflowResults(items, batchStatus, batchCreatedBy) {
-    const section = document.getElementById("workflow-results-section");
-    const container = document.getElementById("workflow-results");
-    const actions = document.getElementById("workflow-batch-actions");
-    const workflowModal = document.getElementById("deduction-workflow-modal");
-    const currentRole = workflowModal.dataset.currentRole || "";
-    const currentUser = Number(workflowModal.dataset.currentUser || 0);
-    const selectedPeriod = deductionWorkflowPeriods.find((row) => Number(row.id) === Number(document.getElementById("workflow-period-select").value || 0));
-    section.classList.remove("hidden");
-    if (batchStatus === "prepared") {
-        actions.innerHTML = '<button type="button" id="workflow-edit-deductions" class="secondary-btn">Edit deductions</button> <button type="button" data-workflow-batch-action="apply" class="primary-btn">Apply deductions</button>';
-    } else if (batchStatus === "submitted") {
-        actions.innerHTML = '<button type="button" data-workflow-batch-action="apply" class="primary-btn">Apply pending deductions</button>';
-    } else if (batchStatus === "processed") {
-        actions.innerHTML = '<button type="button" data-workflow-batch-action="reconcile" class="primary-btn">Reconcile batch totals</button>';
-    } else if (batchStatus === "reconciled") {
-        actions.innerHTML = currentRole === "ACCOUNTING_OFFICE" && Number(batchCreatedBy || 0) === currentUser
-            ? '<button type="button" data-workflow-batch-action="finalize" class="primary-btn">Finalize period</button>'
-            : '<span class="inline-flex rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800">Only the assigned Accounting Officer can finalize this period</span>';
-    } else if (batchStatus === "finalized") {
-        actions.innerHTML = '<span class="inline-flex rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">Finalized and locked</span>';
-    } else {
-        actions.innerHTML = '<span class="inline-flex rounded-xl border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-800">Review the current batch status</span>';
-    }
-    if (!items.length) {
-        container.innerHTML = '<div class="rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center text-sm text-slate-500">No batch items found.</div>';
+function containAccountingDialogKeyboard(modalId, closeDialog) {
+document.getElementById(modalId).addEventListener("keydown", (event) => {
+    if (event.defaultPrevented) return;
+    if (document.body.classList.contains("has-app-dialog") || !event.currentTarget.contains(document.activeElement)) return;
+    if (modalId === "import-csv-modal" && window.IbemsAccountingImport.applying && ["Tab","Escape"].includes(event.key)) {
+        event.preventDefault();
+        document.getElementById("import-csv-result").focus();
         return;
     }
-
-    container.innerHTML = items.map((item) => {
-        const pending = String(item.result_status || "pending") === "pending";
-        return `
-            <article class="rounded-xl border border-slate-200 bg-slate-50 p-3" data-workflow-item="${aEscape(item.id)}">
-                <div class="flex flex-wrap items-start justify-between gap-2">
-                    <div>
-                        <strong class="block text-sm text-slate-900">${aEscape(item.name || "Employee")}</strong>
-                        <small class="text-slate-500">${aEscape(item.employee_id || "-")} · Requested ${aEscape(aMoney(item.requested_amount || 0))} · Current debt ${aEscape(aMoney(item.current_debt || 0))}</small>
-                    </div>
-                    <span class="acct-debt-status ${pending ? "is-info" : "is-success"}">${aEscape(workflowStatusLabel(item.result_status))}</span>
-                </div>
-                ${pending ? `
-                    <div class="mt-2 rounded-lg border border-blue-200 bg-blue-50 p-2 text-sm text-blue-800">This amount will be processed when Apply deductions is selected.</div>
-                ` : `
-                    <div class="mt-2 text-sm text-slate-600">Confirmed ${aEscape(aMoney(item.confirmed_amount || 0))} · Carryover ${aEscape(aMoney(item.carryover_amount || 0))} · Reference ${aEscape(item.result_reference || "-")}</div>
-                `}
-            </article>
-        `;
-    }).join("");
-}
-
-async function loadDeductionWorkflow(preferredPeriodId = null) {
-    const select = document.getElementById("workflow-period-select");
-    const currentPeriodId = preferredPeriodId || Number(select.value || 0);
-    const selectedBefore = deductionWorkflowPeriods.find((period) => Number(period.id) === Number(currentPeriodId));
-    const params = new URLSearchParams();
-    if (currentPeriodId) params.set("period_id", String(currentPeriodId));
-    if (selectedBefore?.batch_id) params.set("batch_id", String(selectedBefore.batch_id));
-    const query = params.toString() ? `?${params.toString()}` : "";
-    const response = await fetch(`/accounting/deduction-workflow${query}`);
-    const data = await response.json();
-    if (!data || data.status !== "success") {
-        setWorkflowMessage(data?.message || "Unable to load deduction workflow.", "error");
+    if (event.key === "Escape") {
+        if (event.currentTarget.querySelector('[aria-expanded="true"]')) return;
+        event.preventDefault();
+        closeDialog();
         return;
     }
-
-    deductionWorkflowPeriods = Array.isArray(data.periods) ? data.periods : [];
-    deductionWorkflowRegister = Array.isArray(data.register) ? data.register : [];
-    deductionWorkflowItems = Array.isArray(data.items) ? data.items : [];
-    select.innerHTML = '<option value="">Select a period</option>' + deductionWorkflowPeriods.map((period) =>
-        `<option value="${aEscape(period.id)}">${aEscape(period.period_code)} · ${aEscape(period.label)}</option>`
-    ).join("");
-    if (currentPeriodId && deductionWorkflowPeriods.some((period) => Number(period.id) === Number(currentPeriodId))) {
-        select.value = String(currentPeriodId);
+    if (event.key !== "Tab") return;
+    const controls = Array.from(event.currentTarget.querySelectorAll("button, input, select, textarea, a[href], [tabindex]"))
+        .filter((control) => !control.disabled && control.tabIndex >= 0 && control.getClientRects().length);
+    const first = controls[0];
+    const last = controls[controls.length - 1];
+    if ((event.shiftKey && (document.activeElement === first || (first?.compareDocumentPosition(document.activeElement) & Node.DOCUMENT_POSITION_PRECEDING)))
+        || (!event.shiftKey && (document.activeElement === last || (last?.compareDocumentPosition(document.activeElement) & Node.DOCUMENT_POSITION_FOLLOWING)))) {
+        event.preventDefault();
+        (event.shiftKey ? last : first)?.focus();
     }
-
-    const selected = deductionWorkflowPeriods.find((period) => Number(period.id) === Number(select.value || 0));
-    const summary = document.getElementById("workflow-period-summary");
-    const prepareSection = document.getElementById("workflow-prepare-section");
-    const resultsSection = document.getElementById("workflow-results-section");
-    if (!selected) {
-        summary.textContent = "Choose or create a deduction period.";
-        prepareSection.classList.add("hidden");
-        resultsSection.classList.add("hidden");
-        return;
-    }
-
-    summary.innerHTML = `<strong>${aEscape(selected.period_code)} · ${aEscape(selected.label)}</strong><br><span>${aEscape(selected.date_start)} to ${aEscape(selected.date_end)} · ${selected.batch_id ? `Batch ${aEscape(workflowStatusLabel(selected.batch_status))}` : "No batch prepared"}</span>`;
-    if (selected.batch_id) {
-        prepareSection.classList.add("hidden");
-        if (!query || Number(selected.batch_id) !== Number(selectedBefore?.batch_id)) {
-            const detailResponse = await fetch(`/accounting/deduction-workflow?period_id=${encodeURIComponent(selected.id)}&batch_id=${encodeURIComponent(selected.batch_id)}`);
-            const detail = await detailResponse.json();
-            deductionWorkflowItems = Array.isArray(detail.items) ? detail.items : [];
-            renderWorkflowResults(Array.isArray(detail.items) ? detail.items : [], selected.batch_status, selected.batch_created_by);
-        } else {
-            renderWorkflowResults(Array.isArray(data.items) ? data.items : [], selected.batch_status, selected.batch_created_by);
-        }
-    } else {
-        resultsSection.classList.add("hidden");
-        prepareSection.classList.remove("hidden");
-        renderWorkflowCandidates();
-    }
+});
 }
+containAccountingDialogKeyboard("import-csv-modal", closeImportModal);
+containAccountingDialogKeyboard("settlement-run-modal", closeSettlementModal);
+containAccountingDialogKeyboard("settlement-run-details-modal", closeSettlementRunDetails);
