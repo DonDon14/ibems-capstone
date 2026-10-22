@@ -1,5 +1,9 @@
 FROM php:8.3-apache
 
+# Reject cached PHP images missing the October 2026 security fixes.
+# Covers CVE-2026-109618 and CVE-2026-109619 on the PHP 8.3 branch.
+RUN php -r 'fwrite(STDOUT, "Build PHP version: " . PHP_VERSION . PHP_EOL); if (PHP_VERSION_ID < 80336 || PHP_VERSION_ID >= 80400) { fwrite(STDERR, "PHP 8.3.36 or a later 8.3 patch is required. Pull a patched base image and rebuild.\n"); exit(1); }'
+
 ENV APACHE_DOCUMENT_ROOT=/var/www/html/public \
     PORT=10000
 
